@@ -4,8 +4,8 @@
 // Dueño de las rutas y archivos del usuario.
 //
 // Usuario/
-//   ├── perfil_default.json
-//   ├── perfil_juegos.json
+//   ├── perfil_Default.json
+//   ├── perfil_Juegos.json
 //   └── ...
 //
 // Este módulo:
@@ -21,6 +21,7 @@
 use std::fs;
 
 use std::path::{
+    Path,
     PathBuf,
 };
 
@@ -106,7 +107,7 @@ pub fn carpeta()
 // 📄 BUSCAR PERFILES
 // ======================================================
 
-fn perfiles()
+fn rutas_perfiles()
 
     -> Result<Vec<PathBuf>, String>
 
@@ -184,13 +185,56 @@ fn perfiles()
 
 
 // ======================================================
+// 📋 LISTAR PERFILES
+// ======================================================
+
+pub fn perfiles()
+
+    -> Result<Vec<String>, String>
+
+{
+
+    let mut nombres =
+
+        rutas_perfiles()?
+
+            .into_iter()
+
+            .filter_map(
+
+                |ruta|
+
+                    nombre_desde_ruta(
+
+                        &ruta
+
+                    )
+
+            )
+
+            .collect::<Vec<_>>();
+
+
+    nombres.sort();
+
+
+    Ok(
+
+        nombres
+
+    )
+
+}
+
+
+// ======================================================
 // 🔎 ES PERFIL
 // ======================================================
 
 fn es_perfil(
 
     ruta:
-        &PathBuf,
+        &Path,
 
 ) -> bool {
 
@@ -233,14 +277,109 @@ fn es_perfil(
 
 
 // ======================================================
-// 🆕 PERFIL DEFAULT
+// 🆔 NOMBRE DESDE RUTA
 // ======================================================
 
-pub fn perfil_default()
+fn nombre_desde_ruta(
+
+    ruta:
+        &Path,
+
+)
+
+    -> Option<String>
+
+{
+
+    let nombre =
+
+        ruta
+
+            .file_name()?
+
+            .to_str()?;
+
+
+    let nombre =
+
+        nombre
+
+            .strip_prefix(
+
+                "perfil_"
+
+            )?
+
+            .strip_suffix(
+
+                ".json"
+
+            )?;
+
+
+    Some(
+
+        nombre.to_string()
+
+    )
+
+}
+
+
+// ======================================================
+// 📍 RUTA POR NOMBRE
+// ======================================================
+
+pub fn ruta_perfil(
+
+    nombre:
+        &str,
+
+)
 
     -> Result<PathBuf, String>
 
 {
+
+    if nombre.trim().is_empty() {
+
+        return Err(
+
+            "El nombre del perfil está vacío"
+
+                .to_string()
+
+        );
+
+    }
+
+
+    if nombre.contains('/')
+
+        ||
+
+        nombre.contains('\\')
+
+        ||
+
+        nombre == "."
+
+        ||
+
+        nombre == ".."
+
+    {
+
+        return Err(
+
+            "Nombre de perfil inválido"
+
+                .to_string()
+
+        );
+
+    }
+
 
     Ok(
 
@@ -248,7 +387,13 @@ pub fn perfil_default()
 
             .join(
 
-                "perfil_default.json"
+                format!(
+
+                    "perfil_{}.json",
+
+                    nombre
+
+                )
 
             )
 
@@ -258,7 +403,31 @@ pub fn perfil_default()
 
 
 // ======================================================
-// 🕒 PERFIL MÁS RECIENTE
+// 🆕 PERFIL DEFAULT
+// ======================================================
+
+pub fn perfil_default()
+
+    -> Result<PathBuf, String>
+
+{
+
+    ruta_perfil(
+
+        "Default"
+
+    )
+
+}
+
+
+// ======================================================
+// 🕒 PERFIL ACTUAL
+// ------------------------------------------------------
+// El perfil actual es siempre el JSON modificado
+// más recientemente.
+//
+// Si no existe ningún perfil, se usa Default.
 // ======================================================
 
 pub fn perfil_actual()
@@ -268,7 +437,7 @@ pub fn perfil_actual()
 {
 
     let perfiles =
-        perfiles()?;
+        rutas_perfiles()?;
 
 
     let Some(perfil) =
@@ -307,11 +476,7 @@ pub fn perfil_actual()
 
     else {
 
-        return Ok(
-
-            perfil_default()?
-
-        );
+        return perfil_default();
 
     };
 
@@ -319,6 +484,42 @@ pub fn perfil_actual()
     Ok(
 
         perfil
+
+    )
+
+}
+
+
+// ======================================================
+// 🆔 NOMBRE PERFIL ACTUAL
+// ======================================================
+
+pub fn nombre_actual()
+
+    -> Result<String, String>
+
+{
+
+    let ruta =
+
+        perfil_actual()?;
+
+
+    nombre_desde_ruta(
+
+        &ruta
+
+    )
+
+    .ok_or_else(
+
+        || {
+
+            "No se pudo determinar el nombre del perfil"
+
+                .to_string()
+
+        }
 
     )
 

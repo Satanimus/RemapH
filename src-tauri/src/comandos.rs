@@ -4,15 +4,15 @@
 // Comandos expuestos a la interfaz.
 //
 // UI
-//   ↓
+//  ↓
 // PerfilJson
-//   ↓
+//  ↓
 // Usuario
-//   ↓
+//  ↓
 // Persistencia
-//   ↓
+//  ↓
 // Compilador
-//   ↓
+//  ↓
 // Cache
 // ======================================================
 
@@ -286,7 +286,133 @@ pub fn obtener_perfil_actual()
 
 
 // ======================================================
-// 🧠 SINCRONIZAR ESTADO CON CACHE
+// 📋 OBTENER PERFILES
+// ======================================================
+
+#[tauri::command]
+pub fn obtener_perfiles()
+
+    -> Result<Vec<String>, String>
+
+{
+
+    usuario::perfiles()
+
+}
+
+
+// ======================================================
+// 🆔 OBTENER NOMBRE ACTUAL
+// ======================================================
+
+#[tauri::command]
+pub fn obtener_nombre_perfil_actual()
+
+    -> Result<String, String>
+
+{
+
+    usuario::nombre_actual()
+
+}
+
+
+// ======================================================
+// 🔄 SELECCIONAR PERFIL
+// ======================================================
+
+#[tauri::command]
+pub fn seleccionar_perfil(
+
+    nombre:
+        String,
+
+)
+
+    -> Result<PerfilJson, String>
+
+{
+
+    let ruta =
+
+        usuario::ruta_perfil(
+
+            &nombre
+
+        )?;
+
+
+    if !ruta.exists() {
+
+        return Err(
+
+            "El perfil seleccionado no existe"
+
+                .to_string()
+
+        );
+
+    }
+
+
+    let perfil =
+
+        persistencia::cargar(
+
+            &ruta
+
+        )?;
+
+
+    // ==================================================
+    // 🕒 MARCAR COMO ÚLTIMO PERFIL USADO
+    // ==================================================
+
+    persistencia::guardar(
+
+        &perfil,
+
+        &ruta,
+
+    )?;
+
+
+    cache::borrar();
+
+
+    estado::desactivar();
+
+
+    compilador::compilar(
+
+        &perfil
+
+    );
+
+
+    sincronizar_estado_cache();
+
+
+    println!(
+
+        "📂 Perfil seleccionado: {}",
+
+        nombre
+
+    );
+
+
+    Ok(
+
+        perfil
+
+    )
+
+}
+
+
+// ======================================================
+// 🔄 SINCRONIZAR ESTADO CON CACHE
 // ======================================================
 
 fn sincronizar_estado_cache() {
@@ -441,7 +567,10 @@ fn convertir_trigger(
                 ),
 
         condicion:
-            trigger.condicion,
+
+            trigger
+
+                .condicion,
 
     }
 
