@@ -191,6 +191,9 @@ pub fn compilar_perfil(
     );
 
 
+    sincronizar_estado_cache();
+
+
     println!(
 
         "📦 Perfil guardado y compilado"
@@ -438,7 +441,6 @@ fn convertir_trigger(
                 ),
 
         condicion:
-
             trigger.condicion,
 
     }
