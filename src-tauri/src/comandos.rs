@@ -4,18 +4,19 @@
 // Comandos expuestos a la interfaz.
 //
 // UI
-//  ↓
+//   ↓
 // PerfilJson
-//  ↓
+//   ↓
 // Usuario
-//  ↓
+//   ↓
 // Persistencia
-//  ↓
+//   ↓
 // Compilador
-//  ↓
+//   ↓
 // Cache
 // ======================================================
 
+use crate::cache;
 use crate::compilador;
 use crate::estado;
 use crate::persistencia;
@@ -117,7 +118,7 @@ pub struct EntradaUI {
 #[tauri::command]
 pub fn activar_perfil() {
 
-    estado::activar();
+    sincronizar_estado_cache();
 
 
     println!(
@@ -234,6 +235,16 @@ pub fn obtener_perfil_actual()
         )?;
 
 
+        compilador::compilar(
+
+            &perfil
+
+        );
+
+
+        sincronizar_estado_cache();
+
+
         return Ok(
 
             perfil
@@ -243,11 +254,51 @@ pub fn obtener_perfil_actual()
     }
 
 
-    persistencia::cargar(
+    let perfil =
 
-        &ruta
+        persistencia::cargar(
+
+            &ruta
+
+        )?;
+
+
+    compilador::compilar(
+
+        &perfil
+
+    );
+
+
+    sincronizar_estado_cache();
+
+
+    Ok(
+
+        perfil
 
     )
+
+}
+
+
+// ======================================================
+// 🧠 SINCRONIZAR ESTADO CON CACHE
+// ======================================================
+
+fn sincronizar_estado_cache() {
+
+    if cache::esta_vacia() {
+
+        estado::desactivar();
+
+    }
+
+    else {
+
+        estado::activar();
+
+    }
 
 }
 
@@ -387,6 +438,7 @@ fn convertir_trigger(
                 ),
 
         condicion:
+
             trigger.condicion,
 
     }
