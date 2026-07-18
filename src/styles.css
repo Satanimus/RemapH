@@ -1,0 +1,9 @@
+/* ======================================================
+   🌍 styles.css RemapH V3
+   ====================================================== */
+
+@import "./styles/styl_variables.css";
+@import "./styles/styl_general.css";
+@import "./styles/styl_layout.css";
+@import "./styles/styl_tabla.css";
+@import "./styles/styl_botones.css";

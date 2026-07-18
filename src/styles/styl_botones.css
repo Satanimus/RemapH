@@ -1,0 +1,96 @@
+/* ======================================================
+   🔘 styl_Botones RemapH V3
+   ====================================================== */
+
+.ui-btn{
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    height:28px;
+    min-width:28px;
+    padding:0 var(--gap8);
+    background:var(--panel3);
+    color:var(--text);
+    border:1px solid var(--border);
+    border-radius:var(--r4);
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    cursor:pointer;
+    transition:
+        background var(--speed),
+        border-color var(--speed),
+        color var(--speed);
+}
+
+.ui-btn:hover{
+    background:var(--border-light);
+    border-color:var(--border-light);
+}
+
+.ui-btn:active{
+    transform:translateY(1px);
+}
+
+.ui-btn.estado{
+    background:var(--green);
+    border-color:var(--green-dark);
+    color:#FFF;
+}
+
+.ui-btn.estado:hover{
+    background:var(--green-dark);
+}
+
+.ui-btn.icono{
+    width:28px;
+    min-width:28px;
+    padding:0;
+}
+
+/* ======================================================
+   🎯 Trigger Captura
+   ====================================================== */
+
+.trigger-extra{
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    width:22px;
+    min-width:22px;
+    height:100%;
+    margin-right:0;
+    color:var(--color-trigger-sintaxis);
+    font-size:16px;
+    font-weight:700;
+    cursor:pointer;
+    transition:
+        color var(--speed),
+        background var(--speed);
+}
+
+.capturador{
+    padding-left:0;
+}
+
+.trigger-extra:hover{
+    color:var(--text);
+    background:var(--border-light);
+}
+
+.trigger-contenido{
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    flex:1;
+}
+
+
+.trigger-tecla{
+    color:var(--text);
+}
+
+
+.trigger-sintaxis{
+    color:var(--color-trigger-sintaxis);
+}

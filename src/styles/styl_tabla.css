@@ -1,0 +1,154 @@
+/* ======================================================
+   📋 styl_Tabla RemapH V3
+   ====================================================== */
+
+.tabla{
+    flex:1;
+    overflow:hidden;
+}
+
+.viewport{
+    width:100%;
+    height:100%;
+    overflow:auto;
+}
+
+/* ==========================
+   Cabecera y filas
+   ========================== */
+
+.cabecera,
+.fila{
+    display:flex;
+    align-items:center;
+    width:100%;
+}
+
+.cabecera{
+    height:var(--header-height);
+    background:var(--panel2);
+    border-bottom:1px solid var(--border);
+    font-size:var(--fs12);
+    font-weight:600;
+    color:var(--text-soft);
+}
+
+.fila{
+    height:var(--row-height);
+    background:var(--panel);
+    border-bottom:1px solid var(--border);
+    transition:background var(--speed);
+}
+
+.fila:hover{
+    background:var(--panel3);
+}
+
+/* ==========================
+   Celdas
+   ========================== */
+
+.cabecera-celda,
+.celda{
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    height:100%;
+    box-sizing:border-box;
+    flex-shrink:0;
+}
+
+.cabecera-celda{
+    position:relative;
+    padding:0 var(--gap8);
+    white-space:nowrap;
+}
+
+.celda{
+    flex:0 0 auto;
+    padding:0 var(--gap8);
+    overflow:hidden;
+}
+
+.celda:not(:last-child){
+    border-right:1px solid rgba(255,255,255,.025);
+}
+
+.celda:first-child{
+    font-weight:bold;
+    color:var(--text-soft);
+}
+
+.celda:last-child,
+.cabecera-celda:last-child{
+    flex:1;
+}
+
+/* ==========================
+   Controles
+   ========================== */
+
+.celda .ui-btn{
+    width:100%;
+    max-width:100%;
+}
+
+.nota{
+    width:100%;
+    flex:1;
+    background:transparent;
+}
+
+/* ==========================
+   Colores cabecera
+   ========================== */
+
+.cabecera-celda.grupo-general{
+    color:#cfcfcf;
+}
+
+.cabecera-celda.grupo-input{
+    color:#88bfff;
+}
+
+.cabecera-celda.grupo-respuesta{
+    color:#8fd68f;
+}
+
+.cabecera-celda.grupo-personalizacion{
+    color:#ffd777;
+}
+
+/* ==========================
+   Divisor columnas
+   ========================== */
+
+.divisor-columna{
+    position:absolute;
+    right:-8px;
+    top:0;
+    width:16px;
+    height:100%;
+    cursor:col-resize;
+}
+
+.divisor-columna::before{
+    content:"";
+    position:absolute;
+    left:7px;
+    top:0;
+    width:2px;
+    height:100%;
+    background:var(--border-light);
+}
+
+/* ==========================
+   Texto largo botones
+   ========================== */
+
+.ui-btn{
+    max-width:100%;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+}
