@@ -2,34 +2,79 @@
 // 🚀 src-tauri/src Lib.rs RemapH V3
 // ------------------------------------------------------
 // Punto de entrada del backend.
+//
 // Inicializa el motor principal.
 // ======================================================
 
+
 mod backend;
+
+
 mod cache;
+
+
 mod captura;
+
+
 mod comandos;
+
+
 mod compilador;
+
+
 mod config;
+
+
 mod eventos;
+
+
 mod entrada;
+
+
 mod estado;
+
+
 pub mod idioma;
+
+
 mod perfilcache;
+
+
 mod persistencia;
+
+
 mod reentrada;
+
+
 mod runtime;
+
+
 mod perfiljson;
+
+
 mod usuario;
 
 
-#[cfg_attr(mobile, tauri::mobile_entry_point)]
+// ======================================================
+// 🚀 INICIO TAURI
+// ======================================================
+
+#[cfg_attr(
+
+    mobile,
+
+    tauri::mobile_entry_point
+
+)]
+
 pub fn run() {
+
 
     entrada::iniciar();
 
 
     tauri::Builder::default()
+
 
         .invoke_handler(
 
@@ -47,9 +92,23 @@ pub fn run() {
 
                 comandos::obtener_perfil_actual,
 
+
                 comandos::obtener_perfiles,
 
                 comandos::obtener_nombre_perfil_actual,
+
+                comandos::obtener_estado_cache,
+
+
+                comandos::restaurar_perfil_actual,
+
+                comandos::clonar_perfil,
+
+                comandos::renombrar_perfil,
+
+                comandos::eliminar_perfil_actual,
+
+                comandos::crear_perfil_nuevo,
 
                 comandos::seleccionar_perfil,
 
@@ -57,11 +116,13 @@ pub fn run() {
 
         )
 
+
         .run(
 
             tauri::generate_context!()
 
         )
+
 
         .expect(
 

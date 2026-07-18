@@ -280,7 +280,7 @@ fn es_perfil(
 // 🆔 NOMBRE DESDE RUTA
 // ======================================================
 
-fn nombre_desde_ruta(
+pub fn nombre_desde_ruta(
 
     ruta:
         &Path,

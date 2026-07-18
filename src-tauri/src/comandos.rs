@@ -16,6 +16,8 @@
 // Cache
 // ======================================================
 
+use std::fs;
+
 use crate::cache;
 use crate::compilador;
 use crate::estado;
@@ -27,7 +29,10 @@ use crate::perfiljson::{
 };
 use crate::usuario;
 
-use serde::Deserialize;
+use serde::{
+    Deserialize,
+    Serialize,
+};
 
 
 // ======================================================
@@ -112,6 +117,30 @@ pub struct EntradaUI {
 
 
 // ======================================================
+// 📦 RESULTADO PERFIL
+// ======================================================
+
+#[derive(
+    Serialize,
+)]
+pub struct ResultadoPerfil {
+
+    pub perfil:
+        PerfilJson,
+
+    pub nombre:
+        String,
+
+    pub perfiles:
+        Vec<String>,
+
+    pub cache_activo:
+        bool,
+
+}
+
+
+// ======================================================
 // 🟢 ACTIVAR PERFIL
 // ======================================================
 
@@ -159,7 +188,7 @@ pub fn compilar_perfil(
     filas:
         Vec<FilaUI>,
 
-) -> Result<(), String> {
+) -> Result<bool, String> {
 
     let perfil =
 
@@ -194,6 +223,11 @@ pub fn compilar_perfil(
     sincronizar_estado_cache();
 
 
+    let cache_activo =
+
+        !cache::esta_vacia();
+
+
     println!(
 
         "📦 Perfil guardado y compilado"
@@ -201,7 +235,11 @@ pub fn compilar_perfil(
     );
 
 
-    Ok(())
+    Ok(
+
+        cache_activo
+
+    )
 
 }
 
@@ -318,6 +356,449 @@ pub fn obtener_nombre_perfil_actual()
 
 
 // ======================================================
+// 🟢 OBTENER ESTADO CACHE
+// ======================================================
+
+#[tauri::command]
+pub fn obtener_estado_cache()
+
+    -> bool
+
+{
+
+    !cache::esta_vacia()
+
+}
+
+
+// ======================================================
+// 🔄 RESTAURAR PERFIL ACTUAL
+// ======================================================
+
+#[tauri::command]
+pub fn restaurar_perfil_actual()
+
+    -> Result<ResultadoPerfil, String>
+
+{
+
+    let ruta =
+
+        usuario::perfil_actual()?;
+
+
+    if !ruta.exists() {
+
+        let perfil =
+
+            PerfilJson::nuevo();
+
+
+        persistencia::guardar(
+
+            &perfil,
+
+            &ruta,
+
+        )?;
+
+    }
+
+
+    let perfil =
+
+        persistencia::cargar(
+
+            &ruta
+
+        )?;
+
+
+    let nombre =
+
+        usuario::nombre_actual()?;
+
+
+    resultado_perfil(
+
+        perfil,
+
+        nombre
+
+    )
+
+}
+
+
+// ======================================================
+// 📋 CLONAR PERFIL ACTUAL
+// ======================================================
+
+#[tauri::command]
+pub fn clonar_perfil(
+
+    filas:
+        Vec<FilaUI>,
+
+)
+
+    -> Result<ResultadoPerfil, String>
+
+{
+
+    let nombre_actual =
+
+        usuario::nombre_actual()?;
+
+
+    let nombre =
+
+        siguiente_nombre(
+
+            &nombre_actual
+
+        )?;
+
+
+    let perfil =
+
+        convertir_perfil(
+
+            filas
+
+        );
+
+
+    cache::borrar();
+
+    estado::desactivar();
+
+
+    let ruta =
+
+        usuario::ruta_perfil(
+
+            &nombre
+
+        )?;
+
+
+    persistencia::guardar(
+
+        &perfil,
+
+        &ruta,
+
+    )?;
+
+
+    resultado_perfil(
+
+        perfil,
+
+        nombre
+
+    )
+
+}
+
+
+// ======================================================
+// ✏️ RENOMBRAR PERFIL ACTUAL
+// ======================================================
+
+#[tauri::command]
+pub fn renombrar_perfil(
+
+    nuevo_nombre:
+        String,
+
+)
+
+    -> Result<ResultadoPerfil, String>
+
+{
+
+    let nombre_actual =
+
+        usuario::nombre_actual()?;
+
+
+    let nuevo_nombre =
+
+        nuevo_nombre.trim();
+
+
+    if nuevo_nombre.is_empty() {
+
+        return Err(
+
+            "El nombre del perfil está vacío"
+
+                .to_string()
+
+        );
+
+    }
+
+
+    if nuevo_nombre == nombre_actual {
+
+        return Err(
+
+            "El perfil ya tiene ese nombre"
+
+                .to_string()
+
+        );
+
+    }
+
+
+    let nuevo_nombre =
+
+        siguiente_nombre(
+
+            nuevo_nombre
+
+        )?;
+
+
+    let ruta_actual =
+
+        usuario::perfil_actual()?;
+
+
+    let nueva_ruta =
+
+        usuario::ruta_perfil(
+
+            &nuevo_nombre
+
+        )?;
+
+
+    cache::borrar();
+
+    estado::desactivar();
+
+
+    fs::rename(
+
+        &ruta_actual,
+
+        &nueva_ruta,
+
+    )
+
+    .map_err(
+
+        |error|
+
+            error.to_string()
+
+    )?;
+
+
+    let perfil =
+
+        persistencia::cargar(
+
+            &nueva_ruta
+
+        )?;
+
+
+    resultado_perfil(
+
+        perfil,
+
+        nuevo_nombre
+
+    )
+
+}
+
+
+// ======================================================
+// 🗑️ ELIMINAR PERFIL ACTUAL
+// ======================================================
+
+#[tauri::command]
+pub fn eliminar_perfil_actual()
+
+    -> Result<ResultadoPerfil, String>
+
+{
+
+    let ruta_actual =
+
+        usuario::perfil_actual()?;
+
+
+    cache::borrar();
+
+    estado::desactivar();
+
+
+    if ruta_actual.exists() {
+
+        fs::remove_file(
+
+            ruta_actual
+
+        )
+
+        .map_err(
+
+            |error|
+
+                error.to_string()
+
+        )?;
+
+    }
+
+
+    let perfiles =
+
+        usuario::perfiles()?;
+
+
+    if let Some(nombre) =
+
+        perfiles.first()
+
+    {
+
+        let ruta =
+
+            usuario::ruta_perfil(
+
+                nombre
+
+            )?;
+
+
+        let perfil =
+
+            persistencia::cargar(
+
+                &ruta
+
+            )?;
+
+
+        return resultado_perfil(
+
+            perfil,
+
+            nombre.to_string()
+
+        );
+
+    }
+
+
+    let nombre =
+
+        "Default".to_string();
+
+
+    let perfil =
+
+        PerfilJson::nuevo();
+
+
+    let ruta =
+
+        usuario::ruta_perfil(
+
+            &nombre
+
+        )?;
+
+
+    persistencia::guardar(
+
+        &perfil,
+
+        &ruta,
+
+    )?;
+
+
+    resultado_perfil(
+
+        perfil,
+
+        nombre
+
+    )
+
+}
+
+
+// ======================================================
+// 🆕 CREAR PERFIL NUEVO
+// ======================================================
+
+#[tauri::command]
+pub fn crear_perfil_nuevo()
+
+    -> Result<ResultadoPerfil, String>
+
+{
+
+    cache::borrar();
+
+    estado::desactivar();
+
+
+    let nombre =
+
+        siguiente_nombre(
+
+            "Default"
+
+        )?;
+
+
+    let perfil =
+
+        PerfilJson::nuevo();
+
+
+    let ruta =
+
+        usuario::ruta_perfil(
+
+            &nombre
+
+        )?;
+
+
+    persistencia::guardar(
+
+        &perfil,
+
+        &ruta,
+
+    )?;
+
+
+    resultado_perfil(
+
+        perfil,
+
+        nombre
+
+    )
+
+}
+
+
+// ======================================================
 // 🔄 SELECCIONAR PERFIL
 // ======================================================
 
@@ -329,7 +810,7 @@ pub fn seleccionar_perfil(
 
 )
 
-    -> Result<PerfilJson, String>
+    -> Result<ResultadoPerfil, String>
 
 {
 
@@ -355,6 +836,11 @@ pub fn seleccionar_perfil(
     }
 
 
+    cache::borrar();
+
+    estado::desactivar();
+
+
     let perfil =
 
         persistencia::cargar(
@@ -364,10 +850,6 @@ pub fn seleccionar_perfil(
         )?;
 
 
-    // ==================================================
-    // 🕒 MARCAR COMO ÚLTIMO PERFIL USADO
-    // ==================================================
-
     persistencia::guardar(
 
         &perfil,
@@ -375,12 +857,6 @@ pub fn seleccionar_perfil(
         &ruta,
 
     )?;
-
-
-    cache::borrar();
-
-
-    estado::desactivar();
 
 
     compilador::compilar(
@@ -402,11 +878,133 @@ pub fn seleccionar_perfil(
     );
 
 
-    Ok(
+    resultado_perfil(
 
-        perfil
+        perfil,
+
+        nombre
 
     )
+
+}
+
+
+// ======================================================
+// 📦 CREAR RESULTADO
+// ======================================================
+
+fn resultado_perfil(
+
+    perfil:
+        PerfilJson,
+
+    nombre:
+        String,
+
+)
+
+    -> Result<ResultadoPerfil, String>
+
+{
+
+    Ok(
+
+        ResultadoPerfil {
+
+            perfil,
+
+            nombre,
+
+            perfiles:
+                usuario::perfiles()?,
+
+            cache_activo:
+                !cache::esta_vacia(),
+
+        }
+
+    )
+
+}
+
+
+// ======================================================
+// 🔢 SIGUIENTE NOMBRE DISPONIBLE
+// ======================================================
+
+fn siguiente_nombre(
+
+    base:
+        &str,
+
+)
+
+    -> Result<String, String>
+
+{
+
+    let ruta =
+
+        usuario::ruta_perfil(
+
+            base
+
+        )?;
+
+
+    if !ruta.exists() {
+
+        return Ok(
+
+            base.to_string()
+
+        );
+
+    }
+
+
+    let mut numero =
+        2;
+
+
+    loop {
+
+        let nombre =
+
+            format!(
+
+                "{} ({})",
+
+                base,
+
+                numero
+
+            );
+
+
+        let ruta =
+
+            usuario::ruta_perfil(
+
+                &nombre
+
+            )?;
+
+
+        if !ruta.exists() {
+
+            return Ok(
+
+                nombre
+
+            );
+
+        }
+
+
+        numero += 1;
+
+    }
 
 }
 
