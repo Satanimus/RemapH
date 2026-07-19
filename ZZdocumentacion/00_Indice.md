@@ -9,9 +9,12 @@
 ## 🎯 Propósito
 
 Este documento es el punto de entrada de la documentación oficial de RemapH V3.
+
 No describe el funcionamiento interno de una capa específica.
+
 Su objetivo es mostrar la estructura general del proyecto y servir como mapa para localizar rápidamente cualquier parte de la documentación.
-Toda decisión de arquitectura deberá quedar documentada en alguno de los documentos indicados aquí.
+
+Toda decisión arquitectónica importante debe quedar documentada en alguno de los documentos indicados aquí.
 
 ---
 
@@ -29,10 +32,10 @@ Toda decisión de arquitectura deberá quedar documentada en alguno de los docum
 
 # 🎯 1. Objetivos del proyecto
 
-RemapH V3 es un remapeador avanzado de dispositivos de entrada para Windows, desarrollado con una arquitectura modular desde cero.
-Su objetivo no es únicamente reasignar teclas, sino convertirse en una plataforma flexible para traducir cualquier entrada física en cualquier acción configurable por el usuario.
+RemapH V3 es un remapeador de dispositivos de entrada para Windows.
 
-RemapH V3 busca convertirse en un remapeador profesional para Windows.
+Su objetivo es traducir entradas físicas en acciones configurables por el usuario mediante una arquitectura modular.
+
 Los pilares del proyecto son:
 
 • Simplicidad.
@@ -47,194 +50,180 @@ Toda decisión futura deberá respetar estos principios.
 
 # 🏛️ 2. Arquitectura general
 
-El proyecto está dividido en cuatro capas completamente independientes.
-Cada una posee una única responsabilidad.
+El proyecto está dividido en cuatro capas conceptuales.
 
 ```
-                Usuario
-                   │
-        ─────────────────────
-
-                  UI
-     Interfaz e interacción
-
-                   │
-
-                 Core
-  Comunicación y reglas comunes
-
-                   │
-
-               Runtime
-      Motor del remapeador
-
-                   │
-
-               Platform
- Integración con Windows y hardware
+UI
+↓
+Core
+↓
+Runtime
+↓
+Platform
 ```
 
-Cada capa únicamente conoce aquello que necesita para cumplir su responsabilidad.
-Las capas superiores nunca ejecutan responsabilidades de las inferiores.
-Las capas inferiores nunca conocen detalles internos de las superiores.
+Cada capa posee una responsabilidad diferente.
+
+Las capas superiores pueden utilizar las inferiores.
+
+Las capas inferiores no conocen detalles internos de las superiores.
 
 ---
 
 ## 🟦 UI
 
-Responsable de toda la experiencia del usuario.
+Responsable de la interfaz y la edición visual del perfil.
+
 Incluye:
 
-• Interfaz.
-• Componentes.
-• Ventanas.
-• Edición de perfiles.
-• Barras.
+• Toolbar.
+• Tabla.
+• Filas.
 • Controles.
+• Popups.
+• Captura visual.
 
-No contiene lógica de remapeo.
+No ejecuta remapeos.
 
 ---
 
 ## 🟨 Core
 
-Responsable de la comunicación interna.
+Responsable de los modelos y estructuras compartidas.
+
 Incluye:
 
-• Eventos.
-• Contexto compartido.
-• Reglas comunes.
-• Infraestructura de comunicación.
+• Perfil UI.
+• Contexto de fila.
+• Entradas.
+• Triggers.
+• Captura y análisis de captura.
 
-No conoce la interfaz ni el sistema operativo.
+No conoce Windows.
 
 ---
 
 ## 🟩 Runtime
 
-Responsable del funcionamiento del remapeador.
+Responsable de resolver remapeos.
+
 Incluye:
 
 • Compilador.
-• Caché.
+• Perfil compilado.
+• Cache.
 • Motor de ejecución.
-• Resolución de acciones.
-• Gestión de remapeos.
 
-No conoce controles visuales.
-No conoce Windows.
-Trabaja únicamente con modelos internos.
+No conoce la UI.
 
 ---
 
 ## 🟥 Platform
 
-Responsable de comunicar RemapH con el sistema operativo.
+Responsable de la comunicación con Windows y hardware.
+
 Incluye:
 
-• Tauri.
 • Interception.
-• APIs de Windows.
-• Hardware.
-• Entrada física.
+• Hooks de Windows.
+• SendInput.
+• Captura física.
 • Salida física.
 
-No contiene reglas del remapeador.
-Únicamente traduce información entre el sistema operativo y el Runtime.
+No decide qué remapeo debe ejecutarse.
 
 ---
 
 # 📂 3. Organización de la documentación
 
 ```
-Documentacion/
+ZZdocumentacion/
 
+000_Arbol_Archivos.md
 00_Indice.md
-
 01_UI.md
 02_Core.md
 03_Runtime.md
 04_Platform.md
-
 05_Estilos.md
 06_Principios.md
 07_Pendientes.md
 ```
 
-Cada documento responde una única pregunta.
+Cada documento responde una pregunta concreta.
 
-| Documento     | Contenido                           |
-| ------------- | ----------------------------------- |
-| 00_Indice     | Visión general del proyecto.        |
-| 01_UI         | Arquitectura de toda la interfaz.   |
-| 02_Core       | Comunicación interna y eventos.     |
-| 03_Runtime    | Motor del remapeador.               |
-| 04_Platform   | Integración con Windows.            |
-| 05_Estilos    | Identidad visual del proyecto.      |
-| 06_Principios | Reglas arquitectónicas permanentes. |
-| 07_Pendientes | Funcionalidades futuras.            |
+| Documento          | Contenido                                                      |
+| ------------------ | -------------------------------------------------------------- |
+| 000_Arbol_Archivos | Estructura real del proyecto y responsabilidad de cada módulo. |
+| 00_Indice          | Visión general.                                                |
+| 01_UI              | Arquitectura de la interfaz.                                   |
+| 02_Core            | Modelos y estructuras compartidas.                             |
+| 03_Runtime         | Compilación, Cache y ejecución.                                |
+| 04_Platform        | Integración física con Windows.                                |
+| 05_Estilos         | Identidad visual.                                              |
+| 06_Principios      | Reglas arquitectónicas permanentes.                            |
+| 07_Pendientes      | Trabajo futuro.                                                |
 
 ---
 
 # 📁 4. Organización del código
 
 ```
-Frontend (TypeScript)
-↓
-UI
-↓
-Core
+TypeScript
+├── UI
+└── Core
 
-══════════════════════════════
-
-Backend (Rust)
-↓
-Runtime
-↓
-Platform
-↓
-Windows
+Rust
+├── Runtime
+└── Platform
 ```
 
 La separación por lenguaje es una decisión técnica.
-La separación por capas es una decisión arquitectónica.
-La arquitectura siempre tiene prioridad.
+
+La separación por responsabilidad es una decisión arquitectónica.
 
 ---
 
 # 🟢 5. Estado del proyecto
 
-| Capa          | Estado             |
+| Área          | Estado             |
 | ------------- | ------------------ |
 | UI            | 🟡 En construcción |
-| Core          | 🟡 En construcción |
-| Runtime       | 🟢 Base estable    |
-| Platform      | 🟢 Base estable    |
+| Core          | 🟢 Base funcional  |
+| Runtime       | 🟢 Base funcional  |
+| Platform      | 🟢 Base funcional  |
 | Estilos       | 🟡 En crecimiento  |
 | Documentación | 🟡 En construcción |
+
+El proyecto se encuentra en una etapa de construcción de la base arquitectónica y funcional.
 
 ---
 
 # 📐 6. Convenciones generales
 
 Todo archivo debe tener una única responsabilidad.
+
 Toda carpeta debe agrupar responsabilidades relacionadas.
-Toda comunicación entre componentes debe respetar la arquitectura del proyecto.
-Antes de crear un nuevo módulo debe responderse una pregunta:
+
+Antes de crear un nuevo módulo debe responderse:
 
 > ¿A qué capa pertenece?
 
-Si la respuesta no es evidente, probablemente la responsabilidad aún no está bien definida.
+Si la respuesta no es evidente, probablemente la responsabilidad todavía no está bien definida.
 
 ---
 
 # 📝 7. Última actualización
 
-Versión de la arquitectura:
-Arquitectura V2
+Estado documentado:
+
+**Commit 004 — base funcional de UI, Core, Runtime y Platform.**
+
 Cambios principales:
 
-• Se reemplazó la división Frontend / Backend por una arquitectura basada en responsabilidades.
-• Se definieron las cuatro capas oficiales del proyecto.
-• Se separó el Runtime de Platform.
-• Se inició la documentación modular del proyecto.
+• Se consolidó la división UI / Core / Runtime / Platform.
+• Se definió el flujo PerfilJson → Compilador → PerfilCache → Cache → Runtime.
+• Se creó un modelo de entrada física genérico mediante InputEvent.
+• Se separaron los modos Full y Portable de entrada física.
+• Se separó el modelo editable del modelo compilado.
+• Se inició la integración real entre UI y Tauri.

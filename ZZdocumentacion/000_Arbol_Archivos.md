@@ -1,42 +1,42 @@
-------------------------------------------
-Arbol de archivos - Hola mundo c:
-------------------------------------------
+---
 
----------------------------
-🧭 Arquitectura general
----------------------------
+## Arbol de archivos
 
-Frontend TypeScript
-│
-├── core/
-│   └── Modelo editable y estado temporal de la UI
-│
-├── ui/
-│   ├── Construcción visual
-│   └── Componentes interactivos
-│
-└── main.ts
-        │
-        ▼
-   Perfil temporal
-        │
-        ▼
-   [Futuro botón Guardar cambios]
-        │
-        ▼
-Backend Rust / Tauri
-        │
-        ├── usuario.rs
-        ├── compilador.rs
-        ├── cache.rs
-        └── runtime.rs
-                │
-                ▼
-          Interception
------------------------------
+---
 
+## 🧭 Arquitectura general
+
+RemapH V3 está dividido en cuatro capas conceptuales:
+
+UI
+│
+▼
+Core
+│
+▼
+Runtime
+│
+▼
+Platform
+│
+▼
+Windows / Hardware
+
+La separación por lenguaje no define la arquitectura.
+
+TypeScript contiene UI y Core.
+
+Rust contiene Runtime y Platform.
+
+La arquitectura se define por responsabilidad.
+
+---
+
+🟦 UI — src/ui/
+🟦 CORE — src/core/
 
 🟦 FRONTEND — src/
+
 🚀 main.ts
 
 Etapa: Entrada de la aplicación.
@@ -51,7 +51,7 @@ Insertarla en document.body.
 Flujo:
 
 main.ts
-  ↓
+↓
 crearApp()
 
 No contiene:
@@ -59,11 +59,13 @@ No contiene:
 Lógica de perfiles.
 Runtime.
 Backend.
-Captura.
+Captura física.
+
 📂 src/core/
+
 📄 core_perfil.ts
 
-Etapa: Modelo oficial del perfil editable.
+Etapa: Modelo editable del perfil.
 
 Contiene:
 
@@ -75,9 +77,15 @@ clonarFila()
 
 Responsabilidad:
 
-Representar la configuración que el usuario está editando.
+Representar la configuración que la UI está editando.
 
-FilaPerfil contiene actualmente:
+Perfil contiene:
+
+activo
+filas
+
+FilaPerfil contiene:
+
 id
 estado
 trigger
@@ -91,36 +99,38 @@ nota
 
 Importante:
 
-FilaPerfil es el modelo de la UI.
+Este modelo representa la intención editable del usuario.
 
-No es el modelo del Runtime.
+No es el modelo compilado del Runtime.
 
-📄 core_perfil_ui.ts (renombrado de temporal a ui)
+📄 core_perfil_ui.ts
 
-Etapa: Estado vivo de edición.
+Etapa: Estado vivo de edición de la UI.
 
 Contiene:
 
-obtenerPerfilTemporal()
-establecerPerfilTemporal()
+obtenerPerfilUi()
+establecerPerfilUi()
 
 Responsabilidad:
 
-Mantener el perfil que la UI está editando actualmente.
+Mantener el Perfil que la interfaz está editando actualmente.
 
-UI
- ↓
-Perfil temporal
+Flujo:
 
-Regla arquitectónica acordada:
+PerfilJson
+↓
+Conversión en Tauri
+↓
+Perfil UI
 
-Los cambios de la UI viven aquí antes de guardarse.
+La UI modifica este perfil.
 
 El Runtime no ve estos cambios automáticamente.
 
 📄 core_perfil_acciones.ts
 
-Etapa: Operaciones sobre el perfil temporal.
+Etapa: Operaciones sobre el Perfil UI.
 
 Contiene:
 
@@ -128,14 +138,32 @@ clonarFilaPorId()
 
 Responsabilidad:
 
-Buscar filas dentro del perfil temporal y ejecutar operaciones sobre ellas.
+Buscar filas dentro del Perfil UI y ejecutar operaciones sobre ellas.
 
 Actualmente:
 
-clonar fila
-🎛️ core_entrada.ts
+Clonar fila.
 
-Etapa: Modelo de entrada física.
+📄 core_contexto_fila.ts
+
+Etapa: Identidad de una fila.
+
+Contiene:
+
+ContextoFila
+crearContextoFila()
+
+Responsabilidad:
+
+Transportar el ID de una fila hacia sus componentes internos.
+
+Regla:
+
+Todos los componentes de una fila reciben el mismo ContextoFila.
+
+📄 core_entrada.ts
+
+Etapa: Modelo canónico de entradas.
 
 Contiene:
 
@@ -143,29 +171,80 @@ TipoEntrada
 Entrada
 crearEntrada()
 
-Tipos actuales:
+Responsabilidad:
 
-Teclado
-Mouse
-Multimedia
-Joystick
+Representar entradas físicas de forma común.
+
+La UI utiliza nombres propios del DOM.
+
+La captura los convierte al idioma canónico de RemapH.
+
+Ejemplos:
+
+ControlLeft
+↓
+LeftControl
+
+KeyA
+↓
+A
+
+Mouse 2
+↓
+RightButton
+
+📄 core_evento_captura.ts
+
+Etapa: Modelo de eventos durante captura.
 
 Responsabilidad:
 
-Representar una tecla o botón físico de forma común.
+Representar los eventos de una captura.
 
 Ejemplo:
 
-Teclado
-ControlLeft
-Control
+Entrada
+↓
+Down / Up
+↓
+EventoCaptura
 
-También normaliza algunos nombres:
+📄 core_analizar_captura.ts
 
-Quote       → ´
-Backquote   → `
-AltGraph    → AltGr
-🎯 core_trigger.ts
+Etapa: Análisis de la captura.
+
+Responsabilidad:
+
+Recibir el timeline de eventos capturados.
+
+Analizar:
+
+• Orden.
+• Down / Up.
+• Modificadores.
+• Gatillo.
+
+Resultado:
+
+Trigger.
+
+📄 core_configuracion_captura.ts
+
+Etapa: Configuración de captura.
+
+Responsabilidad:
+
+Centralizar los valores utilizados por el sistema de captura.
+
+📄 core_normalizar_trigger.ts
+
+Etapa: Normalización del Trigger.
+
+Responsabilidad:
+
+Normalizar la representación de triggers antes de su uso.
+
+📄 core_trigger.ts
 
 Etapa: Modelo y representación visual de triggers.
 
@@ -176,65 +255,78 @@ Trigger
 crearTrigger()
 triggerATexto()
 triggerAHTML()
-Modelo actual:
+
+Modelo:
+
 Trigger
 ├── modificadores[]
 ├── gatillo
 └── condicion
-
-Ejemplo:
-
-[Ctrl + Shift] + Q
 
 Responsabilidad:
 
 Representar triggers.
 Convertirlos a texto.
 Convertirlos a HTML visual.
-Aplicar la condición visual.
-
-Importante:
-
-Aquí está la lógica de cómo se representa un trigger en la UI.
 
 📂 src/ui/
-🖥️ ui_app.ts
+
+📄 ui_app.ts
 
 Etapa: Raíz visual de la aplicación.
 
+Responsabilidad:
+
+Crear el Layout principal.
+
+📄 ui_layout.ts
+
+Etapa: Ensamblador de la pantalla principal.
+
 Contiene:
 
-crearApp()
+Toolbar.
+Tabla.
+StatusBar.
+Contenedor global de Popups.
 
 Responsabilidad:
 
-Crear el elemento raíz:
+Construir la estructura principal de la UI.
 
-main.app
+📄 ui_columnas.ts
 
-y añadir el Layout.
+Etapa: Fuente única de verdad de columnas.
+
+Contiene:
+
+COLUMNAS
+
+Define:
+
+• ID.
+• Título.
+• Grupo.
+• Ancho.
+
+La cabecera y las filas utilizan esta misma definición.
 
 📄 ui_fila.ts
 
-Etapa: Construcción visual de una fila del perfil.
+Etapa: Ensamblador visual de una fila.
 
-Contiene:
+Flujo:
 
-crearFila()
-
-Responsabilidad:
-
-Convertir un FilaPerfil en una fila visual.
-
-Conecta:
 FilaPerfil
-    ↓
+↓
 ContextoFila
-    ↓
+↓
 COLUMNAS
-    ↓
+↓
 Componentes UI
-Conoce estas columnas:
+
+Conoce las columnas:
+
 numero
 estado
 app
@@ -245,39 +337,33 @@ ejecucion
 color
 nota
 
-Este archivo es el ensamblador de la fila.
+Este archivo ensambla.
 
-No debería contener lógica profunda de cada control.
+No contiene la lógica profunda de cada control.
 
-📋 ui_tabla.ts
+📄 ui_tabla.ts
 
 Etapa: Construcción de la tabla.
 
-Contiene:
-
-crearTabla()
-
 Responsabilidad:
 
-Crear tabla.
-Crear cabecera.
-Crear viewport.
-Crear contenedor de filas.
-Recorrer perfil.filas.
-Crear cada ui_fila.
+Crear la tabla.
+Crear la cabecera.
+Crear el viewport.
+Crear el contenedor de filas.
+Recorrer Perfil UI.
+Crear cada fila.
 
-También contiene las funciones internas de:
+También contiene internamente:
 
 reconstruirTabla()
 reconstruirFila()
 
-Importante:
+Además detecta interacción con controles de fila para notificar modificaciones.
 
-Es el lugar donde el modelo temporal se transforma en UI visible.
+📄 ui_tabla_control.ts
 
-📋 ui_tabla_control.ts
-
-Etapa: Control externo de reconstrucción de la UI.
+Etapa: Control externo de reconstrucción.
 
 Contiene:
 
@@ -287,100 +373,133 @@ reconstruirFila()
 
 Responsabilidad:
 
-Permitir que otros componentes digan:
+Permitir que componentes soliciten la reconstrucción de una fila o de la tabla sin conocer cómo se construye internamente.
 
-"reconstruye esta fila"
+No contiene lógica de perfil.
 
-o:
+📄 ui_redimension_columnas.ts
 
-"reconstruye toda la tabla"
+Etapa: Redimensionamiento de columnas.
 
-sin conocer internamente cómo se construye la tabla.
+Responsabilidad:
+
+Gestionar el arrastre de los divisores de cabecera.
+
+No modifica la lógica de filas.
+
+📄 ui_toolbar.ts
+
+Etapa: Barra superior.
+
+Responsabilidad:
+
+Mostrar:
+
+• Nombre de la aplicación.
+• Selector visual de perfil.
+• Estado del perfil.
+• Botón de nueva fila.
+• Configuración.
+
+En el estado actual de commit 004:
+
+El sistema de perfiles completo todavía no está implementado en la UI.
+
+📄 ui_statusbar.ts
+
+Etapa: Barra inferior.
+
+Responsabilidad:
+
+Mostrar información contextual de la aplicación.
 
 📂 src/ui/componentes/
-⌨️🖱️ comp_capturador.ts
 
-Etapa: Captura de teclado y mouse para crear un Trigger.
+⌨️ comp_capturador.ts
 
-Responsabilidad actual:
+Etapa: Control visual de captura.
 
-Crear botón capturador.
-Mostrar trigger existente.
-Mostrar botón +.
-Abrir modificadores.
-Capturar eventos de teclado.
-Capturar eventos de mouse.
-Capturar rueda.
-Construir timeline.
-Finalizar captura.
-Pasar timeline a analizarCaptura().
-Guardar resultado en:
+Responsabilidad:
+
+Crear el botón capturador.
+Mostrar el Trigger.
+Mostrar modificadores.
+Abrir el popup de modificadores.
+Iniciar captura.
+Guardar el resultado en:
+
 filaPerfil.trigger
 
 o:
 
 filaPerfil.accion
 
-Importante:
+La captura física fue separada en:
 
-Actualmente este archivo fue dividido en dos archivos manejables.
+comp_capturador_captura.ts
 
-comp_capturador.ts ya no debería volver a crecer hasta 800+ líneas.
+⌨️ comp_capturador_captura.ts
 
-🎛️ comp_accion.ts
-
-Etapa: Construcción del control de acción.
+Etapa: Captura de entradas de la UI.
 
 Responsabilidad:
 
-Decidir qué componente visual aparece en la columna Acción.
+Escuchar:
+
+• Teclado.
+• Mouse.
+• Rueda.
+
+Construir un timeline de eventos.
+
+Convertir nombres DOM al idioma canónico de RemapH.
+
+Analizar la captura.
+
+Entregar un Trigger.
+
+⚙️ comp_accion.ts
+
+Etapa: Selector visual de Acción.
+
+Responsabilidad:
+
+Decidir qué componente visual representa la acción según filaPerfil.tipo.
 
 Actualmente:
+
 Multimedia
-    ↓
+↓
 crearAccionMultimedia()
 
 Macro
-    ↓
+↓
 crearAccionMacro()
 
 Click coordenada
-    ↓
+↓
 crearAccionCoordenada()
 
-Teclado / Mouse
-    ↓
+Otros tipos
+↓
 crearCapturador(..., "Accion")
 
-Importante:
-
-Aquí está la decisión:
-
-“Qué control representa la acción según el tipo”.
-
-🎛️ comp_accion_contenido.ts
+⚙️ comp_accion_contenido.ts
 
 Etapa: Contenido visual de acciones especiales.
 
-Contiene actualmente:
+Contiene:
 
 crearAccionTeclado()
 crearAccionMultimedia()
 crearAccionMacro()
 crearAccionCoordenada()
 
-Responsabilidad:
+No contiene captura física ni Runtime.
 
-Crear botones visuales simples.
-
-No contiene:
-
-Captura.
-Runtime.
-Ejecución.
 🎛️ comp_controles.ts
 
-Etapa: Controles simples de la fila.
+Etapa: Controles simples de fila.
 
 Contiene:
 
@@ -394,23 +513,17 @@ crearColor()
 
 Responsabilidad:
 
-Crear controles UI y modificar directamente:
+Crear controles visuales.
 
-filaPerfil
+Modificar el FilaPerfil correspondiente.
 
-que pertenece al:
-
-perfil temporal
-
-Regla importante:
-
-Estos cambios todavía no llegan al Runtime.
+Solicitar reconstrucción visual cuando corresponde.
 
 🪟 comp_popup_abrir.ts
 
-Etapa: Opciones de los popups.
+Etapa: Opciones de los Popups.
 
-Contiene:
+Contiene actualmente:
 
 abrirPopupCondicion()
 abrirPopupTipo()
@@ -422,350 +535,398 @@ abrirPopupModificador()
 
 Responsabilidad:
 
-Definir:
+Definir las opciones disponibles y aplicar el resultado al modelo de fila.
 
-qué opciones aparecen
-
-y:
-
-qué ocurre al seleccionar una opción
-Importante
-
-Aquí está actualmente la lista:
-
-Normal
-Turbo
-Mantener
-
-para ejecución.
-
-Y aquí también se agregan modificadores:
-
-Win
-Ctrl
-Shift
-Alt
 🖼️ comp_popup.ts
 
-Etapa: Componente visual genérico de popup.
+Etapa: Control visual genérico.
 
-Responsabilidad conocida:
+Responsabilidad:
 
-Crear el botón/control que abre un popup.
+Crear controles que abren Popups.
 
 🪟 comp_popup_contenedor.ts
 
-Etapa: Contenedor global de popups.
+Etapa: Contenedor global de Popups.
 
-Responsabilidad conocida:
+Responsabilidad:
 
-Mostrar popup.
-Ocultar popup.
+Mostrar Popup.
+Ocultar Popup.
 
+---
 
----------------------------------------------------------------
+🟩 RUNTIME / PLATFORM — src-tauri/src/
 
-
-🟩 BACKEND — src-tauri/src/
 🚀 main.rs
 
 Etapa: Entrada ejecutable.
 
 Responsabilidad:
 
-remaph_lib::run();
+Llamar a:
 
-No contiene lógica.
+remaph_lib::run();
 
 🚀 lib.rs
 
-Etapa: Entrada principal del backend Tauri.
+Etapa: Entrada principal de Tauri.
 
 Responsabilidad:
 
 Declarar módulos.
-Iniciar Runtime.
-Iniciar entrada física.
+
+Iniciar la entrada física.
+
 Crear Tauri.
+
 Registrar comandos.
-Flujo actual:
-run()
- ├── runtime::iniciar()
- ├── entrada::iniciar()
- └── Tauri
-📦 modelos.rs
 
-Etapa: Modelos internos compartidos de Rust.
-
-Contiene:
-
-Remapeo
-Accion
-Modelo actual:
-Remapeo
-├── trigger: Evento
-└── accion: Accion
-Accion actual:
-Tecla(String)
-Mouse(String)
-
-Importante:
-
-Este es el modelo que usa actualmente el Backend.
+No contiene la lógica del Runtime.
 
 📦 eventos.rs
 
-Etapa: Eventos internos del Backend.
+Etapa: Modelo de entrada física genérica.
 
 Contiene:
 
-Evento::Teclado
-Evento::Mouse
-Modelo actual:
-Teclado
-├── tecla
-└── presionado
+InputId
+InputState
+InputEvent
 
-Mouse
-├── boton
-└── presionado
+InputId identifica:
+
+fuente
+control
+
+Ejemplo:
+
+keyboard:A
+mouse:WheelUp
+
+InputState:
+
+Down
+Up
+Pulse
 
 Regla:
 
-Es independiente de Interception.
+El Runtime recibe InputEvent.
 
-👤 usuario.rs
+No recibe directamente eventos de Interception ni Windows.
 
-Etapa: Configuración editable del usuario en Rust.
+📦 perfiljson.rs
+
+Etapa: Modelo persistente.
 
 Contiene:
 
-Configuracion
+PerfilJson
+RemapeoJson
+TriggerJson
 
-con:
+Representa el perfil almacenado en JSON.
 
-remapeos: Vec<Remapeo>
+No es el modelo del Runtime.
 
-Responsabilidad conceptual acordada:
+📦 perfilcache.rs
 
-Propietario de la configuración editable del usuario.
+Etapa: Modelo compilado.
 
-🔨 compilador.rs
+Contiene:
 
-Etapa: Compilación de configuraciones.
+RemapeoCache
+TriggerCache
+AccionCache
 
-Responsabilidad:
+No se serializa.
 
-Remapeo
-    ↓
-Normalización
-    ↓
-Remapeo compilado
-    ↓
+No conoce JSON.
+
+No conoce la UI.
+
+⚙️ compilador.rs
+
+Etapa: Compilación de perfiles.
+
+Flujo:
+
+PerfilJson
+↓
+Compilador
+↓
+PerfilCache
+↓
 Cache
 
-Actualmente normaliza:
+Actualmente:
 
-Eventos de teclado.
-Eventos de mouse.
-Acciones.
+• Ignora remapeos OFF.
+• Extrae gatillos.
+• Convierte entradas a InputId.
+• Construye acciones compiladas.
 
-No debería:
-
-Ejecutar acciones.
-Capturar hardware.
-Ser consultado por Runtime.
 🧠 cache.rs
 
 Etapa: Caché de remapeos compilados.
 
 Responsabilidad:
 
-Almacenar remapeos compilados.
-Reemplazar el conjunto completo.
-Buscar por evento.
-Modelo:
-HashMap<String, Remapeo>
+Almacenar RemapeoCache.
 
-Propietario conceptual:
+Funciones conceptuales:
 
-cache.rs es dueño de los remapeos compilados.
+Reemplazar cache.
+Borrar cache.
+Buscar Trigger exacto.
+Buscar Pulse.
+Detectar prefijos de Trigger.
 
-🚀 runtime.rs
+La Cache no conoce:
+
+• UI.
+• JSON.
+• Windows.
+
+⚙️ runtime.rs
 
 Etapa: Motor de ejecución.
 
-Responsabilidad actual:
+Responsabilidad:
 
-Recibir evento.
-Buscar coincidencia en cache.
-Ejecutar acción.
-Devolver si el evento fue consumido.
-Evento
- ↓
+Recibir InputEvent.
+
+Mantener:
+
+• Inputs activos.
+• Inputs consumidos.
+
+Consultar Cache.
+
+Determinar:
+
+Pasar.
+Esperar.
+Consumir.
+
+Flujo:
+
+InputEvent
+↓
+Runtime
+↓
 Cache
- ↓
-Acción
+↓
+AccionCache
 
-Regla arquitectónica acordada:
+👤 usuario.rs
 
-Runtime no interpreta configuración.
-
-No debería:
-
-Leer JSON.
-Normalizar.
-Entender configuraciones de usuario.
-Decidir qué significa un modo.
-Compilar remapeos.
-🖱️ entrada.rs
-
-Etapa: Bucle principal de entrada física.
+Etapa: Propietario de archivos de usuario.
 
 Responsabilidad:
 
-Inicializar Runtime.
-Crear Interception.
-Recibir eventos.
-Consultar reentrada.
-Consultar captura.
-Traducir eventos.
-Pasar eventos al Runtime.
-Ejecutar salidas.
-Reenviar eventos no bloqueados.
-Flujo actual:
-Interception
-    ↓
-entrada.rs
-    ↓
-captura
-    ↓
-runtime
-    ↓
-salida
+Resolver la carpeta:
 
-Este archivo es el coordinador del flujo físico.
+APPDATA
+↓
+RemapH V3
+↓
+Usuario
+
+Buscar perfiles JSON.
+
+Determinar el perfil actual.
+
+No compila.
+
+No conoce Runtime.
+
+💾 persistencia.rs
+
+Etapa: Lectura y escritura de PerfilJson.
+
+Responsabilidad:
+
+Guardar JSON.
+Cargar JSON.
+
+No decide rutas.
+
+No compila.
+
+No toca Cache.
+
+📡 comandos.rs
+
+Etapa: Puente Tauri.
+
+Responsabilidad:
+
+Recibir datos de la UI.
+
+Convertirlos a PerfilJson.
+
+Exponer comandos para:
+
+• Compilar perfil.
+• Activar perfil.
+• Desactivar perfil.
+• Iniciar captura.
+• Obtener captura.
+• Obtener perfil actual.
+
+Flujo:
+
+UI
+↓
+Tauri
+↓
+PerfilJson
+↓
+Persistencia / Compilador
+
+📊 estado.rs
+
+Etapa: Estado global del perfil.
+
+Responsabilidad:
+
+Mantener si el perfil está activo.
+
+El Runtime consulta este estado.
+
+No conoce Cache.
+
+🖱️ entrada.rs
+
+Etapa: Coordinador de entrada física.
+
+Soporta dos modos:
+
+Full
+Portable
+
+Ambos entregan InputEvent genérico al Runtime.
+
+Entrada no interpreta remapeos.
+
+Entrada no compila configuraciones.
+
+Entrada no ejecuta acciones directamente.
 
 📂 src-tauri/src/backend/
-🖱️ back_interception.rs
 
-Etapa: Adaptador físico de Interception.
+🧩 back_interception.rs
+
+Etapa: Backend de entrada Full.
 
 Responsabilidad:
 
 Inicializar Interception.
-Configurar filtros.
-Recibir Stroke.
-Enviar teclas.
-Reenviar eventos.
-Identificar teclado/mouse.
-Traducir Stroke a Evento.
 
-Importante:
+Recibir Strokes.
 
-Aquí se habla directamente con:
+Traducirlos a InputEvent.
 
-Interception
-🎹 back_teclas.rs
+Reenviar eventos originales.
 
-Etapa: Adaptador físico de teclado.
+No conoce el Runtime.
+
+🪟 back_windows.rs
+
+Etapa: Backend Portable.
+
+Utiliza:
+
+WH_KEYBOARD_LL
+WH_MOUSE_LL
+SendInput
 
 Responsabilidad:
 
-ScanCode
-    ↓
-Evento::Teclado
+Capturar eventos físicos.
 
-También convierte:
+Convertirlos a InputEvent.
 
-String
-    ↓
-ScanCode
+Emitir eventos físicos.
 
-para salida.
+No conoce Cache ni Runtime.
+
+⌨️ back_teclas.rs
+
+Etapa: Conversión de teclado.
+
+Responsabilidad:
+
+Convertir códigos físicos a InputId.
+
+Convertir InputId a salida de teclado.
 
 🖱️ back_mouse.rs
 
-Etapa: Adaptador físico de mouse.
+Etapa: Conversión de mouse.
 
 Responsabilidad:
 
-Convertir:
+Convertir eventos físicos de mouse a InputEvent.
 
-MouseFilter
-MouseFlags
-rolling
+Convertir InputId a salida de mouse.
 
-en:
+▶️ back_salida.rs
 
-Evento::Mouse
-
-Actualmente reconoce:
-
-WHEEL_UP
-WHEEL_DOWN
-
-y botones físicos.
-
-🖱️ back_salida.rs
-
-Etapa: Ejecución física de acciones.
+Etapa: Salida física Full.
 
 Responsabilidad:
 
-Recibir:
+Recibir AccionCache.
 
-Accion
+Traducirla a:
 
-y producir salida física.
+• Teclado.
+• Mouse.
 
-Actualmente:
-
-Accion::Tecla
-    ↓
-back_teclas
-    ↓
-Interception
-
-También controla:
-
-reentrada::bloquear()
-reentrada::liberar()
-
-Importante:
-
-Aquí se ejecuta la salida física.
+Emitir mediante Interception.
 
 🔄 Flujo actual de datos
+
 UI
-Usuario edita
-    ↓
-FilaPerfil
-    ↓
-Perfil temporal
+↓
+Perfil UI
+↓
+Tauri
+↓
+PerfilJson
+↓
+Persistencia
+↓
+Compilador
+↓
+PerfilCache
+↓
+Cache
+↓
+Runtime
+↓
+AccionCache
+↓
+Platform
+↓
+Windows / Hardware
 
-Aquí termina actualmente el cambio de UI.
+Entrada:
 
-Guardado futuro
-Perfil temporal
-    ↓
-Botón principal
-"Perfil en pausa, ¿guardar cambios?"
-    ↓
-JSON
-    ↓
-Rust
-Backend
-Configuración de usuario
-    ↓
-usuario.rs
-    ↓
-compilador.rs
-    ↓
-cache.rs
-    ↓
-runtime.rs
-    ↓
-back_salida.rs
-    ↓
-Interception
+Hardware
+↓
+Platform
+↓
+InputEvent
+↓
+Runtime
+↓
+AccionCache
+↓
+Platform
+↓
+Hardware
+-----

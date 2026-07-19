@@ -94,3 +94,18 @@
 .trigger-sintaxis{
     color:var(--color-trigger-sintaxis);
 }
+
+.popup-perfil-item{
+    justify-content:flex-start;
+    width:100%;
+}
+
+.popup-perfil-eliminar{
+    color:var(--red);
+    border-color:var(--red);
+}
+
+.popup-perfil-eliminar:hover{
+    background:var(--red);
+    color:#FFF;
+}

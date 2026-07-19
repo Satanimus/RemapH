@@ -9,8 +9,11 @@
 ## 🎯 Propósito
 
 Este documento registra funcionalidades, mejoras e investigaciones pendientes del proyecto.
+
 No contiene decisiones definitivas de arquitectura.
+
 No sustituye los documentos oficiales de cada capa.
+
 Su objetivo es mantener una lista clara de trabajo futuro.
 
 ---
@@ -27,53 +30,52 @@ Su objetivo es mantener una lista clara de trabajo futuro.
 
 # 🔨 1. Pendientes de desarrollo
 
-## 🔵 Sistema de entrada unificada
-
-Crear una representación interna única para todos los dispositivos.
-Debe permitir:
-• Teclado.
-• Mouse.
-• Multimedia.
-• Dispositivos futuros.
-La capa superior nunca debe depender del hardware específico.
-
----
-
 ## 🔵 Captura avanzada
 
-Completar sistema de captura:
-• Combinaciones de teclas.
-• Modificadores.
+El sistema base de captura ya existe.
+
+Actualmente soporta:
+
+• Teclado.
 • Mouse.
-• Secuencias.
-• Estados temporales.
+• Rueda.
+• Combinaciones.
+• Modificadores.
+• Análisis de timeline.
+
+Pendiente:
+
+• Ampliar la captura a secuencias más complejas.
+• Definir estados temporales avanzados.
+• Mejorar el modelo de captura para futuros tipos de entrada.
 
 ---
 
 ## 🔵 Sistema de perfiles
 
 Implementar gestión completa de perfiles.
-Flujo esperado:
-```
-Guardar perfil actual
-↓
-Desactivar perfil actual
-↓
-Limpiar interfaz
-↓
-Cargar nuevo perfil
-↓
-Reconstruir configuración
-```
 
-El cambio de perfil es una acción global.
-No debe modelarse como evento de UI.
+Debe incluir:
+
+• Crear perfil.
+• Seleccionar perfil.
+• Renombrar perfil.
+• Clonar perfil.
+• Eliminar perfil.
+• Restaurar perfil.
+
+El flujo de perfiles debe mantenerse separado del Runtime.
+
+El perfil editable debe permanecer en la UI/Core.
+
+El perfil persistente debe utilizar PerfilJson.
 
 ---
 
 ## 🔵 Preferencias globales
 
 Agregar configuración general:
+
 • Tiempos.
 • Comportamientos por defecto.
 • Apariencia.
@@ -84,6 +86,7 @@ Agregar configuración general:
 ## 🔵 Editor de macros
 
 Crear editor visual para secuencias complejas.
+
 Debe permanecer separado de la configuración básica de una fila.
 
 ---
@@ -91,7 +94,9 @@ Debe permanecer separado de la configuración básica de una fila.
 ## 🔵 Ventanas especializadas
 
 Crear ventanas independientes cuando la complejidad lo justifique.
+
 Ejemplos:
+
 • Multimedia avanzada.
 • Programas.
 • Coordenadas.
@@ -105,7 +110,9 @@ Ejemplos:
 ## 🧠 Sistema ADR
 
 Crear un sistema de registro de decisiones arquitectónicas.
+
 Cada decisión importante debe documentar:
+
 • Fecha.
 • Problema existente.
 • Opciones consideradas.
@@ -113,11 +120,7 @@ Cada decisión importante debe documentar:
 • Motivo.
 • Consecuencias.
 
----
-
-## Motivo
-Las decisiones de arquitectura no deben depender únicamente de memoria personal.
-El proyecto debe poder retomarse meses o años después manteniendo su coherencia.
+Las decisiones no deben depender únicamente de memoria personal.
 
 ---
 
@@ -126,15 +129,19 @@ El proyecto debe poder retomarse meses o años después manteniendo su coherenci
 ## 🔵 Joystick
 
 Agregar soporte para dispositivos adicionales.
-Debe seguir la misma arquitectura:
+
+Debe seguir la arquitectura:
+
 ```
 Platform
 ↓
-Evento interno
+InputEvent
 ↓
 Runtime
 ↓
-Acción
+AccionCache
+↓
+Platform
 ```
 
 ---
@@ -142,7 +149,8 @@ Acción
 ## 🔵 Sistema de conflictos
 
 Detectar:
-• Dos remapeos usando el mismo trigger.
+
+• Dos remapeos usando el mismo Trigger.
 • Acciones incompatibles.
 • Configuraciones ambiguas.
 
@@ -151,13 +159,21 @@ Detectar:
 ## 🔵 Importación y exportación
 
 Permitir compartir configuraciones.
-Debe mantenerse independiente del formato interno compilado.
+
+Debe mantenerse independiente del modelo compilado.
+
+---
+
+## 🔵 Multimedia
+
+Completar la representación y ejecución de acciones multimedia.
 
 ---
 
 # 📚 4. Documentación futura
 
 Mantener actualizados:
+
 • Índice maestro.
 • Documentos de arquitectura.
 • ADR.
@@ -170,12 +186,9 @@ Toda decisión importante debe documentarse antes de convertirse en una dependen
 # 💭 5. Ideas descartadas o en evaluación
 
 Esta sección almacena ideas que todavía no tienen una decisión definitiva.
-Ejemplos:
-• Nuevas formas de interfaz.
-• Cambios de organización.
-• Nuevas tecnologías.
 
 Una idea pendiente no debe convertirse automáticamente en una implementación.
+
 Primero debe evaluarse su impacto arquitectónico.
 
 ---
@@ -183,9 +196,11 @@ Primero debe evaluarse su impacto arquitectónico.
 # ✅ Resumen
 
 Los pendientes representan el futuro del proyecto.
+
 Sus reglas principales:
+
 • Separar ideas de decisiones.
 • Registrar cambios importantes.
 • Mantener la arquitectura antes de agregar funciones.
-• Resolver complejidad con nuevas capas cuando corresponda.
+• Resolver complejidad con módulos nuevos cuando corresponda.
 • Evitar crecimiento desordenado.

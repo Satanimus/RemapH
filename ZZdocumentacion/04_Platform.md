@@ -8,23 +8,42 @@
 
 ## 🎯 Propósito
 
-Este documento define la arquitectura de Platform.
-Platform es la capa encargada de comunicar RemapH con el sistema operativo y el hardware.
-Su función es traducir información entre el mundo interno del programa y los sistemas externos.
-No contiene reglas de remapeo.
-No toma decisiones.
-No conoce la interfaz.
+Este documento define la arquitectura actual de Platform.
+
+Platform es la frontera entre RemapH y Windows.
+
+Su responsabilidad es:
+
+```
+Hardware / Windows
+↓
+Platform
+↓
+InputEvent
+```
+
+y:
+
+```
+AccionCache
+↓
+Platform
+↓
+Hardware / Windows
+```
+
+Platform no decide qué remapeo debe ejecutarse.
 
 ---
 
 # 📑 Índice
 
-1. Objetivo de Platform
+1. Objetivo
 2. Responsabilidad
-3. Arquitectura general
-4. Entrada física
-5. Salida física
-6. Interception
+3. Modos de entrada
+4. Entrada Full
+5. Entrada Portable
+6. Salida física
 7. Tauri
 8. Comunicación con Runtime
 9. Reentrada
@@ -32,238 +51,254 @@ No conoce la interfaz.
 
 ---
 
-# 🎯 1. Objetivo de Platform
+# 🎯 1. Objetivo
 
-Platform permite que RemapH interactúe con Windows sin contaminar las capas superiores.
-Su función principal es:
+Platform permite que RemapH interactúe con Windows sin exponer detalles físicos al Runtime.
 
-```
-Mundo externo
-↓
-Platform
-↓
-Información interna
-```
+La entrada física se convierte en:
 
-y:
+`InputEvent`
 
-```
-Decisión interna
-↓
-Platform
-↓
-Acción física
-```
+La salida recibe acciones compiladas.
 
 ---
 
 # 🏛️ 2. Responsabilidad
 
 Platform contiene:
-• Comunicación con Windows.
-• Acceso a hardware.
+
+• Interception.
+• Windows API.
+• Hooks de teclado.
+• Hooks de mouse.
+• SendInput.
 • Captura física.
-• Inyección física.
-• Integración con Tauri.
-• Traducción entre formatos externos e internos.
+• Salida física.
 
 Platform no contiene:
+
 • Reglas de remapeo.
-• Configuración del usuario.
-• Lógica de perfiles.
-• Decisiones de ejecución.
-• Componentes visuales.
+• Perfil UI.
+• Perfil JSON.
+• Cache.
+• Decisiones de coincidencia.
 
 ---
 
-# 🔄 3. Arquitectura general
+# 🔀 3. Modos de entrada
 
-La comunicación completa es:
+`entrada.rs` define dos modos:
 
 ```
-Hardware
-↓
-Platform
-↓
-Runtime
-↓
-Platform
-↓
-Hardware
+Full
+Portable
 ```
 
-Platform funciona como intermediario.
-Nunca como controlador del comportamiento.
+Ambos utilizan el mismo Runtime.
+
+La diferencia está en el backend físico.
 
 ---
 
-# ⌨️ 4. Entrada física
+# 🟦 4. Entrada Full
 
-La entrada física representa eventos provenientes del usuario.
-Ejemplos:
-• Teclado.
-• Mouse.
-• Dispositivos futuros.
+El modo Full utiliza Interception.
 
 Flujo:
+
 ```
-Dispositivo físico
+Interception
 ↓
-Interception / Windows
+back_interception
 ↓
-Platform
+InputEvent
 ↓
-Evento interno
+Runtime
 ```
 
-La entrada debe convertirse a un formato común antes de llegar al Runtime.
-El Runtime nunca debe depender del dispositivo original.
+`back_interception.rs`:
+
+• Inicializa Interception.
+• Configura filtros.
+• Recibe Strokes.
+• Traduce Strokes.
+• Reenvía eventos originales.
+
+No conoce el Runtime.
 
 ---
 
-# ▶️ 5. Salida física
+# 🟨 5. Entrada Portable
 
-La salida física ejecuta acciones solicitadas por Runtime.
-Ejemplos:
+El modo Portable utiliza Windows API.
 
-• Pulsar tecla.
-• Soltar tecla.
-• Mover mouse.
-• Ejecutar multimedia.
-• Dispositivos futuros.
+Utiliza:
 
----
+• WH_KEYBOARD_LL.
+• WH_MOUSE_LL.
+• SendInput.
 
 Flujo:
+
 ```
+Windows Hook
+↓
+back_windows
+↓
+InputEvent
+↓
 Runtime
-↓
-Solicitud de acción
-↓
-Platform
-↓
-Hardware
 ```
 
----
+El backend Portable no conoce:
 
-# 🧩 6. Interception
-
-Interception pertenece exclusivamente a Platform.
-Es la capa encargada de trabajar con la librería de bajo nivel.
-Responsabilidades:
-• Inicialización.
-• Recepción de eventos físicos.
-• Reenvío.
-• Inyección.
-• Comunicación con dispositivos.
-
-Interception no conoce:
+• Cache.
 • Remapeos.
-• Perfiles.
-• UI.
-• Acciones del usuario.
+• Runtime.
+
+Solo traduce eventos físicos y emite eventos genéricos.
+
+---
+
+# ▶️ 6. Salida física
+
+La salida depende del modo físico.
+
+## Full
+
+`back_salida.rs` utiliza Interception.
+
+Flujo:
+
+```
+AccionCache
+↓
+back_salida
+↓
+Interception
+```
+
+## Portable
+
+`back_windows.rs` utiliza SendInput.
+
+Flujo:
+
+```
+AccionCache
+↓
+entrada.rs
+↓
+back_windows
+↓
+SendInput
+```
+
+La acción sigue siendo genérica antes de llegar al backend físico.
 
 ---
 
 # 🖥️ 7. Tauri
 
-Tauri es el puente entre la aplicación y el entorno del sistema.
-Responsabilidades:
-• Crear la aplicación de escritorio.
-• Exponer comandos.
-• Comunicar UI con lógica nativa.
-• Gestionar integración del sistema.
+Tauri es el puente entre la UI y la lógica nativa.
 
-Tauri no debe contener reglas del remapeador.
-Solo transporta información.
+`comandos.rs` expone comandos para:
+
+• Compilar perfil.
+• Activar perfil.
+• Desactivar perfil.
+• Iniciar captura.
+• Obtener captura.
+• Obtener perfil actual.
+
+El flujo de configuración es:
+
+```
+UI
+↓
+Tauri
+↓
+PerfilJson
+↓
+Persistencia / Compilador
+```
+
+Tauri no decide coincidencias de remapeos.
 
 ---
 
 # 🔗 8. Comunicación con Runtime
 
-La comunicación entre Platform y Runtime debe mantenerse simple.
+La comunicación mantiene una separación simple:
 
 ```
-Platform informa
+Platform recibe InputEvent
 ↓
 Runtime decide
 ↓
-Platform ejecuta
+Platform emite AccionCache
 ```
 
----
+Platform no interpreta el Trigger.
 
-Ejemplo:
-Platform recibe:
-```
-Mouse Button X1 Down
-```
-Transforma a:
-```
-Evento interno
-```
-Runtime decide:
-```
-Enviar Ctrl+C
-```
-Platform ejecuta:
-```
-Inyección de teclado
-```
+Platform no busca remapeos.
+
+Platform no decide si un evento debe consumirse.
 
 ---
 
 # 🔁 9. Reentrada
 
-Platform debe impedir que RemapH procese sus propios eventos generados.
-Ejemplo:
+Existe un módulo `reentrada.rs` destinado a controlar eventos generados por el motor.
 
-```
-Runtime genera Ctrl+C
-↓
-Platform inyecta tecla
-↓
-Sistema genera evento
-↓
-RemapH lo recibe
-↓
-Debe ignorarlo
-```
+En el estado actual de commit 004 la integración completa de este mecanismo todavía no constituye el flujo principal de ejecución.
 
-El control de reentrada pertenece a Platform.
-El Runtime nunca debe preocuparse por el origen físico del evento.
+La lógica de entrada y salida debe mantener separadas la entrada física y la emisión física.
 
 ---
 
 # 📌 10. Reglas de diseño
 
 ## Platform no decide
-Platform ejecuta instrucciones.
-No interpreta intención.
 
-## Platform no conoce reglas
-Nunca debe saber:
-• qué es un perfil.
-• qué es un remapeo.
-• qué botón fue presionado.
+Platform ejecuta traducciones físicas.
 
-## Platform traduce, no interpreta
-Su trabajo es convertir formatos.
+## Platform no conoce perfiles
+
+No debe saber qué es un perfil de usuario.
+
+## Platform no conoce la Cache
+
+La Cache pertenece al Runtime.
+
+## Platform traduce
+
+Convierte formatos físicos en formatos internos.
 
 ## Runtime decide, Platform ejecuta
-Esta separación es una regla fundamental de RemapH.
+
+Esta separación debe mantenerse.
 
 ---
 
 # ✅ Resumen
 
-Platform es la frontera entre RemapH y el sistema operativo.
-Sus responsabilidades son:
-• Escuchar hardware.
-• Generar entradas internas.
-• Ejecutar salidas físicas.
-• Comunicar con Windows.
-• Proteger la separación del resto del sistema.
-Platform es el cuerpo de RemapH.
-Runtime es su cerebro.
+Platform es la frontera física de RemapH.
+
+Actualmente soporta dos caminos de entrada:
+
+```
+Full
+↓
+Interception
+```
+
+y:
+
+```
+Portable
+↓
+Windows API
+```
+
+Ambos entregan `InputEvent` al mismo Runtime.

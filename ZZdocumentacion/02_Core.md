@@ -8,11 +8,17 @@
 
 ## 🎯 Propósito
 
-Este documento define la arquitectura interna de Core.
-Core es la capa encargada de la comunicación y estructuras compartidas entre componentes.
-No contiene lógica de interfaz.
-No contiene lógica de remapeo.
-No contiene comunicación con hardware.
+Este documento define la arquitectura actual de Core.
+
+Core contiene modelos y estructuras compartidas.
+
+No contiene botones.
+
+No contiene ventanas.
+
+No contiene Runtime.
+
+No contiene comunicación directa con hardware.
 
 ---
 
@@ -20,190 +26,211 @@ No contiene comunicación con hardware.
 
 1. Objetivos
 2. Responsabilidad de Core
-3. Eventos
+3. Perfil UI
 4. ContextoFila
-5. Comunicación entre componentes
-6. Flujo de información
-7. Reglas de dependencia
-8. Buenas prácticas
+5. Entradas
+6. Triggers
+7. Captura
+8. Reglas de dependencia
+9. Buenas prácticas
 
 ---
 
 # 🎯 1. Objetivos
 
-Core existe para evitar que los componentes dependan directamente entre ellos.
-Su objetivo es permitir que distintas partes del programa puedan comunicarse manteniendo independencia.
-La pregunta principal de Core es:
-> ¿Cómo se comunican las piezas sin conocerse?
+Core existe para mantener los modelos comunes fuera de la UI y del Runtime.
+
+Su pregunta principal es:
+
+> ¿Qué información debe ser compartida sin pertenecer a una capa visual o física?
 
 ---
 
 # 🏛️ 2. Responsabilidad de Core
 
-Core contiene infraestructura común.
-Incluye:
-• Eventos.
-• Contextos compartidos.
-• Sistemas de comunicación.
-• Modelos comunes.
-• Reglas internas reutilizables.
+Core contiene:
+
+• Modelos de perfil.
+• Estado editable de la UI.
+• Identidad de filas.
+• Entradas canónicas.
+• Triggers.
+• Captura y análisis de captura.
 
 Core no contiene:
+
 • Botones.
 • Ventanas.
-• Teclas físicas.
-• Reglas de remapeo.
-• Acciones del sistema.
+• Windows API.
+• Interception.
+• Cache del Runtime.
+• Ejecución física.
 
 ---
 
-# 📡 3. Eventos
+# 👤 3. Perfil UI
 
-## Concepto
+El Perfil UI representa la configuración que el usuario está editando.
 
-Un evento representa un hecho ocurrido dentro del sistema.
-Un evento no representa una orden.
-El componente que emite informa.
-El componente que recibe decide qué hacer.
-
----
-
-## Ejemplo correcto
+El modelo principal es:
 
 ```
-EVT_TIPO
-{
- id:"F001",
- valor:"Mouse"
-}
+Perfil
+│
+├── activo
+└── filas[]
 ```
 
-Significado:
-"El tipo de esta fila ahora es Mouse."
+Cada fila es un:
 
----
+`FilaPerfil`
 
-## Ejemplo incorrecto
+La UI modifica este modelo.
 
-```
-CAMBIAR_ACCION_A_MOUSE
-```
-
-Significado:
-"Ejecuta esta instrucción concreta."
-Eso acopla componentes.
-
----
-
-## Nombre del evento
-
-El nombre debe contener únicamente la categoría del hecho.
-Ejemplo:
+Flujo:
 
 ```
-EVT_TIPO
-EVT_ESTADO
-EVT_ACCION
+UI
+↓
+Perfil UI
 ```
 
-La información específica viaja dentro de los datos.
+El Runtime no utiliza directamente este modelo.
+
+La conversión al modelo persistente ocurre en Tauri.
 
 ---
 
 # 🪪 4. ContextoFila
 
 Cada fila posee una identidad única.
-Esa identidad pertenece a la fila, no a sus botones.
-Una fila clon posee una nueva identidad.
+
+La identidad se representa mediante:
+
+`ContextoFila`
 
 ```
 Fila
-
-ID
 │
-├── Botón Tipo
-├── Botón Estado
-├── Botón Acción
-└── Botón Color
+└── id
 ```
 
-Todos los componentes internos reciben el mismo ContextoFila.
-
----
-
-## Motivo
-
-Los botones pueden destruirse.
-El contenido puede cambiar.
-La fila continúa siendo la misma entidad.
-Por eso la identidad debe vivir fuera de los componentes temporales.
-
----
-
-# 🔄 5. Comunicación entre componentes
-
-La comunicación oficial es:
-
-```
-Componente
-↓
-Evento
-↓
-Componente interesado
-```
+Todos los componentes internos de la fila reciben el mismo ContextoFila.
 
 Ejemplo:
+
 ```
-Usuario cambia Tipo
+Fila
+│
+├── Estado
+├── Tipo
+├── Acción
+└── Color
+
+Todos reciben:
+
+ContextoFila
+```
+
+La identidad pertenece a la fila.
+
+No pertenece a los botones.
+
+Una fila clonada recibe un nuevo ID.
+
+---
+
+# ⌨️ 5. Entradas
+
+`core_entrada.ts` define el modelo canónico de entrada.
+
+La UI puede utilizar nombres propios del DOM.
+
+Core los representa en el idioma canónico de RemapH.
+
+Ejemplo:
+
+```
+ControlLeft
 ↓
-Botón Tipo emite EVT_TIPO
+LeftControl
+```
+
+Una entrada contiene:
+
+• Tipo.
+• Código.
+• Nombre.
+
+La capa superior no debe depender directamente de Windows o Interception.
+
+---
+
+# 🎯 6. Triggers
+
+`core_trigger.ts` define el modelo de Trigger.
+
+```
+Trigger
+├── modificadores[]
+├── gatillo
+└── condicion
+```
+
+El Trigger también contiene funciones de representación visual:
+
+• Texto.
+• HTML.
+
+La representación visual se centraliza en Core para mantener una única interpretación del modelo.
+
+---
+
+# 🎥 7. Captura
+
+La captura se divide en dos etapas.
+
+## Captura
+
+`comp_capturador_captura.ts`
+
+Recibe eventos del DOM.
+
+Construye un timeline.
+
+Convierte entradas al idioma canónico.
+
+---
+
+## Análisis
+
+`core_analizar_captura.ts`
+
+Recibe el timeline.
+
+Analiza la secuencia.
+
+Produce un `Trigger`.
+
+Flujo:
+
+```
+DOM
 ↓
-Componente Acción recibe EVT_TIPO
+Entrada canónica
 ↓
-Reconstruye su contenido
+EventoCaptura
+↓
+Timeline
+↓
+Analizador
+↓
+Trigger
 ```
 
 ---
 
-## Prohibido
-
-Un componente no debe hacer:
-
-```
-Botón Tipo
-↓
-buscar Botón Acción
-↓
-modificarlo directamente
-```
-
-Porque crea dependencia directa.
-
----
-
-# 🔁 6. Flujo de información
-
-La información debe viajar siguiendo una dirección clara.
-
-```
-Usuario
-↓
-Componente UI
-↓
-Core
-↓
-Evento
-↓
-Componente UI
-```
-
-Core transporta información.
-No decide la apariencia.
-No decide la acción.
-
----
-
-# 🔗 7. Reglas de dependencia
+# 🔗 8. Reglas de dependencia
 
 Las dependencias permitidas son:
 
@@ -217,65 +244,45 @@ Runtime
 Platform
 ```
 
-Las capas superiores pueden utilizar servicios inferiores.
-Las capas inferiores nunca conocen las superiores.
+Core no conoce:
+
+• UI visual.
+• Runtime.
+• Windows.
+• Interception.
 
 ---
 
-## Ejemplos
+# ✅ 9. Buenas prácticas
 
-Correcto:
+Antes de crear un nuevo modelo en Core:
 
-UI utiliza eventos de Core.
-Runtime utiliza modelos de Core.
+¿Es compartido?
 
+¿Tiene sentido fuera de la UI?
 
-Incorrecto:
+¿Debe ser independiente del hardware?
 
-Runtime modifica botones.
-Core conoce ventanas.
+¿Pertenece a la configuración o a la ejecución?
 
----
-
-# ✅ 8. Buenas prácticas
-
-Antes de crear una comunicación nueva:
-Preguntar:
-¿Es realmente necesario un evento?
-Si la respuesta es directa y pertenece a un único componente, no necesita evento.
-Ejemplo:
-Un botón que abre su propio menú no necesita evento.
-
----
-
-Usar eventos cuando:
-• varios componentes deben reaccionar.
-• el origen no debe conocer los receptores.
-• la información representa un hecho ocurrido.
-
----
-
-Mantener los eventos pequeños.
-Preferir:
-```
-EVT_TIPO
-{
-id,
-valor
-}
-```
-
-sobre eventos con nombres largos y específicos.
+Si representa una estructura compilada o una acción física, probablemente no pertenece a Core.
 
 ---
 
 # 📌 Resumen
 
-Core es la capa que mantiene unido el proyecto sin crear dependencias.
-Sus reglas principales son:
-• Los eventos comunican hechos.
-• Los receptores deciden.
-• La identidad pertenece a la fila.
-• Los componentes reciben contexto.
-• La comunicación directa entre componentes debe evitarse.
-• Core conecta, pero no controla.
+Core mantiene los modelos comunes de RemapH.
+
+Sus responsabilidades actuales son:
+
+• Perfil editable.
+• Contexto de fila.
+• Entradas.
+• Triggers.
+• Captura.
+
+Core define información.
+
+No controla la apariencia.
+
+No ejecuta remapeos.

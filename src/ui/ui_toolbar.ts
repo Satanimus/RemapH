@@ -10,6 +10,30 @@
 // 🔴 PERFIL PAUSADO
 // ======================================================
 
+import {
+    invoke
+} from "@tauri-apps/api/core";
+
+import {
+    abrirPopupPerfil
+} from "./componentes/comp_popup_perfil";
+
+import type {
+    ResultadoPerfil
+} from "./componentes/comp_popup_perfil";
+
+import {
+    convertirPerfilJson
+} from "../core/core_perfil_json";
+
+import {
+    establecerPerfilUi
+} from "../core/core_perfil_ui";
+
+import {
+    reconstruirTabla
+} from "./ui_tabla_control";
+
 
 // ======================================================
 // 🚀 CREAR TOOLBAR
@@ -170,7 +194,182 @@ export function crearToolbar(
     );
 
 
+    const botonSelector =
+        toolbar.querySelector<HTMLButtonElement>(
+
+            ".perfil-selector"
+
+        );
+
+
+    if (botonSelector) {
+
+        invoke<string>(
+
+            "obtener_nombre_perfil_actual"
+
+        )
+
+        .then(
+
+            nombre => {
+
+                botonSelector.textContent =
+                    `${nombre} ▾`;
+
+            }
+
+        )
+
+        .catch(
+
+            error => {
+
+                console.error(
+
+                    "❌ No se pudo obtener el perfil actual:",
+
+                    error
+
+                );
+
+            }
+
+        );
+
+
+        botonSelector.addEventListener(
+
+            "click",
+
+            evento => {
+
+                abrirPopupPerfil(
+
+                    evento,
+
+                    nombreMostrado(
+
+                        botonSelector
+
+                    ),
+
+                    resultado => {
+
+                        aplicarResultadoPerfil(
+
+                            toolbar,
+
+                            botonSelector,
+
+                            resultado,
+
+                        );
+
+                    },
+
+                );
+
+            }
+
+        );
+
+    }
+
+
     return toolbar;
+
+}
+
+
+// ======================================================
+// 🆔 NOMBRE MOSTRADO EN EL SELECTOR
+// ======================================================
+
+function nombreMostrado(
+
+    botonSelector:
+        HTMLButtonElement,
+
+):
+
+    string
+
+{
+
+    return (
+
+        botonSelector.textContent ??
+            ""
+
+    )
+
+        .replace(
+
+            "▾",
+
+            "",
+
+        )
+
+        .trim();
+
+}
+
+
+// ======================================================
+// 🔄 APLICAR RESULTADO DE PERFIL
+// ------------------------------------------------------
+// Reemplaza el perfil de la UI con el que llega desde
+// Rust (seleccionar / crear / clonar / renombrar /
+// eliminar perfil) y refresca toolbar + tabla.
+// ======================================================
+
+function aplicarResultadoPerfil(
+
+    toolbar:
+        HTMLElement,
+
+    botonSelector:
+        HTMLButtonElement,
+
+    resultado:
+        ResultadoPerfil,
+
+):
+
+    void
+
+{
+
+    const perfil =
+
+        convertirPerfilJson(
+
+            resultado.perfil
+
+        );
+
+
+    establecerPerfilUi(
+
+        perfil
+
+    );
+
+
+    reconstruirTabla();
+
+
+    botonSelector.textContent =
+        `${resultado.nombre} ▾`;
+
+
+    marcarPerfilActivo(
+
+        toolbar
+
+    );
 
 }
 

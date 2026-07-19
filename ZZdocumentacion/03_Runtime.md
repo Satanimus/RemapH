@@ -8,343 +8,295 @@
 
 ## 🎯 Propósito
 
-Este documento define la arquitectura del Runtime de RemapH V3.
-El Runtime es el motor encargado de ejecutar los remapeos configurados por el usuario.
-Recibe eventos internos, consulta la configuración preparada y decide qué acción corresponde ejecutar.
-No conoce la interfaz.
+Este documento define la arquitectura actual del Runtime de RemapH V3.
+
+El Runtime recibe entradas físicas genéricas y resuelve remapeos compilados.
+
+No conoce la UI.
+
 No conoce Windows.
-No conoce dispositivos físicos.
+
+No conoce Interception.
 
 ---
 
 # 📑 Índice
 
-1. Objetivo del Runtime
+1. Objetivo
 2. Responsabilidad
 3. Flujo general
-4. Configuración del usuario
+4. Modelo persistente
 5. Compilador
-6. Caché
-7. Motor de ejecución
-8. Resolución de remapeos
-9. Acciones
-10. Estados y tiempos
-11. Reglas de diseño
+6. Perfil compilado
+7. Cache
+8. Motor de ejecución
+9. Estados
+10. Reglas de diseño
 
 ---
 
-# 🎯 1. Objetivo del Runtime
+# 🎯 1. Objetivo
 
-El Runtime transforma eventos de entrada en acciones según la configuración activa.
-Su función principal es:
+El Runtime transforma un `InputEvent` en una decisión de ejecución.
+
+Su flujo principal es:
 
 ```
-Evento recibido
+InputEvent
 ↓
 Buscar coincidencia
 ↓
-Determinar acción
-↓
-Solicitar ejecución
+Resultado
 ```
 
-El Runtime no crea configuraciones.
-No edita perfiles.
-No muestra información al usuario.
+El resultado puede ser:
+
+```
+Pasar
+Esperar
+Consumir
+```
+
+Si existe una acción compilada, el Runtime la envía a la salida.
 
 ---
 
 # 🏛️ 2. Responsabilidad
 
 El Runtime contiene:
-• Motor de ejecución.
-• Reglas de remapeo.
-• Resolución de coincidencias.
-• Gestión de estados activos.
-• Interpretación de estructuras compiladas.
-• Solicitud de acciones.
 
----
+• Compilación.
+• Modelo compilado.
+• Cache.
+• Resolución de Triggers.
+• Estado lógico de Inputs.
+• Resolución de acciones.
 
 El Runtime no contiene:
+
 • Botones.
-• Ventanas.
-• Popups.
-• Captura física directa.
-• Comunicación visual.
-• Código específico de Windows.
+• UI.
+• JSON.
+• Windows API.
+• Interception.
+• Captura física.
 
 ---
 
 # 🔄 3. Flujo general
 
-El flujo completo del sistema es:
+El flujo de configuración es:
 
 ```
-Usuario
-↓
 UI
 ↓
-Core
-↓
-Configuración
+PerfilJson
 ↓
 Compilador
 ↓
-Caché
+PerfilCache
 ↓
-Runtime
-↓
-Platform
-↓
-Hardware
+Cache
 ```
 
-Durante la ejecución normal:
+El flujo de ejecución es:
 
 ```
 Entrada física
 ↓
-Platform
-↓
-Evento interno
+InputEvent
 ↓
 Runtime
 ↓
-Acción
+Cache
 ↓
-Platform
+AccionCache
 ↓
 Salida física
 ```
 
 ---
 
-# 📄 4. Configuración del usuario
+# 📄 4. Modelo persistente
 
-La configuración editable representa la intención del usuario.
-Debe ser cómoda de leer y modificar.
-Ejemplo conceptual:
+La configuración persistente se representa mediante `PerfilJson`.
 
-```
-Trigger:
-Mouse X1
+El modelo contiene la información necesaria para reconstruir la configuración del usuario.
 
-Acción:
-Ctrl + C
-
-Condición:
-Doble toque
-
-Ámbito:
-Photoshop.exe
-```
-
-Esta información no está optimizada para ejecución.
-Su objetivo es ser comprensible.
+El Runtime no lee directamente este modelo.
 
 ---
 
 # 🔨 5. Compilador
 
-El compilador transforma la configuración del usuario en estructuras preparadas para ejecución.
-Su función:
+`compilador.rs` convierte:
 
 ```
-Configuración editable
+PerfilJson
 ↓
-Validación
+PerfilCache
 ↓
-Normalización
-↓
-Estructura compilada
+Cache
 ```
 
----
+Actualmente el compilador:
 
-El Runtime no debe interpretar configuraciones crudas.
-Debe recibir estructuras preparadas.
+• Ignora remapeos con estado `OFF`.
+• Requiere un gatillo válido.
+• Requiere una acción válida.
+• Convierte entradas a `InputId`.
+• Construye `RemapeoCache`.
 
----
-
-## Motivo
-
-Separar compilación y ejecución permite:
-• Mayor velocidad.
-• Menos complejidad durante uso real.
-• Validación anticipada.
-• Menor cantidad de errores.
+El compilador no ejecuta acciones.
 
 ---
 
-# 💾 6. Caché
+# 📦 6. Perfil compilado
 
-La caché almacena la versión compilada de los remapeos.
-Su función es evitar reconstruir información constantemente.
-Flujo:
+`perfilcache.rs` define las estructuras internas del Runtime.
 
 ```
-Usuario modifica configuración
-↓
-Compilador actualiza caché
-↓
-Runtime consulta caché
+RemapeoCache
+│
+├── TriggerCache
+└── AccionCache
 ```
 
----
-
-La caché pertenece al Runtime.
-No pertenece a la UI.
-No debe contener información visual.
-
----
-
-# ⚙️ 7. Motor de ejecución
-
-El motor recibe eventos internos y busca coincidencias.
-Ejemplo:
+`TriggerCache` contiene:
 
 ```
-Evento:
-
-Mouse X1 presionado
-↓
-Runtime consulta:
-¿Existe remapeo?
-↓
-Sí
-↓
-¿Cumple condiciones?
-↓
-Ejecutar acción
+modificadores[]
+gatillo
 ```
 
+`AccionCache` representa la acción preparada para ejecución.
+
+Este modelo:
+
+• No se serializa.
+• No conoce JSON.
+• No conoce UI.
+
 ---
 
-El motor administra:
-• Activación.
-• Desactivación.
-• Condición de pulsación.
-• Tiempo de espera.
-• Estados internos.
+# 💾 7. Cache
+
+`cache.rs` almacena los `RemapeoCache` compilados.
+
+La Cache:
+
+• Reemplaza el conjunto completo.
+• Busca Triggers exactos.
+• Busca Pulses.
+• Detecta prefijos.
+
+La Cache no contiene información visual.
 
 ---
 
-# 🎯 8. Resolución de remapeos
+# ⚙️ 8. Motor de ejecución
 
-Un remapeo se evalúa mediante sus componentes:
+`runtime.rs` contiene `Estado`.
+
+El Runtime mantiene:
+
+• Orden de Inputs activos.
+• Inputs consumidos.
+
+El orden de Inputs es importante porque la Cache compara los modificadores en orden.
+
+---
+
+## Resultado
+
+El Runtime devuelve:
+
+### Pasar
+
+El evento no corresponde a un remapeo consumido.
+
+La entrada puede continuar.
+
+### Esperar
+
+La entrada actual puede ser el inicio de un Trigger incompleto.
+
+El Runtime espera más Inputs.
+
+### Consumir
+
+El remapeo coincidió.
+
+El evento se considera consumido.
+
+---
+
+# 🟢 9. Estados
+
+El Runtime consulta el estado global del perfil.
+
+Si el perfil está inactivo:
 
 ```
-Trigger
+InputEvent
 ↓
-Condicion
-↓
-Condiciones
-↓
-Ámbito
-↓
-Acción
+Pasar
 ```
 
----
+El estado global vive en `estado.rs`.
 
-Ejemplo:
-
-```
-Trigger:
-Ctrl+A
-↓
-Condición:
-Mantener pulsado
-↓
-Ámbito:
-Global
-↓
-Acción:
-Volumen+
-```
+El Runtime no decide cómo cambiarlo.
 
 ---
 
-El Runtime decide si la acción corresponde.
-La UI únicamente representa la configuración.
+# 📌 10. Reglas de diseño
 
----
+## El Runtime no lee JSON
 
-# ▶️ 9. Acciones
-
-Las acciones representan operaciones que deben ejecutarse.
-Ejemplos:
-• Teclado.
-• Mouse.
-• Multimedia.
-• Macro.
-• Coordenadas.
-• Otras futuras.
-
----
-
-El Runtime no ejecuta directamente hardware.
-Solicita la acción a Platform.
-
-```
-Runtime
-↓
-Solicitud de acción
-↓
-Platform
-↓
-Hardware
-```
-
----
-
-# ⏱️ 10. Estados y tiempos
-
-El Runtime administra comportamientos temporales.
-Ejemplos:
-• Pulsación normal.
-• Mantener pulsado.
-• Doble toque.
-• Retrasos.
-• Secuencias.
-
----
-
-Estos estados pertenecen al motor.
-No pertenecen a la UI.
-La interfaz únicamente permite configurarlos.
-
----
-
-# 📌 11. Reglas de diseño
-
-## El Runtime no interpreta configuraciones humanas
 Toda configuración debe pasar por compilación.
 
-## El Runtime trabaja con eventos internos
-Nunca debe depender de eventos físicos directamente.
+## El Runtime no conoce la UI
 
-## El Runtime no conoce la existencia de la interfaz
-Puede ejecutarse sin UI.
+Puede ejecutarse sin conocer los controles visuales.
 
-## El Runtime no conoce tecnologías externas
-Interception, Tauri o Windows pertenecen a Platform.
+## El Runtime no conoce el hardware
 
-## El Runtime decide, Platform ejecuta
-Esta separación debe mantenerse siempre.
+Trabaja con `InputEvent` e `InputId`.
+
+## El Runtime no interpreta nombres humanos
+
+La conversión ocurre antes de llegar al Runtime.
+
+## La Cache contiene modelos compilados
+
+No debe contener información visual ni persistente.
+
+## Runtime decide
+
+La Platform ejecuta físicamente.
 
 ---
 
 # ✅ Resumen
 
-El Runtime es el cerebro de RemapH.
-Sus responsabilidades son:
-• Recibir eventos internos.
-• Consultar configuraciones compiladas.
-• Resolver coincidencias.
-• Determinar acciones.
-• Solicitar ejecuciones.
-No sabe quién creó la configuración.
-No sabe quién recibe la acción.
-Solo ejecuta la lógica del remapeador.
+El Runtime es el motor lógico de RemapH.
+
+Su flujo actual es:
+
+```
+InputEvent
+↓
+Runtime
+↓
+Cache
+↓
+AccionCache
+```
+
+Su responsabilidad es resolver remapeos compilados.
+
+No conoce la UI.
+
+No conoce Windows.
+
+No conoce la configuración persistente.

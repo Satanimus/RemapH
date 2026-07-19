@@ -122,3 +122,50 @@
     flex-direction:column;
     gap:var(--gap8);
 }
+
+.popup-perfil{
+    min-width:220px;
+}
+
+.popup-perfil-lista{
+    display:flex;
+    flex-direction:column;
+    gap:var(--gap8);
+    max-height:240px;
+    overflow-y:auto;
+}
+
+.popup-perfil-separador{
+    height:1px;
+    background:var(--border);
+    margin:var(--gap4) 0;
+}
+
+.popup-perfil-acciones{
+    display:flex;
+    flex-direction:column;
+    gap:var(--gap8);
+}
+
+.popup-perfil-renombrar{
+    display:flex;
+    flex-direction:column;
+    gap:var(--gap8);
+    min-width:220px;
+}
+
+.popup-input{
+    height:28px;
+    padding:0 var(--gap8);
+    background:var(--panel2);
+    color:var(--text);
+    border:1px solid var(--border);
+    border-radius:var(--r4);
+    font-family:var(--font);
+    font-size:var(--fs13);
+}
+
+.popup-input:focus{
+    outline:none;
+    border-color:var(--blue);
+}
