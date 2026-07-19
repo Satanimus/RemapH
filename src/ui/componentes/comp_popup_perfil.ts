@@ -9,6 +9,11 @@
 //   - Clonar el perfil actual.
 //   - Renombrar el perfil actual.
 //   - Eliminar el perfil actual.
+//
+// Si el perfil actual está "editado" (cambios sin
+// guardar), Nuevo / Renombrar / Abrir preguntan primero
+// si guardar esos cambios. Clonar y Eliminar no preguntan
+// (ver reglas del proyecto).
 // ======================================================
 
 import { invoke } from "@tauri-apps/api/core";
@@ -19,6 +24,8 @@ import {
 } from "./comp_popup_contenedor";
 
 import { crearBoton } from "./comp_boton";
+
+import { confirmarPopup } from "./comp_popup_confirmar";
 
 import { obtenerPerfilUi } from "../../core/core_perfil_ui";
 
@@ -46,6 +53,8 @@ export interface ResultadoPerfil{
 export async function abrirPopupPerfil(
     evento:MouseEvent,
     nombreActual:string,
+    estaEditado:boolean,
+    alGuardar:()=>Promise<void>,
     alCambiarPerfil:(resultado:ResultadoPerfil)=>void
 ):Promise<void>{
 
@@ -63,9 +72,9 @@ export async function abrirPopupPerfil(
     contenedor.className="popup-perfil";
 
     contenedor.append(
-        crearListaPerfiles(perfiles,nombreActual,alCambiarPerfil),
+        crearListaPerfiles(perfiles,nombreActual,estaEditado,alGuardar,alCambiarPerfil),
         crearSeparador(),
-        crearAcciones(nombreActual,alCambiarPerfil)
+        crearAcciones(nombreActual,estaEditado,alGuardar,alCambiarPerfil)
     );
 
     mostrarPopup(
@@ -77,12 +86,49 @@ export async function abrirPopupPerfil(
 }
 
 // ======================================================
+// 🛟 CONFIRMAR SI HAY EDICIÓN PENDIENTE
+// ------------------------------------------------------
+// Si el perfil actual está editado, pregunta si guardar
+// antes de continuar. Si el usuario dice que no, los
+// cambios se descartan (el json original queda intacto).
+// ======================================================
+
+async function confirmarSiEditado(
+    estaEditado:boolean,
+    alGuardar:()=>Promise<void>,
+    evento:MouseEvent
+):Promise<void>{
+
+    if(!estaEditado){
+        return;
+    }
+
+    const guardar=await confirmarPopup(
+        "¿Guardar cambios del perfil actual?",
+        evento
+    );
+
+    if(!guardar){
+        return;
+    }
+
+    try{
+        await alGuardar();
+    }catch(error){
+        console.error("❌ No se pudo guardar el perfil:",error);
+    }
+
+}
+
+// ======================================================
 // 📋 LISTA DE PERFILES
 // ======================================================
 
 function crearListaPerfiles(
     perfiles:string[],
     nombreActual:string,
+    estaEditado:boolean,
+    alGuardar:()=>Promise<void>,
     alCambiarPerfil:(resultado:ResultadoPerfil)=>void
 ):HTMLElement{
 
@@ -99,12 +145,14 @@ function crearListaPerfiles(
 
         boton.addEventListener(
             "click",
-            async ()=>{
+            async evento=>{
 
                 if(nombre===nombreActual){
                     ocultarPopup();
                     return;
                 }
+
+                await confirmarSiEditado(estaEditado,alGuardar,evento);
 
                 try{
 
@@ -152,6 +200,8 @@ function crearSeparador():HTMLElement{
 
 function crearAcciones(
     nombreActual:string,
+    estaEditado:boolean,
+    alGuardar:()=>Promise<void>,
     alCambiarPerfil:(resultado:ResultadoPerfil)=>void
 ):HTMLElement{
 
@@ -164,12 +214,14 @@ function crearAcciones(
     // ----------------------------------
 
     const botonNuevo=crearBoton({
-        texto:"🆕 Nuevo perfil"
+        texto:"Nuevo perfil"
     });
 
     botonNuevo.addEventListener(
         "click",
-        async ()=>{
+        async evento=>{
+
+            await confirmarSiEditado(estaEditado,alGuardar,evento);
 
             try{
 
@@ -189,11 +241,15 @@ function crearAcciones(
     );
 
     // ----------------------------------
-    // 📋 CLONAR PERFIL ACTUAL
+    // 📋 CLONAR PERFIL
+    // ------------------------------------------------------
+    // No pregunta por cambios sin guardar: el clon se lleva
+    // la UI actual tal cual está, y el original en disco
+    // queda intacto (comportamiento intencional).
     // ----------------------------------
 
     const botonClonar=crearBoton({
-        texto:"📋 Clonar perfil actual"
+        texto:"Clonar perfil"
     });
 
     botonClonar.addEventListener(
@@ -219,27 +275,33 @@ function crearAcciones(
     );
 
     // ----------------------------------
-    // ✏️ RENOMBRAR PERFIL ACTUAL
+    // ✏️ RENOMBRAR PERFIL
     // ----------------------------------
 
     const botonRenombrar=crearBoton({
-        texto:"✏️ Renombrar perfil actual"
+        texto:"Renombrar perfil"
     });
 
     botonRenombrar.addEventListener(
         "click",
-        evento=>{
-            evento.stopPropagation();
-            abrirFormularioRenombrar(nombreActual,alCambiarPerfil);
+        async evento=>{
+
+            await confirmarSiEditado(estaEditado,alGuardar,evento);
+
+            abrirFormularioRenombrar(nombreActual,evento,alCambiarPerfil);
+
         }
     );
 
     // ----------------------------------
-    // 🗑️ ELIMINAR PERFIL ACTUAL
+    // 🗑️ ELIMINAR PERFIL
+    // ------------------------------------------------------
+    // Tampoco pregunta por cambios sin guardar: el archivo
+    // actual se borra igual, así que no hay nada que salvar.
     // ----------------------------------
 
     const botonEliminar=crearBoton({
-        texto:"🗑️ Eliminar perfil actual",
+        texto:"Eliminar perfil",
         clase:"popup-perfil-eliminar"
     });
 
@@ -247,9 +309,7 @@ function crearAcciones(
 
     botonEliminar.addEventListener(
         "click",
-        async evento=>{
-
-            evento.stopPropagation();
+        async ()=>{
 
             if(!confirmando){
 
@@ -291,10 +351,14 @@ function crearAcciones(
 
 // ======================================================
 // ✏️ FORMULARIO RENOMBRAR
+// ------------------------------------------------------
+// Un solo popup: input arriba, Guardar/Cancelar abajo,
+// uno al lado del otro. Aparece donde está el puntero.
 // ======================================================
 
 function abrirFormularioRenombrar(
     nombreActual:string,
+    evento:MouseEvent,
     alCambiarPerfil:(resultado:ResultadoPerfil)=>void
 ):void{
 
@@ -308,8 +372,16 @@ function abrirFormularioRenombrar(
     input.type="text";
     input.value=nombreActual;
 
-    const botonConfirmar=crearBoton({
-        texto:"✔️ Renombrar"
+    const botones=document.createElement("div");
+
+    botones.className="popup-confirmar-botones";
+
+    const botonCancelar=crearBoton({
+        texto:"Cancelar"
+    });
+
+    const botonGuardar=crearBoton({
+        texto:"Guardar"
     });
 
     const confirmar=async ()=>{
@@ -338,20 +410,38 @@ function abrirFormularioRenombrar(
 
     };
 
-    botonConfirmar.addEventListener("click",confirmar);
+    botonGuardar.addEventListener("click",confirmar);
+
+    botonCancelar.addEventListener(
+        "click",
+        ()=>{
+            ocultarPopup();
+        }
+    );
 
     input.addEventListener(
         "keydown",
         evento=>{
+
             if(evento.key==="Enter"){
                 confirmar();
             }
+
+            if(evento.key==="Escape"){
+                ocultarPopup();
+            }
+
         }
     );
 
-    contenedor.append(input,botonConfirmar);
+    botones.append(botonCancelar,botonGuardar);
+    contenedor.append(input,botones);
 
-    mostrarPopup(contenedor);
+    mostrarPopup(
+        contenedor,
+        evento.clientX,
+        evento.clientY
+    );
 
     input.focus();
     input.select();

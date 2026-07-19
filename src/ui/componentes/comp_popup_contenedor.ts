@@ -1,8 +1,14 @@
 // ======================================================
 // 🪟 comp_Popup_Contenedor RemapH V3
+// ------------------------------------------------------
+// Capa compartida por TODOS los popups.
+//
+// Cierra solo con click en el fondo, nunca por burbujeo
+// desde el contenido (inputs, botones, etc).
 // ======================================================
 
 let capaPopup:HTMLElement|null=null;
+let alCerrarActual:(()=>void)|null=null;
 
 export function crearContenedorPopup():HTMLElement{
 
@@ -16,8 +22,10 @@ export function crearContenedorPopup():HTMLElement{
 
     capaPopup.addEventListener(
         "click",
-        ()=>{
-            ocultarPopup();
+        evento=>{
+            if(evento.target===capaPopup){
+                ocultarPopup();
+            }
         }
     );
 
@@ -28,7 +36,8 @@ export function crearContenedorPopup():HTMLElement{
 export function mostrarPopup(
     contenido:HTMLElement,
     x?:number,
-    y?:number
+    y?:number,
+    alCerrar?:()=>void
 ):void{
 
     if(!capaPopup){
@@ -42,6 +51,8 @@ export function mostrarPopup(
     );
 
     capaPopup.style.display="block";
+
+    alCerrarActual=alCerrar??null;
 
     if(x!==undefined && y!==undefined){
 
@@ -64,5 +75,11 @@ export function ocultarPopup():void{
     }
 
     capaPopup.style.display="none";
+
+    const alCerrar=alCerrarActual;
+
+    alCerrarActual=null;
+
+    alCerrar?.();
 
 }

@@ -145,7 +145,28 @@ pub struct ResultadoPerfil {
 // ======================================================
 
 #[tauri::command]
-pub fn activar_perfil() {
+pub fn activar_perfil() -> Result<bool, String> {
+
+    let ruta =
+
+        usuario::perfil_actual()?;
+
+
+    let perfil =
+
+        persistencia::cargar(
+
+            &ruta
+
+        )?;
+
+
+    compilador::compilar(
+
+        &perfil
+
+    );
+
 
     sincronizar_estado_cache();
 
@@ -156,6 +177,13 @@ pub fn activar_perfil() {
 
     );
 
+
+    Ok(
+
+        !cache::esta_vacia()
+
+    )
+
 }
 
 
@@ -165,6 +193,8 @@ pub fn activar_perfil() {
 
 #[tauri::command]
 pub fn desactivar_perfil() {
+
+    cache::borrar();
 
     estado::desactivar();
 
@@ -491,6 +521,13 @@ pub fn clonar_perfil(
 
     )?;
 
+    compilador::compilar(
+
+        &perfil
+
+    );
+
+    sincronizar_estado_cache();
 
     resultado_perfil(
 
@@ -608,6 +645,13 @@ pub fn renombrar_perfil(
 
         )?;
 
+        compilador::compilar(
+
+            &perfil
+
+        );
+
+        sincronizar_estado_cache();
 
     resultado_perfil(
 
@@ -688,6 +732,13 @@ pub fn eliminar_perfil_actual()
 
             )?;
 
+            compilador::compilar(
+
+                &perfil
+
+            );
+
+            sincronizar_estado_cache();
 
         return resultado_perfil(
 

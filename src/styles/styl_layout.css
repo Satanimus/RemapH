@@ -78,9 +78,19 @@
     border-radius:var(--r4);
 }
 
-.perfil-estado{
+.perfil-estado[data-estado="activo"]{
     background:var(--green);
-    color:white;
+    color:#FFF;
+}
+
+.perfil-estado[data-estado="inactivo"]{
+    background:var(--red);
+    color:#FFF;
+}
+
+.perfil-estado[data-estado="editado"]{
+    background:var(--yellow);
+    color:#111;
 }
 
 /* ==========================
@@ -168,4 +178,35 @@
 .popup-input:focus{
     outline:none;
     border-color:var(--blue);
+}
+
+.indicador{
+    display:inline-block;
+    width:10px;
+    height:10px;
+    border-radius:50%;
+    background:var(--red);
+    margin-left:var(--gap8);
+}
+
+.indicador[data-estado="activo"]{
+    background:var(--green);
+}
+
+.popup-confirmar{
+    min-width:220px;
+}
+
+.popup-confirmar-mensaje{
+    margin:0 0 var(--gap8) 0;
+    color:var(--text);
+}
+
+.popup-confirmar-botones{
+    display:flex;
+    gap:var(--gap8);
+}
+
+.popup-confirmar-botones .ui-btn{
+    flex:1;
 }

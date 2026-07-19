@@ -3,11 +3,11 @@
 // ------------------------------------------------------
 // Barra superior principal.
 //
-// Estados del perfil:
+// Estados del perfil (botón .perfil-estado):
 //
-// 🟢 PERFIL ACTIVO
-// 🟡 PERFIL EDITADO
-// 🔴 PERFIL PAUSADO
+// 🟢 Perfil Activo      → ui = json = caché
+// 🔴 Perfil inactivo    → ui = json, caché vacía
+// 🟡 Perfil editado, ¿guardar? → ui ≠ json
 // ======================================================
 
 import {
@@ -33,6 +33,11 @@ import {
 import {
     reconstruirTabla
 } from "./ui_tabla_control";
+
+import {
+    crearIndicador,
+    actualizarIndicador
+} from "./componentes/comp_indicador";
 
 
 // ======================================================
@@ -84,7 +89,7 @@ export function crearToolbar(
 
 
             <button class="perfil-estado">
-                PERFIL ACTIVO
+                Perfil Activo
             </button>
 
         </div>
@@ -104,6 +109,61 @@ export function crearToolbar(
         </div>
 
     `;
+
+
+    const cacheDot =
+        crearIndicador("cache-dot");
+
+
+    toolbar.querySelector(
+        ".toolbar-left"
+
+    )?.append(
+
+        cacheDot
+
+    );
+
+
+    invoke<boolean>(
+
+        "obtener_estado_cache"
+
+    )
+
+    .then(
+
+        activo => {
+
+            marcarPerfilSegunCache(
+
+                toolbar,
+
+                cacheDot,
+
+                activo
+
+            );
+
+        }
+
+    )
+
+    .catch(
+
+        error => {
+
+            console.error(
+
+                "❌ No se pudo obtener el estado de la caché:",
+
+                error
+
+            );
+
+        }
+
+    );
 
 
     const botonNuevaFila =
@@ -141,16 +201,8 @@ export function crearToolbar(
 
         async () => {
 
-            if (
-
-                botonEstado.dataset.estado !==
-                "editado"
-
-            ) {
-
-                return;
-
-            }
+            const estadoActual =
+                botonEstado.dataset.estado;
 
 
             botonEstado.disabled =
@@ -159,14 +211,69 @@ export function crearToolbar(
 
             try {
 
-                await alGuardar();
+                if (estadoActual === "editado") {
 
+                    await alGuardar();
 
-                marcarPerfilActivo(
+                    const activo =
+                        await invoke<boolean>(
 
-                    toolbar
+                            "obtener_estado_cache"
 
-                );
+                        );
+
+                    marcarPerfilSegunCache(
+
+                        toolbar,
+
+                        cacheDot,
+
+                        activo
+
+                    );
+
+                }
+
+                else if (estadoActual === "activo") {
+
+                    await invoke(
+
+                        "desactivar_perfil"
+
+                    );
+
+                    marcarPerfilSegunCache(
+
+                        toolbar,
+
+                        cacheDot,
+
+                        false
+
+                    );
+
+                }
+
+                else if (estadoActual === "inactivo") {
+
+                    const activo =
+                        await invoke<boolean>(
+
+                            "activar_perfil"
+
+                        );
+
+                    marcarPerfilSegunCache(
+
+                        toolbar,
+
+                        cacheDot,
+
+                        activo
+
+                    );
+
+                }
 
             }
 
@@ -174,7 +281,7 @@ export function crearToolbar(
 
                 console.error(
 
-                    "❌ No se pudo guardar el perfil:",
+                    "❌ No se pudo cambiar el estado del perfil:",
 
                     error
 
@@ -254,6 +361,10 @@ export function crearToolbar(
 
                     ),
 
+                    botonEstado?.dataset.estado === "editado",
+
+                    alGuardar,
+
                     resultado => {
 
                         aplicarResultadoPerfil(
@@ -261,6 +372,8 @@ export function crearToolbar(
                             toolbar,
 
                             botonSelector,
+
+                            cacheDot,
 
                             resultado,
 
@@ -333,6 +446,9 @@ function aplicarResultadoPerfil(
     botonSelector:
         HTMLButtonElement,
 
+    cacheDot:
+        HTMLElement,
+
     resultado:
         ResultadoPerfil,
 
@@ -365,9 +481,70 @@ function aplicarResultadoPerfil(
         `${resultado.nombre} ▾`;
 
 
-    marcarPerfilActivo(
+    marcarPerfilSegunCache(
 
-        toolbar
+        toolbar,
+
+        cacheDot,
+
+        resultado.cache_activo
+
+    );
+
+}
+
+
+// ======================================================
+// 🎯 MARCAR PERFIL SEGÚN CACHÉ
+// ------------------------------------------------------
+// Punto único que decide Activo/Inactivo + el color del
+// indicador de caché, siempre en espejo (nunca pueden
+// quedar desincronizados).
+// ======================================================
+
+function marcarPerfilSegunCache(
+
+    toolbar:
+        HTMLElement,
+
+    cacheDot:
+        HTMLElement,
+
+    activo:
+        boolean,
+
+):
+
+    void
+
+{
+
+    if (activo) {
+
+        marcarPerfilActivo(
+
+            toolbar
+
+        );
+
+    }
+
+    else {
+
+        marcarPerfilInactivo(
+
+            toolbar
+
+        );
+
+    }
+
+
+    actualizarIndicador(
+
+        cacheDot,
+
+        activo
 
     );
 
@@ -405,7 +582,7 @@ export function marcarPerfilEditado(
 
 
     botonEstado.textContent =
-        "PERFIL EDITADO";
+        "Perfil editado, ¿guardar?";
 
 
     botonEstado.dataset.estado =
@@ -445,10 +622,50 @@ export function marcarPerfilActivo(
 
 
     botonEstado.textContent =
-        "PERFIL ACTIVO";
+        "Perfil Activo";
 
 
     botonEstado.dataset.estado =
         "activo";
+
+}
+
+
+// ======================================================
+// 🔴 MARCAR PERFIL INACTIVO
+// ======================================================
+
+export function marcarPerfilInactivo(
+
+    toolbar:
+        HTMLElement
+
+):
+
+    void
+
+{
+
+    const botonEstado =
+        toolbar.querySelector<HTMLButtonElement>(
+
+            ".perfil-estado"
+
+        );
+
+
+    if (!botonEstado) {
+
+        return;
+
+    }
+
+
+    botonEstado.textContent =
+        "Perfil inactivo";
+
+
+    botonEstado.dataset.estado =
+        "inactivo";
 
 }
