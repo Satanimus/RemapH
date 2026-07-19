@@ -1,457 +1,416 @@
 // ======================================================
-// 🧠 core_Analizar_Captura RemapH V3
+// 🧠 core_Analizar_Captura
+// RemapH V3
 // ======================================================
 
-import type { EventoCaptura } from "./core_evento_captura";
-import type { Trigger } from "./core_trigger";
-import { crearTrigger } from "./core_trigger";
-import { CONFIG_CAPTURA } from "./core_configuracion_captura";
+import type {
+    EventoCaptura,
+} from "./core_evento_captura";
+
+import type {
+    Trigger,
+} from "./core_trigger";
+
+import {
+    crearTrigger,
+} from "./core_trigger";
+
+import {
+    CONFIG_CAPTURA,
+} from "./core_configuracion_captura";
+
+// ======================================================
+// ANALIZAR CAPTURA
+// ======================================================
 
 export function analizarCaptura(
-    timeline:EventoCaptura[],
-    permitirClickIzquierdo=false
-):Trigger{
+    timeline: EventoCaptura[],
+    permitirClickIzquierdo = false,
+): Trigger {
 
-    const trigger=
+    const trigger =
         crearTrigger();
 
-
-    if(timeline.length===0){
+    if (
+        timeline.length === 0
+    ) {
         return trigger;
     }
 
-
-    if(
+    if (
         contieneRueda(timeline)
-    ){
-
+    ) {
         return analizarRueda(
-            timeline
+            timeline,
         );
-
     }
 
-
-    const ultimoDown=
+    const ultimoDown =
         buscarUltimoDown(
-            timeline
+            timeline,
         );
 
-
-    if(!ultimoDown){
+    if (
+        !ultimoDown
+    ) {
         return trigger;
     }
 
-
-    const codigo=
+    const codigo =
         ultimoDown.entrada.codigo;
 
-
-    const bloque=
+    const bloque =
         timeline.filter(
-            evento=>
-                evento.entrada.codigo===codigo
+            evento =>
+                evento.entrada.codigo === codigo,
         );
 
-
-    trigger.gatillo=
+    trigger.gatillo =
         ultimoDown.entrada;
-
 
     analizarCondicion(
         trigger,
-        bloque
+        bloque,
     );
 
-
-    trigger.modificadores=
+    trigger.modificadores =
         limpiarModificadores(
             timeline,
-            codigo
+            codigo,
         );
-
 
     normalizarAltGr(
-        trigger
+        trigger,
     );
 
+    // ==================================================
+    // 🚫 LEFT BUTTON SOLO
+    // --------------------------------------------------
+    // Nunca puede ser un Trigger simple sin modificadores.
+    // ==================================================
 
-    if(
+    if (
         !permitirClickIzquierdo &&
         esClickIzquierdoSolo(trigger)
-    ){
-
+    ) {
         return crearTrigger();
-
     }
 
-
     return trigger;
-
 }
 
-
-// ------------------------------------------------------
-// Detecta si existe rueda.
-// ------------------------------------------------------
+// ======================================================
+// 🖱️ CONTIENE RUEDA
+// ======================================================
 
 function contieneRueda(
-    timeline:EventoCaptura[]
-):boolean{
+    timeline: EventoCaptura[],
+): boolean {
 
     return timeline.some(
-        evento=>
-            evento.entrada.codigo==="WheelUp" ||
-            evento.entrada.codigo==="WheelDown"
+        evento =>
+            evento.entrada.codigo === "WheelUp" ||
+            evento.entrada.codigo === "WheelDown",
     );
-
 }
 
-
-// ------------------------------------------------------
-// Analiza rueda.
-// Siempre es gatillo.
-// ------------------------------------------------------
+// ======================================================
+// 🖱️ ANALIZAR RUEDA
+// ======================================================
 
 function analizarRueda(
-    timeline:EventoCaptura[]
-):Trigger{
+    timeline: EventoCaptura[],
+): Trigger {
 
-    const trigger=
+    const trigger =
         crearTrigger();
 
-
-    const ruedas=
+    const ruedas =
         timeline.filter(
-            evento=>
-                evento.entrada.codigo==="WheelUp" ||
-                evento.entrada.codigo==="WheelDown"
+            evento =>
+                evento.entrada.codigo === "WheelUp" ||
+                evento.entrada.codigo === "WheelDown",
         );
 
-
-    const arriba=
+    const arriba =
         ruedas.filter(
-            evento=>
-                evento.entrada.codigo==="WheelUp"
+            evento =>
+                evento.entrada.codigo === "WheelUp",
         );
 
-
-    const abajo=
+    const abajo =
         ruedas.filter(
-            evento=>
-                evento.entrada.codigo==="WheelDown"
+            evento =>
+                evento.entrada.codigo === "WheelDown",
         );
 
+    const entradaRueda =
+        arriba.length >= abajo.length
+            ? arriba[0]
+            : abajo[0];
 
-    const entradaRueda=
-        arriba.length>=abajo.length
-        ?arriba[0]
-        :abajo[0];
-
-
-    if(!entradaRueda){
+    if (
+        !entradaRueda
+    ) {
         return trigger;
     }
 
-
-    trigger.gatillo=
+    trigger.gatillo =
         entradaRueda.entrada;
 
+    trigger.condicion =
+        ruedas.length >=
+        CONFIG_CAPTURA.sensibilidadRueda
+            ? "Mantenido"
+            : "Simple";
 
-    trigger.condicion=
-        ruedas.length>=CONFIG_CAPTURA.sensibilidadRueda
-        ?"Mantenido"
-        :"Simple";
-
-
-    trigger.modificadores=
+    trigger.modificadores =
         obtenerModificadoresRueda(
-            timeline
+            timeline,
         );
-
 
     return trigger;
-
 }
 
-
-// ------------------------------------------------------
-// Todo lo que no sea rueda pasa a modificador.
-// ------------------------------------------------------
+// ======================================================
+// 🖱️ MODIFICADORES DE RUEDA
+// ======================================================
 
 function obtenerModificadoresRueda(
-    timeline:EventoCaptura[]
-){
+    timeline: EventoCaptura[],
+) {
 
-    const usados=
+    const usados =
         new Set<string>();
 
-
     const resultado:
-        typeof timeline[number]["entrada"][]=[];
+        typeof timeline[number]["entrada"][] =
+        [];
 
-
-    for(
+    for (
         const evento of timeline
-    ){
+    ) {
 
-        if(
-            evento.entrada.codigo==="WheelUp" ||
-            evento.entrada.codigo==="WheelDown"
-        ){
+        if (
+            evento.entrada.codigo === "WheelUp" ||
+            evento.entrada.codigo === "WheelDown"
+        ) {
             continue;
         }
 
-
-        if(
-            evento.evento!=="Down"
-        ){
+        if (
+            evento.evento !== "Down"
+        ) {
             continue;
         }
 
-
-        if(
+        if (
             usados.has(
-                evento.entrada.codigo
+                evento.entrada.codigo,
             )
-        ){
+        ) {
             continue;
         }
-
 
         usados.add(
-            evento.entrada.codigo
+            evento.entrada.codigo,
         );
-
 
         resultado.push(
-            evento.entrada
+            evento.entrada,
         );
-
     }
 
-
     return resultado;
-
 }
 
-
-// ------------------------------------------------------
-// Busca el último evento Down válido.
-// ------------------------------------------------------
+// ======================================================
+// 🔍 BUSCAR ÚLTIMO DOWN VÁLIDO
+// ======================================================
 
 function buscarUltimoDown(
-    timeline:EventoCaptura[]
-):EventoCaptura|undefined{
+    timeline: EventoCaptura[],
+): EventoCaptura | undefined {
 
-    for(
-        let i=timeline.length-1;
-        i>=0;
+    for (
+        let i = timeline.length - 1;
+        i >= 0;
         i--
-    ){
+    ) {
 
-        const evento=
+        const evento =
             timeline[i];
 
-
-        if(
-            evento.evento!=="Down"
-        ){
+        if (
+            evento.evento !== "Down"
+        ) {
             continue;
         }
 
-
-        const tieneUp=
+        const tieneUp =
             timeline.some(
-                siguiente=>
-                    siguiente.entrada.codigo===
-                    evento.entrada.codigo &&
-                    siguiente.evento==="Up" &&
-                    siguiente.tiempo>
-                    evento.tiempo
+                siguiente =>
+                    siguiente.entrada.codigo ===
+                        evento.entrada.codigo &&
+                    siguiente.evento === "Up" &&
+                    siguiente.tiempo > evento.tiempo,
             );
 
-
-        if(tieneUp){
+        if (
+            tieneUp
+        ) {
             return evento;
         }
-
     }
-
 
     return undefined;
-
 }
 
-
-// ------------------------------------------------------
-// Analiza condición del gatillo.
-// ------------------------------------------------------
+// ======================================================
+// ⏱️ ANALIZAR CONDICIÓN
+// ======================================================
 
 function analizarCondicion(
-    trigger:Trigger,
-    bloque:EventoCaptura[]
-){
+    trigger: Trigger,
+    bloque: EventoCaptura[],
+): void {
 
-    const ups=
+    const ups =
         bloque.filter(
-            evento=>
-                evento.evento==="Up"
+            evento =>
+                evento.evento === "Up",
         );
 
+    if (
+        ups.length >= 2
+    ) {
+        trigger.condicion =
+            "Doble";
 
-    if(
-        ups.length>=2
-    ){
-
-        trigger.condicion="Doble";
-
-        return;
-
-    }
-
-
-    if(
-        ups.length!==1
-    ){
         return;
     }
 
+    if (
+        ups.length !== 1
+    ) {
+        return;
+    }
 
-    const primerDown=
+    const primerDown =
         bloque.find(
-            evento=>
-                evento.evento==="Down"
+            evento =>
+                evento.evento === "Down",
         );
 
-
-    if(!primerDown){
+    if (
+        !primerDown
+    ) {
         return;
     }
 
-
-    const duracion=
-        ups[0].tiempo-
+    const duracion =
+        ups[0].tiempo -
         primerDown.tiempo;
 
-
-    trigger.condicion=
-        duracion>=CONFIG_CAPTURA.tiempoMantenido
-        ?"Mantenido"
-        :"Simple";
-
+    trigger.condicion =
+        duracion >=
+        CONFIG_CAPTURA.tiempoMantenido
+            ? "Mantenido"
+            : "Simple";
 }
 
-
-// ------------------------------------------------------
-// Modificadores normales.
-// ------------------------------------------------------
+// ======================================================
+// 🧹 LIMPIAR MODIFICADORES
+// ======================================================
 
 function limpiarModificadores(
-    timeline:EventoCaptura[],
-    codigoGatillo:string
-){
+    timeline: EventoCaptura[],
+    codigoGatillo: string,
+) {
 
-    const usados=
+    const usados =
         new Set<string>();
 
-
     const resultado:
-        typeof timeline[number]["entrada"][]=[];
+        typeof timeline[number]["entrada"][] =
+        [];
 
-
-    for(
+    for (
         const evento of timeline
-    ){
+    ) {
 
-        if(
-            evento.evento!=="Down"
-        ){
+        if (
+            evento.evento !== "Down"
+        ) {
             continue;
         }
 
-
-        if(
-            evento.entrada.codigo===codigoGatillo
-        ){
+        if (
+            evento.entrada.codigo === codigoGatillo
+        ) {
             continue;
         }
 
-
-        if(
+        if (
             usados.has(
-                evento.entrada.codigo
+                evento.entrada.codigo,
             )
-        ){
+        ) {
             continue;
         }
-
 
         usados.add(
-            evento.entrada.codigo
+            evento.entrada.codigo,
         );
-
 
         resultado.push(
-            evento.entrada
+            evento.entrada,
         );
-
     }
 
-
     return resultado;
-
 }
 
-
-// ------------------------------------------------------
-// AltGr no conserva Ctrl fantasma.
-// ------------------------------------------------------
+// ======================================================
+// 🧠 NORMALIZAR ALTGR
+// ======================================================
 
 function normalizarAltGr(
-    trigger:Trigger
-){
+    trigger: Trigger,
+): void {
 
-    const tieneAltGr=
-
-        trigger.gatillo?.codigo==="AltRight"
-
-        ||
-
+    const tieneAltGr =
+        trigger.gatillo?.codigo === "AltRight" ||
         trigger.modificadores.some(
-            entrada=>
-                entrada.codigo==="AltRight"
+            entrada =>
+                entrada.codigo === "AltRight",
         );
 
-    if(!tieneAltGr){
+    if (
+        !tieneAltGr
+    ) {
         return;
     }
 
-    trigger.modificadores=
+    trigger.modificadores =
         trigger.modificadores.filter(
-            entrada=>
-
-                entrada.codigo!=="ControlLeft" &&
-                entrada.codigo!=="ControlRight"
+            entrada =>
+                entrada.codigo !== "ControlLeft" &&
+                entrada.codigo !== "ControlRight",
         );
-
 }
 
-
-// ------------------------------------------------------
-// Click izquierdo simple no es válido para Trigger.
-// ------------------------------------------------------
+// ======================================================
+// 🚫 LEFT BUTTON SOLO
+// ======================================================
 
 function esClickIzquierdoSolo(
-    trigger:Trigger
-):boolean{
+    trigger: Trigger,
+): boolean {
 
-    return(
-
-        trigger.gatillo?.codigo==="Button0" &&
-        trigger.condicion==="Simple" &&
-        trigger.modificadores.length===0
-
+    return (
+        trigger.gatillo?.codigo === "LeftButton" &&
+        trigger.condicion === "Simple" &&
+        trigger.modificadores.length === 0
     );
-
 }

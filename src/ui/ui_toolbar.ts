@@ -1,74 +1,67 @@
 // ======================================================
-// 🧰 ui_Toolbar RemapH V3
-// ------------------------------------------------------
-// Barra superior principal.
+// ui_Toolbar
+// RemapH V3
+// ======================================================
 //
-// Estados del perfil (botón .perfil-estado):
+// Estados del perfil:
 //
-// 🟢 Perfil Activo      → ui = json = caché
-// 🔴 Perfil inactivo    → ui = json, caché vacía
-// 🟡 Perfil editado, ¿guardar? → ui ≠ json
+// Perfil Activo
+//     → ui = json = caché
+//
+// Perfil inactivo
+//     → ui = json, caché vacía
+//
+// Perfil editado
+//     → ui ≠ json
+//     → la caché mantiene su estado anterior
+//
 // ======================================================
 
 import {
-    invoke
+    invoke,
 } from "@tauri-apps/api/core";
 
 import {
-    abrirPopupPerfil
+    abrirPopupPerfil,
 } from "./componentes/comp_popup_perfil";
 
 import type {
-    ResultadoPerfil
+    ResultadoPerfil,
 } from "./componentes/comp_popup_perfil";
 
 import {
-    convertirPerfilJson
+    convertirPerfilJson,
 } from "../core/core_perfil_json";
 
 import {
-    establecerPerfilUi
+    establecerPerfilUi,
 } from "../core/core_perfil_ui";
 
 import {
-    reconstruirTabla
+    reconstruirTabla,
 } from "./ui_tabla_control";
 
 import {
     crearIndicador,
-    actualizarIndicador
+    actualizarIndicador,
 } from "./componentes/comp_indicador";
 
-
 // ======================================================
-// 🚀 CREAR TOOLBAR
+// CREAR TOOLBAR
 // ======================================================
 
 export function crearToolbar(
-
-    alCrearFila:
-        () => void,
-
-    alGuardar:
-        () => Promise<void>
-
-):
-
-    HTMLElement
-
-{
+    alCrearFila: () => void,
+    alGuardar: () => Promise<void>,
+): HTMLElement {
 
     const toolbar =
         document.createElement(
-
-            "header"
-
+            "header",
         );
-
 
     toolbar.className =
         "toolbar";
-
 
     toolbar.innerHTML = `
 
@@ -80,29 +73,39 @@ export function crearToolbar(
 
         </div>
 
-
         <div class="toolbar-center">
 
-            <button class="perfil-selector">
-                Default ▾
-            </button>
+            <div class="perfil-box">
 
+                <button
+                    class="perfil-selector"
+                    type="button"
+                ></button>
 
-            <button class="perfil-estado">
-                Perfil Activo
-            </button>
+                <button
+                    class="perfil-estado"
+                    type="button"
+                >
+                    Perfil Activo
+                </button>
+
+            </div>
 
         </div>
 
-
         <div class="toolbar-right">
 
-            <button class="btn-nueva-fila">
+            <button
+                class="btn-nueva-fila"
+                type="button"
+            >
                 + Fila
             </button>
 
-
-            <button class="configuracion">
+            <button
+                class="configuracion"
+                type="button"
+            >
                 ⚙
             </button>
 
@@ -110,562 +113,382 @@ export function crearToolbar(
 
     `;
 
+    // ==================================================
+    // 🟢🔴 INDICADOR DE CACHE
+    // ==================================================
 
     const cacheDot =
-        crearIndicador("cache-dot");
-
-
-    toolbar.querySelector(
-        ".toolbar-left"
-
-    )?.append(
-
-        cacheDot
-
-    );
-
-
-    invoke<boolean>(
-
-        "obtener_estado_cache"
-
-    )
-
-    .then(
-
-        activo => {
-
-            marcarPerfilSegunCache(
-
-                toolbar,
-
-                cacheDot,
-
-                activo
-
-            );
-
-        }
-
-    )
-
-    .catch(
-
-        error => {
-
-            console.error(
-
-                "❌ No se pudo obtener el estado de la caché:",
-
-                error
-
-            );
-
-        }
-
-    );
-
-
-    const botonNuevaFila =
-        toolbar.querySelector<HTMLButtonElement>(
-
-            ".btn-nueva-fila"
-
+        crearIndicador(
+            "cache-dot",
         );
 
+    const botonSelector =
+        toolbar.querySelector(
+            ".perfil-selector",
+        ) as HTMLButtonElement | null;
+
+    if (
+        !botonSelector
+    ) {
+        return toolbar;
+    }
+
+    botonSelector.append(
+        cacheDot,
+    );
+
+    const nombrePerfil =
+        document.createElement(
+            "span",
+        );
+
+    nombrePerfil.className =
+        "perfil-selector-nombre";
+
+    const flecha =
+        document.createElement(
+            "span",
+        );
+
+    flecha.className =
+        "perfil-selector-flecha";
+
+    flecha.textContent =
+        "▾";
+
+    botonSelector.append(
+        nombrePerfil,
+        flecha,
+    );
+
+    // ==================================================
+    // 📄 PERFIL ACTUAL
+    // ==================================================
+
+    invoke<string>(
+        "obtener_nombre_perfil_actual",
+    )
+        .then(
+            nombre => {
+
+                nombrePerfil.textContent =
+                    nombre;
+            },
+        )
+        .catch(
+            error => {
+
+                console.error(
+                    "❌ No se pudo obtener el perfil actual:",
+                    error,
+                );
+            },
+        );
+
+    // ==================================================
+    // 🟢🔴 ESTADO CACHE INICIAL
+    // ==================================================
+
+    invoke<boolean>(
+        "obtener_estado_cache",
+    )
+        .then(
+            activo => {
+
+                marcarPerfilSegunCache(
+                    toolbar,
+                    cacheDot,
+                    activo,
+                );
+            },
+        )
+        .catch(
+            error => {
+
+                console.error(
+                    "❌ No se pudo obtener el estado de la caché:",
+                    error,
+                );
+            },
+        );
+
+    // ==================================================
+    // ➕ NUEVA FILA
+    // ==================================================
+
+    const botonNuevaFila =
+        toolbar.querySelector(
+            ".btn-nueva-fila",
+        );
 
     botonNuevaFila?.addEventListener(
-
         "click",
-
         () => {
 
             alCrearFila();
-
-        }
-
+        },
     );
 
+    // ==================================================
+    // 🟢🔴 ESTADO PERFIL
+    // ==================================================
 
     const botonEstado =
-        toolbar.querySelector<HTMLButtonElement>(
-
-            ".perfil-estado"
-
-        );
-
+        toolbar.querySelector(
+            ".perfil-estado",
+        ) as HTMLButtonElement | null;
 
     botonEstado?.addEventListener(
-
         "click",
-
         async () => {
 
             const estadoActual =
                 botonEstado.dataset.estado;
 
-
             botonEstado.disabled =
                 true;
 
-
             try {
 
-                if (estadoActual === "editado") {
+                if (
+                    estadoActual === "editado"
+                ) {
 
                     await alGuardar();
 
                     const activo =
                         await invoke<boolean>(
-
-                            "obtener_estado_cache"
-
+                            "obtener_estado_cache",
                         );
 
                     marcarPerfilSegunCache(
-
                         toolbar,
-
                         cacheDot,
-
-                        activo
-
+                        activo,
                     );
 
-                }
-
-                else if (estadoActual === "activo") {
+                } else if (
+                    estadoActual === "activo"
+                ) {
 
                     await invoke(
-
-                        "desactivar_perfil"
-
+                        "desactivar_perfil",
                     );
 
                     marcarPerfilSegunCache(
-
                         toolbar,
-
                         cacheDot,
-
-                        false
-
+                        false,
                     );
 
-                }
-
-                else if (estadoActual === "inactivo") {
+                } else if (
+                    estadoActual === "inactivo"
+                ) {
 
                     const activo =
                         await invoke<boolean>(
-
-                            "activar_perfil"
-
+                            "activar_perfil",
                         );
 
                     marcarPerfilSegunCache(
-
                         toolbar,
-
                         cacheDot,
-
-                        activo
-
+                        activo,
                     );
-
                 }
 
-            }
-
-            catch(error) {
+            } catch (
+                error
+            ) {
 
                 console.error(
-
                     "❌ No se pudo cambiar el estado del perfil:",
-
-                    error
-
+                    error,
                 );
 
-            }
-
-            finally {
+            } finally {
 
                 botonEstado.disabled =
                     false;
-
             }
-
-        }
-
+        },
     );
 
+    // ==================================================
+    // 👤 SELECTOR DE PERFIL
+    // ==================================================
 
-    const botonSelector =
-        toolbar.querySelector<HTMLButtonElement>(
+    botonSelector.addEventListener(
+        "click",
+        evento => {
 
-            ".perfil-selector"
+            abrirPopupPerfil(
+                evento,
 
-        );
+                nombrePerfil.textContent ??
+                    "",
 
+                botonEstado?.dataset.estado ===
+                    "editado",
 
-    if (botonSelector) {
+                cacheDot.dataset.estado ===
+                    "activo",
 
-        invoke<string>(
+                alGuardar,
 
-            "obtener_nombre_perfil_actual"
+                resultado => {
 
-        )
-
-        .then(
-
-            nombre => {
-
-                botonSelector.textContent =
-                    `${nombre} ▾`;
-
-            }
-
-        )
-
-        .catch(
-
-            error => {
-
-                console.error(
-
-                    "❌ No se pudo obtener el perfil actual:",
-
-                    error
-
-                );
-
-            }
-
-        );
-
-
-        botonSelector.addEventListener(
-
-            "click",
-
-            evento => {
-
-                abrirPopupPerfil(
-
-                    evento,
-
-                    nombreMostrado(
-
-                        botonSelector
-
-                    ),
-
-                    botonEstado?.dataset.estado === "editado",
-
-                    alGuardar,
-
-                    resultado => {
-
-                        aplicarResultadoPerfil(
-
-                            toolbar,
-
-                            botonSelector,
-
-                            cacheDot,
-
-                            resultado,
-
-                        );
-
-                    },
-
-                );
-
-            }
-
-        );
-
-    }
-
+                    aplicarResultadoPerfil(
+                        toolbar,
+                        nombrePerfil,
+                        cacheDot,
+                        resultado,
+                    );
+                },
+            );
+        },
+    );
 
     return toolbar;
-
 }
 
-
 // ======================================================
-// 🆔 NOMBRE MOSTRADO EN EL SELECTOR
-// ======================================================
-
-function nombreMostrado(
-
-    botonSelector:
-        HTMLButtonElement,
-
-):
-
-    string
-
-{
-
-    return (
-
-        botonSelector.textContent ??
-            ""
-
-    )
-
-        .replace(
-
-            "▾",
-
-            "",
-
-        )
-
-        .trim();
-
-}
-
-
-// ======================================================
-// 🔄 APLICAR RESULTADO DE PERFIL
-// ------------------------------------------------------
-// Reemplaza el perfil de la UI con el que llega desde
-// Rust (seleccionar / crear / clonar / renombrar /
-// eliminar perfil) y refresca toolbar + tabla.
+// APLICAR RESULTADO PERFIL
 // ======================================================
 
 function aplicarResultadoPerfil(
-
-    toolbar:
-        HTMLElement,
-
-    botonSelector:
-        HTMLButtonElement,
-
-    cacheDot:
-        HTMLElement,
-
-    resultado:
-        ResultadoPerfil,
-
-):
-
-    void
-
-{
+    toolbar: HTMLElement,
+    nombrePerfil: HTMLElement,
+    cacheDot: HTMLElement,
+    resultado: ResultadoPerfil,
+): void {
 
     const perfil =
-
         convertirPerfilJson(
-
-            resultado.perfil
-
+            resultado.perfil,
         );
 
-
     establecerPerfilUi(
-
-        perfil
-
+        perfil,
     );
-
 
     reconstruirTabla();
 
-
-    botonSelector.textContent =
-        `${resultado.nombre} ▾`;
-
+    nombrePerfil.textContent =
+        resultado.nombre;
 
     marcarPerfilSegunCache(
-
         toolbar,
-
         cacheDot,
-
-        resultado.cache_activo
-
+        resultado.cache_activo,
     );
-
 }
 
-
 // ======================================================
-// 🎯 MARCAR PERFIL SEGÚN CACHÉ
-// ------------------------------------------------------
-// Punto único que decide Activo/Inactivo + el color del
-// indicador de caché, siempre en espejo (nunca pueden
-// quedar desincronizados).
+// MARCAR PERFIL SEGÚN CACHE
 // ======================================================
 
 function marcarPerfilSegunCache(
+    toolbar: HTMLElement,
+    cacheDot: HTMLElement,
+    activo: boolean,
+): void {
 
-    toolbar:
-        HTMLElement,
-
-    cacheDot:
-        HTMLElement,
-
-    activo:
-        boolean,
-
-):
-
-    void
-
-{
-
-    if (activo) {
+    if (
+        activo
+    ) {
 
         marcarPerfilActivo(
-
-            toolbar
-
+            toolbar,
         );
 
-    }
-
-    else {
+    } else {
 
         marcarPerfilInactivo(
-
-            toolbar
-
+            toolbar,
         );
-
     }
 
-
     actualizarIndicador(
-
         cacheDot,
-
-        activo
-
+        activo,
     );
-
 }
 
-
 // ======================================================
-// 🟡 MARCAR PERFIL EDITADO
+// ✏️ PERFIL EDITADO
 // ======================================================
 
 export function marcarPerfilEditado(
-
-    toolbar:
-        HTMLElement
-
-):
-
-    void
-
-{
+    toolbar: HTMLElement,
+): void {
 
     const botonEstado =
-        toolbar.querySelector<HTMLButtonElement>(
+        toolbar.querySelector(
+            ".perfil-estado",
+        ) as HTMLButtonElement | null;
 
-            ".perfil-estado"
-
-        );
-
-
-    if (!botonEstado) {
-
+    if (
+        !botonEstado
+    ) {
         return;
-
     }
-
 
     botonEstado.textContent =
         "Perfil editado, ¿guardar?";
 
-
     botonEstado.dataset.estado =
         "editado";
-
 }
 
-
 // ======================================================
-// 🟢 MARCAR PERFIL ACTIVO
+// PERFIL ACTIVO
 // ======================================================
 
 export function marcarPerfilActivo(
-
-    toolbar:
-        HTMLElement
-
-):
-
-    void
-
-{
+    toolbar: HTMLElement,
+): void {
 
     const botonEstado =
-        toolbar.querySelector<HTMLButtonElement>(
+        toolbar.querySelector(
+            ".perfil-estado",
+        ) as HTMLButtonElement | null;
 
-            ".perfil-estado"
-
-        );
-
-
-    if (!botonEstado) {
-
+    if (
+        !botonEstado
+    ) {
         return;
-
     }
-
 
     botonEstado.textContent =
         "Perfil Activo";
 
-
     botonEstado.dataset.estado =
         "activo";
-
 }
 
-
 // ======================================================
-// 🔴 MARCAR PERFIL INACTIVO
+// PERFIL INACTIVO
 // ======================================================
 
 export function marcarPerfilInactivo(
-
-    toolbar:
-        HTMLElement
-
-):
-
-    void
-
-{
+    toolbar: HTMLElement,
+): void {
 
     const botonEstado =
-        toolbar.querySelector<HTMLButtonElement>(
+        toolbar.querySelector(
+            ".perfil-estado",
+        ) as HTMLButtonElement | null;
 
-            ".perfil-estado"
-
-        );
-
-
-    if (!botonEstado) {
-
+    if (
+        !botonEstado
+    ) {
         return;
-
     }
-
 
     botonEstado.textContent =
         "Perfil inactivo";
 
-
     botonEstado.dataset.estado =
         "inactivo";
-
 }

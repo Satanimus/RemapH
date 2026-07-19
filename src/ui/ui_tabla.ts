@@ -1,329 +1,230 @@
 // ======================================================
-// 📋 ui_Tabla RemapH V3
+// ui_Tabla
+// RemapH V3
 // ======================================================
 
 import {
-    COLUMNAS
+    COLUMNAS,
 } from "./ui_columnas";
 
 import {
-    crearFila
+    crearFila,
 } from "./ui_fila";
 
 import {
-    obtenerPerfilUi
+    obtenerPerfilUi,
 } from "../core/core_perfil_ui";
 
 import {
-    registrarReconstruccion
+    registrarReconstruccion,
 } from "./ui_tabla_control";
 
 import {
-    activarRedimensionColumnas
+    activarRedimensionColumnas,
 } from "./ui_redimension_columnas";
 
-
 // ======================================================
-// 🚀 CREAR TABLA
+// CREAR TABLA
 // ======================================================
 
 export function crearTabla(
-
-    alModificar:
-        () => void
-
-):
-
-    HTMLElement
-
-{
+    alModificar: () => void,
+): HTMLElement {
 
     const tabla =
         document.createElement(
-
-            "section"
-
+            "section",
         );
-
 
     tabla.className =
         "tabla";
 
-
     const viewport =
         document.createElement(
-
-            "div"
-
+            "div",
         );
-
 
     viewport.className =
         "viewport";
 
-
     const cabecera =
         document.createElement(
-
-            "div"
-
+            "div",
         );
-
 
     cabecera.className =
         "cabecera";
 
-
     COLUMNAS.forEach(
-
         col => {
 
             const celda =
                 document.createElement(
-
-                    "div"
-
+                    "div",
                 );
-
 
             celda.className =
                 `cabecera-celda grupo-${col.grupo}`;
 
-
             celda.dataset.columna =
                 col.id;
-
 
             celda.style.width =
                 col.ancho;
 
-
             celda.style.flexBasis =
                 col.ancho;
-
 
             celda.textContent =
                 col.titulo;
 
-
             const divisor =
                 document.createElement(
-
-                    "div"
-
+                    "div",
                 );
-
 
             divisor.className =
                 "divisor-columna";
 
-
             celda.append(
-
-                divisor
-
+                divisor,
             );
-
 
             divisor.style.pointerEvents =
                 "auto";
 
-
             cabecera.append(
-
-                celda
-
+                celda,
             );
-
-        }
-
+        },
     );
-
 
     activarRedimensionColumnas(
-
-        cabecera
-
+        cabecera,
     );
-
 
     const filas =
         document.createElement(
-
-            "div"
-
+            "div",
         );
-
 
     filas.className =
         "filas";
 
+    // ==================================================
+    // RECONSTRUIR TABLA
+    // ==================================================
 
     const reconstruirTabla =
-        () => {
+        (): void => {
 
             filas.replaceChildren();
 
-
             const perfil =
                 obtenerPerfilUi();
 
-
             perfil.filas.forEach(
-
                 (
-
                     fila,
-
-                    indice
-
+                    indice,
                 ) => {
 
                     filas.append(
-
                         crearFila(
-
                             fila,
-
-                            indice + 1
-
-                        )
-
+                            indice + 1,
+                            alModificar,
+                        ),
                     );
-
-                }
-
+                },
             );
-
         };
-
 
     reconstruirTabla();
 
+    // ==================================================
+    // RECONSTRUIR FILA
+    // ==================================================
 
     const reconstruirFila =
         (
-
-            id:
-                string
-
-        ) => {
+            id: string,
+        ): void => {
 
             const perfil =
                 obtenerPerfilUi();
 
-
             const indice =
                 perfil.filas.findIndex(
-
                     fila =>
-                        fila.id === id
-
+                        fila.id === id,
                 );
-
 
             if (
-
                 indice < 0
-
             ) {
-
                 return;
-
             }
-
 
             const filaActual =
-                filas.querySelector<HTMLElement>(
-
-                    `[data-id="${id}"]`
-
+                filas.querySelector(
+                    `[data-id="${id}"]`,
                 );
 
-
-            if (!filaActual) {
-
+            if (
+                !filaActual
+            ) {
                 return;
-
             }
 
-
             filaActual.replaceWith(
-
                 crearFila(
-
                     perfil.filas[indice],
-
-                    indice + 1
-
-                )
-
+                    indice + 1,
+                    alModificar,
+                ),
             );
-
         };
 
-
     // ==================================================
-    // 🟡 DETECTAR CAMBIO VISUAL EN FILA
+    // ✏️ CAMBIO VISUAL EN FILA
     // ==================================================
 
     filas.addEventListener(
-
         "click",
-
         evento => {
 
             const objetivo =
                 evento.target as HTMLElement;
 
-
             const control =
                 objetivo.closest(
-
-                    "button, select, input"
-
+                    "button, select, input",
                 );
 
-
-            if (!control) {
-
+            if (
+                !control
+            ) {
                 return;
-
             }
 
-
             alModificar();
-
-        }
-
+        },
     );
-
 
     viewport.append(
-
         cabecera,
-
-        filas
-
+        filas,
     );
-
 
     tabla.append(
-
-        viewport
-
+        viewport,
     );
-
 
     registrarReconstruccion(
-
         reconstruirTabla,
-
-        reconstruirFila
-
+        reconstruirFila,
     );
 
-
     return tabla;
-
 }

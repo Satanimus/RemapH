@@ -1,8 +1,8 @@
 /* ======================================================
-   🎨 styl_Variables RemapH V3
+   styl_Variables
+   RemapH V3
    ------------------------------------------------------
    Identidad visual centralizada.
-   TODO el proyecto debe usar estas variables.
    ====================================================== */
 
 :root {
@@ -20,35 +20,60 @@
     --fs14: 14px;
     --fs16: 16px;
 
+      /* ==========================
+      Colores interactivos
+      ========================== */
+
+      --highlight: #00D9FF;
+      --highlight-red: #C62828;
+
+      /* ==========================
+         Estados de perfil
+         ========================== */
+
+      --green-dark: #2E6F32;
+      --red-dark: #8F2525;
+      --yellow-dark: #A77F1C;
+
     /* ==========================
        Fondos
        ========================== */
 
     --bg: #181818;
+
     --panel: #222222;
+
     --panel2: #2B2B2B;
+
     --panel3: #333333;
+
 
     /* ==========================
        Bordes
        ========================== */
 
     --border: #404040;
+
     --border-light: #555555;
+
 
     /* ==========================
        Texto
        ========================== */
 
     --text: #F2F2F2;
+
     --text-soft: #BDBDBD;
+
     --text-disabled: #777777;
+
 
     /* ==========================
        Colores principales
        ========================== */
 
     --green: #388E3C;
+
     --green-dark: #2E7D32;
 
     --yellow: #D8A628;
@@ -59,6 +84,25 @@
 
     --gray: #555555;
 
+
+    /* ==========================
+       🎨 COLOR DE RESALTADO UI
+       ========================== */
+
+    --highlight: #03A9F4;
+
+    /* ==========================
+       🎨 Color fila y file resaltada
+       ========================== */
+
+    --row-bg: #202020;
+    --row-hover-bg: #0400ff3c;
+
+     /* ==========================
+     🎨 COLOR fondo boton
+     ========================== */
+    --button-bg: #1a1a1a;
+
     /* ==========================
        Colores de filas
        ========================== */
@@ -66,73 +110,105 @@
     --tag-none: transparent;
 
     --tag-red: #D32F2F;
+
     --tag-orange: #F57C00;
+
     --tag-yellow: #FBC02D;
+
     --tag-green: #388E3C;
+
     --tag-cyan: #03A9F4;
+
     --tag-blue: #1976D2;
+
     --tag-purple: #7B1FA2;
+
     --tag-pink: #C2185B;
+
     --tag-gray: #616161;
 
-    --color-trigger-sintaxis:#1976D2;     /*  color simbolos de capturador */
+
+    /* ==========================
+       Color símbolos capturador
+       ========================== */
+
+    --color-trigger-sintaxis: #1976D2;
+
+
     /* ==========================
        Radios
        ========================== */
 
     --r4: 4px;
+
     --r6: 6px;
+
     --r8: 8px;
+
 
     /* ==========================
        Espaciados
        ========================== */
 
     --gap4: 4px;
+
     --gap8: 8px;
+
     --gap12: 12px;
+
     --gap16: 16px;
+
     --gap24: 24px;
+
 
     /* ==========================
        Alturas
        ========================== */
 
     --toolbar-height: 48px;
+
     --header-height: 34px;
+
     --row-height: 40px;
+
     --status-height: 26px;
 
-        /* ==========================
-       Columnas Ancho default al crearse ventana
+
+    /* ==========================
+       Columnas
        ========================== */
 
-    --col-min-width:52px;
+    --col-min-width: 52px;
 
     --col-num: 42px;
+
     --col-state: 58px;
 
     --col-app: 52px;
+
     --col-trigger: 150px;
 
     --col-type: 150px;
+
     --col-action: 150px;
+
     --col-behavior: 150px;
 
     --col-color: 52px;
+
     --col-note: 220px;
 
 
     /* ==========================
-       Mínimos de columnas
+       Mínimos columnas
        ========================== */
 
     --col-min: 52px;
+
 
     /* ==========================
        Animaciones
        ========================== */
 
     --speed: .15s;
-
 }

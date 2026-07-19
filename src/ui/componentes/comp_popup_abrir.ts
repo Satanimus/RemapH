@@ -15,41 +15,58 @@ import { reconstruirFila } from "../ui_tabla_control";
 import { reconstruirTabla } from "../ui_tabla_control";
 
 function crearLista(
-    opciones:string[],
-    seleccion?:(valor:string)=>void
-):HTMLElement{
+    opciones: string[],
+    seleccion?: (
+        valor: string,
+    ) => void,
+): HTMLElement {
 
-    const lista=document.createElement("div");
-
-    opciones.forEach(opcion=>{
-
-        const boton=document.createElement("button");
-
-        boton.className="ui-btn";
-
-        boton.textContent=opcion;
-
-        boton.addEventListener(
-            "click",
-            ()=>{
-
-                if(seleccion){
-                    seleccion(opcion);
-                }
-
-                ocultarPopup();
-
-            }
+    const lista =
+        document.createElement(
+            "div",
         );
 
-        lista.append(
-            boton
-        );
+    lista.className =
+        "popup-lista";
 
-    });
+    opciones.forEach(
+        opcion => {
+
+            const boton =
+                document.createElement(
+                    "button",
+                );
+
+            boton.className =
+                "ui-btn";
+
+            boton.textContent =
+                opcion;
+
+            boton.addEventListener(
+                "click",
+                () => {
+
+                    if (
+                        seleccion
+                    ) {
+
+                        seleccion(
+                            opcion,
+                        );
+                    }
+
+                    ocultarPopup();
+                },
+            );
+
+            lista.append(
+                boton,
+            );
+        },
+    );
 
     return lista;
-
 }
 
 function abrirLista(

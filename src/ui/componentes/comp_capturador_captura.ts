@@ -1,717 +1,485 @@
 // ======================================================
-// ⌨️🖱️ comp_Capturador_Captura RemapH V3
-// ------------------------------------------------------
+// ⌨️ comp_Capturador_Captura
+// RemapH V3
+// ======================================================
+
 // Captura entradas de la interfaz.
 //
 // La interfaz entrega nombres propios de DOM.
 //
-// Este módulo los convierte UNA SOLA VEZ al idioma
-// canónico de RemapH.
-//
-// Idioma canónico:
-//
-// Interception / RemapH
-//
-// Ejemplos:
-//
-// ControlLeft  → LeftControl
-// KeyA         → A
-// Digit1       → Num1
-// Mouse 2      → RightButton
-//
-// Después de esta conversión:
+// Este módulo los convierte UNA SOLA VEZ
+// al idioma canónico de RemapH.
 //
 // UI → Input canónico → Runtime
 // ======================================================
 
-import { crearEntrada } from "../../core/core_entrada";
+import {
+    crearEntrada,
+} from "../../core/core_entrada";
 
 import {
     crearEventoCaptura,
-    type EventoCaptura
+    type EventoCaptura,
 } from "../../core/core_evento_captura";
 
-import { analizarCaptura } from "../../core/core_analizar_captura";
+import {
+    analizarCaptura,
+} from "../../core/core_analizar_captura";
 
-import { CONFIG_CAPTURA }
-    from "../../core/core_configuracion_captura";
+import {
+    CONFIG_CAPTURA,
+} from "../../core/core_configuracion_captura";
 
-import type { Trigger }
-    from "../../core/core_trigger";
-
+import type {
+    Trigger,
+} from "../../core/core_trigger";
 
 // ======================================================
-// 🚀 INICIAR CAPTURA
+// INICIAR CAPTURA
 // ======================================================
 
 export function iniciarCaptura(
-
-    resultado:
-        (trigger:Trigger|null)=>void
-
-):void{
+    resultado: (
+        trigger: Trigger | null,
+    ) => void,
+): void {
 
     const timeline:
-        EventoCaptura[]=[];
+        EventoCaptura[] =
+        [];
 
-
-    const activas=
+    const activas =
         new Set<string>();
 
-
-    const entradasActivas=
-
+    const entradasActivas =
         new Map<
-
             string,
-
-            ReturnType<
-                typeof crearEntrada
-            >
-
+            ReturnType<typeof crearEntrada>
         >();
 
-
-    let terminado=false;
-
+    let terminado =
+        false;
 
     let temporizador:
-        number|undefined;
-
+        number | undefined;
 
     // ==================================================
     // 🧹 LIMPIAR
     // ==================================================
 
-    const limpiar=():void=>{
+    const limpiar =
+        (): void => {
 
-        window.removeEventListener(
-            "keydown",
-            teclaDown
-        );
+            window.removeEventListener(
+                "keydown",
+                teclaDown,
+            );
 
-        window.removeEventListener(
-            "keyup",
-            teclaUp
-        );
+            window.removeEventListener(
+                "keyup",
+                teclaUp,
+            );
 
-        window.removeEventListener(
-            "mousedown",
-            mouseDown
-        );
+            window.removeEventListener(
+                "mousedown",
+                mouseDown,
+            );
 
-        window.removeEventListener(
-            "mouseup",
-            mouseUp
-        );
+            window.removeEventListener(
+                "mouseup",
+                mouseUp,
+            );
 
-        window.removeEventListener(
-            "wheel",
-            rueda
-        );
+            window.removeEventListener(
+                "wheel",
+                rueda,
+            );
 
-        window.removeEventListener(
-            "contextmenu",
-            bloquearMenu
-        );
-
-    };
-
+            window.removeEventListener(
+                "contextmenu",
+                bloquearMenu,
+            );
+        };
 
     // ==================================================
     // 🏁 FINALIZAR
     // ==================================================
 
-    const finalizar=():void=>{
+    const finalizar =
+        (): void => {
 
-        if(
+            if (
+                terminado ||
+                timeline.length === 0
+            ) {
+                return;
+            }
 
-            terminado||
+            terminado =
+                true;
 
-            timeline.length===0
+            const trigger =
+                analizarCaptura(
+                    timeline,
+                );
 
-        ){
+            limpiar();
 
-            return;
+            // ==================================================
+            // 🚫 CAPTURA INVÁLIDA
+            // --------------------------------------------------
+            // Ejemplo:
+            // LeftButton sin modificadores.
+            // ==================================================
 
-        }
+            if (
+                !trigger.gatillo
+            ) {
+                resultado(null);
 
+                return;
+            }
 
-        terminado=true;
-
-
-        const trigger=
-
-            analizarCaptura(
-
-                timeline
-
+            resultado(
+                trigger,
             );
-
-
-        limpiar();
-
-
-        if(!trigger.gatillo){
-
-            resultado(null);
-
-            return;
-
-        }
-
-
-        resultado(trigger);
-
-    };
-
+        };
 
     // ==================================================
     // ⏱️ PROGRAMAR FINAL
     // ==================================================
 
-    const programarFinal=():void=>{
+    const programarFinal =
+        (): void => {
 
-        clearTimeout(
-
-            temporizador
-
-        );
-
-
-        temporizador=
-
-            setTimeout(
-
-                finalizar,
-
-                CONFIG_CAPTURA.tiempoDoble
-
+            clearTimeout(
+                temporizador,
             );
 
-    };
-
+            temporizador =
+                setTimeout(
+                    finalizar,
+                    CONFIG_CAPTURA.tiempoDoble,
+                );
+        };
 
     // ==================================================
-    // 📥 AGREGAR EVENTO
+    // ➕ AGREGAR EVENTO
     // ==================================================
 
-    const agregar=(
-
-        entrada:
-            ReturnType<
+    const agregar =
+        (
+            entrada: ReturnType<
                 typeof crearEntrada
             >,
 
-        evento:
-            "Down"|"Up"
+            evento: "Down" | "Up",
+        ): void => {
 
-    ):void=>{
+            clearTimeout(
+                temporizador,
+            );
 
-        clearTimeout(
-
-            temporizador
-
-        );
-
-
-        timeline.push(
-
-            crearEventoCaptura(
-
-                entrada,
-
-                evento
-
-            )
-
-        );
-
-    };
-
+            timeline.push(
+                crearEventoCaptura(
+                    entrada,
+                    evento,
+                ),
+            );
+        };
 
     // ==================================================
     // ⌨️ TECLA DOWN
     // ==================================================
 
-    const teclaDown=(
+    const teclaDown =
+        (
+            evento: KeyboardEvent,
+        ): void => {
 
-        evento:
-            KeyboardEvent
+            evento.preventDefault();
 
-    ):void=>{
+            const codigo =
+                codigoTeclado(
+                    evento.code,
+                );
 
-        evento.preventDefault();
+            const entrada =
+                crearEntrada(
+                    "Teclado",
+                    codigo,
+                    codigo,
+                );
 
-
-        const codigo=
-
-            codigoTeclado(
-
-                evento.code
-
+            entradasActivas.set(
+                entrada.codigo,
+                entrada,
             );
 
+            if (
+                activas.has(
+                    entrada.codigo,
+                )
+            ) {
+                return;
+            }
 
-        const entrada=
-
-            crearEntrada(
-
-                "Teclado",
-
-                codigo,
-
-                codigo
-
+            activas.add(
+                entrada.codigo,
             );
 
-
-        entradasActivas.set(
-
-            entrada.codigo,
-
-            entrada
-
-        );
-
-
-        if(
-
-            activas.has(
-
-                entrada.codigo
-
-            )
-
-        ){
-
-            return;
-
-        }
-
-
-        activas.add(
-
-            entrada.codigo
-
-        );
-
-
-        agregar(
-
-            entrada,
-
-            "Down"
-
-        );
-
-    };
-
+            agregar(
+                entrada,
+                "Down",
+            );
+        };
 
     // ==================================================
     // ⌨️ TECLA UP
     // ==================================================
 
-    const teclaUp=(
+    const teclaUp =
+        (
+            evento: KeyboardEvent,
+        ): void => {
 
-        evento:
-            KeyboardEvent
+            evento.preventDefault();
 
-    ):void=>{
+            const codigo =
+                codigoTeclado(
+                    evento.code,
+                );
 
-        evento.preventDefault();
+            const entrada =
+                entradasActivas.get(
+                    codigo,
+                ) ??
+                crearEntrada(
+                    "Teclado",
+                    codigo,
+                    codigo,
+                );
 
-
-        const codigo=
-
-            codigoTeclado(
-
-                evento.code
-
+            activas.delete(
+                entrada.codigo,
             );
 
-
-        const entrada=
-
-            entradasActivas.get(
-
-                codigo
-
-            )
-
-            ??
-
-            crearEntrada(
-
-                "Teclado",
-
-                codigo,
-
-                codigo
-
+            entradasActivas.delete(
+                entrada.codigo,
             );
 
+            agregar(
+                entrada,
+                "Up",
+            );
 
-        activas.delete(
-
-            entrada.codigo
-
-        );
-
-
-        entradasActivas.delete(
-
-            entrada.codigo
-
-        );
-
-
-        agregar(
-
-            entrada,
-
-            "Up"
-
-        );
-
-
-        if(
-
-            activas.size===0
-
-        ){
-
-            programarFinal();
-
-        }
-
-    };
-
+            if (
+                activas.size === 0
+            ) {
+                programarFinal();
+            }
+        };
 
     // ==================================================
     // 🖱️ MOUSE DOWN
     // ==================================================
 
-    const mouseDown=(
+    const mouseDown =
+        (
+            evento: MouseEvent,
+        ): void => {
 
-        evento:
-            MouseEvent
+            evento.preventDefault();
 
-    ):void=>{
+            const codigo =
+                codigoMouse(
+                    evento.button,
+                );
 
-        evento.preventDefault();
+            const entrada =
+                crearEntrada(
+                    "Mouse",
+                    codigo,
+                    codigo,
+                );
 
+            if (
+                activas.has(
+                    entrada.codigo,
+                )
+            ) {
+                return;
+            }
 
-        const codigo=
-
-            codigoMouse(
-
-                evento.button
-
+            activas.add(
+                entrada.codigo,
             );
 
-
-        const entrada=
-
-            crearEntrada(
-
-                "Mouse",
-
-                codigo,
-
-                codigo
-
+            agregar(
+                entrada,
+                "Down",
             );
-
-
-        if(
-
-            activas.has(
-
-                entrada.codigo
-
-            )
-
-        ){
-
-            return;
-
-        }
-
-
-        activas.add(
-
-            entrada.codigo
-
-        );
-
-
-        agregar(
-
-            entrada,
-
-            "Down"
-
-        );
-
-    };
-
+        };
 
     // ==================================================
     // 🖱️ MOUSE UP
     // ==================================================
 
-    const mouseUp=(
+    const mouseUp =
+        (
+            evento: MouseEvent,
+        ): void => {
 
-        evento:
-            MouseEvent
+            evento.preventDefault();
 
-    ):void=>{
+            const codigo =
+                codigoMouse(
+                    evento.button,
+                );
 
-        evento.preventDefault();
+            const entrada =
+                crearEntrada(
+                    "Mouse",
+                    codigo,
+                    codigo,
+                );
 
-
-        const codigo=
-
-            codigoMouse(
-
-                evento.button
-
+            activas.delete(
+                entrada.codigo,
             );
 
-
-        const entrada=
-
-            crearEntrada(
-
-                "Mouse",
-
-                codigo,
-
-                codigo
-
+            agregar(
+                entrada,
+                "Up",
             );
 
-
-        activas.delete(
-
-            entrada.codigo
-
-        );
-
-
-        agregar(
-
-            entrada,
-
-            "Up"
-
-        );
-
-
-        if(
-
-            activas.size===0
-
-        ){
-
-            programarFinal();
-
-        }
-
-    };
-
+            if (
+                activas.size === 0
+            ) {
+                programarFinal();
+            }
+        };
 
     // ==================================================
     // 🖱️ RUEDA
     // ==================================================
 
-    const rueda=(
+    const rueda =
+        (
+            evento: WheelEvent,
+        ): void => {
 
-        evento:
-            WheelEvent
+            evento.preventDefault();
 
-    ):void=>{
+            const codigo =
+                evento.deltaY < 0
+                    ? "WheelUp"
+                    : "WheelDown";
 
-        evento.preventDefault();
+            agregar(
+                crearEntrada(
+                    "Mouse",
+                    codigo,
+                    codigo,
+                ),
+                "Down",
+            );
 
-
-        const codigo=
-
-            evento.deltaY<0
-
-                ? "WheelUp"
-
-                : "WheelDown";
-
-
-        agregar(
-
-            crearEntrada(
-
-                "Mouse",
-
-                codigo,
-
-                codigo
-
-            ),
-
-            "Down"
-
-        );
-
-
-        programarFinal();
-
-    };
-
+            programarFinal();
+        };
 
     // ==================================================
     // 🚫 BLOQUEAR MENÚ
     // ==================================================
 
-    const bloquearMenu=(
+    const bloquearMenu =
+        (
+            evento: MouseEvent,
+        ): void => {
 
-        evento:
-            MouseEvent
-
-    ):void=>{
-
-        evento.preventDefault();
-
-    };
-
+            evento.preventDefault();
+        };
 
     // ==================================================
-    // 📡 EVENTOS
+    // 🎧 EVENTOS
     // ==================================================
 
     window.addEventListener(
-
         "keydown",
-
-        teclaDown
-
+        teclaDown,
     );
 
-
     window.addEventListener(
-
         "keyup",
-
-        teclaUp
-
+        teclaUp,
     );
 
-
     window.addEventListener(
-
         "mousedown",
-
-        mouseDown
-
+        mouseDown,
     );
 
-
     window.addEventListener(
-
         "mouseup",
-
-        mouseUp
-
+        mouseUp,
     );
 
-
     window.addEventListener(
-
         "wheel",
-
         rueda,
-
         {
-
-            passive:false
-
-        }
-
+            passive: false,
+        },
     );
-
 
     window.addEventListener(
-
         "contextmenu",
-
-        bloquearMenu
-
+        bloquearMenu,
     );
-
 }
-
 
 // ======================================================
 // ⌨️ NORMALIZAR TECLADO
 // ======================================================
 
 function codigoTeclado(
+    codigo: string,
+): string {
 
-    codigo:
-        string
-
-):string{
-
-    if(
-
+    if (
         codigo.startsWith(
-
-            "Key"
-
+            "Key",
         )
-
-    ){
-
-        return codigo.substring(3);
-
+    ) {
+        return codigo.substring(
+            3,
+        );
     }
 
+    const numeros:
+        Record<string, string> = {
 
-    const numeros:Record<string,string>={
+            Digit1: "Num1",
+            Digit2: "Num2",
+            Digit3: "Num3",
+            Digit4: "Num4",
+            Digit5: "Num5",
+            Digit6: "Num6",
+            Digit7: "Num7",
+            Digit8: "Num8",
+            Digit9: "Num9",
+            Digit0: "Num0",
+        };
 
-        Digit1:"Num1",
-
-        Digit2:"Num2",
-
-        Digit3:"Num3",
-
-        Digit4:"Num4",
-
-        Digit5:"Num5",
-
-        Digit6:"Num6",
-
-        Digit7:"Num7",
-
-        Digit8:"Num8",
-
-        Digit9:"Num9",
-
-        Digit0:"Num0"
-
-    };
-
-
-    if(
-
+    if (
         numeros[codigo]
-
-    ){
-
+    ) {
         return numeros[codigo];
-
     }
 
-
-    switch(codigo){
+    switch (
+        codigo
+    ) {
 
         case "Escape":
             return "Esc";
@@ -760,24 +528,20 @@ function codigoTeclado(
 
         default:
             return codigo;
-
     }
-
 }
-
 
 // ======================================================
 // 🖱️ NORMALIZAR MOUSE
 // ======================================================
 
 function codigoMouse(
+    boton: number,
+): string {
 
-    boton:
-        number
-
-):string{
-
-    switch(boton){
+    switch (
+        boton
+    ) {
 
         case 0:
             return "LeftButton";
@@ -796,7 +560,5 @@ function codigoMouse(
 
         default:
             return `Button${boton}`;
-
     }
-
 }

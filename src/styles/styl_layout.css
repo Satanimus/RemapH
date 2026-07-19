@@ -1,212 +1,550 @@
 /* ======================================================
-   🏗️ styl_Layout RemapH V3
+   styl_Layout
+   RemapH V3
    ====================================================== */
 
-.app{
-    width:100vw;
-    height:100vh;
-    background:var(--bg);
+.app {
+
+    width: 100vw;
+
+    height: 100vh;
+
+    background: var(--bg);
 }
 
-.layout{
-    width:100%;
-    height:100%;
-    display:grid;
+.layout {
+
+    width: 100%;
+
+    height: 100%;
+
+    display: grid;
+
     grid-template-rows:
         var(--toolbar-height)
         1fr
         var(--status-height);
 }
 
-/* ==========================
-   Toolbar
-   ========================== */
 
-.toolbar{
-    display:grid;
+/* ======================================================
+   TOOLBAR
+   ====================================================== */
+
+.toolbar {
+
+    display: grid;
+
     grid-template-columns:
         1fr
         auto
         1fr;
-    align-items:center;
-    padding:0 var(--gap16);
-    background:var(--panel);
-    border-bottom:1px solid(var(--border));
+
+    align-items: center;
+
+    padding: 0 var(--gap16);
+
+    background: var(--panel);
+
+    border-bottom: 1px solid var(--border);
 }
 
 .toolbar-left,
 .toolbar-center,
-.toolbar-right{
-    display:flex;
-    align-items:center;
+.toolbar-right {
+
+    display: flex;
+
+    align-items: center;
 }
 
-.toolbar-left{
-    justify-content:flex-start;
+.toolbar-left {
+
+    justify-content: flex-start;
 }
 
-.toolbar-center{
-    justify-content:center;
-    gap:var(--gap8);
+.toolbar-center {
+
+    justify-content: center;
+
+    gap: var(--gap8);
 }
 
-.toolbar-right{
-    justify-content:flex-end;
-    gap:var(--gap8);
+.toolbar-right {
+
+    justify-content: flex-end;
+
+    gap: var(--gap8);
 }
 
-.titulo{
-    font-size:var(--fs16);
-    font-weight:bold;
+.titulo {
+
+    font-size: var(--fs16);
+
+    font-weight: bold;
 }
 
-.perfil-box{
-    display:flex;
-    align-items:center;
-    gap:var(--gap8);
+/* ======================================================
+   👤 PERFIL
+   ====================================================== */
+
+.perfil-box {
+
+    display: flex;
+
+    align-items: center;
+
+    gap: var(--gap8);
 }
 
-.perfil-selector,
-.perfil-estado,
+/* ======================================================
+   👤 SELECTOR DE PERFIL
+   ====================================================== */
+
+.perfil-selector {
+
+    display: flex;
+
+    align-items: center;
+
+    gap: var(--gap8);
+
+    height: 30px;
+
+    padding: 0 var(--gap8);
+
+    background: var(--panel2);
+
+    color: var(--text);
+
+    border: 1px solid var(--border-light);
+
+    border-radius: var(--r4);
+
+    font-family: var(--font);
+
+    font-size: var(--fs13);
+
+    cursor: pointer;
+
+    transition:
+        border-color .12s ease;
+}
+
+.perfil-selector:hover {
+
+    background: var(--panel2);
+
+    border-color: var(--highlight);
+}
+
+.perfil-selector-nombre {
+
+    white-space: nowrap;
+
+    overflow: hidden;
+
+    text-overflow: ellipsis;
+
+    max-width: 220px;
+}
+
+.perfil-selector-flecha {
+
+    color: var(--text-soft);
+
+    font-size: 12px;
+}
+
+
+/* ======================================================
+   🟢🔴 INDICADOR DEL PERFIL
+   ====================================================== */
+
+.perfil-selector .indicador {
+
+    margin-left: 0;
+
+    flex-shrink: 0;
+}
+
+
+/* ======================================================
+   🟢🟡🔴 ESTADO DEL PERFIL
+   ====================================================== */
+
+.perfil-estado {
+
+    height: 30px;
+
+    padding: 0 var(--gap12);
+
+    color: var(--text);
+
+    border: 1px solid transparent;
+
+    border-radius: var(--r4);
+
+    font-family: var(--font);
+
+    font-size: var(--fs13);
+
+    cursor: pointer;
+
+    transition:
+        background .12s ease,
+        border-color .12s ease;
+}
+
+.perfil-estado[data-estado="activo"] {
+
+    background: var(--green-dark);
+}
+
+.perfil-estado[data-estado="activo"]:hover {
+
+    background: var(--green);
+}
+
+.perfil-estado[data-estado="inactivo"] {
+
+    background: var(--red-dark);
+}
+
+.perfil-estado[data-estado="inactivo"]:hover {
+
+    background: var(--red);
+}
+
+.perfil-estado[data-estado="editado"] {
+
+    background: var(--yellow-dark);
+}
+
+.perfil-estado[data-estado="editado"]:hover {
+
+    background: var(--yellow);
+}
+
+
+/* ======================================================
+   🔘 BOTONES TOOLBAR
+   ====================================================== */
+
 .btn-nueva-fila,
-.configuracion{
-    height:30px;
-    padding:0 12px;
-    background:var(--panel2);
-    color:var(--text);
-    border:1px solid(var(--border));
-    border-radius:var(--r4);
+.configuracion {
+
+    height: 30px;
+
+    padding: 0 var(--gap8);
+
+    background: transparent;
+
+    color: var(--text);
+
+    border: 1px solid var(--border-light);
+
+    border-radius: var(--r4);
+
+    font-family: var(--font);
+
+    font-size: var(--fs13);
+
+    cursor: pointer;
+
+    transition:
+        border-color .12s ease;
 }
 
-.perfil-estado[data-estado="activo"]{
-    background:var(--green);
-    color:#FFF;
+.btn-nueva-fila:hover,
+.configuracion:hover {
+
+    background: transparent;
+
+    border-color: var(--highlight);
 }
 
-.perfil-estado[data-estado="inactivo"]{
-    background:var(--red);
-    color:#FFF;
+
+/* ======================================================
+   STATUS
+   ====================================================== */
+
+.statusbar {
+
+    display: flex;
+
+    align-items: center;
+
+    padding: 0 var(--gap16);
+
+    background: var(--panel);
+
+    border-top: 1px solid var(--border);
+
+    color: var(--text-soft);
 }
 
-.perfil-estado[data-estado="editado"]{
-    background:var(--yellow);
-    color:#111;
+
+/* ======================================================
+   POPUP
+   ====================================================== */
+
+.popup-capa {
+
+    position: fixed;
+
+    inset: 0;
+
+    display: none;
+
+    align-items: center;
+
+    justify-content: center;
+
+    z-index: 9999;
 }
 
-/* ==========================
-   Status
-   ========================== */
+.popup-capa > div {
 
-.statusbar{
-    display:flex;
-    align-items:center;
-    padding:0 var(--gap16);
-    background:var(--panel);
-    border-top:1px solid(var(--border));
-    color:var(--text-soft);
+    width: max-content;
+
+    min-width: 180px;
+
+    padding: 8px;
+
+    background: var(--panel);
+
+    color: var(--text);
+
+    border: 1px solid var(--border-light);
+
+    border-radius: var(--r4);
+
+    box-shadow:
+        0 10px 30px rgba(0, 0, 0, .4);
+
+    display: flex;
+
+    flex-direction: column;
+
+    gap: var(--gap8);
 }
 
-/* ==========================
-   Popup
-   ========================== */
 
-.popup-capa{
-    position:fixed;
-    inset:0;
-    display:none;
-    align-items:center;
-    justify-content:center;
-    z-index:9999;
+/* ======================================================
+   📋 LISTAS DE OPCIONES
+   ====================================================== */
+
+.popup-lista {
+
+    display: flex;
+
+    flex-direction: column;
+
+    gap: 0;
 }
 
-.popup-capa > div{
-    width:max-content;
-    min-width:180px;
-    padding:12px;
-    background:var(--panel);
-    color:var(--text);
-    border:1px solid(var(--border));
-    border-radius:var(--r4);
-    box-shadow:0 10px 30px rgba(0,0,0,.4);
-    display:flex;
-    flex-direction:column;
-    gap:var(--gap8);
+.popup-lista .ui-btn {
+
+    border-radius: var(--r4);
 }
 
-.popup-perfil{
-    min-width:220px;
+
+/* ======================================================
+   👤 POPUP PERFIL
+   ====================================================== */
+
+.popup-perfil {
+
+    min-width: 220px;
 }
 
-.popup-perfil-lista{
-    display:flex;
-    flex-direction:column;
-    gap:var(--gap8);
-    max-height:240px;
-    overflow-y:auto;
+.popup-perfil-lista {
+
+    display: flex;
+
+    flex-direction: column;
+
+    gap: 0;
+
+    max-height: 240px;
+
+    overflow-y: auto;
 }
 
-.popup-perfil-separador{
-    height:1px;
-    background:var(--border);
-    margin:var(--gap4) 0;
+.popup-perfil-acciones {
+
+    display: flex;
+
+    flex-direction: column;
+
+    gap: 0;
 }
 
-.popup-perfil-acciones{
-    display:flex;
-    flex-direction:column;
-    gap:var(--gap8);
+.popup-perfil-item {
+
+    display: flex;
+
+    align-items: center;
+
+    justify-content: flex-start;
+
+    width: 100%;
+
+    gap: 0;
 }
 
-.popup-perfil-renombrar{
-    display:flex;
-    flex-direction:column;
-    gap:var(--gap8);
-    min-width:220px;
+.popup-perfil-indicador-espacio {
+
+    display: flex;
+
+    align-items: center;
+
+    justify-content: center;
+
+    width: 18px;
+
+    min-width: 18px;
+
+    margin-right: var(--gap8);
 }
 
-.popup-input{
-    height:28px;
-    padding:0 var(--gap8);
-    background:var(--panel2);
-    color:var(--text);
-    border:1px solid var(--border);
-    border-radius:var(--r4);
-    font-family:var(--font);
-    font-size:var(--fs13);
+.popup-perfil-indicador {
+
+    margin: 0;
 }
 
-.popup-input:focus{
-    outline:none;
-    border-color:var(--blue);
+.popup-perfil-nombre {
+
+    flex: 1;
+
+    text-align: left;
+
+    white-space: nowrap;
+
+    overflow: hidden;
+
+    text-overflow: ellipsis;
 }
 
-.indicador{
-    display:inline-block;
-    width:10px;
-    height:10px;
-    border-radius:50%;
-    background:var(--red);
-    margin-left:var(--gap8);
+.popup-perfil-revertir-icono {
+
+    margin-left: auto;
+
+    color: var(--text-soft);
+
+    font-size: 16px;
+
+    line-height: 1;
 }
 
-.indicador[data-estado="activo"]{
-    background:var(--green);
+.popup-perfil-item:hover
+.popup-perfil-revertir-icono {
+
+    color: var(--highlight);
 }
 
-.popup-confirmar{
-    min-width:220px;
+.popup-perfil-separador {
+
+    height: 1px;
+
+    background: var(--border);
+
+    margin: var(--gap4) 0;
 }
 
-.popup-confirmar-mensaje{
-    margin:0 0 var(--gap8) 0;
-    color:var(--text);
+
+/* ======================================================
+   ✏️ RENOMBRAR PERFIL
+   ====================================================== */
+
+.popup-perfil-renombrar {
+
+    display: flex;
+
+    flex-direction: column;
+
+    gap: var(--gap8);
+
+    min-width: 220px;
 }
 
-.popup-confirmar-botones{
-    display:flex;
-    gap:var(--gap8);
+.popup-input {
+
+    height: 28px;
+
+    padding: 0 var(--gap8);
+
+    background: var(--panel2);
+
+    color: var(--text);
+
+    border: 1px solid var(--border);
+
+    border-radius: var(--r4);
+
+    font-family: var(--font);
+
+    font-size: var(--fs13);
 }
 
-.popup-confirmar-botones .ui-btn{
-    flex:1;
+.popup-input:focus {
+
+    outline: none;
+
+    border-color: var(--highlight);
+}
+
+
+/* ======================================================
+   ❓ CONFIRMAR
+   ====================================================== */
+
+.popup-confirmar {
+
+    min-width: 220px;
+}
+
+.popup-confirmar-mensaje {
+
+    margin: 0 0 var(--gap8) 0;
+
+    color: var(--text);
+}
+
+.popup-confirmar-botones {
+
+    display: flex;
+
+    gap: var(--gap8);
+}
+
+.popup-confirmar-botones .ui-btn {
+
+    flex: 1;
+}
+
+
+/* ======================================================
+   INDICADOR
+   ====================================================== */
+
+.indicador {
+
+    display: inline-block;
+
+    width: 10px;
+
+    height: 10px;
+
+    border-radius: 50%;
+
+    background: var(--red);
+
+    margin-left: var(--gap8);
+}
+
+.indicador[data-estado="activo"] {
+
+    background: var(--green);
 }

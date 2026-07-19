@@ -1,76 +1,95 @@
 /* ======================================================
-   🌍 styl_general RemapH V3
+   styl_general
+   RemapH V3
    ====================================================== */
 
-*{
-    margin:0;
-    padding:0;
-    box-sizing:border-box;
+* {
+
+    margin: 0;
+
+    padding: 0;
+
+    box-sizing: border-box;
 }
 
 html,
-body{
-    width:100%;
-    height:100%;
-    overflow:hidden;
-    background:var(--bg);
-    color:var(--text);
-    font-family:var(--font);
-    font-size:var(--fs13);
+body {
+
+    width: 100%;
+
+    height: 100%;
+
+    overflow: hidden;
+
+    background: var(--bg);
+
+    color: var(--text);
+
+    font-family: var(--font);
+
+    font-size: var(--fs13);
 }
 
-body{
-    user-select:none;
+body {
+
+    user-select: none;
 }
 
 button,
 select,
 input,
-textarea{
-    font:inherit;
-    outline:none;
+textarea {
+
+    font: inherit;
+
+    outline: none;
 }
 
-button{
-    cursor:pointer;
-    border:none;
-    transition:background var(--speed),
-               color var(--speed),
-               opacity var(--speed);
-}
+button {
 
-button:hover{
-    opacity:.92;
+    cursor: pointer;
 }
 
 input,
-select{
-    background:var(--panel2);
-    color:var(--text);
-    border:1px solid var(--border);
-    border-radius:var(--r4);
-    padding:4px 8px;
+select {
+
+    background: var(--panel2);
+
+    color: var(--text);
+
+    border: 1px solid var(--border);
+
+    border-radius: var(--r4);
+
+    padding: 4px 8px;
 }
 
 input:focus,
-select:focus{
-    border-color:var(--blue);
+select:focus {
+
+    border-color: var(--highlight);
 }
 
-::-webkit-scrollbar{
-    width:10px;
-    height:10px;
+::-webkit-scrollbar {
+
+    width: 10px;
+
+    height: 10px;
 }
 
-::-webkit-scrollbar-track{
-    background:var(--panel);
+::-webkit-scrollbar-track {
+
+    background: var(--panel);
 }
 
-::-webkit-scrollbar-thumb{
-    background:var(--border-light);
-    border-radius:var(--r8);
+::-webkit-scrollbar-thumb {
+
+    background: var(--border-light);
+
+    border-radius: var(--r8);
 }
 
-::-webkit-scrollbar-thumb:hover{
-    background:#666;
+::-webkit-scrollbar-thumb:hover {
+
+    background: #666;
 }

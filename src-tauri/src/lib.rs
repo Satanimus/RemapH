@@ -92,6 +92,7 @@ pub fn run() {
 
                 comandos::obtener_perfil_actual,
 
+                comandos::obtener_estados_cache_perfiles,
 
                 comandos::obtener_perfiles,
 

@@ -139,6 +139,19 @@ pub struct ResultadoPerfil {
 
 }
 
+// ======================================================
+// 🟢🔴 ESTADO CACHE DE PERFIL
+// ======================================================
+
+#[derive(
+    Serialize,
+)]
+pub struct EstadoCachePerfil {
+
+    pub nombre: String,
+
+    pub cache_activo: bool,
+}
 
 // ======================================================
 // 🟢 ACTIVAR PERFIL
@@ -368,6 +381,55 @@ pub fn obtener_perfiles()
 
 }
 
+// ======================================================
+// 🟢🔴 OBTENER ESTADO CACHE DE PERFILES
+// ======================================================
+
+#[tauri::command]
+pub fn obtener_estados_cache_perfiles(
+) -> Result<
+    Vec<EstadoCachePerfil>,
+    String,
+> {
+
+    let nombres =
+        usuario::perfiles()?;
+
+    let mut resultado =
+        Vec::new();
+
+    for nombre in nombres {
+
+        let ruta =
+            usuario::ruta_perfil(
+                &nombre,
+            )?;
+
+        let perfil =
+            persistencia::cargar(
+                &ruta,
+            )?;
+
+        let cache =
+            compilador::compilar_perfil(
+                &perfil,
+            );
+
+        resultado.push(
+            EstadoCachePerfil {
+
+                nombre,
+
+                cache_activo:
+                    !cache.is_empty(),
+            },
+        );
+    }
+
+    Ok(
+        resultado,
+    )
+}
 
 // ======================================================
 // 🆔 OBTENER NOMBRE ACTUAL
