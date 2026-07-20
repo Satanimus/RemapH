@@ -302,13 +302,25 @@ export function crearToolbar(
                     );
                 }
 
-            } catch (
-                error
-            ) {
+            } catch ( error ) {
 
                 console.error(
+
                     "❌ No se pudo cambiar el estado del perfil:",
+
                     error,
+
+                );
+
+
+                window.alert(
+
+                    error instanceof Error
+
+                        ? error.message
+
+                        : String(error)
+
                 );
 
             } finally {

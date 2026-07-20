@@ -6,14 +6,18 @@ import type { ContextoFila } from "../../core/core_contexto_fila";
 import type { FilaPerfil } from "../../core/core_perfil";
 import { crearPopup } from "./comp_popup";
 import { reconstruirFila } from "../ui_tabla_control";
+import { invoke } from "@tauri-apps/api/core";
 
 import {
     abrirPopupCondicion,
     abrirPopupTipo,
-    abrirPopupApp,
     abrirPopupColor,
     abrirPopupEjecucion
 } from "./comp_popup_abrir";
+
+import {
+    abrirPopupApp
+} from "./comp_popup_app";
 
 // ======================================================
 // 🟢🔴 ESTADO (interruptor ON/OFF)
@@ -146,22 +150,237 @@ export function crearEjecucion(
 }
 
 export function crearApp(
-    contexto:ContextoFila,
-    filaPerfil:FilaPerfil
-):HTMLButtonElement{
 
-    return crearPopup({
-        texto:filaPerfil.app,
-        titulo:"Uso global",
-        onClick:(evento)=>{
+    contexto:
+        ContextoFila,
+
+    filaPerfil:
+        FilaPerfil
+
+):
+
+    HTMLButtonElement
+
+{
+
+    const boton =
+        document.createElement(
+            "button"
+        );
+
+    boton.className =
+        "ui-btn app-control";
+
+    boton.title =
+        filaPerfil.app.programa
+        ??
+        "Uso global";
+
+    const icono =
+        document.createElement(
+            "span"
+        );
+
+    icono.className =
+        "app-icono-fallback";
+
+    icono.textContent =
+        filaPerfil.app.programa
+        ?
+
+        "▣"
+
+        :
+
+        "🌐";
+
+    boton.append(
+
+        icono
+
+    );
+
+    if (
+
+        filaPerfil.app.segundoPlano
+
+    ) {
+
+        const indicador =
+            document.createElement(
+                "span"
+            );
+
+        indicador.className =
+            "app-segundo-plano-indicador";
+
+        indicador.textContent =
+            "∶";
+
+        boton.append(
+
+            indicador
+
+        );
+
+    }
+
+    const flecha =
+        document.createElement(
+            "span"
+        );
+
+    flecha.className =
+        "app-flecha";
+
+    flecha.textContent =
+        "▾";
+
+    boton.append(
+
+        flecha
+
+    );
+
+    if (
+
+        filaPerfil.app.programa
+
+    ) {
+
+        invoke<{
+
+            ancho:
+                number;
+
+            alto:
+                number;
+
+            pixeles:
+                string;
+
+        } | null>(
+
+            "obtener_icono_programa",
+
+            {
+
+                nombre:
+                    filaPerfil.app.programa
+
+            }
+
+        )
+
+            .then(
+
+                iconoJson => {
+
+                    if (!iconoJson) {
+
+                        return;
+
+                    }
+
+                    const canvas =
+                        document.createElement(
+                            "canvas"
+                        );
+
+                    canvas.width =
+                        iconoJson.ancho;
+
+                    canvas.height =
+                        iconoJson.alto;
+
+                    const contextoCanvas =
+                        canvas.getContext(
+                            "2d"
+                        );
+
+                    if (!contextoCanvas) {
+
+                        return;
+
+                    }
+
+                    const pixeles =
+                        Uint8ClampedArray.from(
+
+                            atob(
+
+                                iconoJson.pixeles
+
+                            ),
+
+                            caracter =>
+                                caracter.charCodeAt(0)
+
+                        );
+
+                    contextoCanvas.putImageData(
+
+                        new ImageData(
+
+                            pixeles,
+
+                            iconoJson.ancho,
+
+                            iconoJson.alto
+
+                        ),
+
+                        0,
+
+                        0
+
+                    );
+
+                    canvas.className =
+                        "app-icono";
+
+                    boton.replaceChild(
+
+                        canvas,
+
+                        icono
+
+                    );
+
+                }
+
+            )
+
+            .catch(
+
+                () => {}
+
+            );
+
+    }
+
+    boton.addEventListener(
+
+        "click",
+
+        evento => {
 
             abrirPopupApp(
+
                 evento,
+
                 contexto,
+
                 filaPerfil
+
             );
+
         }
-    });
+
+    );
+
+    return boton;
+
 }
 
 export function crearColor(

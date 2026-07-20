@@ -46,6 +46,19 @@ export interface PerfilJson {
 
 }
 
+// ======================================================
+// APP JSON
+// ======================================================
+
+interface AppJson {
+
+    programa:
+    string | null;
+
+    segundoPlano:
+    boolean;
+
+}
 
 interface RemapeoJson {
 
@@ -56,7 +69,7 @@ interface RemapeoJson {
         string;
 
     app:
-        string;
+        AppJson;
 
     trigger:
         TriggerJson;

@@ -27,6 +27,9 @@ import type {
     PerfilJson
 } from "./core/core_perfil_json";
 
+import {
+    validarCompatibilidadApp
+} from "./core/core_validar_compatibilidad";
 
 // ======================================================
 // 💾 GUARDAR Y ACTIVAR PERFIL

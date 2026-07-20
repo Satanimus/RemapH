@@ -22,6 +22,19 @@ export interface Perfil {
 
 }
 
+// ======================================================
+// APP
+// ======================================================
+
+export interface AppPerfil {
+
+    programa:
+    string | null;
+
+    segundoPlano:
+    boolean;
+
+}
 
 // ======================================================
 // 📄 FILA
@@ -30,34 +43,34 @@ export interface Perfil {
 export interface FilaPerfil {
 
     id:
-        string;
+    string;
 
     estado:
-        string;
+    string;
 
     trigger:
-        Trigger;
+    Trigger;
 
     tipo:
-        string;
+    string;
 
     accion:
-        Trigger | null;
+    Trigger | null;
 
     condicion:
-        string;
+    string;
 
     ejecucion:
-        string;
+    string;
 
     app:
-        string;
+    AppPerfil;
 
     color:
-        string;
+    string;
 
     nota:
-        string;
+    string;
 
 }
 
@@ -95,8 +108,15 @@ export function crearFila():
         ejecucion:
             "Normal",
 
-        app:
-            "Global",
+        app: {
+
+            programa:
+            null,
+
+            segundoPlano:
+            false,
+
+        },
 
         color:
             "",
