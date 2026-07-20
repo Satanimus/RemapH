@@ -133,6 +133,7 @@ export function crearTabla(
                         crearFila(
                             fila,
                             indice + 1,
+                            perfil.filas.length,
                             alModificar,
                         ),
                     );
@@ -181,6 +182,7 @@ export function crearTabla(
                 crearFila(
                     perfil.filas[indice],
                     indice + 1,
+                    perfil.filas.length,
                     alModificar,
                 ),
             );

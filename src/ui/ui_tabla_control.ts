@@ -22,3 +22,22 @@ export function reconstruirFila(
 ):void{
     reconstruirFilaCallback?.(id);
 }
+
+
+// ======================================================
+// ↕️ MODO MOVER (global, afecta a toda la tabla)
+// ======================================================
+
+let modoMover=false;
+
+export function estaEnModoMover():boolean{
+    return modoMover;
+}
+
+export function activarModoMover():void{
+    modoMover=true;
+}
+
+export function desactivarModoMover():void{
+    modoMover=false;
+}

@@ -15,6 +15,10 @@ import {
     crearCapturador,
 } from "./componentes/comp_capturador";
 
+import {
+    crearNumero,
+} from "./componentes/comp_numero";
+
 import type {
     FilaPerfil,
 } from "../core/core_perfil";
@@ -39,6 +43,7 @@ import {
 export function crearFila(
     filaPerfil: FilaPerfil,
     numero: number,
+    total: number,
     alModificar: () => void = () => {},
 ): HTMLElement {
 
@@ -84,8 +89,15 @@ export function crearFila(
 
                 case "numero":
 
-                    celda.textContent =
-                        String(numero);
+                    celda.append(
+                        crearNumero(
+                            contexto,
+                            filaPerfil,
+                            numero,
+                            total,
+                            alModificar,
+                        ),
+                    );
 
                     break;
 

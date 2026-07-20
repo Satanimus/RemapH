@@ -8,7 +8,6 @@ import { crearPopup } from "./comp_popup";
 import { reconstruirFila } from "../ui_tabla_control";
 
 import {
-    abrirPopupEstado,
     abrirPopupCondicion,
     abrirPopupTipo,
     abrirPopupApp,
@@ -16,31 +15,39 @@ import {
     abrirPopupEjecucion
 } from "./comp_popup_abrir";
 
+// ======================================================
+// 🟢🔴 ESTADO (interruptor ON/OFF)
+// ======================================================
+
 export function crearEstado(
     contexto:ContextoFila,
     filaPerfil:FilaPerfil
 ):HTMLButtonElement{
 
-    return crearPopup({
-        texto:filaPerfil.estado,
-        onClick:(evento)=>{
+    const boton=document.createElement("button");
 
-            abrirPopupEstado(
-                evento,
-                (texto)=>{
+    boton.className="ui-btn estado-toggle";
 
-                    filaPerfil.estado=texto;
+    boton.dataset.estado=
+        filaPerfil.estado==="ON"?"on":"off";
 
-                    reconstruirFila(
-                        contexto.id
-                    );
+    boton.textContent=filaPerfil.estado;
 
-                },
-                contexto
+    boton.addEventListener(
+        "click",
+        ()=>{
+
+            filaPerfil.estado=
+                filaPerfil.estado==="ON"?"OFF":"ON";
+
+            reconstruirFila(
+                contexto.id
             );
 
         }
-    });
+    );
+
+    return boton;
 
 }
 

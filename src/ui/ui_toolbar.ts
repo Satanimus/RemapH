@@ -39,6 +39,7 @@ import {
 
 import {
     reconstruirTabla,
+    desactivarModoMover,
 } from "./ui_tabla_control";
 
 import {
@@ -255,6 +256,10 @@ export function crearToolbar(
                 ) {
 
                     await alGuardar();
+
+                    desactivarModoMover();
+
+                    reconstruirTabla();
 
                     const activo =
                         await invoke<boolean>(

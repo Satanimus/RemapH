@@ -8,11 +8,12 @@ import {
 } from "./comp_popup_contenedor";
 
 import type { ContextoFila } from "../../core/core_contexto_fila";
-import { clonarFilaPorId } from "../../core/core_perfil_acciones";
+import { clonarFilaPorId, eliminarFilaPorId, filaTieneAccion } from "../../core/core_perfil_acciones";
 import type { FilaPerfil } from "../../core/core_perfil";
 import { crearEntrada } from "../../core/core_entrada";
 import { reconstruirFila } from "../ui_tabla_control";
 import { reconstruirTabla } from "../ui_tabla_control";
+import { activarModoMover } from "../ui_tabla_control";
 
 function crearLista(
     opciones: string[],
@@ -162,6 +163,115 @@ export function abrirPopupEstado(
             }
 
         }
+    );
+
+}
+
+// ======================================================
+// 🔢 POPUP NÚMERO DE FILA
+// ------------------------------------------------------
+// Mover / Clonar / Eliminar. No usa abrirLista porque
+// Eliminar necesita doble confirmación in-place, y las
+// tres acciones modifican el perfil (marcan editado).
+// ======================================================
+
+export function abrirPopupNumero(
+    evento:MouseEvent,
+    contexto:ContextoFila,
+    filaPerfil:FilaPerfil,
+    alModificar:()=>void
+):void{
+
+    const lista=document.createElement("div");
+
+    lista.className="popup-lista";
+
+    // ----------------------------------
+    // ↕️ MOVER
+    // ----------------------------------
+
+    const botonMover=document.createElement("button");
+
+    botonMover.className="ui-btn";
+    botonMover.textContent="Mover";
+
+    botonMover.addEventListener(
+        "click",
+        ()=>{
+
+            activarModoMover();
+            alModificar();
+            reconstruirTabla();
+            ocultarPopup();
+
+        }
+    );
+
+    // ----------------------------------
+    // 📋 CLONAR
+    // ----------------------------------
+
+    const botonClonar=document.createElement("button");
+
+    botonClonar.className="ui-btn";
+    botonClonar.textContent="Clonar";
+
+    botonClonar.addEventListener(
+        "click",
+        ()=>{
+
+            clonarFilaPorId(contexto.id);
+            alModificar();
+            reconstruirTabla();
+            ocultarPopup();
+
+        }
+    );
+
+    // ----------------------------------
+    // 🗑️ ELIMINAR
+    // ----------------------------------
+
+    const botonEliminar=document.createElement("button");
+
+    botonEliminar.className="ui-btn popup-perfil-eliminar";
+    botonEliminar.textContent="Eliminar";
+
+    let confirmando=false;
+
+    botonEliminar.addEventListener(
+        "click",
+        ()=>{
+
+            if(filaTieneAccion(filaPerfil) && !confirmando){
+
+                confirmando=true;
+
+                botonEliminar.textContent=
+                    "⚠️ Confirmar eliminación";
+
+                return;
+
+            }
+
+            eliminarFilaPorId(contexto.id);
+            alModificar();
+            reconstruirTabla();
+            ocultarPopup();
+
+        }
+    );
+
+    lista.append(
+        botonMover,
+        botonClonar,
+        botonEliminar
+    );
+
+    mostrarPopup(
+        lista,
+        evento.clientX,
+        evento.clientY
     );
 
 }
