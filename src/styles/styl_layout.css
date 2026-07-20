@@ -327,7 +327,7 @@
 
     flex-direction: column;
 
-    gap: var(--gap8);
+    gap: 0;
 }
 
 
