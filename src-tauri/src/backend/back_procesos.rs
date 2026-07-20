@@ -1,26 +1,46 @@
 // ======================================================
-// 🖥️ Back_Procesos RemapH V3
+// Back_Procesos
+// RemapH V3
 // ------------------------------------------------------
 // Backend Platform.
 //
 // Responsable de:
-//   - Enumerar procesos con ventana visible (estilo Alt+Tab).
-//   - Extraer el ícono de un ejecutable.
+// - Enumerar procesos actualmente ejecutándose.
+// - Excluir procesos propios de Windows.
+// - Obtener la ruta real del ejecutable.
+// - Extraer el ícono del ejecutable.
 //
 // No conoce:
-//   - Perfiles.
-//   - Runtime.
-//   - UI.
+// - Perfiles.
+// - Runtime.
+// - UI.
 // ======================================================
 
 use std::collections::HashSet;
+
 use std::path::Path;
 
 use windows_sys::Win32::Foundation::{
     CloseHandle,
-    HWND,
-    LPARAM,
-    BOOL,
+};
+
+use windows_sys::Win32::Graphics::Gdi::{
+    BITMAP,
+    BITMAPINFO,
+    CreateCompatibleDC,
+    DIB_RGB_COLORS,
+    DeleteDC,
+    DeleteObject,
+    GetDIBits,
+    GetObjectW,
+};
+
+use windows_sys::Win32::System::Diagnostics::ToolHelp::{
+    CreateToolhelp32Snapshot,
+    Process32FirstW,
+    Process32NextW,
+    PROCESSENTRY32W,
+    TH32CS_SNAPPROCESS,
 };
 
 use windows_sys::Win32::System::Threading::{
@@ -29,181 +49,189 @@ use windows_sys::Win32::System::Threading::{
     PROCESS_QUERY_LIMITED_INFORMATION,
 };
 
-use windows_sys::Win32::UI::WindowsAndMessaging::{
-    EnumWindows,
-    IsWindowVisible,
-    GetWindowTextLengthW,
-    GetWindowThreadProcessId,
-    GetWindowLongW,
-    GetIconInfo,
-    DestroyIcon,
-    ICONINFO,
-    GWL_EXSTYLE,
-    WS_EX_TOOLWINDOW,
-    WS_EX_APPWINDOW,
-};
-
 use windows_sys::Win32::UI::Shell::{
-    SHGetFileInfoW,
-    SHFILEINFOW,
-    SHGFI_ICON,
-    SHGFI_SMALLICON,
+    ExtractIconExW,
 };
 
-use windows_sys::Win32::Graphics::Gdi::{
-    GetObjectW,
-    CreateCompatibleDC,
-    GetDIBits,
-    DeleteDC,
-    DeleteObject,
-    BITMAP,
-    BITMAPINFO,
-    DIB_RGB_COLORS,
+use windows_sys::Win32::UI::WindowsAndMessaging::{
+    DestroyIcon,
+    GetIconInfo,
+    ICONINFO,
 };
 
 
 // ======================================================
-// 🪟 PROCESO CON VENTANA
+// PROCESO
 // ======================================================
 
 pub struct ProcesoVentana {
 
-    pub nombre:
-        String,
+    pub nombre: String,
 
-    pub ruta:
-        String,
-
+    pub ruta: String,
 }
 
 
 // ======================================================
-// 🎨 ÍCONO CRUDO
+// ÍCONO CRUDO
 // ------------------------------------------------------
-// Píxeles en formato RGBA, listos para volcarse en un
-// ImageData del lado de la UI.
+// Píxeles en formato RGBA.
 // ======================================================
 
 pub struct IconoRaw {
 
-    pub ancho:
-        u32,
+    pub ancho: u32,
 
-    pub alto:
-        u32,
+    pub alto: u32,
 
-    pub pixeles:
-        Vec<u8>,
-
+    pub pixeles: Vec<u8>,
 }
 
 
 // ======================================================
-// 📋 ENUMERAR PROCESOS CON VENTANA VISIBLE
+// ENUMERAR PROCESOS
 // ------------------------------------------------------
-// Equivalente a la lista de Alt+Tab: ventanas visibles,
-// con título, que no sean ventanas "herramienta".
+// Mantiene el nombre público original para no romper
+// comandos.rs.
 //
-// Deduplicado por nombre de ejecutable.
+// La implementación ya no depende de ventanas visibles.
 // ======================================================
 
 pub fn enumerar_procesos_ventana() -> Vec<ProcesoVentana> {
 
-    let mut lista: Vec<ProcesoVentana> =
+    let mut lista =
         Vec::new();
 
     unsafe {
 
-        EnumWindows(
-            Some(callback_enumerar),
-            &mut lista as *mut _ as isize,
-        );
+        let snapshot =
+            CreateToolhelp32Snapshot(
+                TH32CS_SNAPPROCESS,
+                0,
+            );
 
+        if snapshot
+            == std::ptr::null_mut()
+        {
+            return lista;
+        }
+
+        let mut entrada:
+            PROCESSENTRY32W =
+            std::mem::zeroed();
+
+        entrada.dwSize =
+            std::mem::size_of::<PROCESSENTRY32W>()
+                as u32;
+
+        let mut exito =
+            Process32FirstW(
+                snapshot,
+                &mut entrada,
+            );
+
+        while exito != 0 {
+
+            let pid =
+                entrada.th32ProcessID;
+
+            if let Some(ruta) =
+                obtener_ruta_proceso(pid)
+            {
+
+                if !es_proceso_windows(
+                    &ruta,
+                ) {
+
+                    let nombre =
+                        Path::new(&ruta)
+                            .file_name()
+                            .map(
+                                |nombre| {
+                                    nombre
+                                        .to_string_lossy()
+                                        .to_string()
+                                },
+                            )
+                            .unwrap_or_else(
+                                || ruta.clone(),
+                            );
+
+                    lista.push(
+                        ProcesoVentana {
+                            nombre,
+                            ruta,
+                        },
+                    );
+                }
+            }
+
+            exito =
+                Process32NextW(
+                    snapshot,
+                    &mut entrada,
+                );
+        }
+
+        CloseHandle(snapshot);
     }
 
-    let mut vistos: HashSet<String> =
+    // ==================================================
+    // DEDUPLICAR POR NOMBRE DE EJECUTABLE
+    // ==================================================
+
+    let mut vistos =
         HashSet::new();
 
     lista.retain(
-        |proceso|
+        |proceso| {
+
             vistos.insert(
-                proceso.nombre.to_lowercase()
+                proceso
+                    .nombre
+                    .to_lowercase(),
             )
+        },
     );
 
     lista
-
 }
 
 
 // ======================================================
-// 🔁 CALLBACK DE ENUMERACIÓN
+// DETERMINAR SI ES PROCESO DE WINDOWS
+// ------------------------------------------------------
+// Se excluyen ejecutables ubicados dentro de la carpeta
+// principal de Windows.
+//
+// No usamos el nombre del proceso para decidir esto.
 // ======================================================
 
-unsafe extern "system" fn callback_enumerar(
-    hwnd: HWND,
-    lparam: LPARAM,
-) -> BOOL {
+fn es_proceso_windows(
+    ruta: &str,
+) -> bool {
 
-    let lista =
-        &mut *(lparam as *mut Vec<ProcesoVentana>);
+    let ruta =
+        ruta.to_lowercase();
 
-    if IsWindowVisible(hwnd) == 0 {
-        return 1;
-    }
+    let carpeta_windows =
+        std::env::var("WINDIR")
+            .unwrap_or_else(
+                |_| "C:\\Windows".to_string(),
+            )
+            .to_lowercase();
 
-    if GetWindowTextLengthW(hwnd) == 0 {
-        return 1;
-    }
-
-    let estilo_ex =
-        GetWindowLongW(hwnd, GWL_EXSTYLE) as u32;
-
-    let es_herramienta =
-        (estilo_ex & WS_EX_TOOLWINDOW) != 0;
-
-    let es_app =
-        (estilo_ex & WS_EX_APPWINDOW) != 0;
-
-    if es_herramienta && !es_app {
-        return 1;
-    }
-
-    let mut pid: u32 = 0;
-
-    GetWindowThreadProcessId(
-        hwnd,
-        &mut pid,
-    );
-
-    if pid == 0 {
-        return 1;
-    }
-
-    if let Some(ruta) = obtener_ruta_proceso(pid) {
-
-        let nombre =
-            Path::new(&ruta)
-                .file_name()
-                .map(|n| n.to_string_lossy().to_string())
-                .unwrap_or_else(|| ruta.clone());
-
-        lista.push(
-            ProcesoVentana {
-                nombre,
-                ruta,
-            }
-        );
-
-    }
-
-    1
-
+    ruta.starts_with(
+        &format!(
+            "{}\\",
+            carpeta_windows,
+        ),
+    )
 }
 
 
 // ======================================================
-// 📄 RUTA DEL EJECUTABLE A PARTIR DEL PID
+// RUTA DEL EJECUTABLE
 // ======================================================
 
 unsafe fn obtener_ruta_proceso(
@@ -217,14 +245,17 @@ unsafe fn obtener_ruta_proceso(
             pid,
         );
 
-    if handle == 0 {
+    if handle
+        == std::ptr::null_mut()
+    {
         return None;
     }
 
-    let mut buffer: [u16; 260] =
-        [0; 260];
+    let mut buffer:
+        [u16; 1024] =
+        [0; 1024];
 
-    let mut tamano: u32 =
+    let mut tamano =
         buffer.len() as u32;
 
     let exito =
@@ -238,24 +269,25 @@ unsafe fn obtener_ruta_proceso(
     CloseHandle(handle);
 
     if exito == 0 {
+
         return None;
     }
 
     Some(
         String::from_utf16_lossy(
-            &buffer[..tamano as usize]
-        )
+            &buffer[..tamano as usize],
+        ),
     )
-
 }
 
 
 // ======================================================
-// 🎨 EXTRAER ÍCONO DE UN EJECUTABLE
+// EXTRAER ÍCONO
 // ------------------------------------------------------
-// Recibe la ruta completa de un .exe y devuelve su ícono
-// pequeño (16x16 / 32x32 según el sistema) como píxeles
-// RGBA planos.
+// Extrae el ícono pequeño del ejecutable.
+//
+// ExtractIconExW crea el HICON.
+// DestroyIcon libera el HICON.
 // ======================================================
 
 pub fn extraer_icono(
@@ -264,50 +296,138 @@ pub fn extraer_icono(
 
     unsafe {
 
-        let ruta_ancha: Vec<u16> =
+        let ruta_ancha:
+            Vec<u16> =
             ruta
                 .encode_utf16()
-                .chain(std::iter::once(0))
+                .chain(
+                    std::iter::once(0),
+                )
                 .collect();
 
-        let mut info: SHFILEINFOW =
-            std::mem::zeroed();
+        let mut icono_grande =
+            std::ptr::null_mut();
 
-        let resultado =
-            SHGetFileInfoW(
+        let mut icono_pequeno =
+            std::ptr::null_mut();
+
+        let extraidos =
+            ExtractIconExW(
                 ruta_ancha.as_ptr(),
                 0,
-                &mut info,
-                std::mem::size_of::<SHFILEINFOW>() as u32,
-                SHGFI_ICON | SHGFI_SMALLICON,
+                &mut icono_grande,
+                &mut icono_pequeno,
+                1,
             );
 
-        if resultado == 0 || info.hIcon == 0 {
+        if extraidos == 0 {
+
+            return None;
+        }
+
+        if icono_pequeno
+            == std::ptr::null_mut()
+        {
+
+            if icono_grande
+                != std::ptr::null_mut()
+            {
+                DestroyIcon(
+                    icono_grande,
+                );
+            }
+
             return None;
         }
 
         let hicon =
-            info.hIcon;
+            icono_pequeno;
 
-        let mut icon_info: ICONINFO =
+        let mut icon_info:
+            ICONINFO =
             std::mem::zeroed();
 
-        if GetIconInfo(hicon, &mut icon_info) == 0 {
+        if GetIconInfo(
+            hicon,
+            &mut icon_info,
+        ) == 0
+        {
 
             DestroyIcon(hicon);
 
-            return None;
+            if icono_grande
+                != std::ptr::null_mut()
+            {
+                DestroyIcon(
+                    icono_grande,
+                );
+            }
 
+            return None;
         }
 
-        let mut bitmap: BITMAP =
+        let hbm_color =
+            icon_info.hbmColor;
+
+        let hbm_mask =
+            icon_info.hbmMask;
+
+        if hbm_color
+            == std::ptr::null_mut()
+        {
+
+            DeleteObject(
+                hbm_mask,
+            );
+
+            DestroyIcon(hicon);
+
+            if icono_grande
+                != std::ptr::null_mut()
+            {
+                DestroyIcon(
+                    icono_grande,
+                );
+            }
+
+            return None;
+        }
+
+        let mut bitmap:
+            BITMAP =
             std::mem::zeroed();
 
-        GetObjectW(
-            icon_info.hbmColor,
-            std::mem::size_of::<BITMAP>() as i32,
-            &mut bitmap as *mut BITMAP as *mut core::ffi::c_void,
-        );
+        let bytes_bitmap =
+            std::mem::size_of::<BITMAP>()
+                as i32;
+
+        let resultado =
+            GetObjectW(
+                hbm_color,
+                bytes_bitmap,
+                &mut bitmap
+                    as *mut BITMAP
+                    as *mut std::ffi::c_void,
+            );
+
+        if resultado == 0 {
+
+            DeleteObject(hbm_color);
+
+            DeleteObject(hbm_mask);
+
+            DestroyIcon(hicon);
+
+            if icono_grande
+                != std::ptr::null_mut()
+            {
+                DestroyIcon(
+                    icono_grande,
+                );
+            }
+
+            return None;
+        }
 
         let ancho =
             bitmap.bmWidth as u32;
@@ -315,72 +435,146 @@ pub fn extraer_icono(
         let alto =
             bitmap.bmHeight as u32;
 
-        if ancho == 0 || alto == 0 {
+        if ancho == 0
+            || alto == 0
+        {
 
-            DeleteObject(icon_info.hbmColor);
-            DeleteObject(icon_info.hbmMask);
+            DeleteObject(hbm_color);
+
+            DeleteObject(hbm_mask);
+
             DestroyIcon(hicon);
 
-            return None;
+            if icono_grande
+                != std::ptr::null_mut()
+            {
+                DestroyIcon(
+                    icono_grande,
+                );
+            }
 
+            return None;
         }
 
         let hdc =
-            CreateCompatibleDC(0);
+            CreateCompatibleDC(
+                std::ptr::null_mut(),
+            );
 
-        let mut bmi: BITMAPINFO =
+        if hdc
+            == std::ptr::null_mut()
+        {
+
+            DeleteObject(hbm_color);
+
+            DeleteObject(hbm_mask);
+
+            DestroyIcon(hicon);
+
+            if icono_grande
+                != std::ptr::null_mut()
+            {
+                DestroyIcon(
+                    icono_grande,
+                );
+            }
+
+            return None;
+        }
+
+        let mut bitmap_info:
+            BITMAPINFO =
             std::mem::zeroed();
 
-        bmi.bmiHeader.biSize =
-            std::mem::size_of_val(&bmi.bmiHeader) as u32;
+        bitmap_info
+            .bmiHeader
+            .biSize =
+            std::mem::size_of_val(
+                &bitmap_info.bmiHeader,
+            ) as u32;
 
-        bmi.bmiHeader.biWidth =
+        bitmap_info
+            .bmiHeader
+            .biWidth =
             ancho as i32;
 
-        bmi.bmiHeader.biHeight =
+        bitmap_info
+            .bmiHeader
+            .biHeight =
             -(alto as i32);
 
-        bmi.bmiHeader.biPlanes =
+        bitmap_info
+            .bmiHeader
+            .biPlanes =
             1;
 
-        bmi.bmiHeader.biBitCount =
+        bitmap_info
+            .bmiHeader
+            .biBitCount =
             32;
 
-        bmi.bmiHeader.biCompression =
-            0; // BI_RGB
+        bitmap_info
+            .bmiHeader
+            .biCompression =
+            0;
 
-        let mut pixeles: Vec<u8> =
-            vec![0u8; (ancho * alto * 4) as usize];
+        let mut pixeles =
+            vec![
+                0u8;
+                (ancho * alto * 4)
+                    as usize
+            ];
 
         let filas_copiadas =
             GetDIBits(
                 hdc,
-                icon_info.hbmColor,
+                hbm_color,
                 0,
                 alto,
-                pixeles.as_mut_ptr() as *mut core::ffi::c_void,
-                &mut bmi,
+                pixeles.as_mut_ptr()
+                    as *mut std::ffi::c_void,
+                &mut bitmap_info,
                 DIB_RGB_COLORS,
             );
 
         DeleteDC(hdc);
-        DeleteObject(icon_info.hbmColor);
-        DeleteObject(icon_info.hbmMask);
+
+        DeleteObject(hbm_color);
+
+        DeleteObject(hbm_mask);
+
         DestroyIcon(hicon);
 
+        if icono_grande
+            != std::ptr::null_mut()
+        {
+            DestroyIcon(
+                icono_grande,
+            );
+        }
+
         if filas_copiadas == 0 {
+
             return None;
         }
 
+        // ==============================================
         // BGRA → RGBA
-        let mut i = 0;
+        // ==============================================
 
-        while i < pixeles.len() {
+        let mut indice =
+            0;
 
-            pixeles.swap(i, i + 2);
+        while indice
+            < pixeles.len()
+        {
 
-            i += 4;
+            pixeles.swap(
+                indice,
+                indice + 2,
+            );
 
+            indice += 4;
         }
 
         Some(
@@ -388,9 +582,7 @@ pub fn extraer_icono(
                 ancho,
                 alto,
                 pixeles,
-            }
+            },
         )
-
     }
-
 }
