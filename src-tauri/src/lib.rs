@@ -8,52 +8,20 @@
 
 
 mod backend;
-
-
 mod cache;
-
-
 mod captura;
-
-
 mod comandos;
-
-
 mod compilador;
-
-
 mod config;
-
-
 mod eventos;
-
-
 mod entrada;
-
-
 mod estado;
-
-
 pub mod idioma;
-
-
 mod perfilcache;
-
-
 mod persistencia;
-
-
-mod reentrada;
-
-
 mod runtime;
-
-
 mod perfiljson;
-
-
 mod usuario;
-
 
 // ======================================================
 // 🚀 INICIO TAURI
