@@ -23,6 +23,7 @@ use crate::compilador;
 use crate::estado;
 use crate::persistencia;
 use crate::perfiljson::{
+    AppJson,
     PerfilJson,
     RemapeoJson,
     TriggerJson,
@@ -34,10 +35,30 @@ use serde::{
     Serialize,
 };
 
-
 // ======================================================
 // 🧩 MODELO UI
 // ======================================================
+
+// ======================================================
+// APP UI
+// ======================================================
+// Representa la configuración de la columna App
+// recibida desde TypeScript.
+// ======================================================
+
+#[derive(
+    Deserialize,
+)]
+pub struct AppUI {
+
+    pub programa:
+        Option<String>,
+
+    #[serde(rename = "segundoPlano")]
+    pub segundo_plano:
+        bool,
+
+}
 
 #[derive(
     Deserialize,
@@ -51,7 +72,7 @@ pub struct FilaUI {
         String,
 
     pub app:
-        String,
+        AppUI,
 
     pub trigger:
         TriggerUI,
@@ -114,7 +135,6 @@ pub struct EntradaUI {
         String,
 
 }
-
 
 // ======================================================
 // 📦 RESULTADO PERFIL
@@ -1183,58 +1203,73 @@ fn convertir_perfil(
 // ======================================================
 
 fn convertir_fila(
-
     fila:
-        FilaUI,
-
-) -> RemapeoJson {
-
+    FilaUI,
+)
+-> RemapeoJson
+{
     RemapeoJson {
 
         id:
-            fila.id,
+        fila.id,
 
         estado:
-            fila.estado,
+        fila.estado,
 
         app:
+        convertir_app(
             fila.app,
+        ),
 
         trigger:
-
-            convertir_trigger(
-
-                fila.trigger
-
-            ),
+        convertir_trigger(
+            fila.trigger,
+        ),
 
         tipo:
-            fila.tipo,
+        fila.tipo,
 
         accion:
-
-            fila.accion.map(
-
-                convertir_trigger
-
-            ),
+        fila.accion
+        .map(
+            convertir_trigger,
+        ),
 
         condicion:
-            fila.condicion,
+        fila.condicion,
 
         ejecucion:
-            fila.ejecucion,
+        fila.ejecucion,
 
         color:
-            fila.color,
+        fila.color,
 
         nota:
-            fila.nota,
+        fila.nota,
 
     }
-
 }
 
+// ======================================================
+// CONVERTIR APP
+// ======================================================
+
+fn convertir_app(
+    app:
+        AppUI,
+)
+-> AppJson
+{
+    AppJson {
+
+        programa:
+            app.programa,
+
+        segundo_plano:
+            app.segundo_plano,
+
+    }
+}
 
 // ======================================================
 // 🎯 CONVERTIR TRIGGER

@@ -55,7 +55,7 @@ pub struct RemapeoJson {
         String,
 
     pub app:
-        String,
+        AppJson,
 
     pub trigger:
         TriggerJson,
@@ -126,5 +126,27 @@ impl PerfilJson {
         }
 
     }
+
+}
+
+// ======================================================
+// APP JSON
+// ======================================================
+
+#[derive(
+    Clone,
+    Debug,
+    PartialEq,
+    serde::Serialize,
+    serde::Deserialize,
+)]
+pub struct AppJson {
+
+    pub programa:
+    Option<String>,
+
+    #[serde(rename = "segundoPlano")]
+    pub segundo_plano:
+    bool,
 
 }
