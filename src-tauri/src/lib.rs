@@ -100,7 +100,6 @@ pub fn run() {
 
                 comandos::obtener_estado_cache,
 
-
                 comandos::restaurar_perfil_actual,
 
                 comandos::clonar_perfil,
@@ -112,6 +111,10 @@ pub fn run() {
                 comandos::crear_perfil_nuevo,
 
                 comandos::seleccionar_perfil,
+
+                comandos::listar_procesos_ventana,
+
+                comandos::obtener_icono_programa,
 
             ]
 

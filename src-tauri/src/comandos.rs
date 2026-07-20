@@ -1380,3 +1380,134 @@ pub fn obtener_captura()
     crate::captura::obtener()
 
 }
+
+// ======================================================
+// 🖥️ PROCESOS Y ÍCONOS (columna App)
+// ------------------------------------------------------
+// Comandos delgados: la lógica real vive en
+// backend::back_procesos (capa Platform).
+// ======================================================
+
+use crate::backend::back_procesos;
+
+use base64::Engine as _;
+use base64::engine::general_purpose::STANDARD as BASE64;
+
+
+#[derive(
+    Serialize,
+)]
+pub struct IconoJson {
+
+    pub ancho:
+        u32,
+
+    pub alto:
+        u32,
+
+    pub pixeles:
+        String,
+
+}
+
+
+#[derive(
+    Serialize,
+)]
+pub struct ProcesoIconoJson {
+
+    pub nombre:
+        String,
+
+    pub icono:
+        Option<IconoJson>,
+
+}
+
+
+fn convertir_icono(
+    icono:
+        back_procesos::IconoRaw,
+) -> IconoJson {
+
+    IconoJson {
+
+        ancho:
+            icono.ancho,
+
+        alto:
+            icono.alto,
+
+        pixeles:
+            BASE64.encode(icono.pixeles),
+
+    }
+
+}
+
+
+// ======================================================
+// 📋 LISTAR PROCESOS CON VENTANA VISIBLE
+// ======================================================
+
+#[tauri::command]
+pub fn listar_procesos_ventana()
+
+    -> Vec<ProcesoIconoJson>
+
+{
+
+    back_procesos::enumerar_procesos_ventana()
+
+        .into_iter()
+
+        .map(
+            |proceso| {
+
+                let icono =
+                    back_procesos::extraer_icono(&proceso.ruta)
+                        .map(convertir_icono);
+
+                ProcesoIconoJson {
+
+                    nombre:
+                        proceso.nombre,
+
+                    icono,
+
+                }
+
+            }
+        )
+
+        .collect()
+
+}
+
+
+// ======================================================
+// 🎨 OBTENER ÍCONO DE UN PROGRAMA PUNTUAL
+// ------------------------------------------------------
+// Busca el proceso en ejecución cuyo nombre coincide y
+// devuelve su ícono. Si no está corriendo, devuelve None
+// (la UI usa el ícono genérico como respaldo).
+// ======================================================
+
+#[tauri::command]
+pub fn obtener_icono_programa(
+    nombre:
+        String,
+) -> Option<IconoJson> {
+
+    let proceso =
+        back_procesos::enumerar_procesos_ventana()
+            .into_iter()
+            .find(
+                |proceso|
+                    proceso.nombre.eq_ignore_ascii_case(&nombre)
+            )?;
+
+    back_procesos::extraer_icono(&proceso.ruta)
+        .map(convertir_icono)
+
+}
