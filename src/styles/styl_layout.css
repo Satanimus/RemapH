@@ -655,3 +655,29 @@
     font-size: var(--fs11);
     line-height: 1;
 }
+
+/* ======================================================
+   🖥️ ALINEACIÓN POPUP APP
+   ====================================================== */
+
+.app-popup .ui-btn {
+
+    justify-content: flex-start;
+
+    text-align: left;
+
+}
+
+.app-popup-segundo-plano {
+
+    justify-content: flex-start;
+
+    text-align: left;
+
+}
+
+.app-popup-lista {
+
+    align-items: stretch;
+
+}

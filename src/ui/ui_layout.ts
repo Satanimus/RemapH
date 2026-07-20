@@ -1,5 +1,5 @@
 // ======================================================
-// 🏗️ ui_Layout RemapH V3
+// ui_Layout RemapH V3
 // ======================================================
 
 import {
@@ -12,7 +12,8 @@ import {
 } from "./ui_tabla";
 
 import {
-    crearStatusbar
+    crearStatusbar,
+    actualizarStatusbar
 } from "./ui_statusbar";
 
 import {
@@ -24,7 +25,8 @@ import {
 } from "../core/core_perfil_ui";
 
 import {
-    reconstruirTabla
+    reconstruirTabla,
+    registrarActualizacionConflictos
 } from "./ui_tabla_control";
 
 import {
@@ -33,7 +35,7 @@ import {
 
 
 // ======================================================
-// 🚀 CREAR LAYOUT
+// CREAR LAYOUT
 // ======================================================
 
 export function crearLayout(
@@ -46,6 +48,25 @@ export function crearLayout(
     HTMLElement
 
 {
+
+    const statusbar =
+        crearStatusbar();
+
+
+    registrarActualizacionConflictos(
+
+        () => {
+
+            actualizarStatusbar(
+
+                obtenerPerfilUi().filas
+
+            );
+
+        }
+
+    );
+
 
     const toolbar =
         crearToolbar(
@@ -64,7 +85,6 @@ export function crearLayout(
 
 
                 reconstruirTabla();
-
 
                 marcarPerfilEditado(
 
@@ -105,7 +125,7 @@ export function crearLayout(
 
         tabla,
 
-        crearStatusbar(),
+        statusbar,
 
         crearContenedorPopup()
 
@@ -118,7 +138,6 @@ export function crearLayout(
             "div"
 
         );
-
 
     contenedor.className =
         "layout";

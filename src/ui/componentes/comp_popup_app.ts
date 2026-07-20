@@ -356,7 +356,10 @@ function crearBotonGlobal(
 function crearSegundoPlano(
 
     filaPerfil:
-        FilaPerfil
+        FilaPerfil,
+
+    contexto:
+        ContextoFila
 
 ):
 
@@ -366,30 +369,41 @@ function crearSegundoPlano(
 
     const fila =
         document.createElement(
+
             "label"
+
         );
 
     fila.className =
         "app-popup-segundo-plano";
 
+
     const check =
         document.createElement(
+
             "input"
+
         );
 
     check.type =
         "checkbox";
 
+
     check.checked =
         filaPerfil.app.segundoPlano;
 
+
     const texto =
         document.createElement(
+
             "span"
+
         );
 
+
     texto.textContent =
-        "Segundo plano";
+        "Segundo plano :";
+
 
     fila.append(
 
@@ -398,6 +412,7 @@ function crearSegundoPlano(
         texto
 
     );
+
 
     check.addEventListener(
 
@@ -408,9 +423,19 @@ function crearSegundoPlano(
             filaPerfil.app.segundoPlano =
                 check.checked;
 
+
+            reconstruirFila(
+
+                contexto.id
+
+            );
+
+            ocultarPopup();
+
         }
 
     );
+
 
     return fila;
 
@@ -578,17 +603,14 @@ export async function abrirPopupApp(
     popup.append(
 
         crearBotonGlobal(
-
             filaPerfil,
-
             contexto
 
         ),
 
         crearSegundoPlano(
-
-            filaPerfil
-
+            filaPerfil,
+            contexto
         ),
 
         crearSeparador()

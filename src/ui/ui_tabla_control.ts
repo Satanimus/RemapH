@@ -1,43 +1,151 @@
 // ======================================================
-// 📋 ui_Tabla_Control RemapH V3
+// ui_Tabla_Control RemapH V3
 // ======================================================
 
-let reconstruirTablaCallback:(()=>void)|null=null;
-let reconstruirFilaCallback:((id:string)=>void)|null=null;
+let reconstruirTablaCallback:
+    (() => void) | null =
+    null;
+
+
+let reconstruirFilaCallback:
+    ((id: string) => void) | null =
+    null;
+
+
+let actualizarConflictosCallback:
+    (() => void) | null =
+    null;
+
+
+// ======================================================
+// 🔄 REGISTRAR RECONSTRUCCIÓN
+// ======================================================
 
 export function registrarReconstruccion(
-    tabla:()=>void,
-    fila:(id:string)=>void
-):void{
-    reconstruirTablaCallback=tabla;
-    reconstruirFilaCallback=fila;
+
+    tabla:
+        () => void,
+
+    fila:
+        (id: string) => void
+
+):
+
+    void
+
+{
+
+    reconstruirTablaCallback =
+        tabla;
+
+    reconstruirFilaCallback =
+        fila;
+
 }
 
-export function reconstruirTabla():void{
-    reconstruirTablaCallback?.();
+
+// ======================================================
+// ⚠️ REGISTRAR CONFLICTOS
+// ======================================================
+
+export function registrarActualizacionConflictos(
+
+    callback:
+        () => void
+
+):
+
+    void
+
+{
+
+    actualizarConflictosCallback =
+        callback;
+
 }
+
+
+// ======================================================
+// 🔄 RECONSTRUIR TABLA
+// ======================================================
+
+export function reconstruirTabla():
+
+    void
+
+{
+
+    reconstruirTablaCallback?.();
+
+    actualizarConflictosCallback?.();
+
+}
+
+
+// ======================================================
+// 🔄 RECONSTRUIR FILA
+// ======================================================
 
 export function reconstruirFila(
-    id:string
-):void{
-    reconstruirFilaCallback?.(id);
+
+    id:
+        string
+
+):
+
+    void
+
+{
+
+    reconstruirFilaCallback?.(
+
+        id
+
+    );
+
+    actualizarConflictosCallback?.();
+
 }
 
 
 // ======================================================
-// ↕️ MODO MOVER (global, afecta a toda la tabla)
+// ↕️ MODO MOVER
 // ======================================================
 
-let modoMover=false;
+let modoMover =
+    false;
 
-export function estaEnModoMover():boolean{
+
+export function estaEnModoMover():
+
+    boolean
+
+{
+
     return modoMover;
+
 }
 
-export function activarModoMover():void{
-    modoMover=true;
+
+export function activarModoMover():
+
+    void
+
+{
+
+    modoMover =
+        true;
+
 }
 
-export function desactivarModoMover():void{
-    modoMover=false;
+
+export function desactivarModoMover():
+
+    void
+
+{
+
+    modoMover =
+        false;
+
 }

@@ -19,37 +19,187 @@ import {
     abrirPopupApp
 } from "./comp_popup_app";
 
+import {
+    obtenerPerfilUi
+} from "../../core/core_perfil_ui";
+
+import {
+    filaTieneConflicto
+} from "../../core/core_conflictos";
+
 // ======================================================
 // 🟢🔴 ESTADO (interruptor ON/OFF)
 // ======================================================
 
 export function crearEstado(
-    contexto:ContextoFila,
-    filaPerfil:FilaPerfil
-):HTMLButtonElement{
 
-    const boton=document.createElement("button");
+    contexto:
+        ContextoFila,
 
-    boton.className="ui-btn estado-toggle";
+    filaPerfil:
+        FilaPerfil
 
-    boton.dataset.estado=
-        filaPerfil.estado==="ON"?"on":"off";
+):
 
-    boton.textContent=filaPerfil.estado;
+    HTMLButtonElement
+
+{
+
+    const boton =
+        document.createElement(
+
+            "button"
+
+        );
+
+
+    boton.className =
+        "ui-btn estado-toggle";
+
+
+    const conflicto =
+        filaTieneConflicto(
+
+            filaPerfil.id,
+
+            obtenerPerfilUi().filas
+
+        );
+
+
+    boton.dataset.estado =
+
+        conflicto
+
+        ?
+
+        "off"
+
+        :
+
+        filaPerfil.estado === "ON"
+
+        ?
+
+        "on"
+
+        :
+
+        "off";
+
+
+    boton.dataset.conflicto =
+
+        conflicto
+
+        ?
+
+        "true"
+
+        :
+
+        "false";
+
+
+    const texto =
+        document.createElement(
+
+            "span"
+
+        );
+
+
+    texto.textContent =
+
+        conflicto
+
+        ?
+
+        "OFF"
+
+        :
+
+        filaPerfil.estado;
+
+
+    boton.append(
+
+        texto
+
+    );
+
+
+    if (
+
+        conflicto
+
+    ) {
+
+        const alerta =
+            document.createElement(
+
+                "span"
+
+            );
+
+        alerta.className =
+            "estado-alerta";
+
+        alerta.textContent =
+            "⚠";
+
+
+        boton.append(
+
+            alerta
+
+        );
+
+    }
+
 
     boton.addEventListener(
-        "click",
-        ()=>{
 
-            filaPerfil.estado=
-                filaPerfil.estado==="ON"?"OFF":"ON";
+        "click",
+
+        evento => {
+
+            if (
+
+                conflicto
+
+            ) {
+
+                evento.stopPropagation();
+
+                return;
+
+            }
+
+
+            filaPerfil.estado =
+
+                filaPerfil.estado === "ON"
+
+                ?
+
+                "OFF"
+
+                :
+
+                "ON";
+
 
             reconstruirFila(
+
                 contexto.id
+
             );
 
         }
+
     );
+
 
     return boton;
 

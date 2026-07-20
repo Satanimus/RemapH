@@ -535,6 +535,10 @@
    reposo, color sólido al pasar el mouse.
    ====================================================== */
 
+/* ======================================================
+   ESTADO DE FILA
+   ====================================================== */
+
 .estado-toggle {
 
     border-color: transparent;
@@ -560,6 +564,28 @@
 .estado-toggle[data-estado="off"]:hover {
 
     background: var(--red);
+}
+
+.estado-toggle[data-conflicto="true"] {
+
+    background: var(--red-dark);
+
+    cursor: not-allowed;
+}
+
+.estado-toggle[data-conflicto="true"]:hover {
+
+    background: var(--red);
+}
+
+.estado-alerta {
+
+    margin-left: var(--gap4);
+
+    color: var(--yellow);
+
+    font-weight: bold;
+
 }
 
 /* ======================================================

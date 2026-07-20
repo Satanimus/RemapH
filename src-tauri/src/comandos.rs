@@ -201,7 +201,11 @@ pub fn activar_perfil() -> Result<bool, String> {
     );
 
 
-    sincronizar_estado_cache();
+    sincronizar_estado_cache(
+
+        &perfil
+
+    );
 
 
     println!(
@@ -283,7 +287,11 @@ pub fn compilar_perfil(
     );
 
 
-    sincronizar_estado_cache();
+    sincronizar_estado_cache(
+
+        &perfil
+
+    );
 
 
     let cache_activo =
@@ -346,7 +354,11 @@ pub fn obtener_perfil_actual()
         );
 
 
-        sincronizar_estado_cache();
+        sincronizar_estado_cache(
+
+            &perfil
+
+        );
 
 
         return Ok(
@@ -374,7 +386,11 @@ pub fn obtener_perfil_actual()
     );
 
 
-    sincronizar_estado_cache();
+    sincronizar_estado_cache(
+
+        &perfil
+
+    );
 
 
     Ok(
@@ -609,7 +625,11 @@ pub fn clonar_perfil(
 
     );
 
-    sincronizar_estado_cache();
+    sincronizar_estado_cache(
+
+        &perfil
+
+    );
 
     resultado_perfil(
 
@@ -733,7 +753,11 @@ pub fn renombrar_perfil(
 
         );
 
-        sincronizar_estado_cache();
+        sincronizar_estado_cache(
+
+            &perfil
+
+        );
 
     resultado_perfil(
 
@@ -820,7 +844,11 @@ pub fn eliminar_perfil_actual()
 
             );
 
-            sincronizar_estado_cache();
+            sincronizar_estado_cache(
+
+                &perfil
+
+            );
 
         return resultado_perfil(
 
@@ -999,7 +1027,11 @@ pub fn seleccionar_perfil(
     );
 
 
-    sincronizar_estado_cache();
+    sincronizar_estado_cache(
+
+        &perfil
+
+    );
 
 
     println!(
@@ -1146,17 +1178,28 @@ fn siguiente_nombre(
 // 🔄 SINCRONIZAR ESTADO CON CACHE
 // ======================================================
 
-fn sincronizar_estado_cache() {
+fn sincronizar_estado_cache(
 
-    if cache::esta_vacia() {
+    perfil:
+        &PerfilJson
 
-        estado::desactivar();
+) {
+
+    if perfil.remapeos.iter().any(
+
+        |remapeo|
+
+            remapeo.estado == "ON"
+
+    ) {
+
+        estado::activar();
 
     }
 
     else {
 
-        estado::activar();
+        estado::desactivar();
 
     }
 
