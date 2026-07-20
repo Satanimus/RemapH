@@ -55,7 +55,9 @@ use windows_sys::Win32::UI::Shell::{
 
 use windows_sys::Win32::UI::WindowsAndMessaging::{
     DestroyIcon,
+    GetForegroundWindow,
     GetIconInfo,
+    GetWindowThreadProcessId,
     ICONINFO,
 };
 
@@ -197,6 +199,84 @@ pub fn enumerar_procesos_ventana() -> Vec<ProcesoVentana> {
     lista
 }
 
+// ======================================================
+// 🖥️ PROGRAMA EN PRIMER PLANO
+// ======================================================
+
+pub fn obtener_programa_activo()
+
+    -> Option<String>
+
+{
+
+    let ventana =
+
+        unsafe {
+
+            GetForegroundWindow()
+
+        };
+
+
+    if ventana.is_null() {
+
+        return None;
+
+    }
+
+
+    let mut pid =
+
+        0;
+
+
+    unsafe {
+
+        GetWindowThreadProcessId(
+
+            ventana,
+
+            &mut pid,
+
+        );
+
+    }
+
+
+    let ruta =
+
+        unsafe {
+
+            obtener_ruta_proceso(
+
+                pid
+
+            )
+
+        }?;
+
+
+    Path::new(
+
+        &ruta
+
+    )
+
+        .file_name()
+
+        .map(
+
+            |nombre|
+
+                nombre
+
+                    .to_string_lossy()
+
+                    .to_string()
+
+        )
+
+}
 
 // ======================================================
 // DETERMINAR SI ES PROCESO DE WINDOWS

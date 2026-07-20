@@ -19,12 +19,16 @@
 //   Backend → Runtime → Salida
 // ======================================================
 
+use crate::cache;
 use crate::eventos::InputEvent;
 use crate::perfilcache::AccionCache;
 use crate::runtime;
-
+use std::collections::HashSet;
 use std::sync::mpsc;
-
+use std::time::{
+    Duration,
+    Instant,
+};
 
 // ======================================================
 // ⚙️ MODO
@@ -53,6 +57,78 @@ const MODO:
 
     = Modo::Portable;
 
+// ======================================================
+// 🖥️ ACTUALIZAR CONTEXTO APP
+// ======================================================
+
+fn actualizar_contexto_cache(
+
+    ultima_actualizacion:
+        &mut Instant,
+
+) {
+
+    if ultima_actualizacion.elapsed()
+
+        < Duration::from_millis(250)
+
+    {
+
+        return;
+
+    }
+
+
+    let programa_activo =
+
+        crate::backend
+
+            ::back_procesos
+
+            ::obtener_programa_activo();
+
+
+    let procesos_activos:
+
+        HashSet<String> =
+
+        crate::backend
+
+            ::back_procesos
+
+            ::enumerar_procesos_ventana()
+
+            .into_iter()
+
+            .map(
+
+                |proceso|
+
+                    proceso
+
+                        .nombre
+
+                        .to_lowercase()
+
+            )
+
+            .collect();
+
+
+    cache::actualizar_contexto(
+
+        programa_activo.as_deref(),
+
+        &procesos_activos,
+
+    );
+
+
+    *ultima_actualizacion =
+
+        Instant::now();
+
+}
 
 // ======================================================
 // 🚀 INICIAR
@@ -133,6 +209,11 @@ fn iniciar_full(
 
                 runtime::Estado::nuevo();
 
+            let mut ultima_actualizacion =
+
+                Instant::now()
+
+                    - Duration::from_secs(1);
 
             let mut pendientes:
 
@@ -201,6 +282,11 @@ fn iniciar_full(
 
                 }
 
+                actualizar_contexto_cache(
+
+                    &mut ultima_actualizacion
+
+                );
 
                 let resultado =
 
@@ -328,6 +414,11 @@ fn iniciar_portable(
 
                 runtime::Estado::nuevo();
 
+            let mut ultima_actualizacion =
+
+                Instant::now()
+
+                    - Duration::from_secs(1);    
 
             let mut pendientes:
 
@@ -362,6 +453,11 @@ fn iniciar_portable(
                             return true;
                         }
 
+                        actualizar_contexto_cache(
+
+                            &mut ultima_actualizacion
+
+                        );
 
                         // ----------------------------------
                         // 🧠 RUNTIME

@@ -27,7 +27,12 @@ use crate::eventos::{
     InputId,
     InputState,
 };
-use crate::perfilcache::AccionCache;
+use crate::perfilcache::{
+    AccionCache,
+    AppCache,
+    RemapeoCache,
+    TriggerCache,
+};
 
 
 // ======================================================
@@ -389,42 +394,46 @@ mod tests {
     }
 
 
-    fn remapeo(
+        fn remapeo(
 
-        modificadores:
-            Vec<InputId>,
+            modificadores:
+                Vec<InputId>,
 
-        gatillo:
-            InputId,
+            gatillo:
+                InputId,
 
-        salida:
-            InputId,
+            salida:
+                InputId,
 
-    ) -> RemapeoCache {
+        ) -> RemapeoCache {
 
-        RemapeoCache {
+            RemapeoCache {
 
-            trigger:
+                app:
 
-                TriggerCache {
+                    AppCache::Global,
 
-                    modificadores,
+                trigger:
 
-                    gatillo,
+                    TriggerCache {
 
-                },
+                        modificadores,
 
-            accion:
+                        gatillo,
 
-                AccionCache::Emitir(
+                    },
 
-                    salida
+                accion:
 
-                ),
+                    AccionCache::Emitir(
+
+                        salida
+
+                    ),
+
+            }
 
         }
-
-    }
 
 
     #[test]

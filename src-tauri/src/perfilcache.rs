@@ -1,27 +1,51 @@
 // ======================================================
-// 🧠 PerfilCache RemapH V3
+// 📦 PerfilCache RemapH V3
 // ------------------------------------------------------
 // Modelo interno compilado.
 //
-// Este modelo:
-//   - No se serializa.
-//   - No conoce JSON.
-//   - No conoce UI.
-//
-// Está preparado para Runtime y Cache.
-//
 // PerfilJson
-//      ↓
+//     ↓
 // Compilador
-//      ↓
+//     ↓
 // PerfilCache
+//     ↓
+// Cache
+//     ↓
+// Runtime
 // ======================================================
 
 use crate::eventos::InputId;
 
 
 // ======================================================
-// 🎯 REMAPEO CACHE
+// 🖥️ APP CACHE
+// ======================================================
+
+#[derive(
+    Clone,
+    Debug,
+    PartialEq,
+    Eq,
+)]
+pub enum AppCache {
+
+    Global,
+
+    Programa {
+
+        nombre:
+            String,
+
+        segundo_plano:
+            bool,
+
+    },
+
+}
+
+
+// ======================================================
+// 🧩 REMAPEO CACHE
 // ======================================================
 
 #[derive(
@@ -30,6 +54,9 @@ use crate::eventos::InputId;
     PartialEq,
 )]
 pub struct RemapeoCache {
+
+    pub app:
+        AppCache,
 
     pub trigger:
         TriggerCache,
@@ -61,7 +88,7 @@ pub struct TriggerCache {
 
 
 // ======================================================
-// 📤 ACCIÓN CACHE
+// ⚡ ACCIÓN CACHE
 // ======================================================
 
 #[derive(

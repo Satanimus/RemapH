@@ -1,21 +1,19 @@
 // ======================================================
-// 🧠 Cache RemapH V3
-// ------------------------------------------------------
-// Almacena PerfilCache compilado.
-//
-// La Cache:
-//   - Solo contiene PerfilCache.
-//   - No contiene PerfilJson.
-//   - No conoce UI.
+// 🗃️ Cache RemapH V3
+// ======================================================
 //
 // PerfilJson
-//      ↓
+//     ↓
 // Compilador
-//      ↓
-// Cache
-//      ↓
+//     ↓
+// Cache compilada
+//     ↓
+// Cache activa
+//     ↓
 // Runtime
 // ======================================================
+
+use std::collections::HashSet;
 
 use std::sync::{
     Mutex,
@@ -23,29 +21,38 @@ use std::sync::{
 };
 
 use crate::eventos::InputId;
-use crate::perfilcache::RemapeoCache;
+
+use crate::perfilcache::{
+    AppCache,
+    RemapeoCache,
+};
 
 
 // ======================================================
-// 💾 CACHE
+// 📦 CACHE COMPILADA
 // ======================================================
 
 static CACHE:
-
     OnceLock<Mutex<Vec<RemapeoCache>>>
-
     = OnceLock::new();
 
 
 // ======================================================
-// 🧪 LOCK DE TESTS
+// ⚡ CACHE ACTIVA
+// ======================================================
+
+static CACHE_ACTIVA:
+    OnceLock<Mutex<Vec<RemapeoCache>>>
+    = OnceLock::new();
+
+
+// ======================================================
+// 🔒 LOCK TESTS
 // ======================================================
 
 #[cfg(test)]
 static TEST_LOCK:
-
     OnceLock<Mutex<()>>
-
     = OnceLock::new();
 
 
@@ -64,7 +71,9 @@ pub fn bloquear_tests()
 
         .get_or_init(
 
-            || Mutex::new(())
+            ||
+
+                Mutex::new(())
 
         )
 
@@ -76,7 +85,7 @@ pub fn bloquear_tests()
 
 
 // ======================================================
-// 🔒 OBTENER CACHE
+// 📦 OBTENER CACHE
 // ======================================================
 
 fn obtener_cache()
@@ -87,7 +96,7 @@ fn obtener_cache()
 
     CACHE.get_or_init(
 
-        || {
+        ||
 
             Mutex::new(
 
@@ -95,7 +104,30 @@ fn obtener_cache()
 
             )
 
-        }
+    )
+
+}
+
+
+// ======================================================
+// ⚡ OBTENER CACHE ACTIVA
+// ======================================================
+
+fn obtener_cache_activa()
+
+    -> &'static Mutex<Vec<RemapeoCache>>
+
+{
+
+    CACHE_ACTIVA.get_or_init(
+
+        ||
+
+            Mutex::new(
+
+                Vec::new()
+
+            )
 
     )
 
@@ -113,21 +145,42 @@ pub fn reemplazar(
 
 ) {
 
-    let mut cache =
+    {
 
-        obtener_cache()
+        let mut cache =
+
+            obtener_cache()
+
+                .lock()
+
+                .unwrap();
+
+
+        *cache =
+
+            remapeos.clone();
+
+    }
+
+
+    let mut cache_activa =
+
+        obtener_cache_activa()
+
             .lock()
+
             .unwrap();
 
 
-    *cache =
+    *cache_activa =
+
         remapeos;
 
 }
 
 
 // ======================================================
-// 🗑️ BORRAR CACHE
+// 🗑️ BORRAR
 // ======================================================
 
 pub fn borrar() {
@@ -163,7 +216,148 @@ pub fn esta_vacia()
 
 
 // ======================================================
-// 🎯 BUSCAR TRIGGER EXACTO
+// 🖥️ ACTUALIZAR CONTEXTO APP
+// ======================================================
+
+pub fn actualizar_contexto(
+
+    programa_activo:
+        Option<&str>,
+
+    procesos_activos:
+        &HashSet<String>,
+
+) {
+
+    let cache =
+
+        obtener_cache()
+
+            .lock()
+
+            .unwrap();
+
+
+    let remapeos =
+
+        cache
+
+            .iter()
+
+            .filter(
+
+                |remapeo|
+
+                    app_activa(
+
+                        &remapeo.app,
+
+                        programa_activo,
+
+                        procesos_activos,
+
+                    )
+
+            )
+
+            .cloned()
+
+            .collect();
+
+
+    drop(cache);
+
+
+    let mut cache_activa =
+
+        obtener_cache_activa()
+
+            .lock()
+
+            .unwrap();
+
+
+    *cache_activa =
+
+        remapeos;
+
+}
+
+
+// ======================================================
+// 🖥️ ¿APP ACTIVA?
+// ======================================================
+
+fn app_activa(
+
+    app:
+        &AppCache,
+
+    programa_activo:
+        Option<&str>,
+
+    procesos_activos:
+        &HashSet<String>,
+
+)
+
+    -> bool
+
+{
+
+    match app {
+
+        AppCache::Global =>
+
+            true,
+
+
+        AppCache::Programa {
+
+            nombre,
+
+            segundo_plano,
+
+        } => {
+
+            if *segundo_plano {
+
+                return procesos_activos.contains(
+
+                    &nombre.to_lowercase()
+
+                );
+
+            }
+
+
+            programa_activo
+
+                .map(
+
+                    |programa|
+
+                        programa
+
+                            .eq_ignore_ascii_case(
+
+                                nombre
+
+                            )
+
+                )
+
+                .unwrap_or(false)
+
+        }
+
+    }
+
+}
+
+
+// ======================================================
+// 🎯 BUSCAR TRIGGER
 // ======================================================
 
 pub fn buscar(
@@ -174,52 +368,65 @@ pub fn buscar(
     gatillo:
         &InputId,
 
-) -> Option<RemapeoCache> {
+)
+
+    -> Option<RemapeoCache>
+
+{
 
     let cache =
 
-        obtener_cache()
+        obtener_cache_activa()
+
             .lock()
+
             .unwrap();
 
 
-    cache.iter().find(
+    cache
 
-        |remapeo| {
+        .iter()
 
-            if remapeo
-                .trigger
-                .gatillo
-                != *gatillo
-            {
+        .find(
 
-                return false;
+            |remapeo| {
+
+                if remapeo.trigger.gatillo != *gatillo {
+
+                    return false;
+
+                }
+
+
+                let modificadores =
+
+                    &remapeo
+
+                        .trigger
+
+                        .modificadores;
+
+
+                if activos.len()
+
+                    != modificadores.len() + 1
+
+                {
+
+                    return false;
+
+                }
+
+
+                &activos[..modificadores.len()]
+
+                    == modificadores.as_slice()
 
             }
 
+        )
 
-            let modificadores =
-
-                &remapeo
-                    .trigger
-                    .modificadores;
-
-
-            if activos.len()
-                != modificadores.len() + 1
-            {
-
-                return false;
-
-            }
-
-
-            &activos[..modificadores.len()]
-                == modificadores.as_slice()
-
-        }
-
-    ).cloned()
+        .cloned()
 
 }
 
@@ -233,38 +440,58 @@ pub fn buscar_pulse(
     gatillo:
         &InputId,
 
-) -> Option<RemapeoCache> {
+)
+
+    -> Option<RemapeoCache>
+
+{
 
     let cache =
 
-        obtener_cache()
+        obtener_cache_activa()
+
             .lock()
+
             .unwrap();
 
 
-    cache.iter().find(
+    cache
 
-        |remapeo| {
+        .iter()
 
-            remapeo
-                .trigger
-                .modificadores
-                .is_empty()
+        .find(
 
-                && remapeo
+            |remapeo| {
+
+                remapeo
+
                     .trigger
-                    .gatillo
-                    == *gatillo
 
-        }
+                    .modificadores
 
-    ).cloned()
+                    .is_empty()
+
+                    &&
+
+                    remapeo
+
+                        .trigger
+
+                        .gatillo
+
+                        == *gatillo
+
+            }
+
+        )
+
+        .cloned()
 
 }
 
 
 // ======================================================
-// ⏳ BUSCAR PREFIJO
+// ⏳ ¿TIENE PREFIJO?
 // ======================================================
 
 pub fn tiene_prefijo(
@@ -272,7 +499,11 @@ pub fn tiene_prefijo(
     activos:
         &[InputId],
 
-) -> bool {
+)
+
+    -> bool
+
+{
 
     if activos.is_empty() {
 
@@ -283,31 +514,47 @@ pub fn tiene_prefijo(
 
     let cache =
 
-        obtener_cache()
+        obtener_cache_activa()
+
             .lock()
+
             .unwrap();
 
 
-    cache.iter().any(
+    cache
 
-        |remapeo| {
+        .iter()
 
-            let modificadores =
+        .any(
 
-                &remapeo
-                    .trigger
-                    .modificadores;
+            |remapeo| {
+
+                let modificadores =
+
+                    &remapeo
+
+                        .trigger
+
+                        .modificadores;
 
 
-            activos.len()
-                <= modificadores.len()
+                activos.len()
 
-                && modificadores
-                    .starts_with(activos)
+                    <= modificadores.len()
 
-        }
+                    &&
 
-    )
+                    modificadores
+
+                        .starts_with(
+
+                            activos
+
+                        )
+
+            }
+
+        )
 
 }
 
@@ -325,7 +572,7 @@ mod tests {
 
     use crate::perfilcache::{
         AccionCache,
-        RemapeoCache,
+        AppCache,
         TriggerCache,
     };
 
@@ -335,7 +582,11 @@ mod tests {
         nombre:
             &str,
 
-    ) -> InputId {
+    )
+
+        -> InputId
+
+    {
 
         InputId::new(
 
@@ -356,9 +607,17 @@ mod tests {
         gatillo:
             InputId,
 
-    ) -> RemapeoCache {
+    )
+
+        -> RemapeoCache
+
+    {
 
         RemapeoCache {
+
+            app:
+
+                AppCache::Global,
 
             trigger:
 
@@ -384,9 +643,11 @@ mod tests {
 
 
     #[test]
+
     fn trigger_simple_coincide() {
 
         let _lock =
+
             bloquear_tests();
 
 
@@ -411,7 +672,7 @@ mod tests {
 
             vec![
 
-                teclado("A"),
+                teclado("A")
 
             ];
 
@@ -434,9 +695,11 @@ mod tests {
 
 
     #[test]
+
     fn trigger_con_modificador_coincide_en_orden() {
 
         let _lock =
+
             bloquear_tests();
 
 
@@ -448,7 +711,7 @@ mod tests {
 
                     vec![
 
-                        teclado("LeftControl"),
+                        teclado("LeftControl")
 
                     ],
 
@@ -490,9 +753,11 @@ mod tests {
 
 
     #[test]
+
     fn trigger_con_modificador_no_coincide_en_orden_incorrecto() {
 
         let _lock =
+
             bloquear_tests();
 
 
@@ -504,7 +769,7 @@ mod tests {
 
                     vec![
 
-                        teclado("LeftControl"),
+                        teclado("LeftControl")
 
                     ],
 
@@ -546,9 +811,11 @@ mod tests {
 
 
     #[test]
+
     fn trigger_incompleto_es_prefijo() {
 
         let _lock =
+
             bloquear_tests();
 
 
@@ -560,7 +827,7 @@ mod tests {
 
                     vec![
 
-                        teclado("LeftControl"),
+                        teclado("LeftControl")
 
                     ],
 
@@ -577,7 +844,7 @@ mod tests {
 
             vec![
 
-                teclado("LeftControl"),
+                teclado("LeftControl")
 
             ];
 
@@ -596,9 +863,11 @@ mod tests {
 
 
     #[test]
+
     fn input_ajeno_no_es_prefijo() {
 
         let _lock =
+
             bloquear_tests();
 
 
@@ -610,7 +879,7 @@ mod tests {
 
                     vec![
 
-                        teclado("LeftControl"),
+                        teclado("LeftControl")
 
                     ],
 
@@ -627,7 +896,7 @@ mod tests {
 
             vec![
 
-                teclado("LeftShift"),
+                teclado("LeftShift")
 
             ];
 
