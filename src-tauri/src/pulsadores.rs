@@ -3,6 +3,8 @@
 // ------------------------------------------------------
 // Diccionario interno de entradas.
 //
+// nativo
+//     ↓
 // interno
 //     ↓
 // interception
@@ -25,6 +27,9 @@ use std::sync::OnceLock;
     Debug,
 )]
 pub struct Pulsador {
+
+    pub nativo:
+        String,
 
     pub interno:
         String,
@@ -66,11 +71,13 @@ fn cargar()
                 );
 
 
-            let mut pulsadores =
+            let mut pulsadores:
+                Vec<Pulsador>
+            =
                 Vec::new();
 
 
-            for (numero, linea)
+            for (numero_linea, linea)
                 in texto.lines().enumerate()
             {
 
@@ -81,16 +88,12 @@ fn cargar()
                 if linea.is_empty()
                     || linea.starts_with('#')
                 {
-
                     continue;
-
                 }
 
 
-                if numero == 0 {
-
+                if numero_linea == 0 {
                     continue;
-
                 }
 
 
@@ -100,38 +103,43 @@ fn cargar()
                     linea.split('\t').collect();
 
 
-                if columnas.len() != 3 {
+                if columnas.len() != 4 {
 
                     panic!(
 
                         "❌ Error interno en pulsadores.tsv. Línea {}",
 
-                        numero + 1
+                        numero_linea + 1
 
                     );
 
                 }
 
 
-                let interno =
+                let nativo =
                     columnas[0].trim();
 
 
-                let interception =
+                let interno =
                     columnas[1].trim();
 
 
-                let ui =
+                let interception =
                     columnas[2].trim();
+
+
+                let ui =
+                    columnas[3].trim();
+
 
 
                 if interno.is_empty() {
 
                     panic!(
 
-                        "❌ Pulsador sin nombre interno. Línea {}",
+                        "❌ Pulsador sin interno. Línea {}",
 
-                        numero + 1
+                        numero_linea + 1
 
                     );
 
@@ -140,15 +148,15 @@ fn cargar()
 
                 if pulsadores.iter().any(
 
-                    |pulsador: &Pulsador|
+                    |p: &Pulsador|
 
-                        pulsador.interno == interno
+                        p.interno == interno
 
                 ) {
 
                     panic!(
 
-                        "❌ Pulsador interno duplicado: {}",
+                        "❌ Interno duplicado: {}",
 
                         interno
 
@@ -157,9 +165,34 @@ fn cargar()
                 }
 
 
+                if !nativo.is_empty()
+                    && pulsadores.iter().any(
+
+                        |p: &Pulsador|
+
+                            p.nativo == nativo
+
+                    )
+                {
+
+                    panic!(
+
+                        "❌ Nativo duplicado: {}",
+
+                        nativo
+
+                    );
+
+                }
+
+
+
                 pulsadores.push(
 
                     Pulsador {
+
+                        nativo:
+                            nativo.to_string(),
 
                         interno:
                             interno.to_string(),
@@ -182,6 +215,34 @@ fn cargar()
         }
 
     )
+
+}
+
+
+// ======================================================
+// 🔍 BUSCAR POR NATIVO
+// ======================================================
+
+pub fn por_nativo(
+
+    nativo:
+        &str,
+
+)
+    -> Option<&'static Pulsador>
+{
+
+    cargar()
+
+        .iter()
+
+        .find(
+
+            |pulsador|
+
+                pulsador.nativo == nativo
+
+        )
 
 }
 
@@ -280,5 +341,141 @@ pub fn todos()
 {
 
     cargar()
+
+}
+
+
+// ======================================================
+// 🔄 CONVERSIONES
+// ======================================================
+
+pub fn nativo_a_interno(
+
+    nativo:
+        &str,
+
+)
+    -> Option<&'static str>
+{
+
+    por_nativo(nativo)
+
+        .map(
+
+            |p|
+
+                p.interno.as_str()
+
+        )
+
+}
+
+
+pub fn interno_a_nativo(
+
+    interno:
+        &str,
+
+)
+    -> Option<&'static str>
+{
+
+    por_interno(interno)
+
+        .map(
+
+            |p|
+
+                p.nativo.as_str()
+
+        )
+
+}
+
+
+pub fn interno_a_interception(
+
+    interno:
+        &str,
+
+)
+    -> Option<&'static str>
+{
+
+    por_interno(interno)
+
+        .map(
+
+            |p|
+
+                p.interception.as_str()
+
+        )
+
+}
+
+
+pub fn interno_a_ui(
+
+    interno:
+        &str,
+
+)
+    -> Option<&'static str>
+{
+
+    por_interno(interno)
+
+        .map(
+
+            |p|
+
+                p.ui.as_str()
+
+        )
+
+}
+
+
+pub fn interception_a_interno(
+
+    interception:
+        &str,
+
+)
+    -> Option<&'static str>
+{
+
+    por_interception(interception)
+
+        .map(
+
+            |p|
+
+                p.interno.as_str()
+
+        )
+
+}
+
+
+pub fn ui_a_interno(
+
+    ui:
+        &str,
+
+)
+    -> Option<&'static str>
+{
+
+    por_ui(ui)
+
+        .map(
+
+            |p|
+
+                p.interno.as_str()
+
+        )
 
 }

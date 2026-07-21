@@ -22,6 +22,7 @@
 
 use std::cell::RefCell;
 use std::mem::size_of;
+use crate::pulsadores;
 
 use windows_sys::Win32::Foundation::{
     LPARAM,
@@ -51,35 +52,6 @@ use windows_sys::Win32::UI::Input::KeyboardAndMouse::{
     MOUSEEVENTF_XUP,
     MOUSEINPUT,
     SendInput,
-    VK_0,
-    VK_9,
-    VK_A,
-    VK_BACK,
-    VK_CAPITAL,
-    VK_ESCAPE,
-    VK_F1,
-    VK_LCONTROL,
-    VK_LMENU,
-    VK_LSHIFT,
-    VK_NUMLOCK,
-    VK_RETURN,
-    VK_RCONTROL,
-    VK_RMENU,
-    VK_RSHIFT,
-    VK_SCROLL,
-    VK_SPACE,
-    VK_TAB,
-    VK_OEM_1,
-    VK_OEM_2,
-    VK_OEM_3,
-    VK_OEM_4,
-    VK_OEM_5,
-    VK_OEM_6,
-    VK_OEM_7,
-    VK_OEM_COMMA,
-    VK_OEM_MINUS,
-    VK_OEM_PERIOD,
-    VK_OEM_PLUS,
 };
 
 use windows_sys::Win32::UI::WindowsAndMessaging::{
@@ -767,22 +739,44 @@ fn traducir_mouse(
         mensaje as u32;
 
 
-    if mensaje
-        == WM_MOUSEWHEEL
-    {
+    if mensaje == WM_MOUSEWHEEL {
 
         let delta =
 
             (
-
                 (
-
                     datos.mouseData
                         >> 16
-
                 ) as u16
 
             ) as i16;
+
+
+        let nativo =
+
+            if delta > 0 {
+
+                "0x020A_UP"
+
+            }
+
+            else {
+
+                "0x020A_DOWN"
+
+            };
+
+
+        let control =
+
+            pulsadores::por_nativo(
+
+                nativo
+
+            )?
+
+            .interno
+            .clone();
 
 
         return Some(
@@ -793,17 +787,7 @@ fn traducir_mouse(
 
                     "mouse",
 
-                    if delta > 0 {
-
-                        "WheelUp"
-
-                    }
-
-                    else {
-
-                        "WheelDown"
-
-                    },
+                    &control,
 
                 )
 
@@ -813,19 +797,18 @@ fn traducir_mouse(
 
     }
 
-
-    let control =
+    let nativo =
 
         match mensaje {
 
             WM_LBUTTONDOWN
-            | WM_LBUTTONUP => "LeftButton",
+            | WM_LBUTTONUP => "0x0201",
 
             WM_RBUTTONDOWN
-            | WM_RBUTTONUP => "RightButton",
+            | WM_RBUTTONUP => "0x0204",
 
             WM_MBUTTONDOWN
-            | WM_MBUTTONUP => "MiddleButton",
+            | WM_MBUTTONUP => "0x0207",
 
             WM_XBUTTONDOWN
             | WM_XBUTTONUP => {
@@ -836,9 +819,9 @@ fn traducir_mouse(
 
                 {
 
-                    1 => "Button4",
+                    1 => "0x020B",
 
-                    2 => "Button5",
+                    2 => "0x020C",
 
                     _ => return None,
 
@@ -851,13 +834,25 @@ fn traducir_mouse(
         };
 
 
+    let control =
+
+        pulsadores::por_nativo(
+
+            nativo
+
+        )?
+
+        .interno
+        .clone();
+
+
     let input =
 
         InputId::new(
 
             "mouse",
 
-            control,
+            &control,
 
         );
 
@@ -909,6 +904,13 @@ fn traducir_mouse(
 
 // ======================================================
 // 🎹 NOMBRE DE TECLA
+// ------------------------------------------------------
+// Windows entrega vkCode.
+// pulsadores.tsv contiene:
+// nativo -> interno
+//
+// No traduce.
+// Solo consulta diccionario.
 // ======================================================
 
 fn teclado_control(
@@ -916,280 +918,38 @@ fn teclado_control(
     vk:
         u32,
 
-    scan:
+    _scan:
         u32,
 
-    flags:
+    _flags:
         u32,
 
 ) -> Option<String> {
 
-    let vk =
-        vk as u16;
 
+    let nativo =
 
-    if (VK_A..=VK_A + 25)
-        .contains(&vk)
-    {
-
-        return Some(
-
-            char::from_u32(
-
-                vk as u32
-
-            )?
-
-            .to_string()
-
+        format!(
+            "0x{:X}",
+            vk
         );
 
-    }
 
+    pulsadores::por_nativo(
 
-    if (VK_0..=VK_9)
-        .contains(&vk)
-    {
+        &nativo
 
-        return Some(
+    )
 
-            format!(
+    .map(
 
-                "Num{}",
+        |pulsador|
 
-                char::from_u32(
+            pulsador.interno.clone()
 
-                    vk as u32
-
-                )?
-
-            )
-
-        );
-
-    }
-
-
-    if vk == 0x10 {
-
-        return Some(
-
-            if scan == 0x2A {
-
-                "LeftShift"
-
-            }
-
-            else {
-
-                "RightShift"
-
-            }
-
-            .to_string()
-
-        );
-
-    }
-
-
-    match vk {
-
-        VK_LCONTROL => {
-
-            Some(
-
-                "LeftControl"
-
-                    .to_string()
-
-            )
-
-        }
-
-
-        VK_RCONTROL => {
-
-            Some(
-
-                "RightControl"
-
-                    .to_string()
-
-            )
-
-        }
-
-
-        0x12 => {
-
-            Some(
-
-                if flags & 0x01 != 0 {
-
-                    "RightAlt"
-
-                }
-
-                else {
-
-                    "LeftAlt"
-
-                }
-
-                .to_string()
-
-            )
-
-        }
-
-
-        VK_RETURN => Some(
-
-            "Enter".to_string()
-
-        ),
-
-        VK_ESCAPE => Some(
-
-            "Esc".to_string()
-
-        ),
-
-        VK_BACK => Some(
-
-            "Backspace".to_string()
-
-        ),
-
-        VK_TAB => Some(
-
-            "Tab".to_string()
-
-        ),
-
-        VK_SPACE => Some(
-
-            "Space".to_string()
-
-        ),
-
-        VK_CAPITAL => Some(
-
-            "CapsLock".to_string()
-
-        ),
-
-        VK_NUMLOCK => Some(
-
-            "NumLock".to_string()
-
-        ),
-
-        VK_SCROLL => Some(
-
-            "ScrollLock".to_string()
-
-        ),
-
-        VK_OEM_MINUS => Some(
-
-            "Minus".to_string()
-
-        ),
-
-        VK_OEM_PLUS => Some(
-
-            "Equals".to_string()
-
-        ),
-
-        VK_OEM_4 => Some(
-
-            "LeftBracket".to_string()
-
-        ),
-
-        VK_OEM_6 => Some(
-
-            "RightBracket".to_string()
-
-        ),
-
-        VK_OEM_5 => Some(
-
-            "BackSlash".to_string()
-
-        ),
-
-        VK_OEM_1 => Some(
-
-            "SemiColon".to_string()
-
-        ),
-
-        VK_OEM_7 => Some(
-
-            "Apostrophe".to_string()
-
-        ),
-
-        VK_OEM_3 => Some(
-
-            "Grave".to_string()
-
-        ),
-
-        VK_OEM_COMMA => Some(
-
-            "Comma".to_string()
-
-        ),
-
-        VK_OEM_PERIOD => Some(
-
-            "Period".to_string()
-
-        ),
-
-        VK_OEM_2 => Some(
-
-            "Slash".to_string()
-
-        ),
-
-        _ => {
-
-            if vk >= VK_F1
-                && vk <= VK_F1 + 11
-            {
-
-                Some(
-
-                    format!(
-
-                        "F{}",
-
-                        vk - VK_F1 + 1
-
-                    )
-
-                )
-
-            }
-
-            else {
-
-                None
-
-            }
-
-        }
-
-    }
+    )
 
 }
-
 
 // ======================================================
 // 📤 EMITIR INPUT
@@ -1217,9 +977,28 @@ pub fn emitir_evento(
 
         Some("keyboard") => {
 
+            let Some(nativo) =
+
+                interno_nativo(control)
+
+            else {
+
+                return;
+
+            };
+
             let Some(vk) =
 
-                tecla_vk(control)
+                nativo
+                    .strip_prefix("0x")
+                    .and_then(
+                        |valor|
+                            u16::from_str_radix(
+                                valor,
+                                16
+                            )
+                            .ok()
+                    )
 
             else {
 
@@ -1595,183 +1374,32 @@ fn emitir_mouse_button(
 
 }
 
-
 // ======================================================
-// 🎹 TECLA → VK
+// 🎹 INTERNO → NATIVO WINDOWS
 // ======================================================
 
-fn tecla_vk(
+fn interno_nativo(
 
-    control:
+    interno:
         &str,
 
-) -> Option<u16> {
+) -> Option<String> {
 
-    if control.len() == 1 {
+    pulsadores::interno_a_nativo(
 
-        let byte =
-            control.as_bytes()[0];
+        interno
 
+    )
 
-        if byte >= b'A'
-            && byte <= b'Z'
-        {
+    .map(
 
-            return Some(
+        |valor|
 
-                byte as u16
+            valor.to_string()
 
-            );
-
-        }
-
-    }
-
-
-    if control.starts_with("Num")
-        && control.len() == 4
-    {
-
-        let numero =
-            control.as_bytes()[3];
-
-
-        if numero >= b'0'
-            && numero <= b'9'
-        {
-
-            return Some(
-
-                VK_0
-                    + (numero - b'0') as u16
-
-            );
-
-        }
-
-    }
-
-
-    match control {
-
-        "Enter" =>
-            Some(VK_RETURN),
-
-        "Esc" =>
-            Some(VK_ESCAPE),
-
-        "Backspace" =>
-            Some(VK_BACK),
-
-        "Tab" =>
-            Some(VK_TAB),
-
-        "Space" =>
-            Some(VK_SPACE),
-
-        "CapsLock" =>
-            Some(VK_CAPITAL),
-
-        "NumLock" =>
-            Some(VK_NUMLOCK),
-
-        "ScrollLock" =>
-            Some(VK_SCROLL),
-
-        "LeftControl" =>
-            Some(VK_LCONTROL),
-
-        "RightControl" =>
-            Some(VK_RCONTROL),
-
-        "LeftShift" =>
-            Some(VK_LSHIFT),
-
-        "RightShift" =>
-            Some(VK_RSHIFT),
-
-        "LeftAlt" =>
-            Some(VK_LMENU),
-
-        "RightAlt" =>
-            Some(VK_RMENU),
-
-        "Minus" =>
-            Some(VK_OEM_MINUS),
-
-        "Equals" =>
-            Some(VK_OEM_PLUS),
-
-        "LeftBracket" =>
-            Some(VK_OEM_4),
-
-        "RightBracket" =>
-            Some(VK_OEM_6),
-
-        "BackSlash" =>
-            Some(VK_OEM_5),
-
-        "SemiColon" =>
-            Some(VK_OEM_1),
-
-        "Apostrophe" =>
-            Some(VK_OEM_7),
-
-        "Grave" =>
-            Some(VK_OEM_3),
-
-        "Comma" =>
-            Some(VK_OEM_COMMA),
-
-        "Period" =>
-            Some(VK_OEM_PERIOD),
-
-        "Slash" =>
-            Some(VK_OEM_2),
-
-        _ => {
-
-            if let Some(numero) =
-
-                control
-                    .strip_prefix("F")
-                    .and_then(
-
-                        |valor|
-
-                            valor
-                                .parse::<u16>()
-                                .ok()
-
-                    )
-
-            {
-
-                if numero >= 1
-                    && numero <= 12
-                {
-
-                    return Some(
-
-                        VK_F1
-                            + numero
-                            - 1
-
-                    );
-
-                }
-
-            }
-
-
-            None
-
-        }
-
-    }
+    )
 
 }
-
 
 // ======================================================
 // 🖱️ FLAGS MOUSE
