@@ -833,7 +833,6 @@ fn traducir_mouse(
 
         };
 
-
     let control =
 
         pulsadores::por_nativo(
@@ -900,7 +899,6 @@ fn traducir_mouse(
     }
 
 }
-
 
 // ======================================================
 // 🎹 NOMBRE DE TECLA

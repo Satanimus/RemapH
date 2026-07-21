@@ -14,6 +14,7 @@
 // ======================================================
 
 use std::collections::HashSet;
+use crate::perfilcache::CondicionTrigger;
 
 use std::sync::{
     Mutex,
@@ -565,6 +566,7 @@ pub fn tiene_prefijo(
 
 #[cfg(test)]
 mod tests {
+    use crate::perfilcache::CondicionTrigger;
 
     use super::*;
 
@@ -619,15 +621,16 @@ mod tests {
 
                 AppCache::Global,
 
-            trigger:
+            trigger: TriggerCache {
 
-                TriggerCache {
+                modificadores,
 
-                    modificadores,
+                gatillo,
 
-                    gatillo,
+                condicion:
+                    CondicionTrigger::Simple,
 
-                },
+            },
 
             accion:
 

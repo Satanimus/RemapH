@@ -43,6 +43,25 @@ pub enum AppCache {
 
 }
 
+// ======================================================
+// 🎯 CONDICIÓN CACHE
+// ======================================================
+
+#[derive(
+    Clone,
+    Debug,
+    PartialEq,
+    Eq,
+)]
+pub enum CondicionTrigger {
+
+    Simple,
+
+    Doble,
+
+    Mantenido,
+
+}
 
 // ======================================================
 // 🧩 REMAPEO CACHE
@@ -66,7 +85,6 @@ pub struct RemapeoCache {
 
 }
 
-
 // ======================================================
 // ⌨️ TRIGGER CACHE
 // ======================================================
@@ -84,8 +102,10 @@ pub struct TriggerCache {
     pub gatillo:
         InputId,
 
-}
+    pub condicion:
+        CondicionTrigger,
 
+}
 
 // ======================================================
 // ⚡ ACCIÓN CACHE

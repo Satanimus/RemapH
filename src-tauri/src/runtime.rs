@@ -370,6 +370,7 @@ mod tests {
     };
 
     use crate::perfilcache::{
+        CondicionTrigger,
         AccionCache,
         RemapeoCache,
         TriggerCache,
@@ -417,11 +418,14 @@ mod tests {
 
                     TriggerCache {
 
-                        modificadores,
+                    modificadores,
 
-                        gatillo,
+                    gatillo,
 
-                    },
+                    condicion:
+                        CondicionTrigger::Simple,
+
+                },
 
                 accion:
 

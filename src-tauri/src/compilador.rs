@@ -18,6 +18,7 @@ use crate::eventos::InputId;
 use crate::perfilcache::{
     AccionCache,
     AppCache,
+    CondicionTrigger,
     RemapeoCache,
     TriggerCache,
 };
@@ -458,8 +459,17 @@ fn compilar_remapeo(
 
                         ),
 
-                },
+                    condicion:
 
+                        convertir_condicion(
+
+                            &remapeo
+                                .trigger
+                                .condicion
+
+                        ),
+
+                },
             accion:
 
                 AccionCache::Emitir(
@@ -540,5 +550,42 @@ fn convertir_input(
         &input.control,
 
     )
+
+}
+
+// ======================================================
+// 🎯 CONVERTIR CONDICIÓN
+// ======================================================
+
+fn convertir_condicion(
+
+    condicion:
+        &str,
+
+)
+
+    -> CondicionTrigger
+
+{
+
+    match condicion {
+
+        "Simple" =>
+
+            CondicionTrigger::Simple,
+
+        "Doble" =>
+
+            CondicionTrigger::Doble,
+
+        "Mantenido" =>
+
+            CondicionTrigger::Mantenido,
+
+        _ =>
+
+            CondicionTrigger::Simple,
+
+    }
 
 }
