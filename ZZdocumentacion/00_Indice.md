@@ -162,7 +162,6 @@ Cada documento responde una pregunta concreta.
 | 04_Platform        | Integración física con Windows.                                |
 | 05_Estilos         | Identidad visual.                                              |
 | 06_Principios      | Reglas arquitectónicas permanentes.                            |
-| 07_Pendientes      | Trabajo futuro.                                                |
 
 ---
 
@@ -210,20 +209,3 @@ Antes de crear un nuevo módulo debe responderse:
 > ¿A qué capa pertenece?
 
 Si la respuesta no es evidente, probablemente la responsabilidad todavía no está bien definida.
-
----
-
-# 📝 7. Última actualización
-
-Estado documentado:
-
-**Commit 004 — base funcional de UI, Core, Runtime y Platform.**
-
-Cambios principales:
-
-• Se consolidó la división UI / Core / Runtime / Platform.
-• Se definió el flujo PerfilJson → Compilador → PerfilCache → Cache → Runtime.
-• Se creó un modelo de entrada física genérico mediante InputEvent.
-• Se separaron los modos Full y Portable de entrada física.
-• Se separó el modelo editable del modelo compilado.
-• Se inició la integración real entre UI y Tauri.
