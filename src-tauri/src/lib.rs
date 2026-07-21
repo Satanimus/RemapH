@@ -16,6 +16,7 @@ mod config;
 mod eventos;
 mod entrada;
 mod estado;
+mod pulsadores;
 pub mod idioma;
 mod perfilcache;
 mod persistencia;
