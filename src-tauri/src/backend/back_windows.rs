@@ -23,6 +23,7 @@
 use std::cell::RefCell;
 use std::mem::size_of;
 use crate::pulsadores;
+use crate::analizador_captura::AnalizadorCaptura;
 
 use windows_sys::Win32::Foundation::{
     LPARAM,
@@ -100,6 +101,9 @@ struct Estado {
     procesar:
         Procesador,
 
+    analizador:
+        AnalizadorCaptura,
+
 }
 
 
@@ -158,6 +162,10 @@ where
                             procesar
 
                         ),
+
+                    analizador:
+
+                        AnalizadorCaptura::nuevo(),
 
                 }
 
@@ -610,6 +618,24 @@ fn evaluar(
             else {
 
                 return false;
+
+            };
+
+
+            let Some(evento) =
+
+                actual
+                    .analizador
+                    .recibir(
+
+                        evento
+
+                    )
+
+            else {
+
+                // El analizador decidió seguir esperando.
+                return true;
 
             };
 

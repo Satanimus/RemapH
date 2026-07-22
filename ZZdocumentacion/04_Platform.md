@@ -46,8 +46,7 @@ Platform no decide qué remapeo debe ejecutarse.
 6. Salida física
 7. Tauri
 8. Comunicación con Runtime
-9. Reentrada
-10. Reglas de diseño
+9. Reglas de diseño
 
 ---
 
@@ -247,17 +246,7 @@ Platform no decide si un evento debe consumirse.
 
 ---
 
-# 🔁 9. Reentrada
-
-Existe un módulo `reentrada.rs` destinado a controlar eventos generados por el motor.
-
-En el estado actual de commit 004 la integración completa de este mecanismo todavía no constituye el flujo principal de ejecución.
-
-La lógica de entrada y salida debe mantener separadas la entrada física y la emisión física.
-
----
-
-# 📌 10. Reglas de diseño
+# 📌 9. Reglas de diseño
 
 ## Platform no decide
 

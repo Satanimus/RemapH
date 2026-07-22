@@ -6,7 +6,7 @@
 // Inicializa el motor principal.
 // ======================================================
 
-
+mod analizador_captura;
 mod backend;
 mod cache;
 mod captura;
