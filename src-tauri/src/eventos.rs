@@ -17,7 +17,7 @@ use serde::{
 };
 
 use std::hash::Hash;
-
+use crate::perfilcache::CondicionTrigger;
 
 // ======================================================
 // 🆔 IDENTIDAD DE INPUT
@@ -148,8 +148,10 @@ pub struct InputEvent {
     pub state:
         InputState,
 
-}
+    pub condicion:
+        CondicionTrigger,
 
+}
 
 // ======================================================
 // 🧱 CONSTRUCTORES
@@ -171,6 +173,9 @@ impl InputEvent {
             state:
                 InputState::Down,
 
+            condicion:
+                CondicionTrigger::Simple,
+
         }
 
     }
@@ -190,10 +195,12 @@ impl InputEvent {
             state:
                 InputState::Up,
 
+            condicion:
+                CondicionTrigger::Simple,
+
         }
 
     }
-
 
     pub fn pulse(
 
@@ -208,6 +215,9 @@ impl InputEvent {
 
             state:
                 InputState::Pulse,
+
+            condicion:
+                CondicionTrigger::Simple,
 
         }
 

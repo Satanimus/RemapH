@@ -47,11 +47,18 @@ pub enum AppCache {
 // 🎯 CONDICIÓN CACHE
 // ======================================================
 
+use serde::{
+    Serialize,
+    Deserialize,
+};
+
 #[derive(
     Clone,
     Debug,
     PartialEq,
     Eq,
+    Serialize,
+    Deserialize,
 )]
 pub enum CondicionTrigger {
 

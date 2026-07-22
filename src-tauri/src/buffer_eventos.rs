@@ -1,70 +1,38 @@
 // ======================================================
 // 🧠 Buffer eventos RemapH V3
 // ------------------------------------------------------
-// Convierte eventos físicos en eventos lógicos.
+//Responsabilidad única:
 //
-// Recibe:
-//     Down
-//     Up
-//     Pulse
+//Agregar eventos físicos.
+//Entregar eventos físicos.
+//Limpiarse cuando el AnalizadorTrigger lo indique.
 //
-// Analiza:
+//Nunca:
 //
-//     • Simple
-//     • Doble
-//     • Mantenido
-//     • Rueda
-//     • Modificadores
-//     • Gatillo
-//
-// Devuelve:
-//
-//     None
-//         -> todavía esperando.
-//
-//     Some(InputEvent)
-//         -> evento completamente analizado.
-//
-// Este módulo será compartido por:
-//
-//     • Backend Portable
-//     • Backend Interception
+//Calcula tiempos.
+//Detecta doble.
+//Detecta mantenido.
+//Decide cuándo borrar.
 // ======================================================
 
 use crate::eventos::InputEvent;
 
-pub struct BufferEventos {
-
-}
+pub struct BufferEventos {}
 
 impl BufferEventos {
-
     // ==================================================
     // 🚀 CREAR
     // ==================================================
 
     pub fn nuevo() -> Self {
-
-        Self {
-
-        }
-
+        Self {}
     }
 
     // ==================================================
     // 📥 RECIBIR EVENTO
     // ==================================================
 
-    pub fn recibir(
-
-        &mut self,
-
-        evento: InputEvent,
-
-    ) -> Option<InputEvent> {
-
+    pub fn recibir(&mut self, evento: InputEvent) -> Option<InputEvent> {
         Some(evento)
-
     }
-
 }

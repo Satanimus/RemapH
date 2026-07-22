@@ -7,6 +7,8 @@ import {
 } from "./ui_layout";
 
 
+
+
 // ======================================================
 // 🚀 CREAR APP
 // ======================================================
@@ -18,9 +20,7 @@ export function crearApp(
 
 ):
 
-    HTMLElement
-
-{
+    HTMLElement {
 
     return crearLayout(
 

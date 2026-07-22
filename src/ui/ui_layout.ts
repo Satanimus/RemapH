@@ -2,154 +2,69 @@
 // ui_Layout RemapH V3
 // ======================================================
 
-import {
-    crearToolbar,
-    marcarPerfilEditado
-} from "./ui_toolbar";
+import { crearToolbar, marcarPerfilEditado } from "./ui_toolbar";
+
+import { crearTabla } from "./ui_tabla";
+
+import { crearStatusbar, actualizarStatusbar } from "./ui_statusbar";
+
+import { crearContenedorPopup } from "./componentes/comp_popup_contenedor";
+
+import { obtenerPerfilUi } from "../core/core_perfil_ui";
 
 import {
-    crearTabla
-} from "./ui_tabla";
-
-import {
-    crearStatusbar,
-    actualizarStatusbar
-} from "./ui_statusbar";
-
-import {
-    crearContenedorPopup
-} from "./componentes/comp_popup_contenedor";
-
-import {
-    obtenerPerfilUi
-} from "../core/core_perfil_ui";
-
-import {
-    reconstruirTabla,
-    registrarActualizacionConflictos
+  reconstruirTabla,
+  registrarActualizacionConflictos,
 } from "./ui_tabla_control";
 
-import {
-    crearFila
-} from "../core/core_perfil";
-
+import { crearFila } from "../core/core_perfil";
 
 // ======================================================
 // CREAR LAYOUT
 // ======================================================
 
-export function crearLayout(
+export function crearLayout(alGuardar: () => Promise<void>): HTMLElement {
+  const statusbar = crearStatusbar();
 
-    alGuardar:
-        () => Promise<void>
+  registrarActualizacionConflictos(() => {
+    actualizarStatusbar(obtenerPerfilUi().filas);
+  });
 
-):
+  const toolbar = crearToolbar(
+    () => {
+      const perfil = obtenerPerfilUi();
 
-    HTMLElement
+      perfil.filas.push(crearFila());
 
-{
+      reconstruirTabla();
 
-    const statusbar =
-        crearStatusbar();
+      marcarPerfilEditado(toolbar);
+    },
 
+    alGuardar,
+  );
 
-    registrarActualizacionConflictos(
+  const tabla = crearTabla(() => {
+    marcarPerfilEditado(toolbar);
+  });
 
-        () => {
+  const fragment = document.createDocumentFragment();
 
-            actualizarStatusbar(
+  fragment.append(
+    toolbar,
 
-                obtenerPerfilUi().filas
+    tabla,
 
-            );
+    statusbar,
 
-        }
+    crearContenedorPopup(),
+  );
 
-    );
+  const contenedor = document.createElement("div");
 
+  contenedor.className = "layout";
 
-    const toolbar =
-        crearToolbar(
+  contenedor.append(fragment);
 
-            () => {
-
-                const perfil =
-                    obtenerPerfilUi();
-
-
-                perfil.filas.push(
-
-                    crearFila()
-
-                );
-
-
-                reconstruirTabla();
-
-                marcarPerfilEditado(
-
-                    toolbar
-
-                );
-
-            },
-
-            alGuardar
-
-        );
-
-
-    const tabla =
-        crearTabla(
-
-            () => {
-
-                marcarPerfilEditado(
-
-                    toolbar
-
-                );
-
-            }
-
-        );
-
-
-    const fragment =
-        document.createDocumentFragment();
-
-
-    fragment.append(
-
-        toolbar,
-
-        tabla,
-
-        statusbar,
-
-        crearContenedorPopup()
-
-    );
-
-
-    const contenedor =
-        document.createElement(
-
-            "div"
-
-        );
-
-    contenedor.className =
-        "layout";
-
-
-    contenedor.append(
-
-        fragment
-
-    );
-
-
-    return contenedor;
-
+  return contenedor;
 }
