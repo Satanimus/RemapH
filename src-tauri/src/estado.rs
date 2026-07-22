@@ -9,82 +9,42 @@
 // No conoce Configuracion.
 // ======================================================
 
-use std::sync::{
-    OnceLock,
-    RwLock,
-};
-
+use std::sync::{OnceLock, RwLock};
 
 // ======================================================
 // 🧠 ESTADO
 // ======================================================
 
-static ACTIVO:
-
-    OnceLock<RwLock<bool>>
-
-    = OnceLock::new();
-
+static ACTIVO: OnceLock<RwLock<bool>> = OnceLock::new();
 
 // ======================================================
 // 🔒 OBTENER ESTADO
 // ======================================================
 
-fn estado()
-
-    -> &'static RwLock<bool>
-
-{
-
-    ACTIVO.get_or_init(
-
-        || RwLock::new(true)
-
-    )
-
+fn estado() -> &'static RwLock<bool> {
+    ACTIVO.get_or_init(|| RwLock::new(true))
 }
-
 
 // ======================================================
 // 🟢 ACTIVAR
 // ======================================================
 
 pub fn activar() {
-
-    *estado()
-        .write()
-        .unwrap()
-        = true;
-
+    *estado().write().unwrap() = true;
 }
-
 
 // ======================================================
 // 🔴 DESACTIVAR
 // ======================================================
 
 pub fn desactivar() {
-
-    *estado()
-        .write()
-        .unwrap()
-        = false;
-
+    *estado().write().unwrap() = false;
 }
-
 
 // ======================================================
 // ❓ ESTADO
 // ======================================================
 
-pub fn esta_activo()
-
-    -> bool
-
-{
-
-    *estado()
-        .read()
-        .unwrap()
-
+pub fn esta_activo() -> bool {
+    *estado().read().unwrap()
 }

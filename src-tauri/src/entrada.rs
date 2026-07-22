@@ -25,109 +25,45 @@ use crate::perfilcache::AccionCache;
 use crate::runtime;
 use std::collections::HashSet;
 use std::sync::mpsc;
-use std::time::{
-    Duration,
-    Instant,
-};
+use std::time::{Duration, Instant};
 
 // ======================================================
 // ⚙️ MODO
 // ======================================================
 
-#[derive(
-    Clone,
-    Copy,
-)]
+#[derive(Clone, Copy)]
 pub enum Modo {
-
     Full,
 
     Portable,
-
 }
-
 
 // ======================================================
 // 🧪 MODO ACTUAL
 // ======================================================
 
-const MODO:
-
-    Modo
-
-    = Modo::Portable;
+const MODO: Modo = Modo::Portable;
 
 // ======================================================
 // 🖥️ ACTUALIZAR CONTEXTO APP
 // ======================================================
 
-fn actualizar_contexto_cache(
-
-    ultima_actualizacion:
-        &mut Instant,
-
-) {
-
-    if ultima_actualizacion.elapsed()
-
-        < Duration::from_millis(250)
-
-    {
-
+fn actualizar_contexto_cache(ultima_actualizacion: &mut Instant) {
+    if ultima_actualizacion.elapsed() < Duration::from_millis(250) {
         return;
-
     }
 
+    let programa_activo = crate::backend::back_procesos::obtener_programa_activo();
 
-    let programa_activo =
-
-        crate::backend
-
-            ::back_procesos
-
-            ::obtener_programa_activo();
-
-
-    let procesos_activos:
-
-        HashSet<String> =
-
-        crate::backend
-
-            ::back_procesos
-
-            ::enumerar_procesos_ventana()
-
+    let procesos_activos: HashSet<String> =
+        crate::backend::back_procesos::enumerar_procesos_ventana()
             .into_iter()
-
-            .map(
-
-                |proceso|
-
-                    proceso
-
-                        .nombre
-
-                        .to_lowercase()
-
-            )
-
+            .map(|proceso| proceso.nombre.to_lowercase())
             .collect();
 
+    cache::actualizar_contexto(programa_activo.as_deref(), &procesos_activos);
 
-    cache::actualizar_contexto(
-
-        programa_activo.as_deref(),
-
-        &procesos_activos,
-
-    );
-
-
-    *ultima_actualizacion =
-
-        Instant::now();
-
+    *ultima_actualizacion = Instant::now();
 }
 
 // ======================================================
@@ -135,402 +71,141 @@ fn actualizar_contexto_cache(
 // ======================================================
 
 pub fn iniciar() {
-
-    let (tx, rx) =
-
-        mpsc::channel::<AccionCache>();
-
+    let (tx, rx) = mpsc::channel::<AccionCache>();
 
     match MODO {
-
         Modo::Full => {
-
-            iniciar_full(
-
-                tx,
-
-                rx,
-
-            );
-
+            iniciar_full(tx, rx);
         }
-
 
         Modo::Portable => {
-
-            iniciar_portable(
-
-                tx,
-
-                rx,
-
-            );
-
+            iniciar_portable(tx, rx);
         }
-
     }
-
 }
-
 
 // ======================================================
 // ⚡ FULL
 // ======================================================
 
-fn iniciar_full(
+fn iniciar_full(tx: mpsc::Sender<AccionCache>, rx: mpsc::Receiver<AccionCache>) {
+    std::thread::spawn(move || {
+        let ict = crate::backend::back_interception::crear();
 
-    tx:
-        mpsc::Sender<AccionCache>,
+        let salida = crate::backend::back_salida::crear();
 
-    rx:
-        mpsc::Receiver<AccionCache>,
+        let mut runtime = runtime::Estado::nuevo();
 
-) {
+        let mut ultima_actualizacion = Instant::now() - Duration::from_secs(1);
 
-    std::thread::spawn(
+        let mut pendientes: Vec<(interception::Device, interception::Stroke)> = Vec::new();
 
-        move || {
+        loop {
+            let Some((device, stroke)) = crate::backend::back_interception::recibir(&ict) else {
+                continue;
+            };
 
-            let ict =
+            let Some(evento) = crate::backend::back_interception::traducir(&stroke) else {
+                continue;
+            };
 
-                crate::backend
-                    ::back_interception
-                    ::crear();
-
-
-            let salida =
-
-                crate::backend
-                    ::back_salida
-                    ::crear();
-
-
-            let mut runtime =
-
-                runtime::Estado::nuevo();
-
-            let mut ultima_actualizacion =
-
-                Instant::now()
-
-                    - Duration::from_secs(1);
-
-            let mut pendientes:
-
-                Vec<(
-
-                    interception::Device,
-
-                    interception::Stroke
-
-                )>
-
-                = Vec::new();
-
-
-            loop {
-
-                let Some((
-
-                    device,
-
-                    stroke,
-
-                )) =
-
-                    crate::backend
-                        ::back_interception
-                        ::recibir(
-
-                            &ict
-
-                        )
-
-                else {
-
-                    continue;
-
-                };
-
-
-                let Some(evento) =
-
-                    crate::backend
-                        ::back_interception
-                        ::traducir(
-
-                            &stroke
-
-                        )
-
-                else {
-
-                    continue;
-
-                };
-
-
-                if crate::captura::procesar(
-
-                    &evento
-
-                )
-
-                {
-
-                    continue;
-
-                }
-
-                actualizar_contexto_cache(
-
-                    &mut ultima_actualizacion
-
-                );
-
-                let resultado =
-
-                    runtime.procesar(
-
-                        evento,
-
-                        &tx,
-
-                    );
-
-
-                match resultado {
-
-                    runtime::Resultado::Esperar => {
-
-                        pendientes.push(
-
-                            (
-
-                                device,
-
-                                stroke,
-
-                            )
-
-                        );
-
-                    }
-
-
-                    runtime::Resultado::Consumir => {
-
-                        pendientes.clear();
-
-                    }
-
-
-                    runtime::Resultado::Pasar => {
-
-                        for (
-
-                            device_pendiente,
-
-                            stroke_pendiente,
-
-                        ) in pendientes.drain(..)
-
-                        {
-
-                            crate::backend
-                                ::back_interception
-                                ::reenviar(
-
-                                    &ict,
-
-                                    device_pendiente,
-
-                                    stroke_pendiente,
-
-                                );
-
-                        }
-
-
-                        crate::backend
-                            ::back_interception
-                            ::reenviar(
-
-                                &ict,
-
-                                device,
-
-                                stroke,
-
-                            );
-
-                    }
-
-                }
-
-
-                while let Ok(accion) =
-
-                    rx.try_recv()
-
-                {
-
-                    salida.ejecutar(
-
-                        accion
-
-                    );
-
-                }
-
+            if crate::captura::procesar(&evento) {
+                continue;
             }
 
+            actualizar_contexto_cache(&mut ultima_actualizacion);
+
+            let resultado = runtime.procesar(evento, &tx);
+
+            match resultado {
+                runtime::Resultado::Esperar => {
+                    pendientes.push((device, stroke));
+                }
+
+                runtime::Resultado::Consumir => {
+                    pendientes.clear();
+                }
+
+                runtime::Resultado::Pasar => {
+                    for (device_pendiente, stroke_pendiente) in pendientes.drain(..) {
+                        crate::backend::back_interception::reenviar(
+                            &ict,
+                            device_pendiente,
+                            stroke_pendiente,
+                        );
+                    }
+
+                    crate::backend::back_interception::reenviar(&ict, device, stroke);
+                }
+            }
+
+            while let Ok(accion) = rx.try_recv() {
+                salida.ejecutar(accion);
+            }
         }
-
-    );
-
+    });
 }
-
 
 // ======================================================
 // 🪟 PORTABLE
 // ======================================================
 
-fn iniciar_portable(
+fn iniciar_portable(tx: mpsc::Sender<AccionCache>, rx: mpsc::Receiver<AccionCache>) {
+    std::thread::spawn(move || {
+        let mut runtime = runtime::Estado::nuevo();
 
-    tx:
-        mpsc::Sender<AccionCache>,
+        let mut ultima_actualizacion = Instant::now() - Duration::from_secs(1);
 
-    rx:
-        mpsc::Receiver<AccionCache>,
+        let mut pendientes: Vec<InputEvent> = Vec::new();
 
-) {
+        crate::backend::back_windows::iniciar(move |evento, emitir| {
+            // ----------------------------------
+            // 📥 EVENTO RECIBIDO
+            // ----------------------------------
 
-    std::thread::spawn(
+            if crate::captura::procesar(&evento) {
+                return true;
+            }
 
-        move || {
+            actualizar_contexto_cache(&mut ultima_actualizacion);
 
-            let mut runtime =
+            // ----------------------------------
+            // 🧠 RUNTIME
+            // ----------------------------------
 
-                runtime::Estado::nuevo();
+            let resultado = runtime.procesar(evento.clone(), &tx);
 
-            let mut ultima_actualizacion =
+            let consumir = match resultado {
+                runtime::Resultado::Esperar => {
+                    pendientes.push(evento);
 
-                Instant::now()
+                    true
+                }
 
-                    - Duration::from_secs(1);    
+                runtime::Resultado::Consumir => {
+                    pendientes.clear();
+                    true
+                }
 
-            let mut pendientes:
-
-                Vec<InputEvent>
-
-                = Vec::new();
-
-
-            crate::backend
-                ::back_windows
-                ::iniciar(
-
-                    move |
-
-                        evento,
-
-                        emitir|
-
-                    {
-
-                        // ----------------------------------
-                        // 📥 EVENTO RECIBIDO
-                        // ----------------------------------
-
-                        if crate::captura::procesar(
-
-                            &evento
-
-                        )
-
-                        {
-                            return true;
-                        }
-
-                        actualizar_contexto_cache(
-
-                            &mut ultima_actualizacion
-
-                        );
-
-                        // ----------------------------------
-                        // 🧠 RUNTIME
-                        // ----------------------------------
-
-                        let resultado =
-
-                            runtime.procesar(
-
-                                evento.clone(),
-
-                                &tx,
-
-                            );
-
-                        let consumir =
-
-                            match resultado {
-
-                                runtime::Resultado::Esperar => {
-
-                                    pendientes.push(
-
-                                        evento
-
-                                    );
-
-
-                                    true
-
-                                }
-
-
-                                runtime::Resultado::Consumir => {
-                                    pendientes.clear();
-                                    true
-                                }
-
-
-                                runtime::Resultado::Pasar => {
-                                    for pendiente in
-                                        pendientes.drain(..)
-                                    {
-
-                                        emitir(
-                                            pendiente
-                                        );
-                                    }
-                                    false
-                                }
-                            };
-
-                        // ----------------------------------
-                        // 📤 ACCIONES
-                        // ----------------------------------
-
-                        while let Ok(accion) =
-
-                            rx.try_recv()
-
-                        {
-
-                            ejecutar_portable(
-                                accion
-                            );
-                        }
-                        consumir
+                runtime::Resultado::Pasar => {
+                    for pendiente in pendientes.drain(..) {
+                        emitir(pendiente);
                     }
-                );
-        }
-    );
-}
+                    false
+                }
+            };
 
+            // ----------------------------------
+            // 📤 ACCIONES
+            // ----------------------------------
+
+            while let Ok(accion) = rx.try_recv() {
+                ejecutar_portable(accion);
+            }
+            consumir
+        });
+    });
+}
 
 // ======================================================
 // 🪟 EJECUTAR PORTABLE
@@ -541,25 +216,13 @@ fn iniciar_portable(
 // La traducción física ocurre aquí.
 // ======================================================
 
-fn ejecutar_portable(
-
-    accion:
-        AccionCache,
-
-) {
-
+fn ejecutar_portable(accion: AccionCache) {
     match accion {
-
         AccionCache::Emitir(input) => {
-
-            crate::backend
-                ::back_windows
-                ::emitir_evento(
-
-                    InputEvent::pulse(
-                        input
-                    )
-                );
+            crate::backend::back_windows::emitir_evento(InputEvent::pulse(
+                input,
+                crate::instante::ahora(),
+            ));
         }
     }
 }

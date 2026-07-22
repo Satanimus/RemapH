@@ -6,144 +6,62 @@
 
 import "./styles.css";
 
-import {
-    invoke
-} from "@tauri-apps/api/core";
+import { invoke } from "@tauri-apps/api/core";
 
-import {
-    crearApp
-} from "./ui/ui_app";
+import { crearApp } from "./ui/ui_app";
 
-import {
-    establecerPerfilUi,
-    obtenerPerfilUi
-} from "./core/core_perfil_ui";
+import { establecerPerfilUi, obtenerPerfilUi } from "./core/core_perfil_ui";
 
-import {
-    convertirPerfilJson
-} from "./core/core_perfil_json";
+import { convertirPerfilJson } from "./core/core_perfil_json";
 
-import type {
-    PerfilJson
-} from "./core/core_perfil_json";
-
-import {
-    validarCompatibilidadApp
-} from "./core/core_validar_compatibilidad";
+import type { PerfilJson } from "./core/core_perfil_json";
 
 // ======================================================
 // 💾 GUARDAR Y ACTIVAR PERFIL
 // ======================================================
 
-async function guardarPerfil():
+async function guardarPerfil(): Promise<void> {
+  const perfil = obtenerPerfilUi();
 
-    Promise<void>
+  await invoke(
+    "compilar_perfil",
 
-{
+    {
+      filas: perfil.filas,
+    },
+  );
 
-    const perfil =
-        obtenerPerfilUi();
-
-
-    await invoke(
-
-        "compilar_perfil",
-
-        {
-
-            filas:
-                perfil.filas
-
-        }
-
-    );
-
-
-    await invoke(
-
-        "activar_perfil"
-
-    );
-
+  await invoke("activar_perfil");
 }
-
 
 // ======================================================
 // 🚀 INICIAR APLICACIÓN
 // ======================================================
 
-async function iniciarApp():
+async function iniciarApp(): Promise<void> {
+  const perfilJson = await invoke<PerfilJson>("obtener_perfil_actual");
 
-    Promise<void>
+  const perfil = convertirPerfilJson(perfilJson);
 
-{
+  establecerPerfilUi(perfil);
 
-    const perfilJson =
-
-        await invoke<PerfilJson>(
-
-            "obtener_perfil_actual"
-
-        );
-
-
-    const perfil =
-
-        convertirPerfilJson(
-
-            perfilJson
-
-        );
-
-
-    establecerPerfilUi(
-
-        perfil
-
-    );
-
-
-    document.body.replaceChildren(
-
-        crearApp(
-
-            guardarPerfil
-
-        )
-
-    );
-
+  document.body.replaceChildren(crearApp(guardarPerfil));
 }
-
 
 // ======================================================
 // 🟢 DOM LISTO
 // ======================================================
 
 window.addEventListener(
+  "DOMContentLoaded",
 
-    "DOMContentLoaded",
+  () => {
+    iniciarApp().catch((error) => {
+      console.error(
+        "❌ No se pudo cargar el perfil:",
 
-    () => {
-
-        iniciarApp()
-
-            .catch(
-
-                error => {
-
-                    console.error(
-
-                        "❌ No se pudo cargar el perfil:",
-
-                        error
-
-                    );
-
-                }
-
-            );
-
-    }
-
+        error,
+      );
+    });
+  },
 );

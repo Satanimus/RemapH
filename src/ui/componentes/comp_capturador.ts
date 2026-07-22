@@ -3,196 +3,117 @@
 // RemapH V3
 // ======================================================
 
-import type {
-    ContextoFila,
-} from "../../core/core_contexto_fila";
+import type { ContextoFila } from "../../core/core_contexto_fila";
 
-import type {
-    FilaPerfil,
-} from "../../core/core_perfil";
+import type { FilaPerfil } from "../../core/core_perfil";
 
-import {
-    crearBoton,
-} from "./comp_boton";
+import { crearBoton } from "./comp_boton";
 
-import {
-    reconstruirFila,
-} from "../ui_tabla_control";
+import { reconstruirFila } from "../ui_tabla_control";
 
-import {
-    triggerATexto,
-    triggerAHTML,
-} from "../../core/core_trigger";
+import { triggerATexto, triggerAHTML } from "../../core/core_trigger";
 
-import {
-    abrirPopupModificador,
-} from "./comp_popup_abrir";
+import { abrirPopupModificador } from "./comp_popup_abrir";
 
-import {
-    iniciarCaptura,
-} from "./comp_capturador_trigger";
+import { iniciarCaptura } from "./comp_capturador_trigger";
 
-import {
-    crearTrigger,
-} from "../../core/core_trigger";
+import { crearTrigger } from "../../core/core_trigger";
 
-type DestinoCaptura =
-    | "Trigger"
-    | "Accion";
+type DestinoCaptura = "Trigger" | "Accion";
 
 // ======================================================
 // CREAR CAPTURADOR
 // ======================================================
 
 export function crearCapturador(
-    contexto: ContextoFila,
-    filaPerfil: FilaPerfil,
-    destino: DestinoCaptura = "Trigger",
-    alModificar: () => void,
+  contexto: ContextoFila,
+  filaPerfil: FilaPerfil,
+  destino: DestinoCaptura = "Trigger",
+  alModificar: () => void,
 ): HTMLButtonElement {
+  const trigger =
+    destino === "Trigger" ? filaPerfil.trigger : filaPerfil.accion;
 
-    const trigger =
-        destino === "Trigger"
-            ? filaPerfil.trigger
-            : filaPerfil.accion;
+  const tieneTrigger = trigger !== null && trigger.gatillo !== null;
 
-    const tieneTrigger =
-        trigger !== null &&
-        trigger.gatillo !== null;
+  const boton = crearBoton({
+    texto: tieneTrigger ? triggerATexto(trigger) : "Capturar",
 
-    const boton =
-        crearBoton({
-
-            texto:
-                tieneTrigger
-                    ? triggerATexto(trigger)
-                    : "Capturar",
-
-            html:
-                tieneTrigger
-                    ? `
+    html: tieneTrigger
+      ? `
                         <div class="trigger-extra">+</div>
                         <div class="trigger-contenido">
                             ${triggerAHTML(trigger)}
                         </div>
                       `
-                    : "Capturar",
+      : "Capturar",
 
-            clase:
-                "capturador",
-        });
+    clase: "capturador",
+  });
 
-    const botonExtra =
-        boton.querySelector(
-            ".trigger-extra",
-        ) as HTMLDivElement | null;
+  const botonExtra = boton.querySelector(
+    ".trigger-extra",
+  ) as HTMLDivElement | null;
 
-    if (
-        botonExtra
-    ) {
+  if (botonExtra) {
+    botonExtra.addEventListener("click", (evento) => {
+      evento.stopPropagation();
 
-        botonExtra.addEventListener(
-            "click",
-            evento => {
+      abrirPopupModificador(evento, contexto, filaPerfil, destino);
+    });
+  }
 
-                evento.stopPropagation();
+  let capturando = false;
 
-                abrirPopupModificador(
-                    evento,
-                    contexto,
-                    filaPerfil,
-                    destino,
-                );
-            },
-        );
+  boton.addEventListener("click", () => {
+    if (capturando) {
+      return;
     }
 
-    let capturando =
-        false;
+    // ==================================================
+    // ✏️ PERFIL EDITADO
+    // ==================================================
 
-    boton.addEventListener(
-        "click",
-        () => {
+    alModificar();
 
-            if (
-                capturando
-            ) {
-                return;
-            }
+    capturando = true;
 
-            // ==================================================
-            // ✏️ PERFIL EDITADO
-            // ==================================================
+    boton.textContent = "Esperando...";
 
-            alModificar();
+    iniciarCaptura((triggerCapturado) => {
+      // ==================================================
+      // 🚫 CAPTURA INVÁLIDA
+      // ==================================================
 
-            capturando =
-                true;
+      if (!triggerCapturado) {
+        if (destino === "Trigger") {
+          filaPerfil.trigger = crearTrigger();
+        } else {
+          filaPerfil.accion = null;
+        }
 
-            boton.textContent =
-                "Esperando...";
+        capturando = false;
 
-            iniciarCaptura(
-                triggerCapturado => {
+        reconstruirFila(contexto.id);
 
-                    // ==================================================
-                    // 🚫 CAPTURA INVÁLIDA
-                    // ==================================================
+        return;
+      }
 
-                    if (
-                        !triggerCapturado
-                    ) {
+      // ==================================================
+      // GUARDAR CAPTURA
+      // ==================================================
 
-                        if (
-                            destino === "Trigger"
-                        ) {
+      if (destino === "Trigger") {
+        filaPerfil.trigger = triggerCapturado;
+      } else {
+        filaPerfil.accion = triggerCapturado;
+      }
 
-                            filaPerfil.trigger =
-                                crearTrigger();
+      capturando = false;
 
-                        } else {
+      reconstruirFila(contexto.id);
+    });
+  });
 
-                            filaPerfil.accion =
-                                null;
-                        }
-
-                        capturando =
-                            false;
-
-                        reconstruirFila(
-                            contexto.id,
-                        );
-
-                        return;
-                    }
-
-                    // ==================================================
-                    // GUARDAR CAPTURA
-                    // ==================================================
-
-                    if (
-                        destino === "Trigger"
-                    ) {
-
-                        filaPerfil.trigger =
-                            triggerCapturado;
-
-                    } else {
-
-                        filaPerfil.accion =
-                            triggerCapturado;
-                    }
-
-                    capturando =
-                        false;
-
-                    reconstruirFila(
-                        contexto.id,
-                    );
-                },
-            );
-        },
-    );
-
-    return boton;
+  return boton;
 }

@@ -7,76 +7,58 @@
 // si se cierra clickeando afuera (equivale a "No").
 // ======================================================
 
-import {
-    mostrarPopup,
-    ocultarPopup
-} from "./comp_popup_contenedor";
+import { mostrarPopup, ocultarPopup } from "./comp_popup_contenedor";
 
 import { crearBoton } from "./comp_boton";
 
 export function confirmarPopup(
-    mensaje:string,
-    evento:MouseEvent
-):Promise<boolean>{
+  mensaje: string,
+  evento: MouseEvent,
+): Promise<boolean> {
+  return new Promise((resolver) => {
+    let resuelto = false;
 
-    return new Promise(resolver=>{
+    const resolverUnaVez = (valor: boolean) => {
+      if (resuelto) {
+        return;
+      }
 
-        let resuelto=false;
+      resuelto = true;
 
-        const resolverUnaVez=(valor:boolean)=>{
+      resolver(valor);
+    };
 
-            if(resuelto){
-                return;
-            }
+    const contenedor = document.createElement("div");
 
-            resuelto=true;
+    contenedor.className = "popup-confirmar";
 
-            resolver(valor);
+    const texto = document.createElement("p");
 
-        };
+    texto.className = "popup-confirmar-mensaje";
+    texto.textContent = mensaje;
 
-        const contenedor=document.createElement("div");
+    const botones = document.createElement("div");
 
-        contenedor.className="popup-confirmar";
+    botones.className = "popup-confirmar-botones";
 
-        const texto=document.createElement("p");
+    const botonNo = crearBoton({ texto: "No" });
+    const botonSi = crearBoton({ texto: "Sí" });
 
-        texto.className="popup-confirmar-mensaje";
-        texto.textContent=mensaje;
-
-        const botones=document.createElement("div");
-
-        botones.className="popup-confirmar-botones";
-
-        const botonNo=crearBoton({ texto:"No" });
-        const botonSi=crearBoton({ texto:"Sí" });
-
-        botonNo.addEventListener(
-            "click",
-            ()=>{
-                resolverUnaVez(false);
-                ocultarPopup();
-            }
-        );
-
-        botonSi.addEventListener(
-            "click",
-            ()=>{
-                resolverUnaVez(true);
-                ocultarPopup();
-            }
-        );
-
-        botones.append(botonNo,botonSi);
-        contenedor.append(texto,botones);
-
-        mostrarPopup(
-            contenedor,
-            evento.clientX,
-            evento.clientY,
-            ()=>resolverUnaVez(false)
-        );
-
+    botonNo.addEventListener("click", () => {
+      resolverUnaVez(false);
+      ocultarPopup();
     });
 
+    botonSi.addEventListener("click", () => {
+      resolverUnaVez(true);
+      ocultarPopup();
+    });
+
+    botones.append(botonNo, botonSi);
+    contenedor.append(texto, botones);
+
+    mostrarPopup(contenedor, evento.clientX, evento.clientY, () =>
+      resolverUnaVez(false),
+    );
+  });
 }

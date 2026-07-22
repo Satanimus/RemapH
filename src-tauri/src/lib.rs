@@ -18,6 +18,7 @@ mod estado;
 pub mod evento_trigger;
 mod eventos;
 pub mod idioma;
+mod instante;
 mod perfilcache;
 mod perfiljson;
 mod persistencia;

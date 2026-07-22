@@ -16,34 +16,20 @@
 // La UI lo representa visualmente.
 // ======================================================
 
-import type {
-    Perfil,
-    FilaPerfil
-} from "./core_perfil";
+import type { Perfil, FilaPerfil } from "./core_perfil";
 
-import {
-    crearEntrada
-} from "./core_entrada";
+import { crearEntrada } from "./core_entrada";
 
-import type {
-    Entrada,
-    TipoEntrada
-} from "./core_entrada";
+import type { Entrada, TipoEntrada } from "./core_entrada";
 
-import {
-    crearTrigger
-} from "./core_trigger";
-
+import { crearTrigger } from "./core_trigger";
 
 // ======================================================
 // 📦 MODELO JSON
 // ======================================================
 
 export interface PerfilJson {
-
-    remapeos:
-        RemapeoJson[];
-
+  remapeos: RemapeoJson[];
 }
 
 // ======================================================
@@ -51,350 +37,169 @@ export interface PerfilJson {
 // ======================================================
 
 interface AppJson {
+  programa: string | null;
 
-    programa:
-    string | null;
-
-    segundoPlano:
-    boolean;
-
+  segundoPlano: boolean;
 }
 
 interface RemapeoJson {
+  id: string;
 
-    id:
-        string;
+  estado: string;
 
-    estado:
-        string;
+  app: AppJson;
 
-    app:
-        AppJson;
+  trigger: TriggerJson;
 
-    trigger:
-        TriggerJson;
+  tipo: string;
 
-    tipo:
-        string;
+  accion: TriggerJson | null;
 
-    accion:
-        TriggerJson | null;
+  condicion: string;
 
-    condicion:
-        string;
+  ejecucion: string;
 
-    ejecucion:
-        string;
+  color: string;
 
-    color:
-        string;
-
-    nota:
-        string;
-
+  nota: string;
 }
-
 
 interface TriggerJson {
+  modificadores: InputJson[];
 
-    modificadores:
-        InputJson[];
-
-    gatillo:
-        InputJson | null;
-
+  gatillo: InputJson | null;
 }
-
 
 interface InputJson {
+  fuente: string;
 
-    fuente:
-        string;
-
-    control:
-        string;
-
+  control: string;
 }
-
 
 // ======================================================
 // 🔄 CONVERTIR PERFIL
 // ======================================================
 
-export function convertirPerfilJson(
+export function convertirPerfilJson(perfilJson: PerfilJson): Perfil {
+  return {
+    activo: true,
 
-    perfilJson:
-        PerfilJson
-
-):
-
-    Perfil
-
-{
-
-    return {
-
-        activo:
-            true,
-
-        filas:
-
-            perfilJson.remapeos.map(
-
-                convertirRemapeo
-
-            )
-
-    };
-
+    filas: perfilJson.remapeos.map(convertirRemapeo),
+  };
 }
-
 
 // ======================================================
 // 🧩 CONVERTIR REMAPEO
 // ======================================================
 
-function convertirRemapeo(
+function convertirRemapeo(remapeo: RemapeoJson): FilaPerfil {
+  return {
+    id: remapeo.id,
 
-    remapeo:
-        RemapeoJson
+    estado: remapeo.estado,
 
-):
+    app: remapeo.app,
 
-    FilaPerfil
+    trigger: convertirTrigger(
+      remapeo.trigger,
 
-{
+      remapeo.condicion,
+    ),
 
-    return {
+    tipo: remapeo.tipo,
 
-        id:
-            remapeo.id,
+    accion: remapeo.accion
+      ? convertirTrigger(
+          remapeo.accion,
 
-        estado:
-            remapeo.estado,
+          "Simple",
+        )
+      : null,
 
-        app:
-            remapeo.app,
+    condicion: remapeo.condicion,
 
-        trigger:
+    ejecucion: remapeo.ejecucion,
 
-            convertirTrigger(
+    color: remapeo.color,
 
-                remapeo.trigger,
-
-                remapeo.condicion
-
-            ),
-
-        tipo:
-            remapeo.tipo,
-
-        accion:
-
-            remapeo.accion
-
-            ?
-
-            convertirTrigger(
-
-                remapeo.accion,
-
-                "Simple"
-
-            )
-
-            :
-
-            null,
-
-        condicion:
-            remapeo.condicion,
-
-        ejecucion:
-            remapeo.ejecucion,
-
-        color:
-            remapeo.color,
-
-        nota:
-            remapeo.nota
-
-    };
-
+    nota: remapeo.nota,
+  };
 }
-
 
 // ======================================================
 // 🎯 CONVERTIR TRIGGER
 // ======================================================
 
 function convertirTrigger(
+  triggerJson: TriggerJson,
 
-    triggerJson:
-        TriggerJson,
+  condicion: string,
+) {
+  const trigger = crearTrigger();
 
-    condicion:
-        string
+  trigger.modificadores = triggerJson.modificadores.map(convertirEntrada);
 
-)
+  trigger.gatillo = triggerJson.gatillo
+    ? convertirEntrada(triggerJson.gatillo)
+    : null;
 
-{
+  trigger.condicion = convertirCondicion(condicion);
 
-    const trigger =
-        crearTrigger();
-
-
-    trigger.modificadores =
-
-        triggerJson.modificadores.map(
-
-            convertirEntrada
-
-        );
-
-
-    trigger.gatillo =
-
-        triggerJson.gatillo
-
-        ?
-
-        convertirEntrada(
-
-            triggerJson.gatillo
-
-        )
-
-        :
-
-        null;
-
-
-    trigger.condicion =
-
-        convertirCondicion(
-
-            condicion
-
-        );
-
-
-    return trigger;
-
+  return trigger;
 }
-
 
 // ======================================================
 // 🆔 CONVERTIR ENTRADA
 // ======================================================
 
-function convertirEntrada(
+function convertirEntrada(input: InputJson): Entrada {
+  return crearEntrada(
+    convertirTipo(input.fuente),
 
-    input:
-        InputJson
+    input.control,
 
-):
-
-    Entrada
-
-{
-
-    return crearEntrada(
-
-        convertirTipo(
-
-            input.fuente
-
-        ),
-
-        input.control,
-
-        input.control
-
-    );
-
+    input.control,
+  );
 }
-
 
 // ======================================================
 // 🌐 FUENTE → TIPO UI
 // ======================================================
 
-function convertirTipo(
+function convertirTipo(fuente: string): TipoEntrada {
+  switch (fuente) {
+    case "keyboard":
+      return "Teclado";
 
-    fuente:
-        string
+    case "mouse":
+      return "Mouse";
 
-):
+    case "multimedia":
+      return "Multimedia";
 
-    TipoEntrada
+    case "joystick":
+      return "Joystick";
 
-{
-
-    switch(fuente){
-
-        case "keyboard":
-
-            return "Teclado";
-
-
-        case "mouse":
-
-            return "Mouse";
-
-
-        case "multimedia":
-
-            return "Multimedia";
-
-
-        case "joystick":
-
-            return "Joystick";
-
-
-        default:
-
-            return "Teclado";
-
-    }
-
+    default:
+      return "Teclado";
+  }
 }
-
 
 // ======================================================
 // 🎯 CONDICIÓN
 // ======================================================
 
 function convertirCondicion(
+  condicion: string,
+): "Simple" | "Mantenido" | "Doble" {
+  switch (condicion) {
+    case "Mantenido":
+      return "Mantenido";
 
-    condicion:
-        string
+    case "Doble":
+      return "Doble";
 
-):
-
-    "Simple"|
-    "Mantenido"|
-    "Doble"
-
-{
-
-    switch(condicion){
-
-        case "Mantenido":
-
-            return "Mantenido";
-
-
-        case "Doble":
-
-            return "Doble";
-
-
-        default:
-
-            return "Simple";
-
-    }
-
+    default:
+      return "Simple";
+  }
 }

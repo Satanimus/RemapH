@@ -21,19 +21,11 @@ use std::fs;
 use crate::cache;
 use crate::compilador;
 use crate::estado;
+use crate::perfiljson::{AppJson, PerfilJson, RemapeoJson, TriggerJson};
 use crate::persistencia;
-use crate::perfiljson::{
-    AppJson,
-    PerfilJson,
-    RemapeoJson,
-    TriggerJson,
-};
 use crate::usuario;
 
-use serde::{
-    Deserialize,
-    Serialize,
-};
+use serde::{Deserialize, Serialize};
 
 // ======================================================
 // 🧩 MODELO UI
@@ -46,128 +38,82 @@ use serde::{
 // recibida desde TypeScript.
 // ======================================================
 
-#[derive(
-    Deserialize,
-)]
+#[derive(Deserialize)]
 pub struct AppUI {
-
-    pub programa:
-        Option<String>,
+    pub programa: Option<String>,
 
     #[serde(rename = "segundoPlano")]
-    pub segundo_plano:
-        bool,
-
+    pub segundo_plano: bool,
 }
 
-#[derive(
-    Deserialize,
-)]
+#[derive(Deserialize)]
 pub struct FilaUI {
+    pub id: String,
 
-    pub id:
-        String,
+    pub estado: String,
 
-    pub estado:
-        String,
+    pub app: AppUI,
 
-    pub app:
-        AppUI,
+    pub trigger: TriggerUI,
 
-    pub trigger:
-        TriggerUI,
+    pub tipo: String,
 
-    pub tipo:
-        String,
+    pub accion: Option<TriggerUI>,
 
-    pub accion:
-        Option<TriggerUI>,
+    pub condicion: String,
 
-    pub condicion:
-        String,
+    pub ejecucion: String,
 
-    pub ejecucion:
-        String,
+    pub color: String,
 
-    pub color:
-        String,
-
-    pub nota:
-        String,
-
+    pub nota: String,
 }
-
 
 // ======================================================
 // 🎯 TRIGGER UI
 // ======================================================
 
-#[derive(
-    Deserialize,
-)]
+#[derive(Deserialize)]
 pub struct TriggerUI {
+    pub modificadores: Vec<EntradaUI>,
 
-    pub modificadores:
-        Vec<EntradaUI>,
+    pub gatillo: Option<EntradaUI>,
 
-    pub gatillo:
-        Option<EntradaUI>,
-
-    pub condicion:
-        String,
-
+    pub condicion: String,
 }
-
 
 // ======================================================
 // 🆔 ENTRADA UI
 // ======================================================
 
-#[derive(
-    Deserialize,
-)]
+#[derive(Deserialize)]
 pub struct EntradaUI {
+    pub tipo: String,
 
-    pub tipo:
-        String,
-
-    pub codigo:
-        String,
-
+    pub codigo: String,
 }
 
 // ======================================================
 // 📦 RESULTADO PERFIL
 // ======================================================
 
-#[derive(
-    Serialize,
-)]
+#[derive(Serialize)]
 pub struct ResultadoPerfil {
+    pub perfil: PerfilJson,
 
-    pub perfil:
-        PerfilJson,
+    pub nombre: String,
 
-    pub nombre:
-        String,
+    pub perfiles: Vec<String>,
 
-    pub perfiles:
-        Vec<String>,
-
-    pub cache_activo:
-        bool,
-
+    pub cache_activo: bool,
 }
 
 // ======================================================
 // 🟢🔴 ESTADO CACHE DE PERFIL
 // ======================================================
 
-#[derive(
-    Serialize,
-)]
+#[derive(Serialize)]
 pub struct EstadoCachePerfil {
-
     pub nombre: String,
 
     pub cache_activo: bool,
@@ -179,50 +125,18 @@ pub struct EstadoCachePerfil {
 
 #[tauri::command]
 pub fn activar_perfil() -> Result<bool, String> {
+    let ruta = usuario::perfil_actual()?;
 
-    let ruta =
+    let perfil = persistencia::cargar(&ruta)?;
 
-        usuario::perfil_actual()?;
+    compilador::compilar(&perfil);
 
+    sincronizar_estado_cache(&perfil);
 
-    let perfil =
+    println!("🟢 Perfil activado");
 
-        persistencia::cargar(
-
-            &ruta
-
-        )?;
-
-
-    compilador::compilar(
-
-        &perfil
-
-    );
-
-
-    sincronizar_estado_cache(
-
-        &perfil
-
-    );
-
-
-    println!(
-
-        "🟢 Perfil activado"
-
-    );
-
-
-    Ok(
-
-        !cache::esta_vacia()
-
-    )
-
+    Ok(!cache::esta_vacia())
 }
-
 
 // ======================================================
 // 🔴 DESACTIVAR PERFIL
@@ -230,191 +144,72 @@ pub fn activar_perfil() -> Result<bool, String> {
 
 #[tauri::command]
 pub fn desactivar_perfil() {
-
     cache::borrar();
 
     estado::desactivar();
 
-
-    println!(
-
-        "🔴 Perfil desactivado"
-
-    );
-
+    println!("🔴 Perfil desactivado");
 }
-
 
 // ======================================================
 // 🔨 GUARDAR Y COMPILAR PERFIL
 // ======================================================
 
 #[tauri::command]
-pub fn compilar_perfil(
+pub fn compilar_perfil(filas: Vec<FilaUI>) -> Result<bool, String> {
+    let perfil = convertir_perfil(filas);
 
-    filas:
-        Vec<FilaUI>,
+    let ruta = usuario::perfil_actual()?;
 
-) -> Result<bool, String> {
+    persistencia::guardar(&perfil, &ruta)?;
 
-    let perfil =
+    compilador::compilar(&perfil);
 
-        convertir_perfil(
+    sincronizar_estado_cache(&perfil);
 
-            filas
+    let cache_activo = !cache::esta_vacia();
 
-        );
+    println!("📦 Perfil guardado y compilado");
 
-
-    let ruta =
-
-        usuario::perfil_actual()?;
-
-
-    persistencia::guardar(
-
-        &perfil,
-
-        &ruta,
-
-    )?;
-
-
-    compilador::compilar(
-
-        &perfil
-
-    );
-
-
-    sincronizar_estado_cache(
-
-        &perfil
-
-    );
-
-
-    let cache_activo =
-
-        !cache::esta_vacia();
-
-
-    println!(
-
-        "📦 Perfil guardado y compilado"
-
-    );
-
-
-    Ok(
-
-        cache_activo
-
-    )
-
+    Ok(cache_activo)
 }
-
 
 // ======================================================
 // 📂 CARGAR PERFIL ACTUAL
 // ======================================================
 
 #[tauri::command]
-pub fn obtener_perfil_actual()
-
-    -> Result<PerfilJson, String>
-
-{
-
-    let ruta =
-
-        usuario::perfil_actual()?;
-
+pub fn obtener_perfil_actual() -> Result<PerfilJson, String> {
+    let ruta = usuario::perfil_actual()?;
 
     if !ruta.exists() {
+        let perfil = PerfilJson::nuevo();
 
-        let perfil =
+        persistencia::guardar(&perfil, &ruta)?;
 
-            PerfilJson::nuevo();
+        compilador::compilar(&perfil);
 
+        sincronizar_estado_cache(&perfil);
 
-        persistencia::guardar(
-
-            &perfil,
-
-            &ruta,
-
-        )?;
-
-
-        compilador::compilar(
-
-            &perfil
-
-        );
-
-
-        sincronizar_estado_cache(
-
-            &perfil
-
-        );
-
-
-        return Ok(
-
-            perfil
-
-        );
-
+        return Ok(perfil);
     }
 
+    let perfil = persistencia::cargar(&ruta)?;
 
-    let perfil =
+    compilador::compilar(&perfil);
 
-        persistencia::cargar(
+    sincronizar_estado_cache(&perfil);
 
-            &ruta
-
-        )?;
-
-
-    compilador::compilar(
-
-        &perfil
-
-    );
-
-
-    sincronizar_estado_cache(
-
-        &perfil
-
-    );
-
-
-    Ok(
-
-        perfil
-
-    )
-
+    Ok(perfil)
 }
-
 
 // ======================================================
 // 📋 OBTENER PERFILES
 // ======================================================
 
 #[tauri::command]
-pub fn obtener_perfiles()
-
-    -> Result<Vec<String>, String>
-
-{
-
+pub fn obtener_perfiles() -> Result<Vec<String>, String> {
     usuario::perfiles()
-
 }
 
 // ======================================================
@@ -422,49 +217,26 @@ pub fn obtener_perfiles()
 // ======================================================
 
 #[tauri::command]
-pub fn obtener_estados_cache_perfiles(
-) -> Result<
-    Vec<EstadoCachePerfil>,
-    String,
-> {
+pub fn obtener_estados_cache_perfiles() -> Result<Vec<EstadoCachePerfil>, String> {
+    let nombres = usuario::perfiles()?;
 
-    let nombres =
-        usuario::perfiles()?;
-
-    let mut resultado =
-        Vec::new();
+    let mut resultado = Vec::new();
 
     for nombre in nombres {
+        let ruta = usuario::ruta_perfil(&nombre)?;
 
-        let ruta =
-            usuario::ruta_perfil(
-                &nombre,
-            )?;
+        let perfil = persistencia::cargar(&ruta)?;
 
-        let perfil =
-            persistencia::cargar(
-                &ruta,
-            )?;
+        let cache = compilador::compilar_perfil(&perfil);
 
-        let cache =
-            compilador::compilar_perfil(
-                &perfil,
-            );
+        resultado.push(EstadoCachePerfil {
+            nombre,
 
-        resultado.push(
-            EstadoCachePerfil {
-
-                nombre,
-
-                cache_activo:
-                    !cache.is_empty(),
-            },
-        );
+            cache_activo: !cache.is_empty(),
+        });
     }
 
-    Ok(
-        resultado,
-    )
+    Ok(resultado)
 }
 
 // ======================================================
@@ -472,824 +244,286 @@ pub fn obtener_estados_cache_perfiles(
 // ======================================================
 
 #[tauri::command]
-pub fn obtener_nombre_perfil_actual()
-
-    -> Result<String, String>
-
-{
-
+pub fn obtener_nombre_perfil_actual() -> Result<String, String> {
     usuario::nombre_actual()
-
 }
-
 
 // ======================================================
 // 🟢 OBTENER ESTADO CACHE
 // ======================================================
 
 #[tauri::command]
-pub fn obtener_estado_cache()
-
-    -> bool
-
-{
-
+pub fn obtener_estado_cache() -> bool {
     !cache::esta_vacia()
-
 }
-
 
 // ======================================================
 // 🔄 RESTAURAR PERFIL ACTUAL
 // ======================================================
 
 #[tauri::command]
-pub fn restaurar_perfil_actual()
-
-    -> Result<ResultadoPerfil, String>
-
-{
-
-    let ruta =
-
-        usuario::perfil_actual()?;
-
+pub fn restaurar_perfil_actual() -> Result<ResultadoPerfil, String> {
+    let ruta = usuario::perfil_actual()?;
 
     if !ruta.exists() {
+        let perfil = PerfilJson::nuevo();
 
-        let perfil =
-
-            PerfilJson::nuevo();
-
-
-        persistencia::guardar(
-
-            &perfil,
-
-            &ruta,
-
-        )?;
-
+        persistencia::guardar(&perfil, &ruta)?;
     }
 
+    let perfil = persistencia::cargar(&ruta)?;
 
-    let perfil =
+    let nombre = usuario::nombre_actual()?;
 
-        persistencia::cargar(
-
-            &ruta
-
-        )?;
-
-
-    let nombre =
-
-        usuario::nombre_actual()?;
-
-
-    resultado_perfil(
-
-        perfil,
-
-        nombre
-
-    )
-
+    resultado_perfil(perfil, nombre)
 }
-
 
 // ======================================================
 // 📋 CLONAR PERFIL ACTUAL
 // ======================================================
 
 #[tauri::command]
-pub fn clonar_perfil(
+pub fn clonar_perfil(filas: Vec<FilaUI>) -> Result<ResultadoPerfil, String> {
+    let nombre_actual = usuario::nombre_actual()?;
 
-    filas:
-        Vec<FilaUI>,
+    let nombre = siguiente_nombre(&nombre_actual)?;
 
-)
-
-    -> Result<ResultadoPerfil, String>
-
-{
-
-    let nombre_actual =
-
-        usuario::nombre_actual()?;
-
-
-    let nombre =
-
-        siguiente_nombre(
-
-            &nombre_actual
-
-        )?;
-
-
-    let perfil =
-
-        convertir_perfil(
-
-            filas
-
-        );
-
+    let perfil = convertir_perfil(filas);
 
     cache::borrar();
 
     estado::desactivar();
 
+    let ruta = usuario::ruta_perfil(&nombre)?;
 
-    let ruta =
+    persistencia::guardar(&perfil, &ruta)?;
 
-        usuario::ruta_perfil(
+    compilador::compilar(&perfil);
 
-            &nombre
+    sincronizar_estado_cache(&perfil);
 
-        )?;
-
-
-    persistencia::guardar(
-
-        &perfil,
-
-        &ruta,
-
-    )?;
-
-    compilador::compilar(
-
-        &perfil
-
-    );
-
-    sincronizar_estado_cache(
-
-        &perfil
-
-    );
-
-    resultado_perfil(
-
-        perfil,
-
-        nombre
-
-    )
-
+    resultado_perfil(perfil, nombre)
 }
-
 
 // ======================================================
 // ✏️ RENOMBRAR PERFIL ACTUAL
 // ======================================================
 
 #[tauri::command]
-pub fn renombrar_perfil(
+pub fn renombrar_perfil(nuevo_nombre: String) -> Result<ResultadoPerfil, String> {
+    let nombre_actual = usuario::nombre_actual()?;
 
-    nuevo_nombre:
-        String,
-
-)
-
-    -> Result<ResultadoPerfil, String>
-
-{
-
-    let nombre_actual =
-
-        usuario::nombre_actual()?;
-
-
-    let nuevo_nombre =
-
-        nuevo_nombre.trim();
-
+    let nuevo_nombre = nuevo_nombre.trim();
 
     if nuevo_nombre.is_empty() {
-
-        return Err(
-
-            "El nombre del perfil está vacío"
-
-                .to_string()
-
-        );
-
+        return Err("El nombre del perfil está vacío".to_string());
     }
-
 
     if nuevo_nombre == nombre_actual {
-
-        return Err(
-
-            "El perfil ya tiene ese nombre"
-
-                .to_string()
-
-        );
-
+        return Err("El perfil ya tiene ese nombre".to_string());
     }
 
+    let nuevo_nombre = siguiente_nombre(nuevo_nombre)?;
 
-    let nuevo_nombre =
+    let ruta_actual = usuario::perfil_actual()?;
 
-        siguiente_nombre(
-
-            nuevo_nombre
-
-        )?;
-
-
-    let ruta_actual =
-
-        usuario::perfil_actual()?;
-
-
-    let nueva_ruta =
-
-        usuario::ruta_perfil(
-
-            &nuevo_nombre
-
-        )?;
-
+    let nueva_ruta = usuario::ruta_perfil(&nuevo_nombre)?;
 
     cache::borrar();
 
     estado::desactivar();
 
+    fs::rename(&ruta_actual, &nueva_ruta).map_err(|error| error.to_string())?;
 
-    fs::rename(
+    let perfil = persistencia::cargar(&nueva_ruta)?;
 
-        &ruta_actual,
+    compilador::compilar(&perfil);
 
-        &nueva_ruta,
+    sincronizar_estado_cache(&perfil);
 
-    )
-
-    .map_err(
-
-        |error|
-
-            error.to_string()
-
-    )?;
-
-
-    let perfil =
-
-        persistencia::cargar(
-
-            &nueva_ruta
-
-        )?;
-
-        compilador::compilar(
-
-            &perfil
-
-        );
-
-        sincronizar_estado_cache(
-
-            &perfil
-
-        );
-
-    resultado_perfil(
-
-        perfil,
-
-        nuevo_nombre
-
-    )
-
+    resultado_perfil(perfil, nuevo_nombre)
 }
-
 
 // ======================================================
 // 🗑️ ELIMINAR PERFIL ACTUAL
 // ======================================================
 
 #[tauri::command]
-pub fn eliminar_perfil_actual()
-
-    -> Result<ResultadoPerfil, String>
-
-{
-
-    let ruta_actual =
-
-        usuario::perfil_actual()?;
-
+pub fn eliminar_perfil_actual() -> Result<ResultadoPerfil, String> {
+    let ruta_actual = usuario::perfil_actual()?;
 
     cache::borrar();
 
     estado::desactivar();
 
-
     if ruta_actual.exists() {
-
-        fs::remove_file(
-
-            ruta_actual
-
-        )
-
-        .map_err(
-
-            |error|
-
-                error.to_string()
-
-        )?;
-
+        fs::remove_file(ruta_actual).map_err(|error| error.to_string())?;
     }
 
+    let perfiles = usuario::perfiles()?;
 
-    let perfiles =
+    if let Some(nombre) = perfiles.first() {
+        let ruta = usuario::ruta_perfil(nombre)?;
 
-        usuario::perfiles()?;
+        let perfil = persistencia::cargar(&ruta)?;
 
+        compilador::compilar(&perfil);
 
-    if let Some(nombre) =
+        sincronizar_estado_cache(&perfil);
 
-        perfiles.first()
-
-    {
-
-        let ruta =
-
-            usuario::ruta_perfil(
-
-                nombre
-
-            )?;
-
-
-        let perfil =
-
-            persistencia::cargar(
-
-                &ruta
-
-            )?;
-
-            compilador::compilar(
-
-                &perfil
-
-            );
-
-            sincronizar_estado_cache(
-
-                &perfil
-
-            );
-
-        return resultado_perfil(
-
-            perfil,
-
-            nombre.to_string()
-
-        );
-
+        return resultado_perfil(perfil, nombre.to_string());
     }
 
+    let nombre = "Default".to_string();
 
-    let nombre =
+    let perfil = PerfilJson::nuevo();
 
-        "Default".to_string();
+    let ruta = usuario::ruta_perfil(&nombre)?;
 
+    persistencia::guardar(&perfil, &ruta)?;
 
-    let perfil =
-
-        PerfilJson::nuevo();
-
-
-    let ruta =
-
-        usuario::ruta_perfil(
-
-            &nombre
-
-        )?;
-
-
-    persistencia::guardar(
-
-        &perfil,
-
-        &ruta,
-
-    )?;
-
-
-    resultado_perfil(
-
-        perfil,
-
-        nombre
-
-    )
-
+    resultado_perfil(perfil, nombre)
 }
-
 
 // ======================================================
 // 🆕 CREAR PERFIL NUEVO
 // ======================================================
 
 #[tauri::command]
-pub fn crear_perfil_nuevo()
-
-    -> Result<ResultadoPerfil, String>
-
-{
-
+pub fn crear_perfil_nuevo() -> Result<ResultadoPerfil, String> {
     cache::borrar();
 
     estado::desactivar();
 
+    let nombre = siguiente_nombre("Default")?;
 
-    let nombre =
+    let perfil = PerfilJson::nuevo();
 
-        siguiente_nombre(
+    let ruta = usuario::ruta_perfil(&nombre)?;
 
-            "Default"
+    persistencia::guardar(&perfil, &ruta)?;
 
-        )?;
-
-
-    let perfil =
-
-        PerfilJson::nuevo();
-
-
-    let ruta =
-
-        usuario::ruta_perfil(
-
-            &nombre
-
-        )?;
-
-
-    persistencia::guardar(
-
-        &perfil,
-
-        &ruta,
-
-    )?;
-
-
-    resultado_perfil(
-
-        perfil,
-
-        nombre
-
-    )
-
+    resultado_perfil(perfil, nombre)
 }
-
 
 // ======================================================
 // 🔄 SELECCIONAR PERFIL
 // ======================================================
 
 #[tauri::command]
-pub fn seleccionar_perfil(
-
-    nombre:
-        String,
-
-)
-
-    -> Result<ResultadoPerfil, String>
-
-{
-
-    let ruta =
-
-        usuario::ruta_perfil(
-
-            &nombre
-
-        )?;
-
+pub fn seleccionar_perfil(nombre: String) -> Result<ResultadoPerfil, String> {
+    let ruta = usuario::ruta_perfil(&nombre)?;
 
     if !ruta.exists() {
-
-        return Err(
-
-            "El perfil seleccionado no existe"
-
-                .to_string()
-
-        );
-
+        return Err("El perfil seleccionado no existe".to_string());
     }
-
 
     cache::borrar();
 
     estado::desactivar();
 
+    let perfil = persistencia::cargar(&ruta)?;
 
-    let perfil =
+    persistencia::guardar(&perfil, &ruta)?;
 
-        persistencia::cargar(
+    compilador::compilar(&perfil);
 
-            &ruta
+    sincronizar_estado_cache(&perfil);
 
-        )?;
+    println!("📂 Perfil seleccionado: {}", nombre);
 
-
-    persistencia::guardar(
-
-        &perfil,
-
-        &ruta,
-
-    )?;
-
-
-    compilador::compilar(
-
-        &perfil
-
-    );
-
-
-    sincronizar_estado_cache(
-
-        &perfil
-
-    );
-
-
-    println!(
-
-        "📂 Perfil seleccionado: {}",
-
-        nombre
-
-    );
-
-
-    resultado_perfil(
-
-        perfil,
-
-        nombre
-
-    )
-
+    resultado_perfil(perfil, nombre)
 }
-
 
 // ======================================================
 // 📦 CREAR RESULTADO
 // ======================================================
 
-fn resultado_perfil(
+fn resultado_perfil(perfil: PerfilJson, nombre: String) -> Result<ResultadoPerfil, String> {
+    Ok(ResultadoPerfil {
+        perfil,
 
-    perfil:
-        PerfilJson,
+        nombre,
 
-    nombre:
-        String,
+        perfiles: usuario::perfiles()?,
 
-)
-
-    -> Result<ResultadoPerfil, String>
-
-{
-
-    Ok(
-
-        ResultadoPerfil {
-
-            perfil,
-
-            nombre,
-
-            perfiles:
-                usuario::perfiles()?,
-
-            cache_activo:
-                !cache::esta_vacia(),
-
-        }
-
-    )
-
+        cache_activo: !cache::esta_vacia(),
+    })
 }
-
 
 // ======================================================
 // 🔢 SIGUIENTE NOMBRE DISPONIBLE
 // ======================================================
 
-fn siguiente_nombre(
-
-    base:
-        &str,
-
-)
-
-    -> Result<String, String>
-
-{
-
-    let ruta =
-
-        usuario::ruta_perfil(
-
-            base
-
-        )?;
-
+fn siguiente_nombre(base: &str) -> Result<String, String> {
+    let ruta = usuario::ruta_perfil(base)?;
 
     if !ruta.exists() {
-
-        return Ok(
-
-            base.to_string()
-
-        );
-
+        return Ok(base.to_string());
     }
 
-
-    let mut numero =
-        2;
-
+    let mut numero = 2;
 
     loop {
+        let nombre = format!("{} ({})", base, numero);
 
-        let nombre =
-
-            format!(
-
-                "{} ({})",
-
-                base,
-
-                numero
-
-            );
-
-
-        let ruta =
-
-            usuario::ruta_perfil(
-
-                &nombre
-
-            )?;
-
+        let ruta = usuario::ruta_perfil(&nombre)?;
 
         if !ruta.exists() {
-
-            return Ok(
-
-                nombre
-
-            );
-
+            return Ok(nombre);
         }
 
-
         numero += 1;
-
     }
-
 }
-
 
 // ======================================================
 // 🔄 SINCRONIZAR ESTADO CON CACHE
 // ======================================================
 
-fn sincronizar_estado_cache(
-
-    perfil:
-        &PerfilJson
-
-) {
-
-    if perfil.remapeos.iter().any(
-
-        |remapeo|
-
-            remapeo.estado == "ON"
-
-    ) {
-
+fn sincronizar_estado_cache(perfil: &PerfilJson) {
+    if perfil.remapeos.iter().any(|remapeo| remapeo.estado == "ON") {
         estado::activar();
-
-    }
-
-    else {
-
+    } else {
         estado::desactivar();
-
     }
-
 }
-
 
 // ======================================================
 // 🔄 CONVERTIR PERFIL
 // ======================================================
 
-fn convertir_perfil(
+fn convertir_perfil(filas: Vec<FilaUI>) -> PerfilJson {
+    let remapeos = filas.into_iter().map(convertir_fila).collect();
 
-    filas:
-        Vec<FilaUI>,
-
-) -> PerfilJson {
-
-    let remapeos =
-
-        filas
-
-            .into_iter()
-
-            .map(
-
-                convertir_fila
-
-            )
-
-            .collect();
-
-
-    PerfilJson {
-
-        remapeos,
-
-    }
-
+    PerfilJson { remapeos }
 }
-
 
 // ======================================================
 // 🧩 CONVERTIR FILA
 // ======================================================
 
-fn convertir_fila(
-    fila:
-    FilaUI,
-)
--> RemapeoJson
-{
+fn convertir_fila(fila: FilaUI) -> RemapeoJson {
     RemapeoJson {
+        id: fila.id,
 
-        id:
-        fila.id,
+        estado: fila.estado,
 
-        estado:
-        fila.estado,
+        app: convertir_app(fila.app),
 
-        app:
-        convertir_app(
-            fila.app,
-        ),
+        trigger: convertir_trigger(fila.trigger),
 
-        trigger:
-        convertir_trigger(
-            fila.trigger,
-        ),
+        tipo: fila.tipo,
 
-        tipo:
-        fila.tipo,
+        accion: fila.accion.map(convertir_trigger),
 
-        accion:
-        fila.accion
-        .map(
-            convertir_trigger,
-        ),
+        condicion: fila.condicion,
 
-        condicion:
-        fila.condicion,
+        ejecucion: fila.ejecucion,
 
-        ejecucion:
-        fila.ejecucion,
+        color: fila.color,
 
-        color:
-        fila.color,
-
-        nota:
-        fila.nota,
-
+        nota: fila.nota,
     }
 }
 
@@ -1297,20 +531,11 @@ fn convertir_fila(
 // CONVERTIR APP
 // ======================================================
 
-fn convertir_app(
-    app:
-        AppUI,
-)
--> AppJson
-{
+fn convertir_app(app: AppUI) -> AppJson {
     AppJson {
+        programa: app.programa,
 
-        programa:
-            app.programa,
-
-        segundo_plano:
-            app.segundo_plano,
-
+        segundo_plano: app.segundo_plano,
     }
 }
 
@@ -1318,112 +543,45 @@ fn convertir_app(
 // 🎯 CONVERTIR TRIGGER
 // ======================================================
 
-fn convertir_trigger(
-
-    trigger:
-        TriggerUI,
-
-) -> TriggerJson {
-
+fn convertir_trigger(trigger: TriggerUI) -> TriggerJson {
     TriggerJson {
+        modificadores: trigger
+            .modificadores
+            .into_iter()
+            .map(convertir_entrada)
+            .collect(),
 
-        modificadores:
+        gatillo: trigger.gatillo.map(convertir_entrada),
 
-            trigger
-
-                .modificadores
-
-                .into_iter()
-
-                .map(
-
-                    convertir_entrada
-
-                )
-
-                .collect(),
-
-        gatillo:
-
-            trigger
-
-                .gatillo
-
-                .map(
-
-                    convertir_entrada
-
-                ),
-
-        condicion:
-
-            trigger
-
-                .condicion,
-
+        condicion: trigger.condicion,
     }
-
 }
-
 
 // ======================================================
 // 🆔 CONVERTIR ENTRADA
 // ======================================================
 
-fn convertir_entrada(
-
-    entrada:
-        EntradaUI,
-
-) -> crate::idioma::Input {
-
-    crate::idioma::Input::nuevo(
-
-        convertir_fuente(
-
-            &entrada.tipo
-
-        ),
-
-        &entrada.codigo,
-
-    )
-
+fn convertir_entrada(entrada: EntradaUI) -> crate::idioma::Input {
+    crate::idioma::Input::nuevo(convertir_fuente(&entrada.tipo), &entrada.codigo)
 }
-
 
 // ======================================================
 // 🌐 TIPO UI → FUENTE INTERNA
 // ======================================================
 
-fn convertir_fuente(
-
-    tipo:
-        &str,
-
-) -> &'static str {
-
+fn convertir_fuente(tipo: &str) -> &'static str {
     match tipo {
+        "Teclado" => "keyboard",
 
-        "Teclado" =>
-            "keyboard",
+        "Mouse" => "mouse",
 
-        "Mouse" =>
-            "mouse",
+        "Multimedia" => "multimedia",
 
-        "Multimedia" =>
-            "multimedia",
+        "Joystick" => "joystick",
 
-        "Joystick" =>
-            "joystick",
-
-        _ =>
-            "unknown",
-
+        _ => "unknown",
     }
-
 }
-
 
 // ======================================================
 // 🎹 INICIAR CAPTURA
@@ -1431,32 +589,18 @@ fn convertir_fuente(
 
 #[tauri::command]
 pub fn iniciar_captura() {
-
     crate::captura::iniciar();
 
-
-    println!(
-
-        "🎹 Captura iniciada"
-
-    );
-
+    println!("🎹 Captura iniciada");
 }
-
 
 // ======================================================
 // 📥 OBTENER CAPTURA
 // ======================================================
 
 #[tauri::command]
-pub fn obtener_captura()
-
-    -> Vec<String>
-
-{
-
+pub fn obtener_captura() -> Vec<String> {
     crate::captura::obtener()
-
 }
 
 // ======================================================
@@ -1468,100 +612,54 @@ pub fn obtener_captura()
 
 use crate::backend::back_procesos;
 
-use base64::Engine as _;
 use base64::engine::general_purpose::STANDARD as BASE64;
+use base64::Engine as _;
 
-
-#[derive(
-    Serialize,
-)]
+#[derive(Serialize)]
 pub struct IconoJson {
+    pub ancho: u32,
 
-    pub ancho:
-        u32,
+    pub alto: u32,
 
-    pub alto:
-        u32,
-
-    pub pixeles:
-        String,
-
+    pub pixeles: String,
 }
 
-
-#[derive(
-    Serialize,
-)]
+#[derive(Serialize)]
 pub struct ProcesoIconoJson {
+    pub nombre: String,
 
-    pub nombre:
-        String,
-
-    pub icono:
-        Option<IconoJson>,
-
+    pub icono: Option<IconoJson>,
 }
 
-
-fn convertir_icono(
-    icono:
-        back_procesos::IconoRaw,
-) -> IconoJson {
-
+fn convertir_icono(icono: back_procesos::IconoRaw) -> IconoJson {
     IconoJson {
+        ancho: icono.ancho,
 
-        ancho:
-            icono.ancho,
+        alto: icono.alto,
 
-        alto:
-            icono.alto,
-
-        pixeles:
-            BASE64.encode(icono.pixeles),
-
+        pixeles: BASE64.encode(icono.pixeles),
     }
-
 }
-
 
 // ======================================================
 // 📋 LISTAR PROCESOS CON VENTANA VISIBLE
 // ======================================================
 
 #[tauri::command]
-pub fn listar_procesos_ventana()
-
-    -> Vec<ProcesoIconoJson>
-
-{
-
+pub fn listar_procesos_ventana() -> Vec<ProcesoIconoJson> {
     back_procesos::enumerar_procesos_ventana()
-
         .into_iter()
+        .map(|proceso| {
+            let icono = back_procesos::extraer_icono(&proceso.ruta).map(convertir_icono);
 
-        .map(
-            |proceso| {
+            ProcesoIconoJson {
+                nombre: proceso.nombre,
 
-                let icono =
-                    back_procesos::extraer_icono(&proceso.ruta)
-                        .map(convertir_icono);
-
-                ProcesoIconoJson {
-
-                    nombre:
-                        proceso.nombre,
-
-                    icono,
-
-                }
-
+                icono,
             }
-        )
-
+        })
         .collect()
-
 }
-
 
 // ======================================================
 // 🎨 OBTENER ÍCONO DE UN PROGRAMA PUNTUAL
@@ -1572,20 +670,10 @@ pub fn listar_procesos_ventana()
 // ======================================================
 
 #[tauri::command]
-pub fn obtener_icono_programa(
-    nombre:
-        String,
-) -> Option<IconoJson> {
+pub fn obtener_icono_programa(nombre: String) -> Option<IconoJson> {
+    let proceso = back_procesos::enumerar_procesos_ventana()
+        .into_iter()
+        .find(|proceso| proceso.nombre.eq_ignore_ascii_case(&nombre))?;
 
-    let proceso =
-        back_procesos::enumerar_procesos_ventana()
-            .into_iter()
-            .find(
-                |proceso|
-                    proceso.nombre.eq_ignore_ascii_case(&nombre)
-            )?;
-
-    back_procesos::extraer_icono(&proceso.ruta)
-        .map(convertir_icono)
-
+    back_procesos::extraer_icono(&proceso.ruta).map(convertir_icono)
 }

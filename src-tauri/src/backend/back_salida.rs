@@ -16,530 +16,214 @@
 //   - SendInput
 // ======================================================
 
-use interception::{
-    Interception,
-    KeyState,
-    Stroke,
-};
+use interception::{Interception, KeyState, Stroke};
 
 use crate::perfilcache::AccionCache;
-
 
 // ======================================================
 // 📦 SALIDA
 // ======================================================
 
 pub struct Salida {
+    ict: Interception,
 
-    ict:
-        Interception,
+    teclado: interception::Device,
 
-    teclado:
-        interception::Device,
-
-    mouse:
-        interception::Device,
-
+    mouse: interception::Device,
 }
-
 
 // ======================================================
 // 🚀 CREAR
 // ======================================================
 
-pub fn crear()
+pub fn crear() -> Salida {
+    let ict = Interception::new().expect("No se pudo iniciar Interception para salida");
 
-    -> Salida
+    let teclado = encontrar_teclado(&ict).expect("No se encontró teclado de salida");
 
-{
+    let mouse = encontrar_mouse(&ict).expect("No se encontró mouse de salida");
 
-    let ict =
-
-        Interception::new()
-
-        .expect(
-            "No se pudo iniciar Interception para salida"
-        );
-
-
-    let teclado =
-
-        encontrar_teclado(
-
-            &ict
-
-        )
-
-        .expect(
-            "No se encontró teclado de salida"
-        );
-
-
-    let mouse =
-
-        encontrar_mouse(
-
-            &ict
-
-        )
-
-        .expect(
-            "No se encontró mouse de salida"
-        );
-
-
-    println!(
-        "📤 Salida inicializada."
-    );
-
+    println!("📤 Salida inicializada.");
 
     Salida {
-
         ict,
 
         teclado,
 
         mouse,
-
     }
-
 }
-
 
 // ======================================================
 // 🎯 EJECUTAR ACCIÓN
 // ======================================================
 
 impl Salida {
-
-    pub fn ejecutar(
-
-        &self,
-
-        accion:
-            AccionCache,
-
-    ) {
-
+    pub fn ejecutar(&self, accion: AccionCache) {
         match accion {
-
             AccionCache::Emitir(input) => {
-
                 match input.fuente() {
-
                     // ----------------------------------
                     // 🎹 TECLADO
                     // ----------------------------------
-
                     Some("keyboard") => {
-
-                        self.emitir_teclado(
-
-                            &input
-
-                        );
-
+                        self.emitir_teclado(&input);
                     }
-
 
                     // ----------------------------------
                     // 🖱️ MOUSE
                     // ----------------------------------
-
                     Some("mouse") => {
-
-                        self.emitir_mouse(
-
-                            &input
-
-                        );
-
+                        self.emitir_mouse(&input);
                     }
-
 
                     // ----------------------------------
                     // ❌ NO SOPORTADO
                     // ----------------------------------
-
                     _ => {
-
-                        println!(
-
-                            "⚠️ Output no soportado: {:?}",
-
-                            input
-
-                        );
-
+                        println!("⚠️ Output no soportado: {:?}", input);
                     }
-
                 }
-
             }
-
         }
-
     }
-
 
     // ==================================================
     // 🎹 EMITIR TECLADO
     // ==================================================
 
-    fn emitir_teclado(
-
-        &self,
-
-        input:
-            &crate::eventos::InputId,
-
-    ) {
-
-        let Some(code) =
-
-            crate::backend::back_teclas::convertir_salida(
-
-                input
-
-            )
-
-        else {
-
-            println!(
-
-                "⚠️ Tecla no soportada: {:?}",
-
-                input
-
-            );
+    fn emitir_teclado(&self, input: &crate::eventos::InputId) {
+        let Some(code) = crate::backend::back_teclas::convertir_salida(input) else {
+            println!("⚠️ Tecla no soportada: {:?}", input);
 
             return;
-
         };
 
-
         let strokes = [
-
             Stroke::Keyboard {
-
                 code,
 
-                state:
-                    KeyState::DOWN,
+                state: KeyState::DOWN,
 
-                information:
-                    0,
-
+                information: 0,
             },
-
-
             Stroke::Keyboard {
-
                 code,
 
-                state:
-                    KeyState::UP,
+                state: KeyState::UP,
 
-                information:
-                    0,
-
+                information: 0,
             },
-
         ];
 
+        println!("📤 Emitiendo teclado: {:?}", input);
 
-        println!(
+        let resultado = self.ict.send(self.teclado, &strokes);
 
-            "📤 Emitiendo teclado: {:?}",
-
-            input
-
-        );
-
-
-        let resultado =
-
-            self.ict.send(
-
-                self.teclado,
-
-                &strokes,
-
-            );
-
-
-        println!(
-
-            "📤 Resultado teclado: {}",
-
-            resultado
-
-        );
-
+        println!("📤 Resultado teclado: {}", resultado);
     }
-
 
     // ==================================================
     // 🖱️ EMITIR MOUSE
     // ==================================================
 
-    fn emitir_mouse(
-
-        &self,
-
-        input:
-            &crate::eventos::InputId,
-
-    ) {
-
-        let Some(output) =
-
-            crate::backend::back_mouse::convertir_salida(
-
-                input
-
-            )
-
-        else {
-
-            println!(
-
-                "⚠️ Mouse no soportado: {:?}",
-
-                input
-
-            );
+    fn emitir_mouse(&self, input: &crate::eventos::InputId) {
+        let Some(output) = crate::backend::back_mouse::convertir_salida(input) else {
+            println!("⚠️ Mouse no soportado: {:?}", input);
 
             return;
-
         };
 
-
         match output {
+            crate::backend::back_mouse::MouseOutput::Button { down, up } => {
+                let abajo = Stroke::Mouse {
+                    state: down,
 
-            crate::backend::back_mouse::MouseOutput::Button {
+                    flags: interception::MouseFlags::empty(),
 
-                down,
+                    rolling: 0,
 
-                up,
+                    x: 0,
 
-            } => {
+                    y: 0,
 
-                let abajo =
+                    information: 0,
+                };
 
-                    Stroke::Mouse {
+                let arriba = Stroke::Mouse {
+                    state: up,
 
-                        state:
-                            down,
+                    flags: interception::MouseFlags::empty(),
 
-                        flags:
-                            interception::MouseFlags::empty(),
+                    rolling: 0,
 
-                        rolling:
-                            0,
+                    x: 0,
 
-                        x:
-                            0,
+                    y: 0,
 
-                        y:
-                            0,
+                    information: 0,
+                };
 
-                        information:
-                            0,
-
-                    };
-
-
-                let arriba =
-
-                    Stroke::Mouse {
-
-                        state:
-                            up,
-
-                        flags:
-                            interception::MouseFlags::empty(),
-
-                        rolling:
-                            0,
-
-                        x:
-                            0,
-
-                        y:
-                            0,
-
-                        information:
-                            0,
-
-                    };
-
-
-                self.ict.send(
-
-                    self.mouse,
-
-                    &[
-
-                        abajo,
-
-                        arriba,
-
-                    ],
-
-                );
-
+                self.ict.send(self.mouse, &[abajo, arriba]);
             }
 
+            crate::backend::back_mouse::MouseOutput::Wheel(rolling) => {
+                let stroke = Stroke::Mouse {
+                    state: interception::MouseFilter::WHEEL,
 
-            crate::backend::back_mouse::MouseOutput::Wheel(
+                    flags: interception::MouseFlags::empty(),
 
-                rolling
+                    rolling,
 
-            ) => {
+                    x: 0,
 
-                let stroke =
+                    y: 0,
 
-                    Stroke::Mouse {
+                    information: 0,
+                };
 
-                        state:
-                            interception::MouseFilter::WHEEL,
-
-                        flags:
-                            interception::MouseFlags::empty(),
-
-                        rolling,
-
-                        x:
-                            0,
-
-                        y:
-                            0,
-
-                        information:
-                            0,
-
-                    };
-
-
-                self.ict.send(
-
-                    self.mouse,
-
-                    &[stroke],
-
-                );
-
+                self.ict.send(self.mouse, &[stroke]);
             }
-
         }
-
     }
-
 }
-
 
 // ======================================================
 // 🔎 BUSCAR TECLADO
 // ======================================================
 
-fn encontrar_teclado(
-
-    ict:
-        &Interception,
-
-) -> Option<interception::Device> {
-
-    let mut buffer =
-
-        [0u8; 4096];
-
+fn encontrar_teclado(ict: &Interception) -> Option<interception::Device> {
+    let mut buffer = [0u8; 4096];
 
     for device in 1..=10 {
-
-        if !interception::is_keyboard(
-
-            device
-
-        ) {
-
+        if !interception::is_keyboard(device) {
             continue;
-
         }
 
-
-        if ict.get_hardware_id(
-
-            device,
-
-            &mut buffer,
-
-        ) > 0 {
-
-            return Some(
-
-                device
-
-            );
-
+        if ict.get_hardware_id(device, &mut buffer) > 0 {
+            return Some(device);
         }
-
     }
 
-
     None
-
 }
-
 
 // ======================================================
 // 🔎 BUSCAR MOUSE
 // ======================================================
 
-fn encontrar_mouse(
-
-    ict:
-        &Interception,
-
-) -> Option<interception::Device> {
-
-    let mut buffer =
-
-        [0u8; 4096];
-
+fn encontrar_mouse(ict: &Interception) -> Option<interception::Device> {
+    let mut buffer = [0u8; 4096];
 
     for device in 11..=20 {
-
-        if !interception::is_mouse(
-
-            device
-
-        ) {
-
+        if !interception::is_mouse(device) {
             continue;
-
         }
 
-
-        if ict.get_hardware_id(
-
-            device,
-
-            &mut buffer,
-
-        ) > 0 {
-
-            return Some(
-
-                device
-
-            );
-
+        if ict.get_hardware_id(device, &mut buffer) > 0 {
+            return Some(device);
         }
-
     }
 
-
     None
-
 }

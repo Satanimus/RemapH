@@ -1,48 +1,64 @@
-🧠 Plan Motor de Captura RemapH V3
-ETAPA 1 — Nomenclatura y arquitectura
-✅ Renombrar módulos para eliminar ambigüedades (CapturadorTrigger, AnalizadorTrigger, ProcesadorEventos, etc.).
-✅ Separar claramente los conceptos:
-Capturar.
-Bufferizar.
-Analizar.
-Ejecutar.
+Motor captura / reconocimiento trigger
 
-TAPA 2 — Buffer de eventos (actual)
-⬜ Crear BufferEventos.
-⬜ Registrar los eventos físicos (Down, Up, Pulse) junto con sus marcas de tiempo.
-⬜ Mantener únicamente la información necesaria para analizar el trigger actual.
-⬜ Reescribir el buffer continuamente (sin historial permanente).
+✅ Renombres iniciales completados
+✅ Separación Runtime / Captura / Cache
+✅ EventoTrigger creado
+✅ InputEvent definido como evento físico
+✅ Estado global de perfil separado
+✅ Decisión: tiempo pertenece al evento físico
+❌ BufferEventos eliminado como módulo independiente
+✅ Agregar Instante a InputEvent
+⬜ Crear AnalizadorTrigger definitivo
+⬜ Mover lógica de Simple/Doble/Mantenido al analizador
+⬜ Implementar timeline interna del analizador
+⬜ Implementar modificadores activos
+⬜ Conectar AnalizadorTrigger → EventoTrigger
+⬜ Revisar Runtime para consumir solamente EventoTrigger
 
 ETAPA 3 — Analizador de Trigger
+
 ⬜ Implementar el análisis completo del trigger.
-⬜ Detectar:
-Simple.
-Doble.
-Mantenido.
+
+Detectar:
+
+⬜ Simple
+⬜ Doble
+⬜ Mantenido
+
 ⬜ Resolver modificadores.
 ⬜ Identificar el gatillo.
 ⬜ Construir el InputEvent lógico que recibirá el Runtime.
 
 ETAPA 4 — Integración
 
-⬜ Conectar:
+Estado actual del flujo:
 
 Capturador
 ↓
-BufferEventos
+InputEvent (con instante)
 ↓
 AnalizadorTrigger
 ↓
+EventoTrigger
+↓
 Runtime
-⬜ Eliminar la lógica temporal que ya no corresponda a otros módulos.
+
+Pendiente:
+
+⬜ Conectar Capturador → AnalizadorTrigger
+⬜ Eliminar referencias antiguas a BufferEventos
+⬜ Asegurar que Runtime no interprete tiempos ni triggers
+⬜ Runtime consume solamente eventos lógicos completos
+
 ETAPA 5 — Validación
+
 ⬜ Probar teclado.
 ⬜ Probar mouse.
 ⬜ Probar rueda.
 ⬜ Probar modificadores.
 ⬜ Probar doble toque.
 ⬜ Probar mantenido.
-⬜ Confirmar que el Runtime recibe únicamente eventos lógicos completos.
+⬜ Confirmar que Runtime recibe únicamente eventos lógicos completos.
 
 ////////////////////////////////////////////
 

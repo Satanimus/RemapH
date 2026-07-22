@@ -3,55 +3,38 @@
 // RemapH V3
 // ======================================================
 
-import type {
-    ContextoFila,
-} from "../../core/core_contexto_fila";
+import type { ContextoFila } from "../../core/core_contexto_fila";
 
-import type {
-    FilaPerfil,
-} from "../../core/core_perfil";
+import type { FilaPerfil } from "../../core/core_perfil";
 
 import {
-    crearAccionMultimedia,
-    crearAccionMacro,
-    crearAccionCoordenada,
+  crearAccionMultimedia,
+  crearAccionMacro,
+  crearAccionCoordenada,
 } from "./comp_accion_contenido";
 
-import {
-    crearCapturador,
-} from "./comp_capturador";
+import { crearCapturador } from "./comp_capturador";
 
 // ======================================================
 // CREAR ACCIÓN
 // ======================================================
 
 export function crearAccion(
-    contexto: ContextoFila,
-    filaPerfil: FilaPerfil,
-    alModificar: () => void,
+  contexto: ContextoFila,
+  filaPerfil: FilaPerfil,
+  alModificar: () => void,
 ): HTMLButtonElement {
+  switch (filaPerfil.tipo) {
+    case "Multimedia":
+      return crearAccionMultimedia();
 
-    switch (filaPerfil.tipo) {
+    case "Macro":
+      return crearAccionMacro();
 
-        case "Multimedia":
+    case "Click coordenada":
+      return crearAccionCoordenada();
 
-            return crearAccionMultimedia();
-
-        case "Macro":
-
-            return crearAccionMacro();
-
-        case "Click coordenada":
-
-            return crearAccionCoordenada();
-
-        default:
-
-            return crearCapturador(
-                contexto,
-                filaPerfil,
-                "Accion",
-                alModificar,
-            );
-    }
+    default:
+      return crearCapturador(contexto, filaPerfil, "Accion", alModificar);
+  }
 }

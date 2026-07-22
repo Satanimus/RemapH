@@ -3,44 +3,30 @@
 // RemapH V3
 // ======================================================
 
-import {
-    invoke,
-} from "@tauri-apps/api/core";
+import { invoke } from "@tauri-apps/api/core";
 
-import {
-    mostrarPopup,
-    ocultarPopup,
-} from "./comp_popup_contenedor";
+import { mostrarPopup, ocultarPopup } from "./comp_popup_contenedor";
 
-import {
-    crearBoton,
-} from "./comp_boton";
+import { crearBoton } from "./comp_boton";
 
-import {
-    confirmarPopup,
-} from "./comp_popup_confirmar";
+import { confirmarPopup } from "./comp_popup_confirmar";
 
-import {
-    obtenerPerfilUi,
-} from "../../core/core_perfil_ui";
+import { obtenerPerfilUi } from "../../core/core_perfil_ui";
 
-import type {
-    PerfilJson,
-} from "../../core/core_perfil_json";
+import type { PerfilJson } from "../../core/core_perfil_json";
 
 // ======================================================
 // RESULTADO PERFIL
 // ======================================================
 
 export interface ResultadoPerfil {
+  perfil: PerfilJson;
 
-    perfil: PerfilJson;
+  nombre: string;
 
-    nombre: string;
+  perfiles: string[];
 
-    perfiles: string[];
-
-    cache_activo: boolean;
+  cache_activo: boolean;
 }
 
 // ======================================================
@@ -48,71 +34,43 @@ export interface ResultadoPerfil {
 // ======================================================
 
 export async function abrirPopupPerfil(
-    evento: MouseEvent,
-    nombreActual: string,
-    estaEditado: boolean,
-    cacheActivo: boolean,
-    alGuardar: () => Promise<void>,
-    alCambiarPerfil: (
-        resultado: ResultadoPerfil,
-    ) => void,
+  evento: MouseEvent,
+  nombreActual: string,
+  estaEditado: boolean,
+  cacheActivo: boolean,
+  alGuardar: () => Promise<void>,
+  alCambiarPerfil: (resultado: ResultadoPerfil) => void,
 ): Promise<void> {
+  let perfiles: string[];
 
-    let perfiles: string[];
+  try {
+    perfiles = await invoke<string[]>("obtener_perfiles");
+  } catch (error) {
+    console.error("❌ No se pudo obtener la lista de perfiles:", error);
 
-    try {
+    return;
+  }
 
-        perfiles =
-            await invoke<string[]>(
-                "obtener_perfiles",
-            );
+  const contenedor = document.createElement("div");
 
-    } catch (
-        error
-    ) {
+  contenedor.className = "popup-perfil";
 
-        console.error(
-            "❌ No se pudo obtener la lista de perfiles:",
-            error,
-        );
+  contenedor.append(
+    crearListaPerfiles(
+      perfiles,
+      nombreActual,
+      estaEditado,
+      cacheActivo,
+      alGuardar,
+      alCambiarPerfil,
+    ),
 
-        return;
-    }
+    crearSeparador(),
 
-    const contenedor =
-        document.createElement(
-            "div",
-        );
+    crearAcciones(nombreActual, estaEditado, alGuardar, alCambiarPerfil),
+  );
 
-    contenedor.className =
-        "popup-perfil";
-
-    contenedor.append(
-
-        crearListaPerfiles(
-            perfiles,
-            nombreActual,
-            estaEditado,
-            cacheActivo,
-            alGuardar,
-            alCambiarPerfil,
-        ),
-
-        crearSeparador(),
-
-        crearAcciones(
-            nombreActual,
-            estaEditado,
-            alGuardar,
-            alCambiarPerfil,
-        ),
-    );
-
-    mostrarPopup(
-        contenedor,
-        evento.clientX,
-        evento.clientY,
-    );
+  mostrarPopup(contenedor, evento.clientX, evento.clientY);
 }
 
 // ======================================================
@@ -120,255 +78,149 @@ export async function abrirPopupPerfil(
 // ======================================================
 
 function crearListaPerfiles(
-    perfiles: string[],
-    nombreActual: string,
-    estaEditado: boolean,
-    cacheActivo: boolean,
-    alGuardar: () => Promise<void>,
-    alCambiarPerfil: (
-        resultado: ResultadoPerfil,
-    ) => void,
+  perfiles: string[],
+  nombreActual: string,
+  estaEditado: boolean,
+  cacheActivo: boolean,
+  alGuardar: () => Promise<void>,
+  alCambiarPerfil: (resultado: ResultadoPerfil) => void,
 ): HTMLElement {
+  const lista = document.createElement("div");
 
-    const lista =
-        document.createElement(
-            "div",
-        );
+  lista.className = "popup-perfil-lista";
 
-    lista.className =
-        "popup-perfil-lista";
+  perfiles.forEach((nombre) => {
+    const esActual = nombre === nombreActual;
 
-    perfiles.forEach(
-        nombre => {
+    const boton = crearBoton({
+      texto: nombre,
 
-            const esActual =
-                nombre === nombreActual;
+      clase: "popup-perfil-item",
+    });
 
-            const boton =
-                crearBoton({
+    // ==================================================
+    // 📐 ESTRUCTURA ALINEADA
+    // ==================================================
 
-                    texto:
-                        nombre,
+    const espacioIndicador = document.createElement("span");
 
-                    clase:
-                        "popup-perfil-item",
-                });
+    espacioIndicador.className = "popup-perfil-indicador-espacio";
 
-            // ==================================================
-            // 📐 ESTRUCTURA ALINEADA
-            // ==================================================
+    if (esActual) {
+      const indicador = document.createElement("span");
 
-            const espacioIndicador =
-                document.createElement(
-                    "span",
-                );
+      indicador.className = "indicador popup-perfil-indicador";
 
-            espacioIndicador.className =
-                "popup-perfil-indicador-espacio";
+      indicador.dataset.estado = cacheActivo ? "activo" : "inactivo";
 
-            if (
-                esActual
-            ) {
+      espacioIndicador.append(indicador);
+    }
 
-                const indicador =
-                    document.createElement(
-                        "span",
-                    );
+    const nombreElemento = document.createElement("span");
 
-                indicador.className =
-                    "indicador popup-perfil-indicador";
+    nombreElemento.className = "popup-perfil-nombre";
 
-                indicador.dataset.estado =
-                    cacheActivo
-                        ? "activo"
-                        : "inactivo";
+    nombreElemento.textContent = nombre;
 
-                espacioIndicador.append(
-                    indicador,
-                );
-            }
+    boton.replaceChildren(
+      espacioIndicador,
 
-            const nombreElemento =
-                document.createElement(
-                    "span",
-                );
-
-            nombreElemento.className =
-                "popup-perfil-nombre";
-
-            nombreElemento.textContent =
-                nombre;
-
-            boton.replaceChildren(
-
-                espacioIndicador,
-
-                nombreElemento,
-            );
-
-            // ==================================================
-            // 🔄 ICONO SOLO PERFIL ACTUAL
-            // ==================================================
-
-            let iconoRevertir:
-                HTMLSpanElement | null =
-                    null;
-
-            if (
-                esActual
-            ) {
-
-                iconoRevertir =
-                    document.createElement(
-                        "span",
-                    );
-
-                iconoRevertir.className =
-                    "popup-perfil-revertir-icono";
-
-                iconoRevertir.textContent =
-                    "↻";
-
-                iconoRevertir.title =
-                    "Revertir cambios";
-
-                boton.append(
-                    iconoRevertir,
-                );
-            }
-
-            let confirmandoRevertir =
-                false;
-
-            boton.addEventListener(
-                "click",
-                async evento => {
-
-                    // ==================================================
-                    // PERFIL ACTUAL
-                    // ==================================================
-
-                    if (
-                        esActual
-                    ) {
-
-                        if (
-                            !estaEditado
-                        ) {
-
-                            ocultarPopup();
-
-                            return;
-                        }
-
-                        if (
-                            !confirmandoRevertir
-                        ) {
-
-                            confirmandoRevertir =
-                                true;
-
-                            boton.classList.add(
-                                "popup-perfil-revertir",
-                            );
-
-                            nombreElemento.textContent =
-                                "¿Revertir cambios?";
-
-                            if (
-                                iconoRevertir
-                            ) {
-
-                                iconoRevertir.textContent =
-                                    "↻";
-                            }
-
-                            return;
-                        }
-
-                        try {
-
-                            const resultado =
-                                await invoke<ResultadoPerfil>(
-                                    "restaurar_perfil_actual",
-                                );
-
-                            alCambiarPerfil(
-                                resultado,
-                            );
-
-                            ocultarPopup();
-
-                        } catch (
-                            error
-                        ) {
-
-                            console.error(
-                                "❌ No se pudieron revertir los cambios:",
-                                error,
-                            );
-                        }
-
-                        return;
-                    }
-
-                    // ==================================================
-                    // CAMBIAR PERFIL
-                    // ==================================================
-
-                    if (
-                        estaEditado
-                    ) {
-
-                        const guardar =
-                            await confirmarPopup(
-                                "¿Guardar cambios del perfil actual?",
-                                evento,
-                            );
-
-                        if (
-                            guardar
-                        ) {
-
-                            await alGuardar();
-                        }
-                    }
-
-                    try {
-
-                        const resultado =
-                            await invoke<ResultadoPerfil>(
-                                "seleccionar_perfil",
-                                {
-                                    nombre,
-                                },
-                            );
-
-                        alCambiarPerfil(
-                            resultado,
-                        );
-
-                    } catch (
-                        error
-                    ) {
-
-                        console.error(
-                            "❌ No se pudo seleccionar el perfil:",
-                            error,
-                        );
-                    }
-
-                    ocultarPopup();
-                },
-            );
-
-            lista.append(
-                boton,
-            );
-        },
+      nombreElemento,
     );
 
-    return lista;
+    // ==================================================
+    // 🔄 ICONO SOLO PERFIL ACTUAL
+    // ==================================================
+
+    let iconoRevertir: HTMLSpanElement | null = null;
+
+    if (esActual) {
+      iconoRevertir = document.createElement("span");
+
+      iconoRevertir.className = "popup-perfil-revertir-icono";
+
+      iconoRevertir.textContent = "↻";
+
+      iconoRevertir.title = "Revertir cambios";
+
+      boton.append(iconoRevertir);
+    }
+
+    let confirmandoRevertir = false;
+
+    boton.addEventListener("click", async (evento) => {
+      // ==================================================
+      // PERFIL ACTUAL
+      // ==================================================
+
+      if (esActual) {
+        if (!estaEditado) {
+          ocultarPopup();
+
+          return;
+        }
+
+        if (!confirmandoRevertir) {
+          confirmandoRevertir = true;
+
+          boton.classList.add("popup-perfil-revertir");
+
+          nombreElemento.textContent = "¿Revertir cambios?";
+
+          if (iconoRevertir) {
+            iconoRevertir.textContent = "↻";
+          }
+
+          return;
+        }
+
+        try {
+          const resultado = await invoke<ResultadoPerfil>(
+            "restaurar_perfil_actual",
+          );
+
+          alCambiarPerfil(resultado);
+
+          ocultarPopup();
+        } catch (error) {
+          console.error("❌ No se pudieron revertir los cambios:", error);
+        }
+
+        return;
+      }
+
+      // ==================================================
+      // CAMBIAR PERFIL
+      // ==================================================
+
+      if (estaEditado) {
+        const guardar = await confirmarPopup(
+          "¿Guardar cambios del perfil actual?",
+          evento,
+        );
+
+        if (guardar) {
+          await alGuardar();
+        }
+      }
+
+      try {
+        const resultado = await invoke<ResultadoPerfil>("seleccionar_perfil", {
+          nombre,
+        });
+
+        alCambiarPerfil(resultado);
+      } catch (error) {
+        console.error("❌ No se pudo seleccionar el perfil:", error);
+      }
+
+      ocultarPopup();
+    });
+
+    lista.append(boton);
+  });
+
+  return lista;
 }
 
 // ======================================================
@@ -376,16 +228,11 @@ function crearListaPerfiles(
 // ======================================================
 
 function crearSeparador(): HTMLElement {
+  const separador = document.createElement("div");
 
-    const separador =
-        document.createElement(
-            "div",
-        );
+  separador.className = "popup-perfil-separador";
 
-    separador.className =
-        "popup-perfil-separador";
-
-    return separador;
+  return separador;
 }
 
 // ======================================================
@@ -393,233 +240,126 @@ function crearSeparador(): HTMLElement {
 // ======================================================
 
 function crearAcciones(
-    nombreActual: string,
-    estaEditado: boolean,
-    alGuardar: () => Promise<void>,
-    alCambiarPerfil: (
-        resultado: ResultadoPerfil,
-    ) => void,
+  nombreActual: string,
+  estaEditado: boolean,
+  alGuardar: () => Promise<void>,
+  alCambiarPerfil: (resultado: ResultadoPerfil) => void,
 ): HTMLElement {
+  const acciones = document.createElement("div");
 
-    const acciones =
-        document.createElement(
-            "div",
-        );
+  acciones.className = "popup-perfil-acciones";
 
-    acciones.className =
-        "popup-perfil-acciones";
+  // ==================================================
+  // NUEVO PERFIL
+  // ==================================================
 
-    // ==================================================
-    // NUEVO PERFIL
-    // ==================================================
+  const botonNuevo = crearBoton({
+    texto: "Nuevo perfil",
+  });
 
-    const botonNuevo =
-        crearBoton({
+  botonNuevo.addEventListener("click", async (evento) => {
+    if (estaEditado) {
+      const guardar = await confirmarPopup(
+        "¿Guardar cambios del perfil actual?",
+        evento,
+      );
 
-            texto:
-                "Nuevo perfil",
-        });
+      if (guardar) {
+        await alGuardar();
+      }
+    }
 
-    botonNuevo.addEventListener(
-        "click",
-        async evento => {
+    try {
+      const resultado = await invoke<ResultadoPerfil>("crear_perfil_nuevo");
 
-            if (
-                estaEditado
-            ) {
+      alCambiarPerfil(resultado);
+    } catch (error) {
+      console.error("❌ No se pudo crear el perfil:", error);
+    }
 
-                const guardar =
-                    await confirmarPopup(
-                        "¿Guardar cambios del perfil actual?",
-                        evento,
-                    );
+    ocultarPopup();
+  });
 
-                if (
-                    guardar
-                ) {
+  // ==================================================
+  // CLONAR PERFIL
+  // ==================================================
 
-                    await alGuardar();
-                }
-            }
+  const botonClonar = crearBoton({
+    texto: "Clonar perfil",
+  });
 
-            try {
+  botonClonar.addEventListener("click", async () => {
+    try {
+      const resultado = await invoke<ResultadoPerfil>("clonar_perfil", {
+        filas: obtenerPerfilUi().filas,
+      });
 
-                const resultado =
-                    await invoke<ResultadoPerfil>(
-                        "crear_perfil_nuevo",
-                    );
+      alCambiarPerfil(resultado);
+    } catch (error) {
+      console.error("❌ No se pudo clonar el perfil:", error);
+    }
 
-                alCambiarPerfil(
-                    resultado,
-                );
+    ocultarPopup();
+  });
 
-            } catch (
-                error
-            ) {
+  // ==================================================
+  // RENOMBRAR
+  // ==================================================
 
-                console.error(
-                    "❌ No se pudo crear el perfil:",
-                    error,
-                );
-            }
+  const botonRenombrar = crearBoton({
+    texto: "Renombrar perfil",
+  });
 
-            ocultarPopup();
-        },
-    );
+  botonRenombrar.addEventListener("click", async (evento) => {
+    if (estaEditado) {
+      const guardar = await confirmarPopup(
+        "¿Guardar cambios del perfil actual?",
+        evento,
+      );
 
-    // ==================================================
-    // CLONAR PERFIL
-    // ==================================================
+      if (guardar) {
+        await alGuardar();
+      }
+    }
 
-    const botonClonar =
-        crearBoton({
+    abrirFormularioRenombrar(nombreActual, evento, alCambiarPerfil);
+  });
 
-            texto:
-                "Clonar perfil",
-        });
+  // ==================================================
+  // ELIMINAR
+  // ==================================================
 
-    botonClonar.addEventListener(
-        "click",
-        async () => {
+  const botonEliminar = crearBoton({
+    texto: "Eliminar perfil",
 
-            try {
+    clase: "popup-perfil-eliminar",
+  });
 
-                const resultado =
-                    await invoke<ResultadoPerfil>(
-                        "clonar_perfil",
-                        {
-                            filas:
-                                obtenerPerfilUi().filas,
-                        },
-                    );
+  let confirmando = false;
 
-                alCambiarPerfil(
-                    resultado,
-                );
+  botonEliminar.addEventListener("click", async () => {
+    if (!confirmando) {
+      confirmando = true;
 
-            } catch (
-                error
-            ) {
+      botonEliminar.textContent = "⚠️ Confirmar eliminación";
 
-                console.error(
-                    "❌ No se pudo clonar el perfil:",
-                    error,
-                );
-            }
+      return;
+    }
 
-            ocultarPopup();
-        },
-    );
+    try {
+      const resultado = await invoke<ResultadoPerfil>("eliminar_perfil_actual");
 
-    // ==================================================
-    // RENOMBRAR
-    // ==================================================
+      alCambiarPerfil(resultado);
+    } catch (error) {
+      console.error("❌ No se pudo eliminar el perfil:", error);
+    }
 
-    const botonRenombrar =
-        crearBoton({
+    ocultarPopup();
+  });
 
-            texto:
-                "Renombrar perfil",
-        });
+  acciones.append(botonNuevo, botonClonar, botonRenombrar, botonEliminar);
 
-    botonRenombrar.addEventListener(
-        "click",
-        async evento => {
-
-            if (
-                estaEditado
-            ) {
-
-                const guardar =
-                    await confirmarPopup(
-                        "¿Guardar cambios del perfil actual?",
-                        evento,
-                    );
-
-                if (
-                    guardar
-                ) {
-
-                    await alGuardar();
-                }
-            }
-
-            abrirFormularioRenombrar(
-                nombreActual,
-                evento,
-                alCambiarPerfil,
-            );
-        },
-    );
-
-    // ==================================================
-    // ELIMINAR
-    // ==================================================
-
-    const botonEliminar =
-        crearBoton({
-
-            texto:
-                "Eliminar perfil",
-
-            clase:
-                "popup-perfil-eliminar",
-        });
-
-    let confirmando =
-        false;
-
-    botonEliminar.addEventListener(
-        "click",
-        async () => {
-
-            if (
-                !confirmando
-            ) {
-
-                confirmando =
-                    true;
-
-                botonEliminar.textContent =
-                    "⚠️ Confirmar eliminación";
-
-                return;
-            }
-
-            try {
-
-                const resultado =
-                    await invoke<ResultadoPerfil>(
-                        "eliminar_perfil_actual",
-                    );
-
-                alCambiarPerfil(
-                    resultado,
-                );
-
-            } catch (
-                error
-            ) {
-
-                console.error(
-                    "❌ No se pudo eliminar el perfil:",
-                    error,
-                );
-            }
-
-            ocultarPopup();
-        },
-    );
-
-    acciones.append(
-
-        botonNuevo,
-        botonClonar,
-        botonRenombrar,
-        botonEliminar,
-    );
-
-    return acciones;
+  return acciones;
 }
 
 // ======================================================
@@ -627,150 +367,79 @@ function crearAcciones(
 // ======================================================
 
 function abrirFormularioRenombrar(
-    nombreActual: string,
-    evento: MouseEvent,
-    alCambiarPerfil: (
-        resultado: ResultadoPerfil,
-    ) => void,
+  nombreActual: string,
+  evento: MouseEvent,
+  alCambiarPerfil: (resultado: ResultadoPerfil) => void,
 ): void {
+  const contenedor = document.createElement("div");
 
-    const contenedor =
-        document.createElement(
-            "div",
-        );
+  contenedor.className = "popup-perfil-renombrar";
 
-    contenedor.className =
-        "popup-perfil-renombrar";
+  const input = document.createElement("input");
 
-    const input =
-        document.createElement(
-            "input",
-        );
+  input.className = "popup-input";
 
-    input.className =
-        "popup-input";
+  input.type = "text";
 
-    input.type =
-        "text";
+  input.value = nombreActual;
 
-    input.value =
-        nombreActual;
+  const botones = document.createElement("div");
 
-    const botones =
-        document.createElement(
-            "div",
-        );
+  botones.className = "popup-confirmar-botones";
 
-    botones.className =
-        "popup-confirmar-botones";
+  const botonCancelar = crearBoton({
+    texto: "Cancelar",
+  });
 
-    const botonCancelar =
-        crearBoton({
+  const botonGuardar = crearBoton({
+    texto: "Guardar",
+  });
 
-            texto:
-                "Cancelar",
-        });
+  const confirmar = async (): Promise<void> => {
+    const nuevoNombre = input.value.trim();
 
-    const botonGuardar =
-        crearBoton({
+    if (!nuevoNombre || nuevoNombre === nombreActual) {
+      ocultarPopup();
 
-            texto:
-                "Guardar",
-        });
+      return;
+    }
 
-    const confirmar =
-        async (): Promise<void> => {
+    try {
+      const resultado = await invoke<ResultadoPerfil>("renombrar_perfil", {
+        nuevoNombre,
+      });
 
-            const nuevoNombre =
-                input.value.trim();
+      alCambiarPerfil(resultado);
+    } catch (error) {
+      console.error("❌ No se pudo renombrar el perfil:", error);
+    }
 
-            if (
-                !nuevoNombre ||
-                nuevoNombre === nombreActual
-            ) {
+    ocultarPopup();
+  };
 
-                ocultarPopup();
+  botonGuardar.addEventListener("click", confirmar);
 
-                return;
-            }
+  botonCancelar.addEventListener("click", () => {
+    ocultarPopup();
+  });
 
-            try {
+  input.addEventListener("keydown", (evento) => {
+    if (evento.key === "Enter") {
+      confirmar();
+    }
 
-                const resultado =
-                    await invoke<ResultadoPerfil>(
-                        "renombrar_perfil",
-                        {
-                            nuevoNombre,
-                        },
-                    );
+    if (evento.key === "Escape") {
+      ocultarPopup();
+    }
+  });
 
-                alCambiarPerfil(
-                    resultado,
-                );
+  botones.append(botonCancelar, botonGuardar);
 
-            } catch (
-                error
-            ) {
+  contenedor.append(input, botones);
 
-                console.error(
-                    "❌ No se pudo renombrar el perfil:",
-                    error,
-                );
-            }
+  mostrarPopup(contenedor, evento.clientX, evento.clientY);
 
-            ocultarPopup();
-        };
+  input.focus();
 
-    botonGuardar.addEventListener(
-        "click",
-        confirmar,
-    );
-
-    botonCancelar.addEventListener(
-        "click",
-        () => {
-
-            ocultarPopup();
-        },
-    );
-
-    input.addEventListener(
-        "keydown",
-        evento => {
-
-            if (
-                evento.key === "Enter"
-            ) {
-
-                confirmar();
-            }
-
-            if (
-                evento.key === "Escape"
-            ) {
-
-                ocultarPopup();
-            }
-        },
-    );
-
-    botones.append(
-        botonCancelar,
-        botonGuardar,
-    );
-
-    contenedor.append(
-        input,
-        botones,
-    );
-
-    mostrarPopup(
-        contenedor,
-        evento.clientX,
-        evento.clientY,
-    );
-
-    input.focus();
-
-    input.select();
+  input.select();
 }

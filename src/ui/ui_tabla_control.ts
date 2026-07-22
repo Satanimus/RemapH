@@ -2,354 +2,144 @@
 // ui_Tabla_Control RemapH V3
 // ======================================================
 
-let reconstruirTablaCallback:
-    (() => void) | null =
-    null;
+let reconstruirTablaCallback: (() => void) | null = null;
 
-let reconstruirFilaCallback:
-    ((id: string) => void) | null =
-    null;
+let reconstruirFilaCallback: ((id: string) => void) | null = null;
 
-let actualizarConflictosCallback:
-    (() => void) | null = null;
+let actualizarConflictosCallback: (() => void) | null = null;
 
-let conflictosAnteriores =
-    new Map<string, Set<string>>();
+let conflictosAnteriores = new Map<string, Set<string>>();
 
-import {
-    obtenerConflictos
-} from "../core/core_conflictos";
+import { obtenerConflictos } from "../core/core_conflictos";
 
-import {
-    obtenerPerfilUi
-} from "../core/core_perfil_ui";
+import { obtenerPerfilUi } from "../core/core_perfil_ui";
 
 // ======================================================
 // 🔄 REGISTRAR RECONSTRUCCIÓN
 // ======================================================
 
 export function registrarReconstruccion(
+  tabla: () => void,
 
-    tabla:
-        () => void,
+  fila: (id: string) => void,
+): void {
+  reconstruirTablaCallback = tabla;
 
-    fila:
-        (id: string) => void
-
-):
-
-    void
-
-{
-
-    reconstruirTablaCallback =
-        tabla;
-
-    reconstruirFilaCallback =
-        fila;
-
+  reconstruirFilaCallback = fila;
 }
-
 
 // ======================================================
 // ⚠️ REGISTRAR CONFLICTOS
 // ======================================================
 
-export function registrarActualizacionConflictos(
-
-    callback:
-        () => void
-
-):
-
-    void
-
-{
-
-    actualizarConflictosCallback =
-        callback;
-
+export function registrarActualizacionConflictos(callback: () => void): void {
+  actualizarConflictosCallback = callback;
 }
-
 
 // ======================================================
 // RECONSTRUIR TABLA
 // ======================================================
 
-export function reconstruirTabla():
+export function reconstruirTabla(): void {
+  reconstruirTablaCallback?.();
 
-    void
+  actualizarMapaConflictos();
 
-{
-
-    reconstruirTablaCallback?.();
-
-
-    actualizarMapaConflictos();
-
-
-    actualizarConflictosCallback?.();
-
+  actualizarConflictosCallback?.();
 }
-
 
 // ======================================================
 // RECONSTRUIR FILA
 // ======================================================
 
-export function reconstruirFila(
+export function reconstruirFila(id: string): void {
+  const conflictosActuales = obtenerMapaConflictos();
 
-    id:
-        string
+  const afectados = new Set<string>();
 
-):
+  afectados.add(id);
 
-    void
+  const anteriores = conflictosAnteriores.get(id);
 
-{
-    const conflictosActuales =
-        obtenerMapaConflictos();
+  anteriores?.forEach((conflictoId) => {
+    afectados.add(conflictoId);
+  });
 
+  const actuales = conflictosActuales.get(id);
 
-    const afectados =
-        new Set<string>();
+  actuales?.forEach((conflictoId) => {
+    afectados.add(conflictoId);
+  });
 
+  afectados.forEach((filaId) => {
+    reconstruirFilaCallback?.(filaId);
+  });
 
-    afectados.add(
+  conflictosAnteriores = conflictosActuales;
 
-        id
-
-    );
-
-    const anteriores =
-        conflictosAnteriores.get(
-
-            id
-
-        );
-
-
-    anteriores?.forEach(
-
-        conflictoId => {
-
-            afectados.add(
-
-                conflictoId
-
-            );
-
-        }
-
-    );
-
-
-    const actuales =
-        conflictosActuales.get(
-
-            id
-
-        );
-
-
-    actuales?.forEach(
-
-        conflictoId => {
-
-            afectados.add(
-
-                conflictoId
-
-            );
-
-        }
-
-    );
-
-
-    afectados.forEach(
-
-        filaId => {
-
-            reconstruirFilaCallback?.(
-
-                filaId
-
-            );
-
-        }
-
-    );
-
-
-    conflictosAnteriores =
-        conflictosActuales;
-
-
-    actualizarConflictosCallback?.();
-
+  actualizarConflictosCallback?.();
 }
-
 
 // ======================================================
 // ⚠️ MAPA DE CONFLICTOS
 // ======================================================
 
-function obtenerMapaConflictos():
+function obtenerMapaConflictos(): Map<string, Set<string>> {
+  const mapa = new Map<string, Set<string>>();
 
-    Map<string, Set<string>>
+  const conflictos = obtenerConflictos(obtenerPerfilUi().filas);
 
-{
+  conflictos.forEach((conflicto) => {
+    const idA = conflicto.filaA.id;
 
-    const mapa =
-        new Map<string, Set<string>>();
+    const idB = conflicto.filaB.id;
 
+    if (!mapa.has(idA)) {
+      mapa.set(
+        idA,
 
-    const conflictos =
-        obtenerConflictos(
+        new Set(),
+      );
+    }
 
-            obtenerPerfilUi().filas
+    if (!mapa.has(idB)) {
+      mapa.set(
+        idB,
 
-        );
+        new Set(),
+      );
+    }
 
+    mapa.get(idA)!.add(idB);
 
-    conflictos.forEach(
+    mapa.get(idB)!.add(idA);
+  });
 
-        conflicto => {
-
-            const idA =
-                conflicto.filaA.id;
-
-            const idB =
-                conflicto.filaB.id;
-
-
-            if (
-
-                !mapa.has(
-
-                    idA
-
-                )
-
-            ) {
-
-                mapa.set(
-
-                    idA,
-
-                    new Set()
-
-                );
-
-            }
-
-
-            if (
-
-                !mapa.has(
-
-                    idB
-
-                )
-
-            ) {
-
-                mapa.set(
-
-                    idB,
-
-                    new Set()
-
-                );
-
-            }
-
-
-            mapa.get(
-
-                idA
-
-            )!.add(
-
-                idB
-
-            );
-
-
-            mapa.get(
-
-                idB
-
-            )!.add(
-
-                idA
-
-            );
-
-        }
-
-    );
-
-
-    return mapa;
-
+  return mapa;
 }
-
 
 // ======================================================
 // 🔄 ACTUALIZAR MAPA DE CONFLICTOS
 // ======================================================
 
-function actualizarMapaConflictos():
-
-    void
-
-{
-
-    conflictosAnteriores =
-        obtenerMapaConflictos();
-
+function actualizarMapaConflictos(): void {
+  conflictosAnteriores = obtenerMapaConflictos();
 }
 
 // ======================================================
 // ↕️ MODO MOVER
 // ======================================================
 
-let modoMover =
-    false;
+let modoMover = false;
 
-
-export function estaEnModoMover():
-
-    boolean
-
-{
-
-    return modoMover;
-
+export function estaEnModoMover(): boolean {
+  return modoMover;
 }
 
-
-export function activarModoMover():
-
-    void
-
-{
-
-    modoMover =
-        true;
-
+export function activarModoMover(): void {
+  modoMover = true;
 }
 
-
-export function desactivarModoMover():
-
-    void
-
-{
-
-    modoMover =
-        false;
-
+export function desactivarModoMover(): void {
+  modoMover = false;
 }

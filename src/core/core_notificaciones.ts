@@ -10,152 +10,71 @@
 // Los textos viven aquí.
 // ======================================================
 
-import type {
-    AppPerfil
-} from "./core_perfil";
-
+import type { AppPerfil } from "./core_perfil";
 
 // ======================================================
 // 📦 DATOS NOTIFICACIÓN
 // ======================================================
 
 export interface DatosNotificacion {
+  filaA: number;
 
-    filaA:
-        number;
+  filaB: number;
 
-    filaB:
-        number;
+  appA: AppPerfil;
 
-    appA:
-        AppPerfil;
-
-    appB:
-        AppPerfil;
-
+  appB: AppPerfil;
 }
-
 
 // ======================================================
 // 📝 TEXTOS
 // ======================================================
 
 const TEXTOS = {
+  estadoNormal: "Perfil activo.",
 
-    estadoNormal:
-
-        "Perfil activo.",
-
-
-    notificacion001:
-
-        (
-
-            datos:
-                DatosNotificacion
-
-        ) =>
-
-            `⚠ (Fila ${datos.filaA} y ${datos.filaB}) ` +
-
-            `Disparador idéntico en dos atajos genera conflicto: ` +
-
-            `${textoApp(datos.appA)} con ` +
-
-            `${textoApp(datos.appB)}.`
-
+  notificacion001: (datos: DatosNotificacion) =>
+    `⚠ (Fila ${datos.filaA} y ${datos.filaB}) ` +
+    `Disparador idéntico en dos atajos genera conflicto: ` +
+    `${textoApp(datos.appA)} con ` +
+    `${textoApp(datos.appB)}.`,
 };
-
 
 // ======================================================
 // 🖥️ TEXTO APP
 // ======================================================
 
-function textoApp(
+function textoApp(app: AppPerfil): string {
+  if (app.programa === null) {
+    return "App global";
+  }
 
-    app:
-        AppPerfil
+  if (app.segundoPlano) {
+    return `Programa ${app.programa} en segundo plano`;
+  }
 
-):
-
-    string
-
-{
-
-    if (
-
-        app.programa === null
-
-    ) {
-
-        return "App global";
-
-    }
-
-
-    if (
-
-        app.segundoPlano
-
-    ) {
-
-        return `Programa ${app.programa} en segundo plano`;
-
-    }
-
-
-    return `Programa ${app.programa}`;
-
+  return `Programa ${app.programa}`;
 }
-
 
 // ======================================================
 // 📝 OBTENER TEXTO DE NOTIFICACIÓN
 // ======================================================
 
 export function obtenerTextoNotificacion(
+  codigo: "001",
 
-    codigo:
-        "001",
-
-    datos:
-        DatosNotificacion
-
-):
-
-    string
-
-{
-
-    switch (
-
-        codigo
-
-    ) {
-
-        case "001":
-
-            return TEXTOS.notificacion001(
-
-                datos
-
-            );
-
-    }
-
+  datos: DatosNotificacion,
+): string {
+  switch (codigo) {
+    case "001":
+      return TEXTOS.notificacion001(datos);
+  }
 }
-
 
 // ======================================================
 // ℹ️ ESTADO NORMAL
 // ======================================================
 
-export function obtenerTextoEstadoNormal():
-
-    string
-
-{
-
-    return TEXTOS.estadoNormal;
-
+export function obtenerTextoEstadoNormal(): string {
+  return TEXTOS.estadoNormal;
 }

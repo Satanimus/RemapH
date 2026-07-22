@@ -3,230 +3,131 @@
 // RemapH V3
 // ======================================================
 
-import {
-    COLUMNAS,
-} from "./ui_columnas";
+import { COLUMNAS } from "./ui_columnas";
 
-import {
-    crearFila,
-} from "./ui_fila";
+import { crearFila } from "./ui_fila";
 
-import {
-    obtenerPerfilUi,
-} from "../core/core_perfil_ui";
+import { obtenerPerfilUi } from "../core/core_perfil_ui";
 
-import {
-    registrarReconstruccion,
-} from "./ui_tabla_control";
+import { registrarReconstruccion } from "./ui_tabla_control";
 
-import {
-    activarRedimensionColumnas,
-} from "./ui_redimension_columnas";
+import { activarRedimensionColumnas } from "./ui_redimension_columnas";
 
 // ======================================================
 // CREAR TABLA
 // ======================================================
 
-export function crearTabla(
-    alModificar: () => void,
-): HTMLElement {
+export function crearTabla(alModificar: () => void): HTMLElement {
+  const tabla = document.createElement("section");
 
-    const tabla =
-        document.createElement(
-            "section",
-        );
+  tabla.className = "tabla";
 
-    tabla.className =
-        "tabla";
+  const viewport = document.createElement("div");
 
-    const viewport =
-        document.createElement(
-            "div",
-        );
+  viewport.className = "viewport";
 
-    viewport.className =
-        "viewport";
+  const cabecera = document.createElement("div");
 
-    const cabecera =
-        document.createElement(
-            "div",
-        );
+  cabecera.className = "cabecera";
 
-    cabecera.className =
-        "cabecera";
+  COLUMNAS.forEach((col) => {
+    const celda = document.createElement("div");
 
-    COLUMNAS.forEach(
-        col => {
+    celda.className = `cabecera-celda grupo-${col.grupo}`;
 
-            const celda =
-                document.createElement(
-                    "div",
-                );
+    celda.dataset.columna = col.id;
 
-            celda.className =
-                `cabecera-celda grupo-${col.grupo}`;
+    celda.style.width = col.ancho;
 
-            celda.dataset.columna =
-                col.id;
+    celda.style.flexBasis = col.ancho;
 
-            celda.style.width =
-                col.ancho;
+    celda.textContent = col.titulo;
 
-            celda.style.flexBasis =
-                col.ancho;
+    const divisor = document.createElement("div");
 
-            celda.textContent =
-                col.titulo;
+    divisor.className = "divisor-columna";
 
-            const divisor =
-                document.createElement(
-                    "div",
-                );
+    celda.append(divisor);
 
-            divisor.className =
-                "divisor-columna";
+    divisor.style.pointerEvents = "auto";
 
-            celda.append(
-                divisor,
-            );
+    cabecera.append(celda);
+  });
 
-            divisor.style.pointerEvents =
-                "auto";
+  activarRedimensionColumnas(cabecera);
 
-            cabecera.append(
-                celda,
-            );
-        },
+  const filas = document.createElement("div");
+
+  filas.className = "filas";
+
+  // ==================================================
+  // RECONSTRUIR TABLA
+  // ==================================================
+
+  const reconstruirTabla = (): void => {
+    filas.replaceChildren();
+
+    const perfil = obtenerPerfilUi();
+
+    perfil.filas.forEach((fila, indice) => {
+      filas.append(
+        crearFila(fila, indice + 1, perfil.filas.length, alModificar),
+      );
+    });
+  };
+
+  reconstruirTabla();
+
+  // ==================================================
+  // RECONSTRUIR FILA
+  // ==================================================
+
+  const reconstruirFila = (id: string): void => {
+    const perfil = obtenerPerfilUi();
+
+    const indice = perfil.filas.findIndex((fila) => fila.id === id);
+
+    if (indice < 0) {
+      return;
+    }
+
+    const filaActual = filas.querySelector(`[data-id="${id}"]`);
+
+    if (!filaActual) {
+      return;
+    }
+
+    filaActual.replaceWith(
+      crearFila(
+        perfil.filas[indice],
+        indice + 1,
+        perfil.filas.length,
+        alModificar,
+      ),
     );
+  };
 
-    activarRedimensionColumnas(
-        cabecera,
-    );
+  // ==================================================
+  // ✏️ CAMBIO VISUAL EN FILA
+  // ==================================================
 
-    const filas =
-        document.createElement(
-            "div",
-        );
+  filas.addEventListener("click", (evento) => {
+    const objetivo = evento.target as HTMLElement;
 
-    filas.className =
-        "filas";
+    const control = objetivo.closest("button, select, input");
 
-    // ==================================================
-    // RECONSTRUIR TABLA
-    // ==================================================
+    if (!control) {
+      return;
+    }
 
-    const reconstruirTabla =
-        (): void => {
+    alModificar();
+  });
 
-            filas.replaceChildren();
+  viewport.append(cabecera, filas);
 
-            const perfil =
-                obtenerPerfilUi();
+  tabla.append(viewport);
 
-            perfil.filas.forEach(
-                (
-                    fila,
-                    indice,
-                ) => {
+  registrarReconstruccion(reconstruirTabla, reconstruirFila);
 
-                    filas.append(
-                        crearFila(
-                            fila,
-                            indice + 1,
-                            perfil.filas.length,
-                            alModificar,
-                        ),
-                    );
-                },
-            );
-        };
-
-    reconstruirTabla();
-
-    // ==================================================
-    // RECONSTRUIR FILA
-    // ==================================================
-
-    const reconstruirFila =
-        (
-            id: string,
-        ): void => {
-
-            const perfil =
-                obtenerPerfilUi();
-
-            const indice =
-                perfil.filas.findIndex(
-                    fila =>
-                        fila.id === id,
-                );
-
-            if (
-                indice < 0
-            ) {
-                return;
-            }
-
-            const filaActual =
-                filas.querySelector(
-                    `[data-id="${id}"]`,
-                );
-
-            if (
-                !filaActual
-            ) {
-                return;
-            }
-
-            filaActual.replaceWith(
-                crearFila(
-                    perfil.filas[indice],
-                    indice + 1,
-                    perfil.filas.length,
-                    alModificar,
-                ),
-            );
-        };
-
-    // ==================================================
-    // ✏️ CAMBIO VISUAL EN FILA
-    // ==================================================
-
-    filas.addEventListener(
-        "click",
-        evento => {
-
-            const objetivo =
-                evento.target as HTMLElement;
-
-            const control =
-                objetivo.closest(
-                    "button, select, input",
-                );
-
-            if (
-                !control
-            ) {
-                return;
-            }
-
-            alModificar();
-        },
-    );
-
-    viewport.append(
-        cabecera,
-        filas,
-    );
-
-    tabla.append(
-        viewport,
-    );
-
-    registrarReconstruccion(
-        reconstruirTabla,
-        reconstruirFila,
-    );
-
-    return tabla;
+  return tabla;
 }

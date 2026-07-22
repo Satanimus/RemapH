@@ -5,206 +5,108 @@
 import type { Entrada } from "./core_entrada";
 import { normalizarEntrada } from "./core_normalizar_trigger";
 
-export type CondicionTrigger=
-    "Simple"|
-    "Mantenido"|
-    "Doble";
+export type CondicionTrigger = "Simple" | "Mantenido" | "Doble";
 
-export interface Trigger{
+export interface Trigger {
+  modificadores: Entrada[];
 
-    modificadores:Entrada[];
+  gatillo: Entrada | null;
 
-    gatillo:Entrada|null;
-
-    condicion:CondicionTrigger;
-
+  condicion: CondicionTrigger;
 }
 
-export function crearTrigger():Trigger{
+export function crearTrigger(): Trigger {
+  return {
+    modificadores: [],
 
-    return{
+    gatillo: null,
 
-        modificadores:[],
-
-        gatillo:null,
-
-        condicion:"Simple"
-
-    };
-
+    condicion: "Simple",
+  };
 }
-
 
 // ------------------------------------------------------
 // Texto plano.
 // Usado para títulos, debug y lectura.
 // ------------------------------------------------------
 
-export function triggerATexto(
-    trigger:Trigger
-):string{
+export function triggerATexto(trigger: Trigger): string {
+  if (!trigger.gatillo) {
+    return "";
+  }
 
-    if(!trigger.gatillo){
-        return "";
-    }
+  const modificadores = trigger.modificadores.map(normalizarEntrada);
 
-    const modificadores=
-        trigger.modificadores.map(
-            normalizarEntrada
-        );
+  const gatillo = normalizarEntrada(trigger.gatillo);
 
-    const gatillo=
-        normalizarEntrada(
-            trigger.gatillo
-        );
+  const nombres = modificadores.map((entrada) => entrada.nombre);
 
-    const nombres=
-        modificadores.map(
-            entrada=>entrada.nombre
-        );
+  let texto = gatillo.nombre;
 
-    let texto=
-        gatillo.nombre;
+  switch (trigger.condicion) {
+    case "Mantenido":
+      texto = `[${texto}]`;
+      break;
 
-    switch(trigger.condicion){
+    case "Doble":
+      texto = `${texto} ×2`;
+      break;
+  }
 
-        case "Mantenido":
-            texto=`[${texto}]`;
-            break;
+  if (nombres.length === 0) {
+    return texto;
+  }
 
-        case "Doble":
-            texto=`${texto} ×2`;
-            break;
-
-    }
-
-    if(nombres.length===0){
-        return texto;
-    }
-
-    return `[${nombres.join(" + ")}] + ${texto}`;
-
+  return `[${nombres.join(" + ")}] + ${texto}`;
 }
-
 
 // ------------------------------------------------------
 // HTML visual.
 // Separa teclas y símbolos para estilos.
 // ------------------------------------------------------
 
-export function triggerAHTML(
-    trigger:Trigger
-):string{
+export function triggerAHTML(trigger: Trigger): string {
+  if (!trigger.gatillo) {
+    return "";
+  }
 
-    if(!trigger.gatillo){
-        return "";
-    }
+  const modificadores = trigger.modificadores.map(normalizarEntrada);
 
+  const gatillo = normalizarEntrada(trigger.gatillo);
 
-    const modificadores=
-        trigger.modificadores.map(
-            normalizarEntrada
-        );
+  const partes: string[] = [];
 
+  if (modificadores.length > 0) {
+    partes.push(`<span class="trigger-sintaxis">[</span>`);
 
-    const gatillo=
-        normalizarEntrada(
-            trigger.gatillo
-        );
+    modificadores.forEach((entrada, indice) => {
+      partes.push(`<span class="trigger-tecla">${entrada.nombre}</span>`);
 
+      if (indice < modificadores.length - 1) {
+        partes.push(`<span class="trigger-sintaxis"> + </span>`);
+      }
+    });
 
-    const partes:string[]=[];
+    partes.push(`<span class="trigger-sintaxis">]</span>`);
 
+    partes.push(`<span class="trigger-sintaxis"> + </span>`);
+  }
 
-    if(
-        modificadores.length>0
-    ){
+  let nombreGatillo = gatillo.nombre;
 
-        partes.push(
-            `<span class="trigger-sintaxis">[</span>`
-        );
+  if (trigger.condicion === "Mantenido") {
+    partes.push(`<span class="trigger-sintaxis">[</span>`);
+  }
 
+  partes.push(`<span class="trigger-tecla">${nombreGatillo}</span>`);
 
-        modificadores.forEach(
-            (
-                entrada,
-                indice
-            )=>{
+  if (trigger.condicion === "Mantenido") {
+    partes.push(`<span class="trigger-sintaxis">]</span>`);
+  }
 
-                partes.push(
-                    `<span class="trigger-tecla">${entrada.nombre}</span>`
-                );
+  if (trigger.condicion === "Doble") {
+    partes.push(`<span class="trigger-sintaxis"> ×2</span>`);
+  }
 
-
-                if(
-                    indice<
-                    modificadores.length-1
-                ){
-
-                    partes.push(
-                        `<span class="trigger-sintaxis"> + </span>`
-                    );
-
-                }
-
-            }
-        );
-
-
-        partes.push(
-            `<span class="trigger-sintaxis">]</span>`
-        );
-
-
-        partes.push(
-            `<span class="trigger-sintaxis"> + </span>`
-        );
-
-    }
-
-
-    let nombreGatillo=
-        gatillo.nombre;
-
-
-    if(
-        trigger.condicion==="Mantenido"
-    ){
-
-        partes.push(
-            `<span class="trigger-sintaxis">[</span>`
-        );
-
-    }
-
-
-    partes.push(
-        `<span class="trigger-tecla">${nombreGatillo}</span>`
-    );
-
-
-    if(
-        trigger.condicion==="Mantenido"
-    ){
-
-        partes.push(
-            `<span class="trigger-sintaxis">]</span>`
-        );
-
-    }
-
-
-    if(
-        trigger.condicion==="Doble"
-    ){
-
-        partes.push(
-            `<span class="trigger-sintaxis"> ×2</span>`
-        );
-
-    }
-
-
-    return partes.join("");
-
+  return partes.join("");
 }

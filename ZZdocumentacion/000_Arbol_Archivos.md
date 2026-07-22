@@ -1,7 +1,5 @@
 ---
-
 ## Arbol de archivos
-
 ---
 
 ## 🧭 Arquitectura general
@@ -929,4 +927,5 @@ AccionCache
 Platform
 ↓
 Hardware
------
+
+---

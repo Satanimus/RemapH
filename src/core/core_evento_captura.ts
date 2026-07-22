@@ -4,34 +4,25 @@
 
 import type { Entrada } from "./core_entrada";
 
-export type TipoEventoBuffer=
-    "Down"|
-    "Up";
+export type TipoEventoBuffer = "Down" | "Up";
 
-export interface EventoBuffer{
+export interface EventoBuffer {
+  entrada: Entrada;
 
-    entrada:Entrada;
+  evento: TipoEventoBuffer;
 
-    evento:TipoEventoBuffer;
-
-    tiempo:number;
-
+  tiempo: number;
 }
 
 export function crearEventoBuffer(
-    entrada:Entrada,
-    evento:TipoEventoBuffer
-):EventoBuffer{
+  entrada: Entrada,
+  evento: TipoEventoBuffer,
+): EventoBuffer {
+  return {
+    entrada,
 
-    return{
+    evento,
 
-        entrada,
-
-        evento,
-
-        tiempo:
-            performance.now()
-
-    };
-
+    tiempo: performance.now(),
+  };
 }

@@ -5,92 +5,39 @@
 // También convierte outputs genéricos a ScanCode.
 // ======================================================
 
+use crate::eventos::{Evento, InputId};
+use crate::instante;
 use interception::ScanCode;
-
-use crate::eventos::{
-    Evento,
-    InputId,
-};
-
 
 // ======================================================
 // 📥 ENTRADA
 // ======================================================
 
-pub fn convertir(
-
-    code:
-        ScanCode,
-
-    presionado:
-        bool,
-
-) -> Evento {
-
-    let input =
-
-        InputId::new(
-
-            "keyboard",
-
-            &format!(
-                "{:?}",
-                code
-            ),
-
-        );
-
+pub fn convertir(code: ScanCode, presionado: bool) -> Evento {
+    let input = InputId::new("keyboard", &format!("{:?}", code));
 
     if presionado {
-
-        Evento::down(
-            input
-        )
-
+        Evento::down(input, instante::ahora())
+    } else {
+        Evento::up(input, instante::ahora())
     }
-
-    else {
-
-        Evento::up(
-            input
-        )
-
-    }
-
 }
-
 
 // ======================================================
 // 📤 SALIDA
 // ======================================================
 
-pub fn convertir_salida(
-
-    input:
-        &InputId,
-
-) -> Option<ScanCode> {
-
-    if input.fuente()
-        != Some("keyboard")
-    {
-
+pub fn convertir_salida(input: &InputId) -> Option<ScanCode> {
+    if input.fuente() != Some("keyboard") {
         return None;
-
     }
 
-
-    let tecla =
-
-        input.control()?;
-
+    let tecla = input.control()?;
 
     match tecla {
-
         // ----------------------------------------------
         // 🔤 LETRAS
         // ----------------------------------------------
-
         "A" => Some(ScanCode::A),
         "B" => Some(ScanCode::B),
         "C" => Some(ScanCode::C),
@@ -118,11 +65,9 @@ pub fn convertir_salida(
         "Y" => Some(ScanCode::Y),
         "Z" => Some(ScanCode::Z),
 
-
         // ----------------------------------------------
         // 🔢 NÚMEROS
         // ----------------------------------------------
-
         "Num1" => Some(ScanCode::Num1),
         "Num2" => Some(ScanCode::Num2),
         "Num3" => Some(ScanCode::Num3),
@@ -134,22 +79,18 @@ pub fn convertir_salida(
         "Num9" => Some(ScanCode::Num9),
         "Num0" => Some(ScanCode::Num0),
 
-
         // ----------------------------------------------
         // ⌨️ BÁSICAS
         // ----------------------------------------------
-
         "Enter" => Some(ScanCode::Enter),
         "Esc" => Some(ScanCode::Esc),
         "Backspace" => Some(ScanCode::Backspace),
         "Tab" => Some(ScanCode::Tab),
         "Space" => Some(ScanCode::Space),
 
-
         // ----------------------------------------------
         // 🔣 SÍMBOLOS
         // ----------------------------------------------
-
         "Minus" => Some(ScanCode::Minus),
         "Equals" => Some(ScanCode::Equals),
         "LeftBracket" => Some(ScanCode::LeftBracket),
@@ -162,20 +103,16 @@ pub fn convertir_salida(
         "Period" => Some(ScanCode::Period),
         "Slash" => Some(ScanCode::Slash),
 
-
         // ----------------------------------------------
         // 🔒 BLOQUEO
         // ----------------------------------------------
-
         "CapsLock" => Some(ScanCode::CapsLock),
         "NumLock" => Some(ScanCode::NumLock),
         "ScrollLock" => Some(ScanCode::ScrollLock),
 
-
         // ----------------------------------------------
         // ⚙️ FUNCIÓN
         // ----------------------------------------------
-
         "F1" => Some(ScanCode::F1),
         "F2" => Some(ScanCode::F2),
         "F3" => Some(ScanCode::F3),
@@ -189,22 +126,16 @@ pub fn convertir_salida(
         "F11" => Some(ScanCode::F11),
         "F12" => Some(ScanCode::F12),
 
-
         // ----------------------------------------------
         // 🎛️ MODIFICADORES
         // ----------------------------------------------
-
         "LeftControl" => Some(ScanCode::LeftControl),
         "LeftShift" => Some(ScanCode::LeftShift),
         "LeftAlt" => Some(ScanCode::LeftAlt),
 
-
         // ----------------------------------------------
         // ❌ NO SOPORTADO
         // ----------------------------------------------
-
         _ => None,
-
     }
-
 }

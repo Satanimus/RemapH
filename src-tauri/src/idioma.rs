@@ -8,63 +8,29 @@
 // Runtime solo recibe InputId.
 // ======================================================
 
-
-use serde::{
-    Serialize,
-    Deserialize,
-};
-
+use serde::{Deserialize, Serialize};
 
 // ======================================================
 // 🆔 INPUT INTERNO
 // ======================================================
 
-#[derive(
-    Clone,
-    Debug,
-    PartialEq,
-    Eq,
-    Hash,
-    Serialize,
-    Deserialize,
-)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct Input {
+    pub fuente: String,
 
-    pub fuente:
-        String,
-
-    pub control:
-        String,
-
+    pub control: String,
 }
-
 
 // ======================================================
 // 🏗️ CREAR INPUT
 // ======================================================
 
 impl Input {
-
-    pub fn nuevo(
-
-        fuente:
-            &str,
-
-        control:
-            &str,
-
-    ) -> Self {
-
+    pub fn nuevo(fuente: &str, control: &str) -> Self {
         Self {
+            fuente: fuente.to_string(),
 
-            fuente:
-                fuente.to_string(),
-
-            control:
-                control.to_string(),
-
+            control: control.to_string(),
         }
-
     }
-
 }

@@ -15,57 +15,36 @@
 // WheelUp
 // ======================================================
 
-export type TipoEntrada=
-
-    "Teclado"|
-    "Mouse"|
-    "Multimedia"|
-    "Joystick";
-
+export type TipoEntrada = "Teclado" | "Mouse" | "Multimedia" | "Joystick";
 
 // ======================================================
 // 📦 ENTRADA
 // ======================================================
 
-export interface Entrada{
+export interface Entrada {
+  tipo: TipoEntrada;
 
-    tipo:
-        TipoEntrada;
+  codigo: string;
 
-    codigo:
-        string;
-
-    nombre:
-        string;
-
+  nombre: string;
 }
-
 
 // ======================================================
 // 🏗️ CREAR ENTRADA
 // ======================================================
 
 export function crearEntrada(
+  tipo: TipoEntrada,
 
-    tipo:
-        TipoEntrada,
+  codigo: string,
 
-    codigo:
-        string,
+  nombre: string,
+): Entrada {
+  return {
+    tipo,
 
-    nombre:
-        string
+    codigo,
 
-):Entrada{
-
-    return{
-
-        tipo,
-
-        codigo,
-
-        nombre
-
-    };
-
+    nombre,
+  };
 }

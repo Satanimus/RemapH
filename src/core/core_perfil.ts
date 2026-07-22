@@ -7,19 +7,14 @@
 import type { Trigger } from "./core_trigger";
 import { crearTrigger } from "./core_trigger";
 
-
 // ======================================================
 // 👤 PERFIL
 // ======================================================
 
 export interface Perfil {
+  activo: boolean;
 
-    activo:
-        boolean;
-
-    filas:
-        FilaPerfil[];
-
+  filas: FilaPerfil[];
 }
 
 // ======================================================
@@ -27,13 +22,9 @@ export interface Perfil {
 // ======================================================
 
 export interface AppPerfil {
+  programa: string | null;
 
-    programa:
-    string | null;
-
-    segundoPlano:
-    boolean;
-
+  segundoPlano: boolean;
 }
 
 // ======================================================
@@ -41,176 +32,93 @@ export interface AppPerfil {
 // ======================================================
 
 export interface FilaPerfil {
+  id: string;
 
-    id:
-    string;
+  estado: string;
 
-    estado:
-    string;
+  trigger: Trigger;
 
-    trigger:
-    Trigger;
+  tipo: string;
 
-    tipo:
-    string;
+  accion: Trigger | null;
 
-    accion:
-    Trigger | null;
+  condicion: string;
 
-    condicion:
-    string;
+  ejecucion: string;
 
-    ejecucion:
-    string;
+  app: AppPerfil;
 
-    app:
-    AppPerfil;
+  color: string;
 
-    color:
-    string;
-
-    nota:
-    string;
-
+  nota: string;
 }
-
 
 // ======================================================
 // ➕ CREAR FILA
 // ======================================================
 
-export function crearFila():
+export function crearFila(): FilaPerfil {
+  return {
+    id: crypto.randomUUID(),
 
-    FilaPerfil
+    estado: "ON",
 
-{
+    trigger: crearTrigger(),
 
-    return {
+    tipo: "Teclado",
 
-        id:
-            crypto.randomUUID(),
+    accion: null,
 
-        estado:
-            "ON",
+    condicion: "Normal",
 
-        trigger:
-            crearTrigger(),
+    ejecucion: "Normal",
 
-        tipo:
-            "Teclado",
+    app: {
+      programa: null,
 
-        accion:
-            null,
+      segundoPlano: false,
+    },
 
-        condicion:
-            "Normal",
+    color: "",
 
-        ejecucion:
-            "Normal",
-
-        app: {
-
-            programa:
-            null,
-
-            segundoPlano:
-            false,
-
-        },
-
-        color:
-            "",
-
-        nota:
-            ""
-
-    };
-
+    nota: "",
+  };
 }
-
 
 // ======================================================
 // 👤 CREAR PERFIL
 // ======================================================
 
-export function crearPerfil():
+export function crearPerfil(): Perfil {
+  return {
+    activo: true,
 
-    Perfil
-
-{
-
-    return {
-
-        activo:
-            true,
-
-        filas: [
-
-            crearFila()
-
-        ]
-
-    };
-
+    filas: [crearFila()],
+  };
 }
-
 
 // ======================================================
 // 📋 CLONAR FILA
 // ======================================================
 
-export function clonarFila(
+export function clonarFila(fila: FilaPerfil): FilaPerfil {
+  return {
+    ...fila,
 
-    fila:
-        FilaPerfil
+    id: crypto.randomUUID(),
 
-):
+    trigger: {
+      ...fila.trigger,
 
-    FilaPerfil
+      modificadores: [...fila.trigger.modificadores],
+    },
 
-{
+    accion: fila.accion
+      ? {
+          ...fila.accion,
 
-    return {
-
-        ...fila,
-
-        id:
-            crypto.randomUUID(),
-
-        trigger: {
-
-            ...fila.trigger,
-
-            modificadores: [
-
-                ...fila.trigger.modificadores
-
-            ]
-
-        },
-
-        accion:
-
-            fila.accion
-
-            ?
-
-            {
-
-                ...fila.accion,
-
-                modificadores: [
-
-                    ...fila.accion.modificadores
-
-                ]
-
-            }
-
-            :
-
-            null
-
-    };
-
+          modificadores: [...fila.accion.modificadores],
+        }
+      : null,
+  };
 }

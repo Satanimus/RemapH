@@ -7,79 +7,64 @@
 // desde el contenido (inputs, botones, etc).
 // ======================================================
 
-let capaPopup:HTMLElement|null=null;
-let alCerrarActual:(()=>void)|null=null;
+let capaPopup: HTMLElement | null = null;
+let alCerrarActual: (() => void) | null = null;
 
-export function crearContenedorPopup():HTMLElement{
-
-    if(capaPopup){
-        return capaPopup;
-    }
-
-    capaPopup=document.createElement("div");
-
-    capaPopup.className="popup-capa";
-
-    capaPopup.addEventListener(
-        "click",
-        evento=>{
-            if(evento.target===capaPopup){
-                ocultarPopup();
-            }
-        }
-    );
-
+export function crearContenedorPopup(): HTMLElement {
+  if (capaPopup) {
     return capaPopup;
+  }
 
+  capaPopup = document.createElement("div");
+
+  capaPopup.className = "popup-capa";
+
+  capaPopup.addEventListener("click", (evento) => {
+    if (evento.target === capaPopup) {
+      ocultarPopup();
+    }
+  });
+
+  return capaPopup;
 }
 
 export function mostrarPopup(
-    contenido:HTMLElement,
-    x?:number,
-    y?:number,
-    alCerrar?:()=>void
-):void{
+  contenido: HTMLElement,
+  x?: number,
+  y?: number,
+  alCerrar?: () => void,
+): void {
+  if (!capaPopup) {
+    return;
+  }
 
-    if(!capaPopup){
-        return;
-    }
+  capaPopup.innerHTML = "";
 
-    capaPopup.innerHTML="";
+  capaPopup.append(contenido);
 
-    capaPopup.append(
-        contenido
-    );
+  capaPopup.style.display = "block";
 
-    capaPopup.style.display="block";
+  alCerrarActual = alCerrar ?? null;
 
-    alCerrarActual=alCerrar??null;
-
-    if(x!==undefined && y!==undefined){
-
-        contenido.style.position="fixed";
-        contenido.style.left=`${x}px`;
-        contenido.style.top=`${y}px`;
-
-    }else{
-
-        contenido.style.position="static";
-
-    }
-
+  if (x !== undefined && y !== undefined) {
+    contenido.style.position = "fixed";
+    contenido.style.left = `${x}px`;
+    contenido.style.top = `${y}px`;
+  } else {
+    contenido.style.position = "static";
+  }
 }
 
-export function ocultarPopup():void{
+export function ocultarPopup(): void {
+  if (!capaPopup) {
+    return;
+  }
 
-    if(!capaPopup){
-        return;
-    }
+  capaPopup.style.display = "none";
 
-    capaPopup.style.display="none";
+  const alCerrar = alCerrarActual;
 
-    const alCerrar=alCerrarActual;
+  alCerrarActual = null;
 
-    alCerrarActual=null;
-
-    alCerrar?.();
-
+  alCerrar?.();
 }

@@ -14,53 +14,26 @@
 // Perfil UI
 // ======================================================
 
-import {
-    Perfil,
-    crearPerfil
-} from "./core_perfil";
-
+import { Perfil, crearPerfil } from "./core_perfil";
 
 // ======================================================
 // 🧠 PERFIL UI
 // ======================================================
 
-let perfilUi:
-    Perfil =
-
-        crearPerfil();
-
+let perfilUi: Perfil = crearPerfil();
 
 // ======================================================
 // 📤 OBTENER PERFIL UI
 // ======================================================
 
-export function obtenerPerfilUi():
-
-    Perfil
-
-{
-
-    return perfilUi;
-
+export function obtenerPerfilUi(): Perfil {
+  return perfilUi;
 }
-
 
 // ======================================================
 // 📥 ESTABLECER PERFIL UI
 // ======================================================
 
-export function establecerPerfilUi(
-
-    perfil:
-        Perfil
-
-):
-
-    void
-
-{
-
-    perfilUi =
-        perfil;
-
+export function establecerPerfilUi(perfil: Perfil): void {
+  perfilUi = perfil;
 }

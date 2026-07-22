@@ -6,22 +6,15 @@
 // que le pasen. Ej: caché activa, captura en curso, etc.
 // ======================================================
 
-export function crearIndicador(clase:string):HTMLElement{
+export function crearIndicador(clase: string): HTMLElement {
+  const punto = document.createElement("span");
 
-    const punto=document.createElement("span");
+  punto.className = `indicador ${clase}`;
+  punto.dataset.estado = "inactivo";
 
-    punto.className=`indicador ${clase}`;
-    punto.dataset.estado="inactivo";
-
-    return punto;
-
+  return punto;
 }
 
-export function actualizarIndicador(
-    punto:HTMLElement,
-    activo:boolean
-):void{
-
-    punto.dataset.estado=activo?"activo":"inactivo";
-
+export function actualizarIndicador(punto: HTMLElement, activo: boolean): void {
+  punto.dataset.estado = activo ? "activo" : "inactivo";
 }

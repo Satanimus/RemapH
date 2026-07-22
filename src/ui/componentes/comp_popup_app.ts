@@ -13,717 +13,366 @@
 
 import { invoke } from "@tauri-apps/api/core";
 
-import {
-    mostrarPopup,
-    ocultarPopup
-} from "./comp_popup_contenedor";
+import { mostrarPopup, ocultarPopup } from "./comp_popup_contenedor";
 
-import {
-    reconstruirFila
-} from "../ui_tabla_control";
+import { reconstruirFila } from "../ui_tabla_control";
 
-import type {
-    ContextoFila
-} from "../../core/core_contexto_fila";
+import type { ContextoFila } from "../../core/core_contexto_fila";
 
-import type {
-    FilaPerfil
-} from "../../core/core_perfil";
-
+import type { FilaPerfil } from "../../core/core_perfil";
 
 // ======================================================
 // 📦 MODELOS BACKEND
 // ======================================================
 
 interface IconoJson {
+  ancho: number;
 
-    ancho:
-        number;
+  alto: number;
 
-    alto:
-        number;
-
-    pixeles:
-        string;
-
+  pixeles: string;
 }
-
 
 interface ProcesoIconoJson {
+  nombre: string;
 
-    nombre:
-        string;
-
-    icono:
-        IconoJson | null;
-
+  icono: IconoJson | null;
 }
-
 
 // ======================================================
 // 🎨 ICONO FALLBACK
 // ======================================================
 
-function crearIconoFallback():
+function crearIconoFallback(): HTMLElement {
+  const icono = document.createElement("span");
 
-    HTMLElement
+  icono.className = "app-icono-fallback";
 
-{
+  icono.textContent = "▣";
 
-    const icono =
-        document.createElement(
-            "span"
-        );
-
-    icono.className =
-        "app-icono-fallback";
-
-    icono.textContent =
-        "▣";
-
-    return icono;
-
+  return icono;
 }
-
 
 // ======================================================
 // 🖼️ CREAR ICONO REAL
 // ======================================================
 
-function crearIcono(
+function crearIcono(datos: IconoJson): HTMLElement {
+  const canvas = document.createElement("canvas");
 
-    datos:
-        IconoJson
+  canvas.width = datos.ancho;
 
-):
+  canvas.height = datos.alto;
 
-    HTMLElement
+  const contexto = canvas.getContext("2d");
 
-{
+  if (!contexto) {
+    return crearIconoFallback();
+  }
 
-    const canvas =
-        document.createElement(
-            "canvas"
-        );
+  const pixeles = Uint8ClampedArray.from(
+    atob(datos.pixeles),
 
-    canvas.width =
-        datos.ancho;
+    (caracter) => caracter.charCodeAt(0),
+  );
 
-    canvas.height =
-        datos.alto;
+  const imagen = new ImageData(
+    pixeles,
 
-    const contexto =
-        canvas.getContext(
-            "2d"
-        );
+    datos.ancho,
 
-    if (!contexto) {
+    datos.alto,
+  );
 
-        return crearIconoFallback();
+  contexto.putImageData(
+    imagen,
 
-    }
+    0,
 
-    const pixeles =
-        Uint8ClampedArray.from(
+    0,
+  );
 
-            atob(
-                datos.pixeles
-            ),
+  canvas.className = "app-icono";
 
-            caracter =>
-                caracter.charCodeAt(0)
-
-        );
-
-    const imagen =
-        new ImageData(
-
-            pixeles,
-
-            datos.ancho,
-
-            datos.alto
-
-        );
-
-    contexto.putImageData(
-
-        imagen,
-
-        0,
-
-        0
-
-    );
-
-    canvas.className =
-        "app-icono";
-
-    return canvas;
-
+  return canvas;
 }
-
 
 // ======================================================
 // 🧩 ICONO DE PROCESO
 // ======================================================
 
-function crearIconoProceso(
+function crearIconoProceso(proceso: ProcesoIconoJson): HTMLElement {
+  if (!proceso.icono) {
+    return crearIconoFallback();
+  }
 
-    proceso:
-        ProcesoIconoJson
-
-):
-
-    HTMLElement
-
-{
-
-    if (!proceso.icono) {
-
-        return crearIconoFallback();
-
-    }
-
-    return crearIcono(
-
-        proceso.icono
-
-    );
-
+  return crearIcono(proceso.icono);
 }
-
 
 // ======================================================
 // 🔘 BOTÓN DE PROCESO
 // ======================================================
 
 function crearBotonProceso(
+  proceso: ProcesoIconoJson,
 
-    proceso:
-        ProcesoIconoJson,
+  seleccionar: () => void,
+): HTMLButtonElement {
+  const boton = document.createElement("button");
 
-    seleccionar:
-        () => void
+  boton.className = "ui-btn app-popup-programa";
 
-):
+  boton.append(crearIconoProceso(proceso));
 
-    HTMLButtonElement
+  const nombre = document.createElement("span");
 
-{
+  nombre.className = "app-popup-nombre";
 
-    const boton =
-        document.createElement(
-            "button"
-        );
+  nombre.textContent = proceso.nombre;
 
-    boton.className =
-        "ui-btn app-popup-programa";
+  boton.append(nombre);
 
-    boton.append(
+  boton.addEventListener(
+    "click",
 
-        crearIconoProceso(
+    () => {
+      seleccionar();
 
-            proceso
+      ocultarPopup();
+    },
+  );
 
-        )
-
-    );
-
-    const nombre =
-        document.createElement(
-            "span"
-        );
-
-    nombre.className =
-        "app-popup-nombre";
-
-    nombre.textContent =
-        proceso.nombre;
-
-    boton.append(
-
-        nombre
-
-    );
-
-    boton.addEventListener(
-
-        "click",
-
-        () => {
-
-            seleccionar();
-
-            ocultarPopup();
-
-        }
-
-    );
-
-    return boton;
-
+  return boton;
 }
-
 
 // ======================================================
 // 🌐 USO GLOBAL
 // ======================================================
 
 function crearBotonGlobal(
+  filaPerfil: FilaPerfil,
 
-    filaPerfil:
-        FilaPerfil,
+  contexto: ContextoFila,
+): HTMLButtonElement {
+  const boton = document.createElement("button");
 
-    contexto:
-        ContextoFila
+  boton.className = "ui-btn app-popup-global";
 
-):
+  const icono = document.createElement("span");
 
-    HTMLButtonElement
+  icono.className = "app-popup-global-icono";
 
-{
+  icono.textContent = "🌐";
 
-    const boton =
-        document.createElement(
-            "button"
-        );
+  boton.append(icono);
 
-    boton.className =
-        "ui-btn app-popup-global";
+  const texto = document.createElement("span");
 
-    const icono =
-        document.createElement(
-            "span"
-        );
+  texto.textContent = "Uso global";
 
-    icono.className =
-        "app-popup-global-icono";
+  boton.append(texto);
 
-    icono.textContent =
-        "🌐";
+  boton.addEventListener(
+    "click",
 
-    boton.append(
+    () => {
+      filaPerfil.app.programa = null;
 
-        icono
+      reconstruirFila(contexto.id);
 
-    );
+      ocultarPopup();
+    },
+  );
 
-    const texto =
-        document.createElement(
-            "span"
-        );
-
-    texto.textContent =
-        "Uso global";
-
-    boton.append(
-
-        texto
-
-    );
-
-    boton.addEventListener(
-
-        "click",
-
-        () => {
-
-            filaPerfil.app.programa =
-                null;
-
-            reconstruirFila(
-
-                contexto.id
-
-            );
-
-            ocultarPopup();
-
-        }
-
-    );
-
-    return boton;
-
+  return boton;
 }
-
 
 // ======================================================
 // 🟢 SEGUNDO PLANO
 // ======================================================
 
 function crearSegundoPlano(
+  filaPerfil: FilaPerfil,
 
-    filaPerfil:
-        FilaPerfil,
+  contexto: ContextoFila,
+): HTMLElement {
+  const fila = document.createElement("label");
 
-    contexto:
-        ContextoFila
+  fila.className = "app-popup-segundo-plano";
 
-):
+  const check = document.createElement("input");
 
-    HTMLElement
+  check.type = "checkbox";
 
-{
+  check.checked = filaPerfil.app.segundoPlano;
 
-    const fila =
-        document.createElement(
+  const texto = document.createElement("span");
 
-            "label"
+  texto.textContent = "Segundo plano :";
 
-        );
+  fila.append(
+    check,
 
-    fila.className =
-        "app-popup-segundo-plano";
+    texto,
+  );
 
+  check.addEventListener(
+    "change",
 
-    const check =
-        document.createElement(
+    () => {
+      filaPerfil.app.segundoPlano = check.checked;
 
-            "input"
+      reconstruirFila(contexto.id);
 
-        );
+      ocultarPopup();
+    },
+  );
 
-    check.type =
-        "checkbox";
-
-
-    check.checked =
-        filaPerfil.app.segundoPlano;
-
-
-    const texto =
-        document.createElement(
-
-            "span"
-
-        );
-
-
-    texto.textContent =
-        "Segundo plano :";
-
-
-    fila.append(
-
-        check,
-
-        texto
-
-    );
-
-
-    check.addEventListener(
-
-        "change",
-
-        () => {
-
-            filaPerfil.app.segundoPlano =
-                check.checked;
-
-
-            reconstruirFila(
-
-                contexto.id
-
-            );
-
-            ocultarPopup();
-
-        }
-
-    );
-
-
-    return fila;
-
+  return fila;
 }
-
 
 // ======================================================
 // ➖ SEPARADOR
 // ======================================================
 
-function crearSeparador():
+function crearSeparador(): HTMLElement {
+  const separador = document.createElement("div");
 
-    HTMLElement
+  separador.className = "app-popup-separador";
 
-{
-
-    const separador =
-        document.createElement(
-            "div"
-        );
-
-    separador.className =
-        "app-popup-separador";
-
-    return separador;
-
+  return separador;
 }
-
 
 // ======================================================
 // 📂 OTROS PROGRAMAS
 // ======================================================
 
 function abrirOtrosProgramas(
+  procesos: ProcesoIconoJson[],
 
-    procesos:
-        ProcesoIconoJson[],
+  contexto: ContextoFila,
 
-    contexto:
-        ContextoFila,
+  filaPerfil: FilaPerfil,
 
-    filaPerfil:
-        FilaPerfil,
+  evento: MouseEvent,
+): void {
+  const popup = document.createElement("div");
 
-    evento:
-        MouseEvent
+  popup.className = "app-popup";
 
-):
+  const lista = document.createElement("div");
 
-    void
+  lista.className = "app-popup-lista";
 
-{
+  procesos
 
-    const popup =
-        document.createElement(
-            "div"
-        );
+    .filter((proceso) => !proceso.icono)
 
-    popup.className =
-        "app-popup";
+    .forEach((proceso) => {
+      lista.append(
+        crearBotonProceso(
+          proceso,
 
-    const lista =
-        document.createElement(
-            "div"
-        );
+          () => {
+            filaPerfil.app.programa = proceso.nombre;
 
-    lista.className =
-        "app-popup-lista";
+            reconstruirFila(contexto.id);
+          },
+        ),
+      );
+    });
 
-    procesos
+  popup.append(lista);
 
-        .filter(
+  mostrarPopup(
+    popup,
 
-            proceso =>
-                !proceso.icono
+    evento.clientX,
 
-        )
-
-        .forEach(
-
-            proceso => {
-
-                lista.append(
-
-                    crearBotonProceso(
-
-                        proceso,
-
-                        () => {
-
-                            filaPerfil.app.programa =
-                                proceso.nombre;
-
-                            reconstruirFila(
-
-                                contexto.id
-
-                            );
-
-                        }
-
-                    )
-
-                );
-
-            }
-
-        );
-
-    popup.append(
-
-        lista
-
-    );
-
-    mostrarPopup(
-
-        popup,
-
-        evento.clientX,
-
-        evento.clientY
-
-    );
-
+    evento.clientY,
+  );
 }
-
 
 // ======================================================
 // 🖥️ ABRIR POPUP APP
 // ======================================================
 
 export async function abrirPopupApp(
+  evento: MouseEvent,
 
-    evento:
-        MouseEvent,
+  contexto: ContextoFila,
 
-    contexto:
-        ContextoFila,
+  filaPerfil: FilaPerfil,
+): Promise<void> {
+  const procesos = await invoke<ProcesoIconoJson[]>("listar_procesos_ventana");
 
-    filaPerfil:
-        FilaPerfil
+  const popup = document.createElement("div");
 
-):
+  popup.className = "app-popup";
 
-    Promise<void>
+  popup.append(
+    crearBotonGlobal(filaPerfil, contexto),
 
-{
+    crearSegundoPlano(filaPerfil, contexto),
 
-    const procesos =
-        await invoke<ProcesoIconoJson[]>(
+    crearSeparador(),
+  );
 
-            "listar_procesos_ventana"
+  const lista = document.createElement("div");
 
-        );
+  lista.className = "app-popup-lista";
 
-    const popup =
-        document.createElement(
-            "div"
-        );
+  procesos
 
-    popup.className =
-        "app-popup";
+    .filter((proceso) => proceso.icono !== null)
 
-    popup.append(
+    .forEach((proceso) => {
+      lista.append(
+        crearBotonProceso(
+          proceso,
 
-        crearBotonGlobal(
-            filaPerfil,
-            contexto
+          () => {
+            filaPerfil.app.programa = proceso.nombre;
 
+            reconstruirFila(contexto.id);
+          },
         ),
+      );
+    });
 
-        crearSegundoPlano(
-            filaPerfil,
-            contexto
-        ),
+  popup.append(lista);
 
-        crearSeparador()
+  popup.append(crearSeparador());
 
-    );
+  const otros = document.createElement("button");
 
-    const lista =
-        document.createElement(
-            "div"
-        );
+  otros.className = "ui-btn app-popup-otros";
 
-    lista.className =
-        "app-popup-lista";
+  otros.textContent = "Otros programas  ▸";
 
-    procesos
+  otros.addEventListener(
+    "click",
 
-        .filter(
+    () => {
+      abrirOtrosProgramas(
+        procesos,
 
-            proceso =>
-                proceso.icono !== null
+        contexto,
 
-        )
+        filaPerfil,
 
-        .forEach(
+        evento,
+      );
+    },
+  );
 
-            proceso => {
+  popup.append(otros);
 
-                lista.append(
+  mostrarPopup(
+    popup,
 
-                    crearBotonProceso(
+    evento.clientX,
 
-                        proceso,
-
-                        () => {
-
-                            filaPerfil.app.programa =
-                                proceso.nombre;
-
-                            reconstruirFila(
-
-                                contexto.id
-
-                            );
-
-                        }
-
-                    )
-
-                );
-
-            }
-
-        );
-
-    popup.append(
-
-        lista
-
-    );
-
-    popup.append(
-
-        crearSeparador()
-
-    );
-
-    const otros =
-        document.createElement(
-            "button"
-        );
-
-    otros.className =
-        "ui-btn app-popup-otros";
-
-    otros.textContent =
-        "Otros programas  ▸";
-
-    otros.addEventListener(
-
-        "click",
-
-        () => {
-
-            abrirOtrosProgramas(
-
-                procesos,
-
-                contexto,
-
-                filaPerfil,
-
-                evento
-
-            );
-
-        }
-
-    );
-
-    popup.append(
-
-        otros
-
-    );
-
-    mostrarPopup(
-
-        popup,
-
-        evento.clientX,
-
-        evento.clientY
-
-    );
-
+    evento.clientY,
+  );
 }

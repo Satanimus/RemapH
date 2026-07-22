@@ -11,66 +11,30 @@
 
 import type { Entrada } from "./core_entrada";
 
-
 // ======================================================
 // 🔤 NORMALIZAR NOMBRE
 // ======================================================
 
-function normalizarNombre(
-
-    nombre:
-        string
-
-):string{
-
-    return nombre;
-
+function normalizarNombre(nombre: string): string {
+  return nombre;
 }
-
 
 // ======================================================
 // 🎯 NORMALIZAR ENTRADA
 // ======================================================
 
-export function normalizarEntrada(
+export function normalizarEntrada(entrada: Entrada): Entrada {
+  return {
+    ...entrada,
 
-    entrada:
-        Entrada
-
-):Entrada{
-
-    return{
-
-        ...entrada,
-
-        nombre:
-
-            normalizarNombre(
-
-                entrada.nombre
-
-            )
-
-    };
-
+    nombre: normalizarNombre(entrada.nombre),
+  };
 }
-
 
 // ======================================================
 // 📦 NORMALIZAR ENTRADAS
 // ======================================================
 
-export function normalizarEntradas(
-
-    entradas:
-        Entrada[]
-
-):Entrada[]{
-
-    return entradas.map(
-
-        normalizarEntrada
-
-    );
-
+export function normalizarEntradas(entradas: Entrada[]): Entrada[] {
+  return entradas.map(normalizarEntrada);
 }

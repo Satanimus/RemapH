@@ -22,336 +22,123 @@ use std::collections::HashSet;
 use std::sync::mpsc::Sender;
 
 use crate::cache;
-use crate::eventos::{
-    InputEvent,
-    InputId,
-    InputState,
-};
-use crate::perfilcache::{
-    AccionCache,
-    AppCache,
-    RemapeoCache,
-    TriggerCache,
-};
-
+use crate::eventos::{InputEvent, InputId, InputState};
+use crate::perfilcache::{AccionCache, AppCache, RemapeoCache, TriggerCache};
 
 // ======================================================
 // ⚙️ RESULTADO
 // ======================================================
 
-#[derive(
-    Clone,
-    Copy,
-    Debug,
-    PartialEq,
-    Eq,
-)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Resultado {
-
     Pasar,
 
     Esperar,
 
     Consumir,
-
 }
-
 
 // ======================================================
 // 🧠 ESTADO
 // ======================================================
 
 pub struct Estado {
+    orden_activos: Vec<InputId>,
 
-    orden_activos:
-        Vec<InputId>,
-
-    consumidos:
-        HashSet<InputId>,
-
+    consumidos: HashSet<InputId>,
 }
-
 
 // ======================================================
 // 🚀 CREAR
 // ======================================================
 
 impl Estado {
-
-    pub fn nuevo()
-
-        -> Self
-
-    {
-
+    pub fn nuevo() -> Self {
         Self {
+            orden_activos: Vec::new(),
 
-            orden_activos:
-                Vec::new(),
-
-            consumidos:
-                HashSet::new(),
-
+            consumidos: HashSet::new(),
         }
-
     }
-
 
     // ==================================================
     // 🎯 PROCESAR
     // ==================================================
 
-    pub fn procesar(
-
-        &mut self,
-
-        evento:
-            InputEvent,
-
-        salida:
-            &Sender<AccionCache>,
-
-    ) -> Resultado {
-
+    pub fn procesar(&mut self, evento: InputEvent, salida: &Sender<AccionCache>) -> Resultado {
         if !crate::estado::esta_activo() {
-
             return Resultado::Pasar;
-
         }
-
 
         match evento.state {
+            InputState::Down => self.procesar_down(evento.input, salida),
 
-            InputState::Down => {
+            InputState::Up => self.procesar_up(evento.input),
 
-                self.procesar_down(
-
-                    evento.input,
-
-                    salida,
-
-                )
-
-            }
-
-
-            InputState::Up => {
-
-                self.procesar_up(
-
-                    evento.input
-
-                )
-
-            }
-
-
-            InputState::Pulse => {
-
-                self.procesar_pulse(
-
-                    evento.input,
-
-                    salida,
-
-                )
-
-            }
-
+            InputState::Pulse => self.procesar_pulse(evento.input, salida),
         }
-
     }
-
 
     // ==================================================
     // ⬇️ DOWN
     // ==================================================
 
-    fn procesar_down(
-
-        &mut self,
-
-        input:
-            InputId,
-
-        salida:
-            &Sender<AccionCache>,
-
-    ) -> Resultado {
-
-        if self
-            .consumidos
-            .contains(&input)
-        {
-
+    fn procesar_down(&mut self, input: InputId, salida: &Sender<AccionCache>) -> Resultado {
+        if self.consumidos.contains(&input) {
             return Resultado::Consumir;
-
         }
 
-
-        if self
-            .orden_activos
-            .contains(&input)
-        {
-
+        if self.orden_activos.contains(&input) {
             return Resultado::Pasar;
-
         }
 
+        self.orden_activos.push(input.clone());
 
-        self.orden_activos.push(
-
-            input.clone()
-
-        );
-
-
-        if let Some(remapeo) =
-
-            cache::buscar(
-
-                &self.orden_activos,
-
-                &input,
-
-            )
-
-        {
-
-            for activo in
-
-                &self.orden_activos
-
-            {
-
-                self.consumidos.insert(
-
-                    activo.clone()
-
-                );
-
+        if let Some(remapeo) = cache::buscar(&self.orden_activos, &input) {
+            for activo in &self.orden_activos {
+                self.consumidos.insert(activo.clone());
             }
 
-
-            salida
-
-                .send(
-
-                    remapeo.accion
-
-                )
-
-                .unwrap();
-
+            salida.send(remapeo.accion).unwrap();
 
             return Resultado::Consumir;
-
         }
 
-
-        if cache::tiene_prefijo(
-
-            &self.orden_activos
-
-        )
-
-        {
-
+        if cache::tiene_prefijo(&self.orden_activos) {
             return Resultado::Esperar;
-
         }
-
 
         Resultado::Pasar
-
     }
-
 
     // ==================================================
     // ⬆️ UP
     // ==================================================
 
-    fn procesar_up(
+    fn procesar_up(&mut self, input: InputId) -> Resultado {
+        self.orden_activos.retain(|activo| activo != &input);
 
-        &mut self,
-
-        input:
-            InputId,
-
-    ) -> Resultado {
-
-        self.orden_activos.retain(
-
-            |activo|
-
-                activo != &input
-
-        );
-
-
-        if self
-            .consumidos
-            .remove(&input)
-        {
-
+        if self.consumidos.remove(&input) {
             return Resultado::Consumir;
-
         }
 
-
         Resultado::Pasar
-
     }
-
 
     // ==================================================
     // ⚡ PULSE
     // ==================================================
 
-    fn procesar_pulse(
-
-        &mut self,
-
-        input:
-            InputId,
-
-        salida:
-            &Sender<AccionCache>,
-
-    ) -> Resultado {
-
-        let Some(remapeo) =
-
-            cache::buscar_pulse(
-
-                &input
-
-            )
-
-        else {
-
+    fn procesar_pulse(&mut self, input: InputId, salida: &Sender<AccionCache>) -> Resultado {
+        let Some(remapeo) = cache::buscar_pulse(&input) else {
             return Resultado::Pasar;
-
         };
 
-
-        salida
-
-            .send(
-
-                remapeo.accion
-
-            )
-
-            .unwrap();
-
+        salida.send(remapeo.accion).unwrap();
 
         Resultado::Consumir
-
     }
-
 }
-
 
 // ======================================================
 // 🧪 TESTS
@@ -364,317 +151,113 @@ mod tests {
 
     use crate::cache;
 
-    use crate::eventos::{
-        InputEvent,
-        InputId,
-    };
+    use crate::eventos::{InputEvent, InputId};
 
-    use crate::perfilcache::{
-        CondicionTrigger,
-        AccionCache,
-        RemapeoCache,
-        TriggerCache,
-    };
+    use crate::perfilcache::{AccionCache, CondicionTrigger, RemapeoCache, TriggerCache};
 
-
-    fn teclado(
-
-        nombre:
-            &str,
-
-    ) -> InputId {
-
-        InputId::new(
-
-            "keyboard",
-
-            nombre,
-
-        )
-
+    fn teclado(nombre: &str) -> InputId {
+        InputId::new("keyboard", nombre)
     }
 
+    fn remapeo(modificadores: Vec<InputId>, gatillo: InputId, salida: InputId) -> RemapeoCache {
+        RemapeoCache {
+            app: AppCache::Global,
 
-        fn remapeo(
+            trigger: TriggerCache {
+                modificadores,
 
-            modificadores:
-                Vec<InputId>,
+                gatillo,
 
-            gatillo:
-                InputId,
+                condicion: CondicionTrigger::Simple,
+            },
 
-            salida:
-                InputId,
-
-        ) -> RemapeoCache {
-
-            RemapeoCache {
-
-                app:
-
-                    AppCache::Global,
-
-                trigger:
-
-                    TriggerCache {
-
-                    modificadores,
-
-                    gatillo,
-
-                    condicion:
-                        CondicionTrigger::Simple,
-
-                },
-
-                accion:
-
-                    AccionCache::Emitir(
-
-                        salida
-
-                    ),
-
-            }
-
+            accion: AccionCache::Emitir(salida),
         }
-
+    }
 
     #[test]
     fn remapeo_simple_consumido() {
+        let _lock = cache::bloquear_tests();
 
-        let _lock =
-            cache::bloquear_tests();
+        cache::reemplazar(vec![remapeo(vec![], teclado("A"), teclado("B"))]);
 
+        let mut runtime = Estado::nuevo();
 
-        cache::reemplazar(
-
-            vec![
-
-                remapeo(
-
-                    vec![],
-
-                    teclado("A"),
-
-                    teclado("B"),
-
-                )
-
-            ]
-
-        );
-
-
-        let mut runtime =
-            Estado::nuevo();
-
-
-        let (tx, _rx) =
-            std::sync::mpsc::channel();
-
+        let (tx, _rx) = std::sync::mpsc::channel();
 
         assert_eq!(
-
             runtime.procesar(
-
-                InputEvent::down(
-
-                    teclado("A")
-
-                ),
-
+                InputEvent::down(teclado("A"), crate::instante::ahora()),
                 &tx,
-
             ),
-
             Resultado::Consumir
-
         );
-
     }
-
 
     #[test]
     fn remapeo_con_modificador_ciclo_completo() {
+        let _lock = cache::bloquear_tests();
 
-        let _lock =
-            cache::bloquear_tests();
+        cache::reemplazar(vec![remapeo(
+            vec![teclado("LeftControl")],
+            teclado("A"),
+            teclado("B"),
+        )]);
 
+        let mut runtime = Estado::nuevo();
 
-        cache::reemplazar(
-
-            vec![
-
-                remapeo(
-
-                    vec![
-
-                        teclado("LeftControl"),
-
-                    ],
-
-                    teclado("A"),
-
-                    teclado("B"),
-
-                )
-
-            ]
-
-        );
-
-
-        let mut runtime =
-            Estado::nuevo();
-
-
-        let (tx, _rx) =
-            std::sync::mpsc::channel();
-
+        let (tx, _rx) = std::sync::mpsc::channel();
 
         assert_eq!(
-
             runtime.procesar(
-
-                InputEvent::down(
-
-                    teclado("LeftControl")
-
-                ),
-
+                InputEvent::down(teclado("LeftControl"), crate::instante::ahora()),
                 &tx,
-
             ),
-
             Resultado::Esperar
-
         );
-
 
         assert_eq!(
-
             runtime.procesar(
-
-                InputEvent::down(
-
-                    teclado("A")
-
-                ),
-
+                InputEvent::down(teclado("A"), crate::instante::ahora()),
                 &tx,
-
             ),
-
             Resultado::Consumir
-
         );
-
 
         assert_eq!(
-
-            runtime.procesar(
-
-                InputEvent::up(
-
-                    teclado("A")
-
-                ),
-
-                &tx,
-
-            ),
-
+            runtime.procesar(InputEvent::up(teclado("A"), crate::instante::ahora()), &tx,),
             Resultado::Consumir
-
         );
-
 
         assert_eq!(
-
             runtime.procesar(
-
-                InputEvent::up(
-
-                    teclado("LeftControl")
-
-                ),
-
+                InputEvent::up(teclado("LeftControl"), crate::instante::ahora()),
                 &tx,
-
             ),
-
             Resultado::Consumir
-
         );
-
     }
-
 
     #[test]
     fn pulse_remapeado() {
+        let _lock = cache::bloquear_tests();
 
-        let _lock =
-            cache::bloquear_tests();
+        cache::reemplazar(vec![remapeo(
+            vec![],
+            InputId::new("mouse", "WheelUp"),
+            teclado("B"),
+        )]);
 
+        let mut runtime = Estado::nuevo();
 
-        cache::reemplazar(
-
-            vec![
-
-                remapeo(
-
-                    vec![],
-
-                    InputId::new(
-
-                        "mouse",
-
-                        "WheelUp",
-
-                    ),
-
-                    teclado("B"),
-
-                )
-
-            ]
-
-        );
-
-
-        let mut runtime =
-            Estado::nuevo();
-
-
-        let (tx, _rx) =
-            std::sync::mpsc::channel();
-
+        let (tx, _rx) = std::sync::mpsc::channel();
 
         assert_eq!(
-
             runtime.procesar(
-
-                InputEvent::pulse(
-
-                    InputId::new(
-
-                        "mouse",
-
-                        "WheelUp",
-
-                    )
-
-                ),
-
+                InputEvent::pulse(InputId::new("mouse", "WheelUp",), crate::instante::ahora()),
                 &tx,
-
             ),
-
             Resultado::Consumir
-
         );
-
     }
-
 }
