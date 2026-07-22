@@ -30,7 +30,7 @@ import {
 
 import {
     iniciarCaptura,
-} from "./comp_capturador_captura";
+} from "./comp_capturador_trigger";
 
 import {
     crearTrigger,

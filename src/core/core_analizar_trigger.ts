@@ -1,10 +1,10 @@
 // ======================================================
-// 🧠 core_Analizar_Captura
+// 🧠 core_Analizar_trigger
 // RemapH V3
 // ======================================================
 
 import type {
-    EventoCaptura,
+    EventoBuffer,
 } from "./core_evento_captura";
 
 import type {
@@ -20,11 +20,11 @@ import {
 } from "./core_configuracion_captura";
 
 // ======================================================
-// ANALIZAR CAPTURA
+// ANALIZAR trigger
 // ======================================================
 
-export function analizarCaptura(
-    timeline: EventoCaptura[],
+export function analizarTrigger(
+    bufferEventos: EventoBuffer[],
     permitirClickIzquierdo = false,
 ): Trigger {
 
@@ -32,22 +32,22 @@ export function analizarCaptura(
         crearTrigger();
 
     if (
-        timeline.length === 0
+        bufferEventos.length === 0
     ) {
         return trigger;
     }
 
     if (
-        contieneRueda(timeline)
+        contieneRueda(bufferEventos)
     ) {
         return analizarRueda(
-            timeline,
+            bufferEventos,
         );
     }
 
     const ultimoDown =
         buscarUltimoDown(
-            timeline,
+            bufferEventos,
         );
 
     if (
@@ -60,7 +60,7 @@ export function analizarCaptura(
         ultimoDown.entrada.codigo;
 
     const bloque =
-        timeline.filter(
+        bufferEventos.filter(
             evento =>
                 evento.entrada.codigo === codigo,
         );
@@ -75,7 +75,7 @@ export function analizarCaptura(
 
     trigger.modificadores =
         limpiarModificadores(
-            timeline,
+            bufferEventos,
             codigo,
         );
 
@@ -104,10 +104,10 @@ export function analizarCaptura(
 // ======================================================
 
 function contieneRueda(
-    timeline: EventoCaptura[],
+    bufferEventos: EventoBuffer[],
 ): boolean {
 
-    return timeline.some(
+    return bufferEventos.some(
         evento =>
             evento.entrada.codigo === "WheelUp" ||
             evento.entrada.codigo === "WheelDown",
@@ -119,14 +119,14 @@ function contieneRueda(
 // ======================================================
 
 function analizarRueda(
-    timeline: EventoCaptura[],
+    bufferEventos: EventoBuffer[],
 ): Trigger {
 
     const trigger =
         crearTrigger();
 
     const ruedas =
-        timeline.filter(
+        bufferEventos.filter(
             evento =>
                 evento.entrada.codigo === "WheelUp" ||
                 evento.entrada.codigo === "WheelDown",
@@ -166,7 +166,7 @@ function analizarRueda(
 
     trigger.modificadores =
         obtenerModificadoresRueda(
-            timeline,
+            bufferEventos,
         );
 
     return trigger;
@@ -177,18 +177,18 @@ function analizarRueda(
 // ======================================================
 
 function obtenerModificadoresRueda(
-    timeline: EventoCaptura[],
+    bufferEventos: EventoBuffer[],
 ) {
 
     const usados =
         new Set<string>();
 
     const resultado:
-        typeof timeline[number]["entrada"][] =
+        typeof bufferEventos[number]["entrada"][] =
         [];
 
     for (
-        const evento of timeline
+        const evento of bufferEventos
     ) {
 
         if (
@@ -229,17 +229,17 @@ function obtenerModificadoresRueda(
 // ======================================================
 
 function buscarUltimoDown(
-    timeline: EventoCaptura[],
-): EventoCaptura | undefined {
+    bufferEventos: EventoBuffer[],
+): EventoBuffer | undefined {
 
     for (
-        let i = timeline.length - 1;
+        let i = bufferEventos.length - 1;
         i >= 0;
         i--
     ) {
 
         const evento =
-            timeline[i];
+            bufferEventos[i];
 
         if (
             evento.evento !== "Down"
@@ -248,7 +248,7 @@ function buscarUltimoDown(
         }
 
         const tieneUp =
-            timeline.some(
+            bufferEventos.some(
                 siguiente =>
                     siguiente.entrada.codigo ===
                         evento.entrada.codigo &&
@@ -272,7 +272,7 @@ function buscarUltimoDown(
 
 function analizarCondicion(
     trigger: Trigger,
-    bloque: EventoCaptura[],
+    bloque: EventoBuffer[],
 ): void {
 
     const ups =
@@ -324,7 +324,7 @@ function analizarCondicion(
 // ======================================================
 
 function limpiarModificadores(
-    timeline: EventoCaptura[],
+    bufferEventos: EventoBuffer[],
     codigoGatillo: string,
 ) {
 
@@ -332,11 +332,11 @@ function limpiarModificadores(
         new Set<string>();
 
     const resultado:
-        typeof timeline[number]["entrada"][] =
+        typeof bufferEventos[number]["entrada"][] =
         [];
 
     for (
-        const evento of timeline
+        const evento of bufferEventos
     ) {
 
         if (

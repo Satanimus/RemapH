@@ -4,24 +4,24 @@
 
 import type { Entrada } from "./core_entrada";
 
-export type TipoEventoCaptura=
+export type TipoEventoBuffer=
     "Down"|
     "Up";
 
-export interface EventoCaptura{
+export interface EventoBuffer{
 
     entrada:Entrada;
 
-    evento:TipoEventoCaptura;
+    evento:TipoEventoBuffer;
 
     tiempo:number;
 
 }
 
-export function crearEventoCaptura(
+export function crearEventoBuffer(
     entrada:Entrada,
-    evento:TipoEventoCaptura
-):EventoCaptura{
+    evento:TipoEventoBuffer
+):EventoBuffer{
 
     return{
 

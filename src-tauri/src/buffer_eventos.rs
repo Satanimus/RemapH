@@ -1,5 +1,5 @@
 // ======================================================
-// 🧠 Analizador Captura RemapH V3
+// 🧠 Buffer eventos RemapH V3
 // ------------------------------------------------------
 // Convierte eventos físicos en eventos lógicos.
 //
@@ -33,11 +33,11 @@
 
 use crate::eventos::InputEvent;
 
-pub struct AnalizadorCaptura {
+pub struct BufferEventos {
 
 }
 
-impl AnalizadorCaptura {
+impl BufferEventos {
 
     // ==================================================
     // 🚀 CREAR

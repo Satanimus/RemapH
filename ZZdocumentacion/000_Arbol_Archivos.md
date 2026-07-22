@@ -207,15 +207,15 @@ Entrada
 ↓
 Down / Up
 ↓
-EventoCaptura
+EventoBuffer
 
-📄 core_analizar_captura.ts
+📄 core_analizar_trigger.ts
 
 Etapa: Análisis de la captura.
 
 Responsabilidad:
 
-Recibir el timeline de eventos capturados.
+Recibir el bufferEventos de eventos capturados.
 
 Analizar:
 
@@ -436,9 +436,9 @@ filaPerfil.accion
 
 La captura física fue separada en:
 
-comp_capturador_captura.ts
+comp_capturador_trigger.ts
 
-⌨️ comp_capturador_captura.ts
+⌨️ comp_capturador_trigger.ts
 
 Etapa: Captura de entradas de la UI.
 
@@ -450,11 +450,11 @@ Escuchar:
 • Mouse.
 • Rueda.
 
-Construir un timeline de eventos.
+Construir un bufferEventos de eventos.
 
 Convertir nombres DOM al idioma canónico de RemapH.
 
-Analizar la captura.
+Analizar trigger.
 
 Entregar un Trigger.
 

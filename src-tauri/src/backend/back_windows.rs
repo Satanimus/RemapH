@@ -23,7 +23,7 @@
 use std::cell::RefCell;
 use std::mem::size_of;
 use crate::pulsadores;
-use crate::analizador_captura::AnalizadorCaptura;
+use crate::buffer_eventos::BufferEventos;
 
 use windows_sys::Win32::Foundation::{
     LPARAM,
@@ -101,8 +101,8 @@ struct Estado {
     procesar:
         Procesador,
 
-    analizador:
-        AnalizadorCaptura,
+    buffer:
+        BufferEventos,
 
 }
 
@@ -163,9 +163,9 @@ where
 
                         ),
 
-                    analizador:
+                    buffer:
 
-                        AnalizadorCaptura::nuevo(),
+                        BufferEventos::nuevo(),
 
                 }
 
@@ -625,7 +625,7 @@ fn evaluar(
             let Some(evento) =
 
                 actual
-                    .analizador
+                    .buffer
                     .recibir(
 
                         evento

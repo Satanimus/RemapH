@@ -1,5 +1,5 @@
 // ======================================================
-// ⌨️ comp_Capturador_Captura
+// ⌨️ comp_Capturador_trigger
 // RemapH V3
 // ======================================================
 
@@ -18,13 +18,13 @@ import {
 } from "../../core/core_entrada";
 
 import {
-    crearEventoCaptura,
-    type EventoCaptura,
+    crearEventoBuffer,
+    type EventoBuffer,
 } from "../../core/core_evento_captura";
 
 import {
-    analizarCaptura,
-} from "../../core/core_analizar_captura";
+    analizarTrigger,
+} from "../../core/core_analizar_trigger";
 
 import {
     CONFIG_CAPTURA,
@@ -44,8 +44,8 @@ export function iniciarCaptura(
     ) => void,
 ): void {
 
-    const timeline:
-        EventoCaptura[] =
+    const bufferEventos:
+        EventoBuffer[] =
         [];
 
     const activas =
@@ -110,7 +110,7 @@ export function iniciarCaptura(
 
             if (
                 terminado ||
-                timeline.length === 0
+                bufferEventos.length === 0
             ) {
                 return;
             }
@@ -119,8 +119,8 @@ export function iniciarCaptura(
                 true;
 
             const trigger =
-                analizarCaptura(
-                    timeline,
+                analizarTrigger(
+                    bufferEventos,
                 );
 
             limpiar();
@@ -180,8 +180,8 @@ export function iniciarCaptura(
                 temporizador,
             );
 
-            timeline.push(
-                crearEventoCaptura(
+            bufferEventos.push(
+                crearEventoBuffer(
                     entrada,
                     evento,
                 ),

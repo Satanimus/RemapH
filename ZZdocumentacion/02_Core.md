@@ -192,11 +192,11 @@ La captura se divide en dos etapas.
 
 ## Captura
 
-`comp_capturador_captura.ts`
+`comp_capturador_trigger.ts`
 
 Recibe eventos del DOM.
 
-Construye un timeline.
+Construye un bufferEventos.
 
 Convierte entradas al idioma canónico.
 
@@ -204,9 +204,9 @@ Convierte entradas al idioma canónico.
 
 ## Análisis
 
-`core_analizar_captura.ts`
+`core_analizar_trigger.ts`
 
-Recibe el timeline.
+Recibe el bufferEventos.
 
 Analiza la secuencia.
 
@@ -219,11 +219,11 @@ DOM
 ↓
 Entrada canónica
 ↓
-EventoCaptura
+EventoBuffer
 ↓
-Timeline
+bufferEventos
 ↓
-Analizador
+Buffer
 ↓
 Trigger
 ```
