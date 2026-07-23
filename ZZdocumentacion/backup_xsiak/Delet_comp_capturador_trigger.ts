@@ -2,29 +2,23 @@
 // ⌨️ comp_Capturador_trigger
 // RemapH V3
 // ======================================================
-
-// Captura entradas de la interfaz.
-//
-// La interfaz entrega nombres propios de DOM.
-//
-// Este módulo los convierte UNA SOLA VEZ
-// al idioma canónico de RemapH.
-//
-// UI → Input canónico → Runtime
+// La interfaz entrega códigos físicos del navegador.
+// Este módulo NO interpreta nombres.
+// La traducción física pertenece a pulsadores.tsv.
 // ======================================================
 
-import { crearEntrada } from "../../core/core_entrada";
+import { crearEntrada } from "../../src/core/core_entrada";
 
 import {
   crearEventoBuffer,
   type EventoBuffer,
-} from "../../core/core_evento_captura";
+} from "../../src/core/core_evento_captura";
 
-import { analizarTrigger } from "../../core/core_analizar_trigger";
+import { analizarTrigger } from "../../src/core/core_analizar_trigger";
 
-import { CONFIG_CAPTURA } from "../../core/core_configuracion_captura";
+import { CONFIG_CAPTURA } from "../../src/core/core_configuracion_captura";
 
-import type { Trigger } from "../../core/core_trigger";
+import type { Trigger } from "../../src/core/core_trigger";
 
 // ======================================================
 // INICIAR CAPTURA
@@ -123,7 +117,7 @@ export function iniciarCaptura(
   const teclaDown = (evento: KeyboardEvent): void => {
     evento.preventDefault();
 
-    const codigo = codigoTeclado(evento.code);
+    const codigo = evento.code;
 
     const entrada = crearEntrada("Teclado", codigo, codigo);
 
@@ -145,7 +139,7 @@ export function iniciarCaptura(
   const teclaUp = (evento: KeyboardEvent): void => {
     evento.preventDefault();
 
-    const codigo = codigoTeclado(evento.code);
+    const codigo = evento.code;
 
     const entrada =
       entradasActivas.get(codigo) ?? crearEntrada("Teclado", codigo, codigo);
@@ -240,83 +234,6 @@ export function iniciarCaptura(
   });
 
   window.addEventListener("contextmenu", bloquearMenu);
-}
-
-// ======================================================
-// ⌨️ NORMALIZAR TECLADO
-// ======================================================
-
-function codigoTeclado(codigo: string): string {
-  if (codigo.startsWith("Key")) {
-    return codigo.substring(3);
-  }
-
-  const numeros: Record<string, string> = {
-    Digit1: "Num1",
-    Digit2: "Num2",
-    Digit3: "Num3",
-    Digit4: "Num4",
-    Digit5: "Num5",
-    Digit6: "Num6",
-    Digit7: "Num7",
-    Digit8: "Num8",
-    Digit9: "Num9",
-    Digit0: "Num0",
-  };
-
-  if (numeros[codigo]) {
-    return numeros[codigo];
-  }
-
-  switch (codigo) {
-    case "Escape":
-      return "Esc";
-
-    case "Equal":
-      return "Equals";
-
-    case "BracketLeft":
-      return "LeftBracket";
-
-    case "BracketRight":
-      return "RightBracket";
-
-    case "Backslash":
-      return "BackSlash";
-
-    case "Semicolon":
-      return "SemiColon";
-
-    case "Quote":
-      return "Apostrophe";
-
-    case "Backquote":
-      return "Grave";
-
-    case "ControlLeft":
-      return "LeftControl";
-
-    case "ShiftLeft":
-      return "LeftShift";
-
-    case "AltLeft":
-      return "LeftAlt";
-
-    case "ArrowUp":
-      return "Up";
-
-    case "ArrowDown":
-      return "Down";
-
-    case "ArrowLeft":
-      return "Left";
-
-    case "ArrowRight":
-      return "Right";
-
-    default:
-      return codigo;
-  }
 }
 
 // ======================================================

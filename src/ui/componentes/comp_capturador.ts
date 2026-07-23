@@ -15,7 +15,7 @@ import { triggerATexto, triggerAHTML } from "../../core/core_trigger";
 
 import { abrirPopupModificador } from "./comp_popup_abrir";
 
-import { iniciarCaptura } from "./comp_capturador_trigger";
+// import { iniciarCaptura } from "./nuevo_capturador"; // Nombre provisional, no existe aun
 
 import { crearTrigger } from "../../core/core_trigger";
 
