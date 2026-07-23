@@ -11,13 +11,16 @@
 //      ↓
 // EventoTrigger
 //
-// Responsabilidades futuras:
+// Actualmente:
 //
-//   - Detectar Simple.
-//   - Detectar Doble.
-//   - Detectar Mantenido.
-//   - Mantener timeline.
-//   - Resolver modificadores activos.
+//   - Simple.
+//   - Modificadores activos.
+//
+// Futuro:
+//
+//   - Doble.
+//   - Mantenido.
+//   - Timeline.
 //
 // No ejecuta acciones.
 // No conoce Runtime.
@@ -55,16 +58,13 @@ impl AnalizadorTrigger {
             // ⬇️ DOWN
             // ------------------------------------------
             InputState::Down => {
-                // Guarda modificadores activos.
-                //
-                // La identificación definitiva de modificador
-                // dependerá del cache/perfil.
-                self.modificadores_activos.push(evento.input.clone());
+                let gatillo = evento.input.clone();
 
-                Some(EventoTrigger::simple(
-                    self.modificadores_activos.clone(),
-                    evento.input,
-                ))
+                let modificadores = self.modificadores_activos.clone();
+
+                self.modificadores_activos.push(gatillo.clone());
+
+                Some(EventoTrigger::simple(modificadores, gatillo))
             }
 
             // ------------------------------------------

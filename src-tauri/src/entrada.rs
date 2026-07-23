@@ -151,17 +151,21 @@ fn iniciar_portable(tx: mpsc::Sender<AccionCache>, rx: mpsc::Receiver<AccionCach
 
             actualizar_contexto_cache(&mut ultima_actualizacion);
 
-            let Some(trigger) = analizador.procesar(evento) else {
+            let Some(trigger) = analizador.procesar(evento.clone()) else {
                 return false;
             };
 
-            let _resultado = runtime.procesar(trigger, &tx);
+            let resultado = runtime.procesar(trigger, &tx);
+
+            if resultado == runtime::Resultado::Consumir {
+                return true;
+            }
 
             while let Ok(accion) = rx.try_recv() {
                 ejecutar_portable(accion);
             }
 
-            true
+            false
         });
     });
 }
