@@ -20,7 +20,6 @@
 //   - Emite InputEvent genérico.
 // ======================================================
 
-use crate::buffer_eventos::BufferEventos;
 use crate::instante;
 use crate::pulsadores;
 use std::cell::RefCell;
@@ -54,8 +53,6 @@ type Procesador = Box<dyn FnMut(InputEvent, &mut dyn FnMut(InputEvent)) -> bool>
 
 struct Estado {
     procesar: Procesador,
-
-    buffer: BufferEventos,
 }
 
 // ======================================================
@@ -83,8 +80,6 @@ where
     ESTADO.with(|estado| {
         *estado.borrow_mut() = Some(Estado {
             procesar: Box::new(procesar),
-
-            buffer: BufferEventos::nuevo(),
         });
     });
 
@@ -202,11 +197,6 @@ fn evaluar(evento: InputEvent) -> bool {
             return false;
         };
 
-        let Some(evento) = actual.buffer.recibir(evento) else {
-            // El analizador decidió seguir esperando.
-            return true;
-        };
-
         let mut emitir = |evento: InputEvent| {
             emitir_evento(evento);
         };
@@ -301,10 +291,22 @@ fn traducir_mouse(mensaje: WPARAM, datos: &MSLLHOOKSTRUCT) -> Option<InputEvent>
 // Solo consulta diccionario.
 // ======================================================
 
-fn teclado_control(vk: u32, _scan: u32, _flags: u32) -> Option<String> {
+fn teclado_control(vk: u32, scan: u32, flags: u32) -> Option<String> {
     let nativo = format!("0x{:X}", vk);
 
-    pulsadores::por_nativo(&nativo).map(|pulsador| pulsador.interno.clone())
+    println!("[TECLADO] Buscando {}", nativo);
+
+    match pulsadores::por_nativo(&nativo) {
+        Some(pulsador) => {
+            println!("[TECLADO] Encontrado {}", pulsador.interno);
+            Some(pulsador.interno.clone())
+        }
+
+        None => {
+            println!("[TECLADO] NO encontrado {}", nativo);
+            None
+        }
+    }
 }
 
 // ======================================================

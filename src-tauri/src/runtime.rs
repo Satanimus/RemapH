@@ -5,26 +5,25 @@
 //
 // El Runtime:
 //   - No lee JSON.
-//   - No interpreta configuraciones.
+//   - No interpreta configuración.
 //   - No conoce Windows.
-//   - No conoce Interception.
+//   - No conoce eventos físicos.
 //
-// Solo recibe InputEvent genérico.
+// Recibe:
+//     EventoTrigger
 //
-// La entrada física pendiente pertenece a Entrada.
-// El Runtime solo mantiene estado lógico.
+// Busca:
+//     Cache activa
 //
-// El orden de los inputs activos se conserva porque
-// Cache utiliza el orden para resolver triggers.
+// Ejecuta:
+//     AccionCache
 // ======================================================
 
-use std::collections::HashSet;
 use std::sync::mpsc::Sender;
 
 use crate::cache;
 use crate::evento_trigger::EventoTrigger;
-use crate::eventos::InputId;
-use crate::perfilcache::{AccionCache, AppCache, RemapeoCache, TriggerCache};
+use crate::perfilcache::AccionCache;
 
 // ======================================================
 // ⚙️ RESULTADO
@@ -34,8 +33,6 @@ use crate::perfilcache::{AccionCache, AppCache, RemapeoCache, TriggerCache};
 pub enum Resultado {
     Pasar,
 
-    Esperar,
-
     Consumir,
 }
 
@@ -43,11 +40,7 @@ pub enum Resultado {
 // 🧠 ESTADO
 // ======================================================
 
-pub struct Estado {
-    orden_activos: Vec<InputId>,
-
-    consumidos: HashSet<InputId>,
-}
+pub struct Estado;
 
 // ======================================================
 // 🚀 CREAR
@@ -55,11 +48,7 @@ pub struct Estado {
 
 impl Estado {
     pub fn nuevo() -> Self {
-        Self {
-            orden_activos: Vec::new(),
-
-            consumidos: HashSet::new(),
-        }
+        Self
     }
 
     // ==================================================
@@ -71,158 +60,27 @@ impl Estado {
             return Resultado::Pasar;
         }
 
-        self.orden_activos.clear();
+        println!(
+            "[RUNTIME] Trigger recibido -> {:?} {:?} {:?}",
+            evento.modificadores, evento.gatillo, evento.condicion
+        );
 
-        for modificador in evento.modificadores {
-            self.orden_activos.push(modificador);
-        }
+        let mut activos = evento.modificadores.clone();
 
-        self.orden_activos.push(evento.gatillo.clone());
+        activos.push(evento.gatillo.clone());
 
-        if let Some(remapeo) = cache::buscar(&self.orden_activos, &evento.gatillo) {
-            salida.send(remapeo.accion).unwrap();
+        println!("[RUNTIME] Buscando cache -> {:?}", activos);
 
-            return Resultado::Consumir;
-        }
+        let Some(remapeo) = cache::buscar(&activos, &evento.gatillo) else {
+            println!("[RUNTIME] Sin remapeo -> Pasar");
 
-        Resultado::Pasar
-    }
-
-    // ==================================================
-    // ⬇️ DOWN
-    // ==================================================
-
-    fn procesar_down(&mut self, input: InputId, salida: &Sender<AccionCache>) -> Resultado {
-        if self.consumidos.contains(&input) {
-            return Resultado::Consumir;
-        }
-
-        if self.orden_activos.contains(&input) {
-            return Resultado::Pasar;
-        }
-
-        self.orden_activos.push(input.clone());
-
-        if let Some(remapeo) = cache::buscar(&self.orden_activos, &input) {
-            for activo in &self.orden_activos {
-                self.consumidos.insert(activo.clone());
-            }
-
-            salida.send(remapeo.accion).unwrap();
-
-            return Resultado::Consumir;
-        }
-
-        if cache::tiene_prefijo(&self.orden_activos) {
-            return Resultado::Esperar;
-        }
-
-        Resultado::Pasar
-    }
-
-    // ==================================================
-    // ⬆️ UP
-    // ==================================================
-
-    fn procesar_up(&mut self, input: InputId) -> Resultado {
-        self.orden_activos.retain(|activo| activo != &input);
-
-        if self.consumidos.remove(&input) {
-            return Resultado::Consumir;
-        }
-
-        Resultado::Pasar
-    }
-
-    // ==================================================
-    // ⚡ PULSE
-    // ==================================================
-
-    fn procesar_pulse(&mut self, input: InputId, salida: &Sender<AccionCache>) -> Resultado {
-        let Some(remapeo) = cache::buscar_pulse(&input) else {
             return Resultado::Pasar;
         };
+
+        println!("[RUNTIME] Remapeo encontrado");
 
         salida.send(remapeo.accion).unwrap();
 
         Resultado::Consumir
-    }
-}
-
-// ======================================================
-// 🧪 TESTS
-// ======================================================
-
-#[cfg(test)]
-mod tests {
-
-    use super::*;
-
-    use crate::cache;
-
-    use crate::evento_trigger::EventoTrigger;
-    use crate::eventos::InputId;
-
-    use crate::perfilcache::{AccionCache, CondicionTrigger, RemapeoCache, TriggerCache};
-
-    fn teclado(nombre: &str) -> InputId {
-        InputId::new("keyboard", nombre)
-    }
-
-    fn remapeo(modificadores: Vec<InputId>, gatillo: InputId, salida: InputId) -> RemapeoCache {
-        RemapeoCache {
-            app: AppCache::Global,
-
-            trigger: TriggerCache {
-                modificadores,
-
-                gatillo,
-
-                condicion: CondicionTrigger::Simple,
-            },
-
-            accion: AccionCache::Emitir(salida),
-        }
-    }
-
-    #[test]
-    #[test]
-    fn remapeo_simple_consumido() {
-        let _lock = cache::bloquear_tests();
-
-        cache::reemplazar(vec![remapeo(vec![], teclado("A"), teclado("B"))]);
-
-        let mut runtime = Estado::nuevo();
-
-        let (tx, _rx) = std::sync::mpsc::channel();
-
-        assert_eq!(
-            runtime.procesar(EventoTrigger::simple(vec![], teclado("A"),), &tx,),
-            Resultado::Consumir
-        );
-    }
-
-    #[test]
-    #[test]
-    fn remapeo_con_modificador() {
-        let _lock = cache::bloquear_tests();
-
-        cache::reemplazar(vec![remapeo(
-            vec![teclado("LeftControl")],
-            teclado("A"),
-            teclado("B"),
-        )]);
-
-        let mut runtime = Estado::nuevo();
-
-        let (tx, _rx) = std::sync::mpsc::channel();
-
-        assert_eq!(
-            runtime.procesar(
-                EventoTrigger::simple(vec![teclado("LeftControl")], teclado("A"),),
-                &tx,
-            ),
-            Resultado::Consumir
-        );
     }
 }

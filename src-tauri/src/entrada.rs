@@ -157,15 +157,19 @@ fn iniciar_portable(tx: mpsc::Sender<AccionCache>, rx: mpsc::Receiver<AccionCach
 
             let resultado = runtime.procesar(trigger, &tx);
 
-            if resultado == runtime::Resultado::Consumir {
-                return true;
-            }
+            println!("[ENTRADA] Resultado Runtime -> {:?}", resultado);
 
             while let Ok(accion) = rx.try_recv() {
+                println!("[ENTRADA] Ejecutando salida");
+
                 ejecutar_portable(accion);
             }
 
-            false
+            match resultado {
+                runtime::Resultado::Consumir => true,
+
+                runtime::Resultado::Pasar => false,
+            }
         });
     });
 }
@@ -175,6 +179,8 @@ fn iniciar_portable(tx: mpsc::Sender<AccionCache>, rx: mpsc::Receiver<AccionCach
 // ======================================================
 
 fn ejecutar_portable(accion: AccionCache) {
+    println!("[SALIDA] Acción recibida -> {:?}", accion);
+
     match accion {
         AccionCache::Emitir(input) => {
             crate::backend::back_windows::emitir_evento(InputEvent::pulse(

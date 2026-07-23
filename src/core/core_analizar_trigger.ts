@@ -239,8 +239,8 @@ function limpiarModificadores(
 
 function normalizarAltGr(trigger: Trigger): void {
   const tieneAltGr =
-    trigger.gatillo?.codigo === "AltRight" ||
-    trigger.modificadores.some((entrada) => entrada.codigo === "AltRight");
+    trigger.gatillo?.codigo === "RightAlt" ||
+    trigger.modificadores.some((entrada) => entrada.codigo === "RightAlt");
 
   if (!tieneAltGr) {
     return;
@@ -248,7 +248,7 @@ function normalizarAltGr(trigger: Trigger): void {
 
   trigger.modificadores = trigger.modificadores.filter(
     (entrada) =>
-      entrada.codigo !== "ControlLeft" && entrada.codigo !== "ControlRight",
+      entrada.codigo !== "LeftControl" && entrada.codigo !== "RightControl",
   );
 }
 

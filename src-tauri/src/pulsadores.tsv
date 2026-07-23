@@ -37,16 +37,40 @@ nativo	interno	interception	ui
 0x38	Num8	Num8	8
 0x39	Num9	Num9	9
 
-0x0D	Enter	Enter	Enter
+0x60	NumPad0	NumPad0	NumPad 0
+0x61	NumPad1	NumPad1	NumPad 1
+0x62	NumPad2	NumPad2	NumPad 2
+0x63	NumPad3	NumPad3	NumPad 3
+0x64	NumPad4	NumPad4	NumPad 4
+0x65	NumPad5	NumPad5	NumPad 5
+0x66	NumPad6	NumPad6	NumPad 6
+0x67	NumPad7	NumPad7	NumPad 7
+0x68	NumPad8	NumPad8	NumPad 8
+0x69	NumPad9	NumPad9	NumPad 9
+
+0x6A	Multiply	Multiply	*
+0x6B	Add	Add	+
+0x6D	Subtract	Subtract	-
+0x6E	Decimal	Decimal	.
+0x6F	Divide	Divide	/
+
+0xD	Enter	Enter	Enter
 0x1B	Escape	Escape	Escape
-0x08	Backspace	Backspace	Backspace
-0x09	Tab	Tab	Tab
+0x8	Backspace	Backspace	Backspace
+0x9	Tab	Tab	Tab
 0x20	Space	Space	Espacio
 
 0x25	Left	Left	Flecha izquierda
 0x26	Up	Up	Flecha arriba
 0x27	Right	Right	Flecha derecha
 0x28	Down	Down	Flecha abajo
+
+0x24	Home	Home	Inicio
+0x23	End	End	Fin
+0x21	PageUp	PageUp	Re Pág
+0x22	PageDown	PageDown	Av Pág
+0x2D	Insert	Insert	Insert
+0x2E	Delete	Delete	Delete
 
 0x14	CapsLock	CapsLock	Caps Lock
 0x90	NumLock	NumLock	Num Lock
@@ -66,8 +90,13 @@ nativo	interno	interception	ui
 0x7B	F12	F12	F12
 
 0xA0	LeftShift	LeftShift	Shift izquierdo
+0xA1	RightShift	RightShift	Shift derecho
+
 0xA2	LeftControl	LeftControl	Ctrl izquierdo
+0xA3	RightControl	RightControl	Ctrl derecho
+
 0xA4	LeftAlt	LeftAlt	Alt izquierdo
+0xA5	RightAlt	RightAlt	Alt derecho
 
 0xBD	Minus	Minus	-
 0xBB	Equals	Equals	=
@@ -86,11 +115,11 @@ nativo	interno	interception	ui
 0xBE	Period	Period	.
 0xBF	Slash	Slash	/
 
-
 0x0201	LeftButton	LeftButton	Click izquierdo
 0x0204	RightButton	RightButton	Click derecho
 0x0207	MiddleButton	MiddleButton	Click central
 0x020B	Button4	Button4	Botón lateral 4
 0x020C	Button5	Button5	Botón lateral 5
+
 0x020A_UP	WheelUp	WheelUp	Rueda arriba
 0x020A_DOWN	WheelDown	WheelDown	Rueda abajo

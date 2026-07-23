@@ -11,21 +11,17 @@
 //      ↓
 // EventoTrigger
 //
-// Actualmente:
+// Responsabilidades:
 //
-//   - Simple.
-//   - Modificadores activos.
-//
-// Futuro:
-//
-//   - Doble.
-//   - Mantenido.
-//   - Timeline.
+//   - Detectar gatillo.
+//   - Mantener modificadores activos.
+//   - Preparar Simple/Doble/Mantenido.
 //
 // No ejecuta acciones.
 // No conoce Runtime.
 // ======================================================
 
+use crate::cache;
 use crate::evento_trigger::EventoTrigger;
 use crate::eventos::{InputEvent, InputId, InputState};
 
@@ -58,13 +54,30 @@ impl AnalizadorTrigger {
             // ⬇️ DOWN
             // ------------------------------------------
             InputState::Down => {
-                let gatillo = evento.input.clone();
+                let input = evento.input.clone();
 
-                let modificadores = self.modificadores_activos.clone();
+                // --------------------------------------
+                // Es modificador
+                // --------------------------------------
 
-                self.modificadores_activos.push(gatillo.clone());
+                if cache::es_modificador(&input) {
+                    if !self.modificadores_activos.contains(&input) {
+                        self.modificadores_activos.push(input);
+                    }
 
-                Some(EventoTrigger::simple(modificadores, gatillo))
+                    return None;
+                }
+
+                // --------------------------------------
+                // Es gatillo
+                // --------------------------------------
+
+                println!("[ANALIZADOR] Gatillo -> {:?}", input);
+
+                Some(EventoTrigger::simple(
+                    self.modificadores_activos.clone(),
+                    input,
+                ))
             }
 
             // ------------------------------------------

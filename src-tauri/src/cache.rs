@@ -207,6 +207,18 @@ pub fn tiene_prefijo(activos: &[InputId]) -> bool {
 }
 
 // ======================================================
+// 🔎 CONSULTAR MODIFICADOR
+// ======================================================
+
+pub fn es_modificador(input: &InputId) -> bool {
+    let cache = obtener_cache_activa().lock().unwrap();
+
+    cache
+        .iter()
+        .any(|remapeo| remapeo.trigger.modificadores.contains(input))
+}
+
+// ======================================================
 // 🧪 TESTS
 // ======================================================
 
