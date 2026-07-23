@@ -6,6 +6,7 @@
 // Inicializa el motor principal.
 // ======================================================
 
+mod analizador_trigger;
 mod backend;
 mod buffer_eventos;
 mod cache;

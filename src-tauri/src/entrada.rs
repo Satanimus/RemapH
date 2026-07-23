@@ -3,26 +3,30 @@
 // ------------------------------------------------------
 // Orquesta los backends físicos.
 //
-// Full: Interception
-// Portable: Windows API
-//
-// Ambos entregan InputEvent genérico.
-// El Runtime es único.
+// Backend
+//    ↓
+// InputEvent
+//    ↓
+// AnalizadorTrigger
+//    ↓
+// EventoTrigger
+//    ↓
+// Runtime
+//    ↓
+// Salida
 //
 // Entrada no:
 //   - Interpreta remapeos.
 //   - Compila configuraciones.
-//   - Conoce teclas concretas.
-//   - Ejecuta Accion directamente.
-//
-// Solo conecta:
-//   Backend → Runtime → Salida
+//   - Ejecuta acciones.
 // ======================================================
 
+use crate::analizador_trigger::AnalizadorTrigger;
 use crate::cache;
 use crate::eventos::InputEvent;
 use crate::perfilcache::AccionCache;
 use crate::runtime;
+
 use std::collections::HashSet;
 use std::sync::mpsc;
 use std::time::{Duration, Instant};
@@ -45,7 +49,7 @@ pub enum Modo {
 const MODO: Modo = Modo::Portable;
 
 // ======================================================
-// 🖥️ ACTUALIZAR CONTEXTO APP
+// 🖥️ CONTEXTO APP
 // ======================================================
 
 fn actualizar_contexto_cache(ultima_actualizacion: &mut Instant) {
@@ -96,9 +100,9 @@ fn iniciar_full(tx: mpsc::Sender<AccionCache>, rx: mpsc::Receiver<AccionCache>) 
 
         let mut runtime = runtime::Estado::nuevo();
 
-        let mut ultima_actualizacion = Instant::now() - Duration::from_secs(1);
+        let mut analizador = AnalizadorTrigger::nuevo();
 
-        let mut pendientes: Vec<(interception::Device, interception::Stroke)> = Vec::new();
+        let mut ultima_actualizacion = Instant::now() - Duration::from_secs(1);
 
         loop {
             let Some((device, stroke)) = crate::backend::back_interception::recibir(&ict) else {
@@ -115,29 +119,11 @@ fn iniciar_full(tx: mpsc::Sender<AccionCache>, rx: mpsc::Receiver<AccionCache>) 
 
             actualizar_contexto_cache(&mut ultima_actualizacion);
 
-            let resultado = runtime.procesar(evento, &tx);
+            let Some(trigger) = analizador.procesar(evento) else {
+                continue;
+            };
 
-            match resultado {
-                runtime::Resultado::Esperar => {
-                    pendientes.push((device, stroke));
-                }
-
-                runtime::Resultado::Consumir => {
-                    pendientes.clear();
-                }
-
-                runtime::Resultado::Pasar => {
-                    for (device_pendiente, stroke_pendiente) in pendientes.drain(..) {
-                        crate::backend::back_interception::reenviar(
-                            &ict,
-                            device_pendiente,
-                            stroke_pendiente,
-                        );
-                    }
-
-                    crate::backend::back_interception::reenviar(&ict, device, stroke);
-                }
-            }
+            let _resultado = runtime.procesar(trigger, &tx);
 
             while let Ok(accion) = rx.try_recv() {
                 salida.ejecutar(accion);
@@ -154,66 +140,34 @@ fn iniciar_portable(tx: mpsc::Sender<AccionCache>, rx: mpsc::Receiver<AccionCach
     std::thread::spawn(move || {
         let mut runtime = runtime::Estado::nuevo();
 
+        let mut analizador = AnalizadorTrigger::nuevo();
+
         let mut ultima_actualizacion = Instant::now() - Duration::from_secs(1);
 
-        let mut pendientes: Vec<InputEvent> = Vec::new();
-
         crate::backend::back_windows::iniciar(move |evento, emitir| {
-            // ----------------------------------
-            // 📥 EVENTO RECIBIDO
-            // ----------------------------------
-
             if crate::captura::procesar(&evento) {
                 return true;
             }
 
             actualizar_contexto_cache(&mut ultima_actualizacion);
 
-            // ----------------------------------
-            // 🧠 RUNTIME
-            // ----------------------------------
-
-            let resultado = runtime.procesar(evento.clone(), &tx);
-
-            let consumir = match resultado {
-                runtime::Resultado::Esperar => {
-                    pendientes.push(evento);
-
-                    true
-                }
-
-                runtime::Resultado::Consumir => {
-                    pendientes.clear();
-                    true
-                }
-
-                runtime::Resultado::Pasar => {
-                    for pendiente in pendientes.drain(..) {
-                        emitir(pendiente);
-                    }
-                    false
-                }
+            let Some(trigger) = analizador.procesar(evento) else {
+                return false;
             };
 
-            // ----------------------------------
-            // 📤 ACCIONES
-            // ----------------------------------
+            let _resultado = runtime.procesar(trigger, &tx);
 
             while let Ok(accion) = rx.try_recv() {
                 ejecutar_portable(accion);
             }
-            consumir
+
+            true
         });
     });
 }
 
 // ======================================================
 // 🪟 EJECUTAR PORTABLE
-// ------------------------------------------------------
-// Adaptador temporal de salida para Windows.
-//
-// La acción sigue siendo genérica.
-// La traducción física ocurre aquí.
 // ======================================================
 
 fn ejecutar_portable(accion: AccionCache) {

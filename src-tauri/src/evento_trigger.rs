@@ -23,6 +23,9 @@
 //   - Simple.
 //   - Doble.
 //   - Mantenido.
+//
+// También conserva:
+//   - Modificadores activos.
 // ======================================================
 
 use crate::eventos::InputId;
@@ -34,6 +37,8 @@ use crate::perfilcache::CondicionTrigger;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct EventoTrigger {
+    pub modificadores: Vec<InputId>,
+
     pub gatillo: InputId,
 
     pub condicion: CondicionTrigger,
@@ -48,8 +53,10 @@ impl EventoTrigger {
     // SIMPLE
     // ==================================================
 
-    pub fn simple(gatillo: InputId) -> Self {
+    pub fn simple(modificadores: Vec<InputId>, gatillo: InputId) -> Self {
         Self {
+            modificadores,
+
             gatillo,
 
             condicion: CondicionTrigger::Simple,
@@ -60,8 +67,10 @@ impl EventoTrigger {
     // DOBLE
     // ==================================================
 
-    pub fn doble(gatillo: InputId) -> Self {
+    pub fn doble(modificadores: Vec<InputId>, gatillo: InputId) -> Self {
         Self {
+            modificadores,
+
             gatillo,
 
             condicion: CondicionTrigger::Doble,
@@ -72,8 +81,10 @@ impl EventoTrigger {
     // MANTENIDO
     // ==================================================
 
-    pub fn mantenido(gatillo: InputId) -> Self {
+    pub fn mantenido(modificadores: Vec<InputId>, gatillo: InputId) -> Self {
         Self {
+            modificadores,
+
             gatillo,
 
             condicion: CondicionTrigger::Mantenido,

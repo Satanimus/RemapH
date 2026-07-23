@@ -22,7 +22,8 @@ use std::collections::HashSet;
 use std::sync::mpsc::Sender;
 
 use crate::cache;
-use crate::eventos::{InputEvent, InputId, InputState};
+use crate::evento_trigger::EventoTrigger;
+use crate::eventos::InputId;
 use crate::perfilcache::{AccionCache, AppCache, RemapeoCache, TriggerCache};
 
 // ======================================================
@@ -65,18 +66,26 @@ impl Estado {
     // 🎯 PROCESAR
     // ==================================================
 
-    pub fn procesar(&mut self, evento: InputEvent, salida: &Sender<AccionCache>) -> Resultado {
+    pub fn procesar(&mut self, evento: EventoTrigger, salida: &Sender<AccionCache>) -> Resultado {
         if !crate::estado::esta_activo() {
             return Resultado::Pasar;
         }
 
-        match evento.state {
-            InputState::Down => self.procesar_down(evento.input, salida),
+        self.orden_activos.clear();
 
-            InputState::Up => self.procesar_up(evento.input),
-
-            InputState::Pulse => self.procesar_pulse(evento.input, salida),
+        for modificador in evento.modificadores {
+            self.orden_activos.push(modificador);
         }
+
+        self.orden_activos.push(evento.gatillo.clone());
+
+        if let Some(remapeo) = cache::buscar(&self.orden_activos, &evento.gatillo) {
+            salida.send(remapeo.accion).unwrap();
+
+            return Resultado::Consumir;
+        }
+
+        Resultado::Pasar
     }
 
     // ==================================================
@@ -151,7 +160,8 @@ mod tests {
 
     use crate::cache;
 
-    use crate::eventos::{InputEvent, InputId};
+    use crate::evento_trigger::EventoTrigger;
+    use crate::eventos::InputId;
 
     use crate::perfilcache::{AccionCache, CondicionTrigger, RemapeoCache, TriggerCache};
 
@@ -176,6 +186,7 @@ mod tests {
     }
 
     #[test]
+    #[test]
     fn remapeo_simple_consumido() {
         let _lock = cache::bloquear_tests();
 
@@ -186,16 +197,14 @@ mod tests {
         let (tx, _rx) = std::sync::mpsc::channel();
 
         assert_eq!(
-            runtime.procesar(
-                InputEvent::down(teclado("A"), crate::instante::ahora()),
-                &tx,
-            ),
+            runtime.procesar(EventoTrigger::simple(vec![], teclado("A"),), &tx,),
             Resultado::Consumir
         );
     }
 
     #[test]
-    fn remapeo_con_modificador_ciclo_completo() {
+    #[test]
+    fn remapeo_con_modificador() {
         let _lock = cache::bloquear_tests();
 
         cache::reemplazar(vec![remapeo(
@@ -210,51 +219,7 @@ mod tests {
 
         assert_eq!(
             runtime.procesar(
-                InputEvent::down(teclado("LeftControl"), crate::instante::ahora()),
-                &tx,
-            ),
-            Resultado::Esperar
-        );
-
-        assert_eq!(
-            runtime.procesar(
-                InputEvent::down(teclado("A"), crate::instante::ahora()),
-                &tx,
-            ),
-            Resultado::Consumir
-        );
-
-        assert_eq!(
-            runtime.procesar(InputEvent::up(teclado("A"), crate::instante::ahora()), &tx,),
-            Resultado::Consumir
-        );
-
-        assert_eq!(
-            runtime.procesar(
-                InputEvent::up(teclado("LeftControl"), crate::instante::ahora()),
-                &tx,
-            ),
-            Resultado::Consumir
-        );
-    }
-
-    #[test]
-    fn pulse_remapeado() {
-        let _lock = cache::bloquear_tests();
-
-        cache::reemplazar(vec![remapeo(
-            vec![],
-            InputId::new("mouse", "WheelUp"),
-            teclado("B"),
-        )]);
-
-        let mut runtime = Estado::nuevo();
-
-        let (tx, _rx) = std::sync::mpsc::channel();
-
-        assert_eq!(
-            runtime.procesar(
-                InputEvent::pulse(InputId::new("mouse", "WheelUp",), crate::instante::ahora()),
+                EventoTrigger::simple(vec![teclado("LeftControl")], teclado("A"),),
                 &tx,
             ),
             Resultado::Consumir
