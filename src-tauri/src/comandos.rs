@@ -21,10 +21,10 @@ use std::fs;
 use crate::cache;
 use crate::compilador;
 use crate::estado;
+use crate::evento_trigger::EventoTrigger;
 use crate::perfiljson::{AppJson, PerfilJson, RemapeoJson, TriggerJson};
 use crate::persistencia;
 use crate::usuario;
-
 use serde::{Deserialize, Serialize};
 
 // ======================================================
@@ -599,7 +599,7 @@ pub fn iniciar_captura() {
 // ======================================================
 
 #[tauri::command]
-pub fn obtener_captura() -> Vec<String> {
+pub fn obtener_captura() -> Option<EventoTrigger> {
     crate::captura::obtener()
 }
 

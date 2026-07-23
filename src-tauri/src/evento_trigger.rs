@@ -30,12 +30,13 @@
 
 use crate::eventos::InputId;
 use crate::perfilcache::CondicionTrigger;
+use serde::{Deserialize, Serialize};
 
 // ======================================================
 // 🎯 EVENTO TRIGGER
 // ======================================================
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct EventoTrigger {
     pub modificadores: Vec<InputId>,
 

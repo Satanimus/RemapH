@@ -3,6 +3,10 @@
 // RemapH V3
 // ======================================================
 
+// @ts-nocheck
+
+import { invoke } from "@tauri-apps/api/core";
+
 import type { ContextoFila } from "../../core/core_contexto_fila";
 
 import type { FilaPerfil } from "../../core/core_perfil";
@@ -14,8 +18,6 @@ import { reconstruirFila } from "../ui_tabla_control";
 import { triggerATexto, triggerAHTML } from "../../core/core_trigger";
 
 import { abrirPopupModificador } from "./comp_popup_abrir";
-
-// import { iniciarCaptura } from "./nuevo_capturador"; // Nombre provisional, no existe aun
 
 import { crearTrigger } from "../../core/core_trigger";
 
@@ -41,11 +43,12 @@ export function crearCapturador(
 
     html: tieneTrigger
       ? `
-                        <div class="trigger-extra">+</div>
-                        <div class="trigger-contenido">
-                            ${triggerAHTML(trigger)}
-                        </div>
-                      `
+            <div class="trigger-extra">+</div>
+
+            <div class="trigger-contenido">
+                ${triggerAHTML(trigger)}
+            </div>
+          `
       : "Capturar",
 
     clase: "capturador",
@@ -65,14 +68,10 @@ export function crearCapturador(
 
   let capturando = false;
 
-  boton.addEventListener("click", () => {
+  boton.addEventListener("click", async () => {
     if (capturando) {
       return;
     }
-
-    // ==================================================
-    // ✏️ PERFIL EDITADO
-    // ==================================================
 
     alModificar();
 
@@ -80,39 +79,41 @@ export function crearCapturador(
 
     boton.textContent = "Esperando...";
 
-    iniciarCaptura((triggerCapturado) => {
-      // ==================================================
-      // 🚫 CAPTURA INVÁLIDA
-      // ==================================================
+    // ==============================================
+    // 🚀 ACTIVAR CAPTURA BACKEND
+    // ==============================================
 
-      if (!triggerCapturado) {
-        if (destino === "Trigger") {
-          filaPerfil.trigger = crearTrigger();
-        } else {
-          filaPerfil.accion = null;
+    await invoke("iniciar_captura");
+
+    // ==============================================
+    // ⏳ ESPERAR RESULTADO
+    // ==============================================
+
+    const esperar = async () => {
+      while (capturando) {
+        const capturado = await invoke("obtener_captura");
+
+        console.log(capturado);
+
+        if (capturado) {
+          if (destino === "Trigger") {
+            filaPerfil.trigger = capturado;
+          } else {
+            filaPerfil.accion = capturado;
+          }
+
+          capturando = false;
+
+          reconstruirFila(contexto.id);
+
+          return;
         }
 
-        capturando = false;
-
-        reconstruirFila(contexto.id);
-
-        return;
+        await new Promise((resolver) => setTimeout(resolver, 50));
       }
+    };
 
-      // ==================================================
-      // GUARDAR CAPTURA
-      // ==================================================
-
-      if (destino === "Trigger") {
-        filaPerfil.trigger = triggerCapturado;
-      } else {
-        filaPerfil.accion = triggerCapturado;
-      }
-
-      capturando = false;
-
-      reconstruirFila(contexto.id);
-    });
+    await esperar();
   });
 
   return boton;

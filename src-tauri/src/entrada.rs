@@ -9,20 +9,12 @@
 //    ↓
 // AnalizadorTrigger
 //    ↓
-// EventoTrigger
-//    ↓
-// Runtime
-//    ↓
-// Salida
-//
-// Entrada no:
-//   - Interpreta remapeos.
-//   - Compila configuraciones.
-//   - Ejecuta acciones.
+// Captura o Runtime
 // ======================================================
 
 use crate::analizador_trigger::AnalizadorTrigger;
 use crate::cache;
+use crate::captura;
 use crate::eventos::InputEvent;
 use crate::perfilcache::AccionCache;
 use crate::runtime;
@@ -105,7 +97,7 @@ fn iniciar_full(tx: mpsc::Sender<AccionCache>, rx: mpsc::Receiver<AccionCache>) 
         let mut ultima_actualizacion = Instant::now() - Duration::from_secs(1);
 
         loop {
-            let Some((device, stroke)) = crate::backend::back_interception::recibir(&ict) else {
+            let Some((_device, stroke)) = crate::backend::back_interception::recibir(&ict) else {
                 continue;
             };
 
@@ -113,21 +105,15 @@ fn iniciar_full(tx: mpsc::Sender<AccionCache>, rx: mpsc::Receiver<AccionCache>) 
                 continue;
             };
 
-            if crate::captura::procesar(&evento) {
-                continue;
-            }
-
-            actualizar_contexto_cache(&mut ultima_actualizacion);
-
-            let Some(trigger) = analizador.procesar(evento) else {
-                continue;
-            };
-
-            let _resultado = runtime.procesar(trigger, &tx);
-
-            while let Ok(accion) = rx.try_recv() {
-                salida.ejecutar(accion);
-            }
+            procesar_evento(
+                evento,
+                &mut analizador,
+                &mut runtime,
+                &tx,
+                &rx,
+                &mut ultima_actualizacion,
+                Some(&salida),
+            );
         }
     });
 }
@@ -144,34 +130,76 @@ fn iniciar_portable(tx: mpsc::Sender<AccionCache>, rx: mpsc::Receiver<AccionCach
 
         let mut ultima_actualizacion = Instant::now() - Duration::from_secs(1);
 
-        crate::backend::back_windows::iniciar(move |evento, emitir| {
-            if crate::captura::procesar(&evento) {
-                return true;
-            }
+        crate::backend::back_windows::iniciar(move |evento, _emitir| {
+            procesar_evento(
+                evento,
+                &mut analizador,
+                &mut runtime,
+                &tx,
+                &rx,
+                &mut ultima_actualizacion,
+                None,
+            );
 
-            actualizar_contexto_cache(&mut ultima_actualizacion);
-
-            let Some(trigger) = analizador.procesar(evento.clone()) else {
-                return false;
-            };
-
-            let resultado = runtime.procesar(trigger, &tx);
-
-            println!("[ENTRADA] Resultado Runtime -> {:?}", resultado);
-
-            while let Ok(accion) = rx.try_recv() {
-                println!("[ENTRADA] Ejecutando salida");
-
-                ejecutar_portable(accion);
-            }
-
-            match resultado {
-                runtime::Resultado::Consumir => true,
-
-                runtime::Resultado::Pasar => false,
-            }
+            false
         });
     });
+}
+
+// ======================================================
+// 🧠 PROCESAR EVENTO CENTRAL
+// ======================================================
+
+fn procesar_evento(
+    evento: InputEvent,
+
+    analizador: &mut AnalizadorTrigger,
+
+    runtime: &mut runtime::Estado,
+
+    tx: &mpsc::Sender<AccionCache>,
+
+    rx: &mpsc::Receiver<AccionCache>,
+
+    ultima_actualizacion: &mut Instant,
+
+    salida: Option<&crate::backend::back_salida::Salida>,
+) {
+    actualizar_contexto_cache(ultima_actualizacion);
+
+    let Some(trigger) = analizador.procesar(evento) else {
+        return;
+    };
+
+    // ==================================================
+    // 🎹 CAPTURA ACTIVA
+    // ==================================================
+
+    if captura::activa() {
+        captura::recibir(trigger);
+
+        return;
+    }
+
+    // ==================================================
+    // ⚙️ RUNTIME
+    // ==================================================
+
+    let resultado = runtime.procesar(trigger, tx);
+
+    while let Ok(accion) = rx.try_recv() {
+        match salida {
+            Some(salida) => {
+                salida.ejecutar(accion);
+            }
+
+            None => {
+                ejecutar_portable(accion);
+            }
+        }
+    }
+
+    println!("[ENTRADA] Resultado Runtime -> {:?}", resultado);
 }
 
 // ======================================================
@@ -179,8 +207,6 @@ fn iniciar_portable(tx: mpsc::Sender<AccionCache>, rx: mpsc::Receiver<AccionCach
 // ======================================================
 
 fn ejecutar_portable(accion: AccionCache) {
-    println!("[SALIDA] Acción recibida -> {:?}", accion);
-
     match accion {
         AccionCache::Emitir(input) => {
             crate::backend::back_windows::emitir_evento(InputEvent::pulse(

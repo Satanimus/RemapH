@@ -129,6 +129,8 @@ where
 // ======================================================
 
 unsafe extern "system" fn teclado(codigo: i32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
+    println!("HOOK TECLADO");
+
     if codigo < 0 {
         return CallNextHookEx(std::ptr::null_mut(), codigo, wparam, lparam);
     }
@@ -151,6 +153,8 @@ unsafe extern "system" fn teclado(codigo: i32, wparam: WPARAM, lparam: LPARAM) -
     else {
         return CallNextHookEx(std::ptr::null_mut(), codigo, wparam, lparam);
     };
+
+    println!("HOOK -> {:?}", evento);
 
     if evaluar(evento) {
         return 1;

@@ -1,18 +1,28 @@
 // ======================================================
 // 🎹 Captura RemapH V3
 // ------------------------------------------------------
-// Captura inputs físicos genéricos.
+// Modo temporal de captura.
 //
-// No conoce:
-//   - Interception.
-//   - Windows API.
+// No lee dispositivos.
+// No conoce Windows.
+// No conoce Interception.
 //
-// Recibe InputEvent genérico.
+// Recibe EventoTrigger ya analizado.
+//
+// Flujo:
+//
+// InputEvent
+//      ↓
+// AnalizadorTrigger
+//      ↓
+// Captura
+//      ↓
+// UI
 // ======================================================
 
 use std::sync::{Mutex, OnceLock};
 
-use crate::eventos::InputEvent;
+use crate::evento_trigger::EventoTrigger;
 
 // ======================================================
 // 🧠 ESTADO
@@ -21,7 +31,7 @@ use crate::eventos::InputEvent;
 struct EstadoCaptura {
     activa: bool,
 
-    ultimo: Vec<String>,
+    ultimo: Option<EventoTrigger>,
 }
 
 static CAPTURA: OnceLock<Mutex<EstadoCaptura>> = OnceLock::new();
@@ -35,7 +45,7 @@ fn estado() -> &'static Mutex<EstadoCaptura> {
         Mutex::new(EstadoCaptura {
             activa: false,
 
-            ultimo: Vec::new(),
+            ultimo: None,
         })
     })
 }
@@ -49,7 +59,7 @@ pub fn iniciar() {
 
     captura.activa = true;
 
-    captura.ultimo.clear();
+    captura.ultimo = None;
 }
 
 // ======================================================
@@ -69,35 +79,25 @@ pub fn activa() -> bool {
 }
 
 // ======================================================
-// 📥 GUARDAR
+// 📥 RECIBIR TRIGGER
 // ======================================================
 
-pub fn guardar(valor: String) {
-    estado().lock().unwrap().ultimo.push(valor);
-}
+pub fn recibir(evento: EventoTrigger) {
+    let mut captura = estado().lock().unwrap();
 
-// ======================================================
-// 📤 OBTENER
-// ======================================================
-
-pub fn obtener() -> Vec<String> {
-    estado().lock().unwrap().ultimo.clone()
-}
-
-// ======================================================
-// 🎯 PROCESAR
-// ======================================================
-
-pub fn procesar(evento: &InputEvent) -> bool {
-    if !activa() {
-        return false;
+    if !captura.activa {
+        return;
     }
 
-    let valor = evento.input.control().unwrap_or("Unknown").to_string();
+    captura.ultimo = Some(evento);
 
-    guardar(valor);
+    captura.activa = false;
+}
 
-    finalizar();
+// ======================================================
+// 📤 OBTENER RESULTADO
+// ======================================================
 
-    true
+pub fn obtener() -> Option<EventoTrigger> {
+    estado().lock().unwrap().ultimo.clone()
 }

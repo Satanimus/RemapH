@@ -45,7 +45,7 @@ impl AnalizadorTrigger {
     }
 
     // ==================================================
-    // 📥 PROCESAR
+    // 📥 PROCESAR EVENTO
     // ==================================================
 
     pub fn procesar(&mut self, evento: InputEvent) -> Option<EventoTrigger> {
@@ -57,7 +57,7 @@ impl AnalizadorTrigger {
                 let input = evento.input.clone();
 
                 // --------------------------------------
-                // Es modificador
+                // Modificador
                 // --------------------------------------
 
                 if cache::es_modificador(&input) {
@@ -69,10 +69,8 @@ impl AnalizadorTrigger {
                 }
 
                 // --------------------------------------
-                // Es gatillo
+                // Gatillo
                 // --------------------------------------
-
-                println!("[ANALIZADOR] Gatillo -> {:?}", input);
 
                 Some(EventoTrigger::simple(
                     self.modificadores_activos.clone(),
@@ -98,5 +96,13 @@ impl AnalizadorTrigger {
                 evento.input,
             )),
         }
+    }
+
+    // ==================================================
+    // 🧹 LIMPIAR
+    // ==================================================
+
+    pub fn limpiar(&mut self) {
+        self.modificadores_activos.clear();
     }
 }
