@@ -1,3 +1,7 @@
+//////////////////////////////////////////////
+Solución BUG hook teclado: Agregar esta linea en src-tauri\src\lib.rs
+.device_event_filter(tauri::DeviceEventFilter::Always)
+////////////////////////////////////////////
 Motor captura / reconocimiento trigger
 
 ✅ Renombres iniciales completados

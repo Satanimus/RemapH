@@ -37,6 +37,7 @@ pub fn run() {
     entrada::iniciar();
 
     tauri::Builder::default()
+        .device_event_filter(tauri::DeviceEventFilter::Always)
         .invoke_handler(tauri::generate_handler![
             comandos::compilar_perfil,
             comandos::activar_perfil,
