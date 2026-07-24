@@ -77,21 +77,38 @@ pub fn iniciar<F>(procesar: F)
 where
     F: FnMut(InputEvent, &mut dyn FnMut(InputEvent)) -> bool + Send + 'static,
 {
+    println!("[BACK] iniciar()");
+
     ESTADO.with(|estado| {
         *estado.borrow_mut() = Some(Estado {
             procesar: Box::new(procesar),
         });
     });
 
+    println!("[BACK] Estado creado");
+
     let modulo = unsafe { GetModuleHandleW(std::ptr::null()) };
 
-    let teclado = unsafe { SetWindowsHookExW(WH_KEYBOARD_LL, Some(teclado), modulo, 0) };
+    println!("[BACK] Módulo = {:?}", modulo);
+
+    let teclado = unsafe {
+        SetWindowsHookExW(
+            WH_KEYBOARD_LL,
+            Some(prueba_hook_teclado),
+            std::ptr::null_mut(),
+            0,
+        )
+    };
+
+    println!("[BACK] Hook teclado = {:?}", teclado);
 
     if teclado.is_null() {
         panic!("No se pudo instalar hook de teclado");
     }
 
-    let mouse = unsafe { SetWindowsHookExW(WH_MOUSE_LL, Some(mouse), modulo, 0) };
+    let mouse =
+        unsafe { SetWindowsHookExW(WH_MOUSE_LL, Some(hook_mouse), std::ptr::null_mut(), 0) };
+    println!("[BACK] Hook mouse = {:?}", mouse);
 
     if mouse.is_null() {
         unsafe {
@@ -101,43 +118,66 @@ where
         panic!("No se pudo instalar hook de mouse");
     }
 
-    println!("🪟 Backend Portable iniciado.");
+    println!("[BACK] Hooks instalados");
+    println!("[BACK] Entrando a GetMessage()");
 
     let mut mensaje: MSG = unsafe { std::mem::zeroed() };
 
     loop {
         let resultado = unsafe { GetMessageW(&mut mensaje, std::ptr::null_mut(), 0, 0) };
 
+        println!("[BACK] GetMessage -> {}", resultado);
+
         if resultado <= 0 {
+            println!("[BACK] Saliendo del loop");
             break;
         }
     }
 
+    println!("[BACK] Desinstalando hooks");
+
     unsafe {
         UnhookWindowsHookEx(teclado);
-
         UnhookWindowsHookEx(mouse);
     }
 
     ESTADO.with(|estado| {
         *estado.borrow_mut() = None;
     });
+
+    println!("[BACK] Finalizado");
 }
 
 // ======================================================
 // 🎹 HOOK TECLADO
 // ======================================================
 
-unsafe extern "system" fn teclado(codigo: i32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
-    println!("HOOK TECLADO");
+unsafe extern "system" fn prueba_hook_teclado(
+    codigo: i32,
+    wparam: WPARAM,
+    lparam: LPARAM,
+) -> LRESULT {
+    println!(
+        "[TECLADO RAW] Entró callback. codigo={} wparam={}",
+        codigo, wparam
+    );
 
     if codigo < 0 {
+        println!("[TECLADO RAW] codigo < 0");
+
         return CallNextHookEx(std::ptr::null_mut(), codigo, wparam, lparam);
     }
 
     let datos = &*(lparam as *const KBDLLHOOKSTRUCT);
 
+    println!(
+        "[TECLADO RAW] vk={} scan={} flags={:#X}",
+        datos.vkCode, datos.scanCode, datos.flags
+    );
+
     if datos.flags & 0x10 != 0 {
+        println!("[TECLADO RAW] Evento inyectado ignorado");
+
         return CallNextHookEx(std::ptr::null_mut(), codigo, wparam, lparam);
     }
 
@@ -145,20 +185,33 @@ unsafe extern "system" fn teclado(codigo: i32, wparam: WPARAM, lparam: LPARAM) -
 
     let liberado = wparam == WM_KEYUP as usize || wparam == WM_SYSKEYUP as usize;
 
+    println!(
+        "[TECLADO RAW] presionado={} liberado={}",
+        presionado, liberado
+    );
+
     if !presionado && !liberado {
+        println!("[TECLADO RAW] Mensaje ignorado");
+
         return CallNextHookEx(std::ptr::null_mut(), codigo, wparam, lparam);
     }
 
     let Some(evento) = traducir_teclado(datos.vkCode, datos.scanCode, datos.flags, presionado)
     else {
+        println!("[TECLADO RAW] No pudo traducir teclado");
+
         return CallNextHookEx(std::ptr::null_mut(), codigo, wparam, lparam);
     };
 
-    println!("HOOK -> {:?}", evento);
+    println!("[TECLADO RAW] Evento traducido -> {:?}", evento);
 
     if evaluar(evento) {
+        println!("[TECLADO RAW] Consumido");
+
         return 1;
     }
+
+    println!("[TECLADO RAW] Pasando a Windows");
 
     CallNextHookEx(std::ptr::null_mut(), codigo, wparam, lparam)
 }
@@ -167,7 +220,7 @@ unsafe extern "system" fn teclado(codigo: i32, wparam: WPARAM, lparam: LPARAM) -
 // 🖱️ HOOK MOUSE
 // ======================================================
 
-unsafe extern "system" fn mouse(codigo: i32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
+unsafe extern "system" fn hook_mouse(codigo: i32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
     if codigo < 0 {
         return CallNextHookEx(std::ptr::null_mut(), codigo, wparam, lparam);
     }

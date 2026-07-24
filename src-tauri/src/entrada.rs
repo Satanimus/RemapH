@@ -131,7 +131,7 @@ fn iniciar_portable(tx: mpsc::Sender<AccionCache>, rx: mpsc::Receiver<AccionCach
         let mut ultima_actualizacion = Instant::now() - Duration::from_secs(1);
 
         crate::backend::back_windows::iniciar(move |evento, _emitir| {
-            procesar_evento(
+            let resultado = procesar_evento(
                 evento,
                 &mut analizador,
                 &mut runtime,
@@ -141,7 +141,7 @@ fn iniciar_portable(tx: mpsc::Sender<AccionCache>, rx: mpsc::Receiver<AccionCach
                 None,
             );
 
-            false
+            matches!(resultado, runtime::Resultado::Consumir)
         });
     });
 }
@@ -164,11 +164,11 @@ fn procesar_evento(
     ultima_actualizacion: &mut Instant,
 
     salida: Option<&crate::backend::back_salida::Salida>,
-) {
+) -> runtime::Resultado {
     actualizar_contexto_cache(ultima_actualizacion);
 
     let Some(trigger) = analizador.procesar(evento) else {
-        return;
+        return runtime::Resultado::Pasar;
     };
 
     // ==================================================
@@ -178,7 +178,7 @@ fn procesar_evento(
     if captura::activa() {
         captura::recibir(trigger);
 
-        return;
+        return runtime::Resultado::Consumir;
     }
 
     // ==================================================
@@ -200,6 +200,8 @@ fn procesar_evento(
     }
 
     println!("[ENTRADA] Resultado Runtime -> {:?}", resultado);
+
+    resultado
 }
 
 // ======================================================
