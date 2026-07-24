@@ -3,21 +3,14 @@
 // ------------------------------------------------------
 // El idioma canónico ya llega normalizado.
 //
-// Este módulo se conserva como punto de compatibilidad
+// Este módulo se conserva como compatibilidad
 // para la UI.
 //
-// Actualmente NO traduce nombres.
+// NO traduce nombres.
+// La personalización visual ocurre al dibujar.
 // ======================================================
 
 import type { Entrada } from "./core_entrada";
-
-// ======================================================
-// 🔤 NORMALIZAR NOMBRE
-// ======================================================
-
-function normalizarNombre(nombre: string): string {
-  return nombre;
-}
 
 // ======================================================
 // 🎯 NORMALIZAR ENTRADA
@@ -27,7 +20,7 @@ export function normalizarEntrada(entrada: Entrada): Entrada {
   return {
     ...entrada,
 
-    nombre: normalizarNombre(entrada.nombre),
+    nombre: entrada.codigo,
   };
 }
 
