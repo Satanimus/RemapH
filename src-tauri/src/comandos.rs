@@ -630,7 +630,7 @@ fn convertir_input_captura(input: &crate::eventos::InputId) -> EntradaCapturaUI 
 
     let codigo = input.control().unwrap_or("").to_string();
 
-    let nombre = codigo.clone();
+    let nombre = crate::pulsadores::ui_desde_interno(&codigo);
 
     EntradaCapturaUI {
         tipo: fuente.to_string(),

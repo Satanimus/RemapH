@@ -1,13 +1,10 @@
 // ======================================================
 // 🔤 core_Normalizar_Trigger RemapH V3
 // ------------------------------------------------------
-// El idioma canónico ya llega normalizado.
+// Compatibilidad.
 //
-// Este módulo se conserva como compatibilidad
-// para la UI.
-//
-// NO traduce nombres.
-// La personalización visual ocurre al dibujar.
+// El Backend ya entrega el nombre visible.
+// Aquí no se modifica.
 // ======================================================
 
 import type { Entrada } from "./core_entrada";
@@ -17,11 +14,7 @@ import type { Entrada } from "./core_entrada";
 // ======================================================
 
 export function normalizarEntrada(entrada: Entrada): Entrada {
-  return {
-    ...entrada,
-
-    nombre: entrada.codigo,
-  };
+  return entrada;
 }
 
 // ======================================================
@@ -29,5 +22,5 @@ export function normalizarEntrada(entrada: Entrada): Entrada {
 // ======================================================
 
 export function normalizarEntradas(entradas: Entrada[]): Entrada[] {
-  return entradas.map(normalizarEntrada);
+  return entradas;
 }
