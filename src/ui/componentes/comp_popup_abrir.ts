@@ -212,51 +212,38 @@ export function abrirPopupModificador(
   filaPerfil: FilaPerfil,
   destino: "Trigger" | "Accion" = "Trigger",
 ): void {
-  abrirLista(
-    evento,
-    ["Win +", "Ctrl Izq +", "Shift Izq +", "Alt Izq +"],
-    (texto) => {
-      const entrada = crearModificador(texto);
+  abrirLista(evento, ["Win +"], (texto) => {
+    const entrada = crearModificador(texto);
 
-      if (!entrada) {
-        return;
-      }
+    if (!entrada) {
+      return;
+    }
 
-      const trigger =
-        destino === "Trigger" ? filaPerfil.trigger : filaPerfil.accion;
+    const trigger =
+      destino === "Trigger" ? filaPerfil.trigger : filaPerfil.accion;
 
-      if (!trigger) {
-        return;
-      }
+    if (!trigger) {
+      return;
+    }
 
-      const existe = trigger.modificadores.some(
-        (modificador) => modificador.codigo === entrada.codigo,
-      );
+    const existe = trigger.modificadores.some(
+      (modificador) => modificador.codigo === entrada.codigo,
+    );
 
-      if (existe) {
-        return;
-      }
+    if (existe) {
+      return;
+    }
 
-      trigger.modificadores.unshift(entrada);
+    trigger.modificadores.unshift(entrada);
 
-      reconstruirFila(contexto.id);
-    },
-  );
+    reconstruirFila(contexto.id);
+  });
 }
 
 function crearModificador(texto: string) {
   switch (texto) {
     case "Win +":
-      return crearEntrada("Teclado", "MetaLeft", "Meta");
-
-    case "Ctrl Izq +":
-      return crearEntrada("Teclado", "ControlLeft", "Control");
-
-    case "Shift Izq +":
-      return crearEntrada("Teclado", "ShiftLeft", "Shift");
-
-    case "Alt Izq +":
-      return crearEntrada("Teclado", "AltLeft", "Alt");
+      return crearEntrada("Teclado", "MetaLeft", "Win");
 
     default:
       return null;

@@ -125,3 +125,5 @@ nativo	interno	interception	ui
 
 0x020A_UP	WheelUp	WheelUp	Rueda arriba
 0x020A_DOWN	WheelDown	WheelDown	Rueda abajo
+
+0x5B	LeftMeta	LeftMeta	Win
