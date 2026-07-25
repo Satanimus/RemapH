@@ -1,36 +1,40 @@
 // ======================================================
 // 🧠 Analizador Trigger RemapH V3
 // ------------------------------------------------------
-// Convierte eventos físicos en triggers lógicos.
+// Analiza secuencias físicas.
 //
-// Entrada:
-//
-// InputEvent
-//      ↓
-// AnalizadorTrigger
-//      ↓
-// EventoTrigger
-//
-// Responsabilidades:
-//
-//   - Detectar gatillo.
-//   - Mantener modificadores activos.
-//   - Preparar Simple/Doble/Mantenido.
-//
-// No ejecuta acciones.
-// No conoce Runtime.
+// Regla:
+// - Respeta orden de Down.
+// - Último Down = gatillo.
+// - Todo Down anterior = modificadores.
+// - Espera ventana antes de liberar.
 // ======================================================
 
-use crate::cache;
 use crate::evento_trigger::EventoTrigger;
 use crate::eventos::{InputEvent, InputId, InputState};
+
+use std::time::{Duration, Instant};
+
+// ======================================================
+// 🔎 RESULTADO
+// ======================================================
+
+pub enum ResultadoTrigger {
+    Esperar,
+
+    Trigger(EventoTrigger),
+
+    Liberar(Vec<InputEvent>),
+}
 
 // ======================================================
 // 🧠 ANALIZADOR
 // ======================================================
 
 pub struct AnalizadorTrigger {
-    modificadores_activos: Vec<InputId>,
+    eventos_pendientes: Vec<InputEvent>,
+
+    ultimo_evento: Option<Instant>,
 }
 
 // ======================================================
@@ -40,62 +44,89 @@ pub struct AnalizadorTrigger {
 impl AnalizadorTrigger {
     pub fn nuevo() -> Self {
         Self {
-            modificadores_activos: Vec::new(),
+            eventos_pendientes: Vec::new(),
+
+            ultimo_evento: None,
         }
     }
 
     // ==================================================
-    // 📥 PROCESAR EVENTO
+    // 📥 EVENTO
     // ==================================================
 
-    pub fn procesar(&mut self, evento: InputEvent) -> Option<EventoTrigger> {
-        match evento.state {
-            // ------------------------------------------
-            // ⬇️ DOWN
-            // ------------------------------------------
-            InputState::Down => {
-                let input = evento.input.clone();
+    pub fn procesar(&mut self, evento: InputEvent) -> ResultadoTrigger {
+        self.ultimo_evento = Some(Instant::now());
 
-                // --------------------------------------
-                // Modificador
-                // --------------------------------------
+        self.eventos_pendientes.push(evento);
 
-                if cache::es_modificador(&input) {
-                    if !self.modificadores_activos.contains(&input) {
-                        self.modificadores_activos.push(input);
-                    }
+        self.analizar()
+    }
 
-                    return None;
-                }
+    // ==================================================
+    // ⏱️ TIMEOUT
+    // ==================================================
 
-                // --------------------------------------
-                // Gatillo
-                // --------------------------------------
+    pub fn comprobar_timeout(&mut self) -> ResultadoTrigger {
+        let Some(ultimo) = self.ultimo_evento else {
+            return ResultadoTrigger::Esperar;
+        };
 
-                Some(EventoTrigger::simple(
-                    self.modificadores_activos.clone(),
-                    input,
-                ))
-            }
-
-            // ------------------------------------------
-            // ⬆️ UP
-            // ------------------------------------------
-            InputState::Up => {
-                self.modificadores_activos
-                    .retain(|activo| activo != &evento.input);
-
-                None
-            }
-
-            // ------------------------------------------
-            // ⚡ PULSE
-            // ------------------------------------------
-            InputState::Pulse => Some(EventoTrigger::simple(
-                self.modificadores_activos.clone(),
-                evento.input,
-            )),
+        if ultimo.elapsed() < Duration::from_millis(250) {
+            return ResultadoTrigger::Esperar;
         }
+
+        let eventos = self.eventos_pendientes.clone();
+
+        self.limpiar();
+
+        ResultadoTrigger::Liberar(eventos)
+    }
+
+    // ==================================================
+    // 🔎 ANALIZAR
+    // ==================================================
+
+    fn analizar(&self) -> ResultadoTrigger {
+        let inputs = self.inputs_down();
+
+        if inputs.is_empty() {
+            return ResultadoTrigger::Esperar;
+        }
+
+        let Some(gatillo) = inputs.last() else {
+            return ResultadoTrigger::Esperar;
+        };
+
+        let modificadores = if inputs.len() > 1 {
+            inputs[..inputs.len() - 1].to_vec()
+        } else {
+            Vec::new()
+        };
+
+        if crate::cache::buscar(&inputs, gatillo).is_some() {
+            return ResultadoTrigger::Trigger(EventoTrigger::simple(
+                modificadores,
+                gatillo.clone(),
+            ));
+        }
+
+        if crate::cache::tiene_prefijo(&inputs) {
+            return ResultadoTrigger::Esperar;
+        }
+
+        ResultadoTrigger::Esperar
+    }
+
+    // ==================================================
+    // 🔎 DOWN ACTIVOS
+    // ==================================================
+
+    fn inputs_down(&self) -> Vec<InputId> {
+        self.eventos_pendientes
+            .iter()
+            .filter(|evento| evento.state == InputState::Down)
+            .map(|evento| evento.input.clone())
+            .collect()
     }
 
     // ==================================================
@@ -103,6 +134,8 @@ impl AnalizadorTrigger {
     // ==================================================
 
     pub fn limpiar(&mut self) {
-        self.modificadores_activos.clear();
+        self.eventos_pendientes.clear();
+
+        self.ultimo_evento = None;
     }
 }

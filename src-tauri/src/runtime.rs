@@ -2,21 +2,6 @@
 // 🧠 Runtime RemapH V3
 // ------------------------------------------------------
 // Ejecuta remapeos compilados.
-//
-// El Runtime:
-//   - No lee JSON.
-//   - No interpreta configuración.
-//   - No conoce Windows.
-//   - No conoce eventos físicos.
-//
-// Recibe:
-//     EventoTrigger
-//
-// Busca:
-//     Cache activa
-//
-// Ejecuta:
-//     AccionCache
 // ======================================================
 
 use std::sync::mpsc::Sender;
@@ -60,24 +45,21 @@ impl Estado {
             return Resultado::Pasar;
         }
 
-        println!(
-            "[RUNTIME] Trigger recibido -> {:?} {:?} {:?}",
-            evento.modificadores, evento.gatillo, evento.condicion
-        );
-
         let mut activos = evento.modificadores.clone();
 
         activos.push(evento.gatillo.clone());
 
-        println!("[RUNTIME] Buscando cache -> {:?}", activos);
-
         let Some(remapeo) = cache::buscar(&activos, &evento.gatillo) else {
-            println!("[RUNTIME] Sin remapeo -> Pasar");
-
             return Resultado::Pasar;
         };
 
-        println!("[RUNTIME] Remapeo encontrado");
+        // =============================================
+        // Verificación de condición
+        // =============================================
+
+        if remapeo.trigger.condicion != evento.condicion {
+            return Resultado::Pasar;
+        }
 
         salida.send(remapeo.accion).unwrap();
 

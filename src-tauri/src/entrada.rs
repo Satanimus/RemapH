@@ -167,8 +167,38 @@ fn procesar_evento(
 ) -> runtime::Resultado {
     actualizar_contexto_cache(ultima_actualizacion);
 
-    let Some(trigger) = analizador.procesar(evento) else {
-        return runtime::Resultado::Pasar;
+    let trigger = match analizador.procesar(evento) {
+        crate::analizador_trigger::ResultadoTrigger::Trigger(trigger) => Some(trigger),
+
+        crate::analizador_trigger::ResultadoTrigger::Esperar => None,
+
+        crate::analizador_trigger::ResultadoTrigger::Liberar(eventos) => {
+            for evento in eventos {
+                println!("[ENTRADA] Liberando evento pendiente -> {:?}", evento);
+            }
+
+            return runtime::Resultado::Pasar;
+        }
+    };
+
+    let trigger = match trigger {
+        Some(trigger) => trigger,
+
+        None => match analizador.comprobar_timeout() {
+            crate::analizador_trigger::ResultadoTrigger::Trigger(trigger) => trigger,
+
+            crate::analizador_trigger::ResultadoTrigger::Liberar(eventos) => {
+                for evento in eventos {
+                    println!("[ENTRADA] Timeout liberando -> {:?}", evento);
+                }
+
+                return runtime::Resultado::Pasar;
+            }
+
+            crate::analizador_trigger::ResultadoTrigger::Esperar => {
+                return runtime::Resultado::Pasar;
+            }
+        },
     };
 
     // ==================================================
