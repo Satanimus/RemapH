@@ -1,15 +1,15 @@
 // ======================================================
 // 🧠 Analizador Trigger RemapH V3
 // ------------------------------------------------------
-// Analiza secuencias físicas.
+// Buffer lógico de entrada.
 //
-// Reglas:
+// Recibe eventos físicos.
+// Retiene temporalmente.
+// Decide si existe trigger.
+// Si no existe, libera eventos originales.
 //
-// • Respeta el orden de Down.
-// • Último Down = Gatillo.
-// • Downs anteriores = Modificadores.
-// • Espera hasta que expire la ventana de análisis.
-// • El tiempo proviene de config.rs.
+// No ejecuta acciones.
+// No conoce Runtime.
 // ======================================================
 
 use crate::evento_trigger::EventoTrigger;
@@ -34,7 +34,7 @@ pub enum ResultadoTrigger {
 // ======================================================
 
 pub struct AnalizadorTrigger {
-    eventos: Vec<InputEvent>,
+    buffer: Vec<InputEvent>,
 
     ultimo_evento: Option<Instant>,
 }
@@ -46,7 +46,7 @@ pub struct AnalizadorTrigger {
 impl AnalizadorTrigger {
     pub fn nuevo() -> Self {
         Self {
-            eventos: Vec::new(),
+            buffer: Vec::new(),
 
             ultimo_evento: None,
         }
@@ -57,7 +57,7 @@ impl AnalizadorTrigger {
     // ==================================================
 
     pub fn procesar(&mut self, evento: InputEvent) -> ResultadoTrigger {
-        self.eventos.push(evento);
+        self.buffer.push(evento);
 
         self.ultimo_evento = Some(Instant::now());
 
@@ -65,7 +65,7 @@ impl AnalizadorTrigger {
     }
 
     // ==================================================
-    // ⏱️ COMPROBAR TIMEOUT
+    // ⏱️ TIMEOUT
     // ==================================================
 
     pub fn comprobar_timeout(&mut self) -> ResultadoTrigger {
@@ -77,7 +77,7 @@ impl AnalizadorTrigger {
             return ResultadoTrigger::Esperar;
         }
 
-        let eventos = self.eventos.clone();
+        let eventos = self.buffer.clone();
 
         self.limpiar();
 
@@ -107,19 +107,15 @@ impl AnalizadorTrigger {
             return ResultadoTrigger::Trigger(EventoTrigger::simple(modificadores, gatillo));
         }
 
-        if crate::cache::tiene_prefijo(&activos) {
-            return ResultadoTrigger::Esperar;
-        }
-
         ResultadoTrigger::Esperar
     }
 
     // ==================================================
-    // ⬇️ INPUTS DOWN
+    // ⬇️ DOWN ACTIVOS
     // ==================================================
 
     fn down_activos(&self) -> Vec<InputId> {
-        self.eventos
+        self.buffer
             .iter()
             .filter(|evento| evento.state == InputState::Down)
             .map(|evento| evento.input.clone())
@@ -131,7 +127,7 @@ impl AnalizadorTrigger {
     // ==================================================
 
     pub fn limpiar(&mut self) {
-        self.eventos.clear();
+        self.buffer.clear();
 
         self.ultimo_evento = None;
     }

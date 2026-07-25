@@ -1,18 +1,16 @@
 // ======================================================
 // 🚀 Entrada RemapH V3
 // ------------------------------------------------------
-// Orquesta los backends físicos.
-//
-// Backend
-//    ↓
-// InputEvent
-//    ↓
+// Orquesta:
+// Input físico
+//      ↓
 // AnalizadorTrigger
-//    ↓
-// Captura o Runtime
+//      ↓
+// Captura / Runtime
 // ======================================================
 
-use crate::analizador_trigger::AnalizadorTrigger;
+use crate::analizador_trigger::{AnalizadorTrigger, ResultadoTrigger};
+
 use crate::cache;
 use crate::captura;
 use crate::eventos::InputEvent;
@@ -34,32 +32,27 @@ pub enum Modo {
     Portable,
 }
 
-// ======================================================
-// 🧪 MODO ACTUAL
-// ======================================================
-
 const MODO: Modo = Modo::Portable;
 
 // ======================================================
-// 🖥️ CONTEXTO APP
+// 🖥️ CONTEXTO CACHE
 // ======================================================
 
-fn actualizar_contexto_cache(ultima_actualizacion: &mut Instant) {
-    if ultima_actualizacion.elapsed() < Duration::from_millis(250) {
+fn actualizar_contexto_cache(ultima: &mut Instant) {
+    if ultima.elapsed() < Duration::from_millis(250) {
         return;
     }
 
-    let programa_activo = crate::backend::back_procesos::obtener_programa_activo();
+    let programa = crate::backend::back_procesos::obtener_programa_activo();
 
-    let procesos_activos: HashSet<String> =
-        crate::backend::back_procesos::enumerar_procesos_ventana()
-            .into_iter()
-            .map(|proceso| proceso.nombre.to_lowercase())
-            .collect();
+    let procesos: HashSet<String> = crate::backend::back_procesos::enumerar_procesos_ventana()
+        .into_iter()
+        .map(|p| p.nombre.to_lowercase())
+        .collect();
 
-    cache::actualizar_contexto(programa_activo.as_deref(), &procesos_activos);
+    cache::actualizar_contexto(programa.as_deref(), &procesos);
 
-    *ultima_actualizacion = Instant::now();
+    *ultima = Instant::now();
 }
 
 // ======================================================
@@ -70,52 +63,12 @@ pub fn iniciar() {
     let (tx, rx) = mpsc::channel::<AccionCache>();
 
     match MODO {
-        Modo::Full => {
-            iniciar_full(tx, rx);
-        }
+        Modo::Portable => iniciar_portable(tx, rx),
 
-        Modo::Portable => {
-            iniciar_portable(tx, rx);
+        Modo::Full => {
+            println!("Modo Full pendiente");
         }
     }
-}
-
-// ======================================================
-// ⚡ FULL
-// ======================================================
-
-fn iniciar_full(tx: mpsc::Sender<AccionCache>, rx: mpsc::Receiver<AccionCache>) {
-    std::thread::spawn(move || {
-        let ict = crate::backend::back_interception::crear();
-
-        let salida = crate::backend::back_salida::crear();
-
-        let mut runtime = runtime::Estado::nuevo();
-
-        let mut analizador = AnalizadorTrigger::nuevo();
-
-        let mut ultima_actualizacion = Instant::now() - Duration::from_secs(1);
-
-        loop {
-            let Some((_device, stroke)) = crate::backend::back_interception::recibir(&ict) else {
-                continue;
-            };
-
-            let Some(evento) = crate::backend::back_interception::traducir(&stroke) else {
-                continue;
-            };
-
-            procesar_evento(
-                evento,
-                &mut analizador,
-                &mut runtime,
-                &tx,
-                &rx,
-                &mut ultima_actualizacion,
-                Some(&salida),
-            );
-        }
-    });
 }
 
 // ======================================================
@@ -147,7 +100,7 @@ fn iniciar_portable(tx: mpsc::Sender<AccionCache>, rx: mpsc::Receiver<AccionCach
 }
 
 // ======================================================
-// 🧠 PROCESAR EVENTO CENTRAL
+// 🧠 PROCESAR EVENTO
 // ======================================================
 
 fn procesar_evento(
@@ -167,75 +120,67 @@ fn procesar_evento(
 ) -> runtime::Resultado {
     actualizar_contexto_cache(ultima_actualizacion);
 
-    let trigger = match analizador.procesar(evento) {
-        crate::analizador_trigger::ResultadoTrigger::Trigger(trigger) => Some(trigger),
+    let resultado_trigger = analizador.procesar(evento);
 
-        crate::analizador_trigger::ResultadoTrigger::Esperar => None,
+    match resultado_trigger {
+        crate::analizador_trigger::ResultadoTrigger::Trigger(trigger) => {
+            if captura::activa() {
+                captura::recibir(trigger);
 
+                return runtime::Resultado::Consumir;
+            }
+
+            let resultado = runtime.procesar(trigger, tx);
+
+            while let Ok(accion) = rx.try_recv() {
+                match salida {
+                    Some(salida) => {
+                        salida.ejecutar(accion);
+                    }
+
+                    None => {
+                        ejecutar_portable(accion);
+                    }
+                }
+            }
+
+            println!("[ENTRADA] Resultado Runtime -> {:?}", resultado);
+
+            resultado
+        }
+
+        // El analizador todavía no sabe si es trigger.
+        // Bloqueamos para evitar que Windows ejecute la tecla.
+        crate::analizador_trigger::ResultadoTrigger::Esperar => runtime::Resultado::Consumir,
+
+        // No era trigger.
+        // Liberamos los eventos físicos originales.
         crate::analizador_trigger::ResultadoTrigger::Liberar(eventos) => {
             for evento in eventos {
                 println!("[ENTRADA] Liberando evento pendiente -> {:?}", evento);
+
+                crate::backend::back_windows::emitir_evento(evento);
             }
 
-            return runtime::Resultado::Pasar;
-        }
-    };
+            analizador.limpiar();
 
-    let trigger = match trigger {
-        Some(trigger) => trigger,
-
-        None => match analizador.comprobar_timeout() {
-            crate::analizador_trigger::ResultadoTrigger::Trigger(trigger) => trigger,
-
-            crate::analizador_trigger::ResultadoTrigger::Liberar(eventos) => {
-                for evento in eventos {
-                    println!("[ENTRADA] Timeout liberando -> {:?}", evento);
-                }
-
-                return runtime::Resultado::Pasar;
-            }
-
-            crate::analizador_trigger::ResultadoTrigger::Esperar => {
-                return runtime::Resultado::Pasar;
-            }
-        },
-    };
-
-    // ==================================================
-    // 🎹 CAPTURA ACTIVA
-    // ==================================================
-
-    if captura::activa() {
-        captura::recibir(trigger);
-
-        return runtime::Resultado::Consumir;
-    }
-
-    // ==================================================
-    // ⚙️ RUNTIME
-    // ==================================================
-
-    let resultado = runtime.procesar(trigger, tx);
-
-    while let Ok(accion) = rx.try_recv() {
-        match salida {
-            Some(salida) => {
-                salida.ejecutar(accion);
-            }
-
-            None => {
-                ejecutar_portable(accion);
-            }
+            runtime::Resultado::Consumir
         }
     }
-
-    println!("[ENTRADA] Resultado Runtime -> {:?}", resultado);
-
-    resultado
 }
 
 // ======================================================
-// 🪟 EJECUTAR PORTABLE
+// ⚡ EJECUTAR SALIDAS
+// ======================================================
+
+fn ejecutar_salidas(rx: &mpsc::Receiver<AccionCache>) {
+    while let Ok(accion) = rx.try_recv() {
+        ejecutar_portable(accion);
+    }
+}
+
+// ======================================================
+// 🪟 EMITIR PORTABLE
 // ======================================================
 
 fn ejecutar_portable(accion: AccionCache) {

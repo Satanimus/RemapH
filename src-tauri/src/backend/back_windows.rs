@@ -205,10 +205,10 @@ unsafe extern "system" fn prueba_hook_teclado(
 
     println!("[TECLADO RAW] Evento traducido -> {:?}", evento);
 
-    if evaluar(evento) {
-        println!("[TECLADO RAW] Consumido");
+    let consumido = evaluar(evento);
 
-        return 1;
+    if consumido {
+        println!("[TECLADO RAW] Consumido");
     }
 
     println!("[TECLADO RAW] Pasando a Windows");
@@ -235,8 +235,10 @@ unsafe extern "system" fn hook_mouse(codigo: i32, wparam: WPARAM, lparam: LPARAM
         return CallNextHookEx(std::ptr::null_mut(), codigo, wparam, lparam);
     };
 
-    if evaluar(evento) {
-        return 1;
+    let consumido = evaluar(evento);
+
+    if consumido {
+        println!("[MOUSE RAW] Consumido");
     }
 
     CallNextHookEx(std::ptr::null_mut(), codigo, wparam, lparam)
