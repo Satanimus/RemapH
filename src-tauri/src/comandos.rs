@@ -94,6 +94,34 @@ pub struct EntradaUI {
 }
 
 // ======================================================
+// 🎹 CAPTURA UI
+// ------------------------------------------------------
+// Formato que entiende TypeScript.
+// ======================================================
+
+#[derive(Serialize)]
+pub struct EntradaCapturaUI {
+    pub tipo: String,
+
+    pub codigo: String,
+
+    pub nombre: String,
+}
+
+// ======================================================
+// 🎯 TRIGGER CAPTURA UI
+// ======================================================
+
+#[derive(Serialize)]
+pub struct TriggerCapturaUI {
+    pub modificadores: Vec<EntradaCapturaUI>,
+
+    pub gatillo: Option<EntradaCapturaUI>,
+
+    pub condicion: String,
+}
+
+// ======================================================
 // 📦 RESULTADO PERFIL
 // ======================================================
 
@@ -584,6 +612,54 @@ fn convertir_fuente(tipo: &str) -> &'static str {
 }
 
 // ======================================================
+// 🔄 INPUTID → ENTRADA UI
+// ======================================================
+
+fn convertir_input_captura(input: &crate::eventos::InputId) -> EntradaCapturaUI {
+    let fuente = match input.fuente().unwrap_or("") {
+        "keyboard" => "Teclado",
+
+        "mouse" => "Mouse",
+
+        "multimedia" => "Multimedia",
+
+        "joystick" => "Joystick",
+
+        _ => "Desconocido",
+    };
+
+    let codigo = input.control().unwrap_or("").to_string();
+
+    let nombre = codigo.clone();
+
+    EntradaCapturaUI {
+        tipo: fuente.to_string(),
+
+        codigo,
+
+        nombre,
+    }
+}
+
+// ======================================================
+// 🔄 EVENTOTRIGGER → TRIGGER UI
+// ======================================================
+
+fn convertir_trigger_captura(trigger: EventoTrigger) -> TriggerCapturaUI {
+    TriggerCapturaUI {
+        modificadores: trigger
+            .modificadores
+            .iter()
+            .map(convertir_input_captura)
+            .collect(),
+
+        gatillo: Some(convertir_input_captura(&trigger.gatillo)),
+
+        condicion: format!("{:?}", trigger.condicion),
+    }
+}
+
+// ======================================================
 // 🎹 INICIAR CAPTURA
 // ======================================================
 
@@ -599,8 +675,8 @@ pub fn iniciar_captura() {
 // ======================================================
 
 #[tauri::command]
-pub fn obtener_captura() -> Option<EventoTrigger> {
-    crate::captura::obtener()
+pub fn obtener_captura() -> Option<TriggerCapturaUI> {
+    crate::captura::obtener().map(convertir_trigger_captura)
 }
 
 // ======================================================
