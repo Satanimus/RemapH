@@ -57,6 +57,8 @@ pub fn run() {
             comandos::seleccionar_perfil,
             comandos::listar_procesos_ventana,
             comandos::obtener_icono_programa,
+            comandos::obtener_tiempo_doble,
+            comandos::establecer_tiempo_doble,
         ])
         .run(tauri::generate_context!())
         .expect("error al ejecutar Tauri");

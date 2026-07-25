@@ -286,6 +286,20 @@ pub fn obtener_estado_cache() -> bool {
 }
 
 // ======================================================
+// ⏱️ CONFIGURACIÓN TIEMPO DOBLE
+// ======================================================
+
+#[tauri::command]
+pub fn obtener_tiempo_doble() -> u64 {
+    crate::config::tiempo_doble()
+}
+
+#[tauri::command]
+pub fn establecer_tiempo_doble(valor: u64) {
+    crate::config::establecer_tiempo_doble(valor);
+}
+
+// ======================================================
 // 🔄 RESTAURAR PERFIL ACTUAL
 // ======================================================
 
