@@ -1,474 +1,211 @@
-PLAN — Nuevo sistema de análisis de triggers RemapH V3
-Objetivo final
+PLAN — Refactorización Capturador / Analizador V3
+Objetivo general
 
-Pasar de:
+Eliminar toda la lógica duplicada entre Capturador y Analizador.
 
-InputEvent
-↓
-"¿es modificador conocido?"
-↓
-"si no, es gatillo"
-↓
-EventoTrigger
+Al finalizar:
 
-a:
-
-InputEvent
-↓
-AnalizadorTrigger
-↓
-Lista temporal de posibilidades
-↓
-Consulta Cache
-↓
-Decisión: - esperar - liberar - ejecutar remapeo
-ETAPA 1 — Redefinir la responsabilidad del AnalizadorTrigger
+existe un solo algoritmo que interpreta triggers.
+el Runtime y el botón Capturar usan exactamente el mismo analizador.
+el Capturador sólo graba InputEvents.
+ETAPA 1 — Simplificar Capturador
 Objetivo
 
-Eliminar la idea de:
+Convertir Capturador en un grabador de eventos.
 
-"algunas teclas son modificadores"
+Archivos
+capturador_trigger.rs
+Cambios
 
-y reemplazarla por:
+Eliminar completamente:
 
-"cualquier input puede participar en un trigger".
+construir()
+inputs_down()
+EventoTrigger::simple()
+cualquier decisión sobre modificadores
+cualquier decisión sobre gatillo
 
-Pasos generales
-1.1 Eliminar dependencia de modificadores predefinidos
+Agregar solamente:
 
-Eliminar progresivamente:
+eventos() -> &[InputEvent]
 
-cache::es_modificador()
+para entregar el buffer completo.
 
-como criterio de análisis.
+Debe conservar:
 
-La cache será la única fuente de verdad.
+recibir()
+comprobar_timeout()
+limpiar()
+Resultado esperado
 
-1.2 Cambiar estado interno del analizador
-
-Actualmente:
-
-AnalizadorTrigger
-{
-modificadores_activos
-}
-
-Cambiar hacia:
-
-AnalizadorTrigger
-{
-eventos_pendientes
-}
-
-Guardando:
-
-InputId
-Estado
-Instante
-1.3 Mantener orden físico
-
-El analizador debe respetar:
-
-primer Down
-segundo Down
-tercer Down
-...
-último Down = gatillo
-
-Ejemplo:
-
-Ctrl Down
-A Down
-Mouse Down
-
-produce:
-
-Modificadores:
-Ctrl
-A
-
-Gatillo:
-Mouse
-1.4 Validar arquitectura
-
-Al terminar esta etapa:
-
-Debe existir una base donde cualquier dispositivo pueda ser:
-
-modificador
-gatillo
-acción
-ETAPA 2 — Crear motor de candidatos usando Cache
-Objetivo
-
-Que el analizador pueda preguntar:
-
-"¿Esto todavía puede convertirse en algún trigger?"
-
-Pasos generales
-2.1 Extender Cache
-
-Actualmente tenemos:
-
-buscar()
-tiene_prefijo()
-
-Evolucionar hacia consultas más generales:
-
-Ejemplo:
-
-Entrada:
-
-[
-Ctrl
-]
-
-Respuesta:
-
-Puede continuar:
-Ctrl+A
-Ctrl+B
-Ctrl+Mouse
-2.2 Crear concepto de candidato
-
-El analizador debe poder recibir:
-
-Ctrl
-
-y saber:
-
-esperar
-
-No porque Ctrl sea modificador.
-
-Sino porque:
-
-existe un trigger que comienza así.
-2.3 Resolver tres estados posibles
-
-El analizador debe devolver internamente:
-
-ESPERAR
-
-LIBERAR
-
-COINCIDENCIA
-
-Ejemplo:
-
-Caso 1
-A
-
-Cache:
-
-A doble
-
-Resultado:
-
-ESPERAR
-Caso 2
-X
-
-Cache:
-
-Ctrl+A
-
-Resultado:
-
-LIBERAR X
-Caso 3
-Ctrl+A
-
-Cache:
-
-Ctrl+A
-
-Resultado:
-
-COINCIDENCIA
-ETAPA 3 — Implementar condición Simple / Doble / Mantenido
-Objetivo
-
-Que el analizador pueda diferenciar:
-
-A
-A x2
-A mantenido
-Pasos generales
-3.1 Simple
-
-Regla:
-
-A Down
-esperar tiempoDoble
-
-Si no ocurre:
-
-A = Simple
-3.2 Doble
-
-Ejemplo:
-
-A Down
-A Up
-A Down
-
-Dentro de:
-
-CONFIG_CAPTURA.tiempoDoble
-
-Resultado:
-
-A = Doble
-3.3 Mantenido
-
-Ejemplo:
-
-A Down
-...
-300ms
-...
-A sigue presionado
-
-Resultado:
-
-A = Mantenido
-
-Usando:
-
-tiempoMantenido
-ETAPA 4 — Rediseñar EventoTrigger
-Objetivo
-
-Que represente correctamente el resultado del análisis.
-
-Actualmente:
-
-EventoTrigger
-{
-modificadores
-gatillo
-condición
-}
-
-Está bien como concepto.
-
-Pero debemos decidir si necesita agregar:
-
-orden original
-
-o
-
-secuencia
-
-para soportar:
-
-Ctrl+A+Click
-
-y futuras variantes.
-
-Pasos:
-
-4.1 Revisar estructura
-
-Confirmar que soporta:
-
-Mouse como modificador
-Joystick como modificador
-Teclado como gatillo
-4.2 Mantener Runtime limpio
-
-Runtime sigue sin saber:
-
-tiempos
-buffers
-doble tap
-mantenido
-ETAPA 5 — Adaptar Runtime
-Objetivo
-
-Que Runtime trabaje con el nuevo resultado.
-
-Pasos generales
-5.1 Mantener filosofía
-
-Runtime:
-
-NO:
-
-analiza
-espera
-decide
-
-Solo:
-
-EventoTrigger
-↓
-buscar cache
-↓
-ejecutar acción
-5.2 Implementar consumo correcto
-
-Cuando hay coincidencia:
-
-Debe:
-
-Consumir todos los inputs involucrados
-
-Ejemplo:
-
-Ctrl+A
-
-No debe pasar:
-
-Ctrl
-A
-
-a Windows.
-
-ETAPA 6 — Capturador UI usando el mismo analizador
-Objetivo
-
-Que captura y runtime tengan exactamente la misma lógica.
-
-Ejemplo:
-
-Usuario captura:
-
-Ctrl+A+Click mantenido
-
-Debe guardar:
-
-Modificadores:
-Ctrl
-A
-
-Gatillo:
-Click
-
-Condición:
-Mantenido
-
-Pasos:
-
-6.1 Eliminar lógica paralela del capturador
-
-No crear:
-
-Analizador captura
-Analizador runtime
-
-Debe existir:
-
-Un único sistema de interpretación.
-6.2 Conectar captura con cache temporal
-
-Durante captura:
-
-Puede usar:
-
-perfil actual
-remapeos existentes
-modo captura especial
-ETAPA 7 — Configuración editable de tiempos
-Objetivo
-
-Que exista:
-
-En UI:
-
-Tiempo Doble: 250ms
-Tiempo Mantenido: 300ms
-
-Pasos:
-
-7.1 Mantener fuente única
-
-No duplicar:
-
-frontend 250
-backend 250
-7.2 Guardar configuración
-
-Flujo:
-
-UI
-↓
-Configuración
-↓
-Persistencia
-↓
-Analizador
-ETAPA 8 — Nuevo sistema "+" de restricciones
-Objetivo
-
-Preparar futuras condiciones.
-
-Primera versión:
-
-Popup:
-
-- |
-  └── Win +
-
-Arquitectura futura:
+Capturador deja de conocer:
 
 Trigger
-|
-+-- Inputs
-|
-+-- Restricciones
-|
-+-- Monitor
-+-- Posición mouse
-+-- Programa
-+-- Estado dispositivo
-ETAPA 9 — Limpieza final
+Modificadores
+Gatilo
+Simple
+Doble
+Mantenido
+
+Sólo conoce:
+
+Vec<InputEvent>
+Punto crítico
+
+Ninguno.
+
+Sólo afecta un archivo.
+
+ETAPA 2 — Enseñar al Analizador a analizar capturas
 Objetivo
 
-Eliminar restos de arquitectura vieja.
+Mover TODA la interpretación al Analizador.
 
-Revisión:
+Archivos
+analizador_trigger.rs
+Cambios
 
-nombres internos
-comentarios antiguos
-funciones obsoletas
-tests
-documentación
-Orden recomendado de ejecución
+Agregar:
 
-La secuencia correcta sería:
+analizar_captura(eventos)
 
-1. AnalizadorTrigger nuevo
-   ↓
-2. Cache preparada para candidatos
-   ↓
-3. Condiciones Simple/Doble/Mantenido
-   ↓
-4. EventoTrigger definitivo
-   ↓
-5. Runtime adaptado
-   ↓
-6. Captura usando mismo sistema
-   ↓
-7. Configuración editable
-   ↓
-8. Restricciones "+"
-   ↓
-9. Limpieza
-   Punto de control importante
+Esta función:
 
-Cuando terminemos la Etapa 5, RemapH ya debería ser capaz de:
+recibe un Vec<InputEvent>
+reconstruye presionados
+aplica exactamente el mismo algoritmo
+devuelve EventoTrigger
 
-✅ Ctrl+A
-✅ Ctrl+A mantenido
-✅ A doble
-✅ Mouse+Mouse
-✅ Joystick+Teclado
-✅ Orden de pulsación real
-✅ Sin depender de "teclas modificadoras conocidas"
+No consulta Runtime.
 
-Ese será el primer estado realmente sólido de la arquitectura nueva.
+No ejecuta acciones.
+
+No consulta captura.
+
+Sólo interpreta.
+
+Punto crítico
+
+Aquí desaparece definitivamente la lógica duplicada.
+
+ETAPA 3 — Conectar Captura
+Objetivo
+
+Cambiar Entrada.
+
+Archivos
+entrada.rs
+
+Actualmente:
+
+Capturador
+↓
+
+construir()
+↓
+
+Captura
+
+Debe quedar:
+
+Capturador
+
+↓
+
+timeout
+
+↓
+
+Analizador::analizar_captura()
+
+↓
+
+Captura
+Punto crítico
+
+Entrada deja de construir triggers.
+
+ETAPA 4 — Unificar algoritmo interno
+Objetivo
+
+Que Runtime y Captura usen exactamente el mismo motor.
+
+Archivo
+analizador_trigger.rs
+
+Hoy existen caminos distintos.
+
+Quedará:
+
+Runtime
+↓
+Motor
+
+Captura
+↓
+Motor
+
+Una sola implementación.
+
+Punto crítico
+
+No debe cambiar el comportamiento del Runtime.
+
+ETAPA 5 — Limpiar responsabilidades
+Archivos
+capturador_trigger.rs
+analizador_trigger.rs
+entrada.rs
+
+Eliminar código muerto.
+
+Eliminar funciones que ya no existen.
+
+Eliminar imports.
+
+Eliminar comentarios antiguos.
+
+ETAPA 6 — Compilación
+Revisar
+
+Todos los errores.
+
+No agregar hacks.
+
+No agregar variables temporales.
+
+No modificar Runtime.
+
+Resultado esperado
+
+La arquitectura queda así:
+
+Hook
+
+↓
+
+InputEvent
+
+↓
+
+Capturador (solo graba)
+│
+│ timeout
+▼
+
+AnalizadorTrigger
+│
+├──────────────► Runtime
+│
+└──────────────► Captura/UI
+Ventajas obtenidas
+✅ Una sola lógica de interpretación.
+✅ Un solo lugar donde se decide qué es un trigger.
+✅ El botón Capturar y el Runtime hablan exactamente el mismo lenguaje.
+✅ Se elimina la mayor fuente de inconsistencias del proyecto.
+✅ Facilita la futura optimización que comentaste: filtrar primero por caché y sólo analizar tiempos cuando realmente exista una combinación candidata con condición Doble o Mantenido.
+
+Creo que esta es una base mucho más sólida para seguir evolucionando el sistema sin volver a caer en duplicación de lógica.
 
 //////////////////////////////////////////////
 📌Solución BUG hook teclado: Agregar esta linea en src-tauri\src\lib.rs

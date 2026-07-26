@@ -236,7 +236,7 @@ unsafe extern "system" fn hook_mouse(codigo: i32, wparam: WPARAM, lparam: LPARAM
         return CallNextHookEx(std::ptr::null_mut(), codigo, wparam, lparam);
     };
 
-    let consumido = evaluar(evento);
+    let consumido = false;
 
     if consumido {
         println!("[TECLADO RAW] Bloqueado");
