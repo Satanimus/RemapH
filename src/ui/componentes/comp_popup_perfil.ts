@@ -13,14 +13,14 @@ import { confirmarPopup } from "./comp_popup_confirmar";
 
 import { obtenerPerfilUi } from "../../core/core_perfil_ui";
 
-import type { PerfilJson } from "../../core/core_perfil_json";
+import type { perfil_json } from "../../core/core_perfil_json";
 
 // ======================================================
 // RESULTADO PERFIL
 // ======================================================
 
 export interface ResultadoPerfil {
-  perfil: PerfilJson;
+  perfil: perfil_json;
 
   nombre: string;
 

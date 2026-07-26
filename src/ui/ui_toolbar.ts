@@ -23,7 +23,7 @@ import { abrirPopupPerfil } from "./componentes/comp_popup_perfil";
 
 import type { ResultadoPerfil } from "./componentes/comp_popup_perfil";
 
-import { convertirPerfilJson } from "../core/core_perfil_json";
+import { convertirperfil_json } from "../core/core_perfil_json";
 
 import { establecerPerfilUi } from "../core/core_perfil_ui";
 
@@ -239,7 +239,7 @@ function aplicarResultadoPerfil(
   cacheDot: HTMLElement,
   resultado: ResultadoPerfil,
 ): void {
-  const perfil = convertirPerfilJson(resultado.perfil);
+  const perfil = convertirperfil_json(resultado.perfil);
 
   establecerPerfilUi(perfil);
 

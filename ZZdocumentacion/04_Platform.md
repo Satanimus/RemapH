@@ -217,7 +217,7 @@ UI
 ↓
 Tauri
 ↓
-PerfilJson
+perfil_json
 ↓
 Persistencia / Compilador
 ```

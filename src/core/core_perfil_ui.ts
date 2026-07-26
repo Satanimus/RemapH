@@ -7,7 +7,7 @@
 //   - Mantiene el Perfil actual de la UI.
 //   - Permite reemplazarlo al cargar JSON.
 //
-// PerfilJson
+// perfil_json
 //      ↓
 // Conversión
 //      ↓

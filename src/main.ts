@@ -12,9 +12,9 @@ import { crearApp } from "./ui/ui_app";
 
 import { establecerPerfilUi, obtenerPerfilUi } from "./core/core_perfil_ui";
 
-import { convertirPerfilJson } from "./core/core_perfil_json";
+import { convertirperfil_json } from "./core/core_perfil_json";
 
-import type { PerfilJson } from "./core/core_perfil_json";
+import type { perfil_json } from "./core/core_perfil_json";
 
 // ======================================================
 // 💾 GUARDAR Y ACTIVAR PERFIL
@@ -39,9 +39,9 @@ async function guardarPerfil(): Promise<void> {
 // ======================================================
 
 async function iniciarApp(): Promise<void> {
-  const perfilJson = await invoke<PerfilJson>("obtener_perfil_actual");
+  const perfil_json = await invoke<perfil_json>("obtener_perfil_actual");
 
-  const perfil = convertirPerfilJson(perfilJson);
+  const perfil = convertirperfil_json(perfil_json);
 
   establecerPerfilUi(perfil);
 

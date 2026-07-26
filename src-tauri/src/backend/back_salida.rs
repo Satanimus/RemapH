@@ -18,7 +18,7 @@
 
 use interception::{Interception, KeyState, Stroke};
 
-use crate::perfilcache::AccionCache;
+use crate::perfil_cache::AccionCache;
 
 // ======================================================
 // 📦 SALIDA

@@ -2,11 +2,11 @@
 // 🔨 Compilador RemapH V3
 // ======================================================
 //
-// PerfilJson
+// perfil_json
 //     ↓
 // Compilador
 //     ↓
-// PerfilCache
+// perfil_cache
 //     ↓
 // Cache
 // ======================================================
@@ -15,9 +15,9 @@ use crate::cache;
 
 use crate::eventos::InputId;
 
-use crate::perfilcache::{AccionCache, AppCache, CondicionTrigger, RemapeoCache, TriggerCache};
+use crate::perfil_cache::{AccionCache, AppCache, CondicionTrigger, RemapeoCache, TriggerCache};
 
-use crate::perfiljson::{AppJson, PerfilJson, RemapeoJson};
+use crate::perfil_json::{perfil_json, AppJson, RemapeoJson};
 
 use std::collections::HashSet;
 
@@ -25,7 +25,7 @@ use std::collections::HashSet;
 // ⚙️ COMPILAR PERFIL
 // ======================================================
 
-pub fn compilar_perfil(perfil: &PerfilJson) -> Vec<RemapeoCache> {
+pub fn compilar_perfil(perfil: &perfil_json) -> Vec<RemapeoCache> {
     let conflictivos = indices_conflictivos(perfil);
 
     perfil
@@ -49,7 +49,7 @@ pub fn compilar_perfil(perfil: &PerfilJson) -> Vec<RemapeoCache> {
 // ⚠️ ÍNDICES CONFLICTIVOS
 // ======================================================
 
-fn indices_conflictivos(perfil: &PerfilJson) -> HashSet<usize> {
+fn indices_conflictivos(perfil: &perfil_json) -> HashSet<usize> {
     let mut resultado = HashSet::new();
 
     for indice_a in 0..perfil.remapeos.len() {
@@ -129,7 +129,7 @@ fn apps_conflictivas(fila_a: &RemapeoJson, fila_b: &RemapeoJson) -> bool {
     }
 }
 
-pub fn compilar(perfil: &PerfilJson) {
+pub fn compilar(perfil: &perfil_json) {
     let remapeos = compilar_perfil(perfil);
 
     let cantidad = remapeos.len();

@@ -8,7 +8,7 @@ use std::sync::mpsc::Sender;
 
 use crate::cache;
 use crate::evento_trigger::EventoTrigger;
-use crate::perfilcache::AccionCache;
+use crate::perfil_cache::AccionCache;
 
 // ======================================================
 // ⚙️ RESULTADO

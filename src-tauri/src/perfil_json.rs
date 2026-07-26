@@ -1,16 +1,16 @@
 // ======================================================
-// 👤 PerfilJson RemapH V3
+// 👤 perfil_json RemapH V3
 // ------------------------------------------------------
 // Modelo persistente del perfil.
 //
-// PerfilJson representa la tabla de la UI.
+// perfil_json representa la tabla de la UI.
 //
 // El número de fila no se guarda.
 // El orden dentro del Vec determina el número.
 //
 // JSON
 //   ↓
-// PerfilJson
+// perfil_json
 // ======================================================
 
 use crate::idioma::Input;
@@ -20,7 +20,7 @@ use crate::idioma::Input;
 // ======================================================
 
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
-pub struct PerfilJson {
+pub struct perfil_json {
     pub remapeos: Vec<RemapeoJson>,
 }
 
@@ -68,7 +68,7 @@ pub struct TriggerJson {
 // 🚀 CREAR PERFIL JSON
 // ======================================================
 
-impl PerfilJson {
+impl perfil_json {
     pub fn nuevo() -> Self {
         Self {
             remapeos: Vec::new(),

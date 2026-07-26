@@ -1,12 +1,12 @@
 // ======================================================
 // 🔄 core_Perfil_Json RemapH V3
 // ------------------------------------------------------
-// Convierte PerfilJson recibido desde Rust
+// Convierte perfil_json recibido desde Rust
 // al modelo Perfil utilizado por la UI.
 //
 // Rust
 //   ↓
-// PerfilJson
+// perfil_json
 //   ↓
 // Este módulo
 //   ↓
@@ -28,7 +28,7 @@ import { crearTrigger } from "./core_trigger";
 // 📦 MODELO JSON
 // ======================================================
 
-export interface PerfilJson {
+export interface perfil_json {
   remapeos: RemapeoJson[];
 }
 
@@ -80,11 +80,11 @@ interface InputJson {
 // 🔄 CONVERTIR PERFIL
 // ======================================================
 
-export function convertirPerfilJson(perfilJson: PerfilJson): Perfil {
+export function convertirperfil_json(perfil_json: perfil_json): Perfil {
   return {
     activo: true,
 
-    filas: perfilJson.remapeos.map(convertirRemapeo),
+    filas: perfil_json.remapeos.map(convertirRemapeo),
   };
 }
 

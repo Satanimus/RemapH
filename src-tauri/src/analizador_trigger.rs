@@ -25,7 +25,7 @@
 
 use crate::evento_trigger::EventoTrigger;
 use crate::eventos::{InputEvent, InputId, InputState};
-use crate::perfilcache::CondicionTrigger;
+use crate::perfil_cache::CondicionTrigger;
 
 use std::time::{Duration, Instant};
 

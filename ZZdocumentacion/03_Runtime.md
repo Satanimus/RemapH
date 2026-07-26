@@ -90,11 +90,11 @@ El flujo de configuración es:
 ```
 UI
 ↓
-PerfilJson
+perfil_json
 ↓
 Compilador
 ↓
-PerfilCache
+perfil_cache
 ↓
 Cache
 ```
@@ -119,7 +119,7 @@ Salida física
 
 # 📄 4. Modelo persistente
 
-La configuración persistente se representa mediante `PerfilJson`.
+La configuración persistente se representa mediante `perfil_json`.
 
 El modelo contiene la información necesaria para reconstruir la configuración del usuario.
 
@@ -132,9 +132,9 @@ El Runtime no lee directamente este modelo.
 `compilador.rs` convierte:
 
 ```
-PerfilJson
+perfil_json
 ↓
-PerfilCache
+perfil_cache
 ↓
 Cache
 ```
@@ -153,7 +153,7 @@ El compilador no ejecuta acciones.
 
 # 📦 6. Perfil compilado
 
-`perfilcache.rs` define las estructuras internas del Runtime.
+`perfil_cache.rs` define las estructuras internas del Runtime.
 
 ```
 RemapeoCache

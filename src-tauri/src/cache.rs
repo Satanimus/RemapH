@@ -3,7 +3,7 @@
 // ======================================================
 
 use crate::eventos::InputId;
-use crate::perfilcache::{CondicionTrigger, RemapeoCache};
+use crate::perfil_cache::{CondicionTrigger, RemapeoCache};
 
 use std::collections::HashSet;
 use std::sync::{Mutex, OnceLock};

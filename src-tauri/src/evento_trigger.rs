@@ -1,35 +1,80 @@
 // ======================================================
-// 🎯 EventoTrigger RemapH V3
+// 🎯 EVENTOTRIGGER RemapH V3
+// ======================================================
+// ETAPA 2 DEL FLUJO
 // ------------------------------------------------------
-// Representa un trigger ya analizado.
+// 1. ¿Qué hace este archivo?
+// Representa un Trigger completamente interpretado.
+// Aquí ya desaparecieron:
+// - Down.
+// - Up.
+// - Instantes.
+// - Buffer.
+// - Eventos físicos.
 //
-// Flujo:
+// Sólo existe la intención detectada.
 //
-// InputEvent físico
-//        ↓
-// BufferEventos
-//        ↓
+// El Runtime nunca analiza tiempos.
+// Sólo recibe este objeto.
+// ------------------------------------------------------
+// 2. ¿Quién llama este archivo?
+// AnalizadorTrigger.
+//
+// ------------------------------------------------------
+// 3. ¿Qué información recibe?
+// El AnalizadorTrigger ya determinó:
+//
+// - Modificadores activos.
+// - Gatillo.
+// - Tipo de trigger.
+//
+// Ejemplo:
+//
+// Ctrl
+// Shift
+// A
+// Doble
+//
+// ------------------------------------------------------
+// 4. ¿Qué información entrega?
+// EventoTrigger.
+//
+// Ejemplo:
+//
+// EventoTrigger {
+//     modificadores: [keyboard:LeftCtrl, keyboard:LeftShift],
+//     gatillo: keyboard:A,
+//     condicion: Doble,
+// }
+//
+// ------------------------------------------------------
+// 5. Funciones del archivo
+//
+// simple()
+//     Construye un trigger Simple.
+//
+// doble()
+//     Construye un trigger Doble.
+//
+// mantenido()
+//     Construye un trigger Mantenido.
+//
+// ------------------------------------------------------
+// Transformación que realiza
+//
+// InputEvents físicos
+//          ↓
 // AnalizadorTrigger
-//        ↓
-// EventoTrigger
-//
-// Aquí ya no existen:
-//   - Down.
-//   - Up.
-//   - Tiempos.
-//   - Buffer.
-//
-// Solo existe la intención detectada:
-//   - Simple.
-//   - Doble.
-//   - Mantenido.
-//
-// También conserva:
-//   - Modificadores activos.
+//          ↓
+// EventoTrigger {
+//     modificadores,
+//     gatillo,
+//     condicion,
+// }
 // ======================================================
 
 use crate::eventos::InputId;
-use crate::perfilcache::CondicionTrigger;
+use crate::perfil_cache::CondicionTrigger;
 use serde::{Deserialize, Serialize};
 
 // ======================================================

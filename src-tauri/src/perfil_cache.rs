@@ -1,13 +1,13 @@
 // ======================================================
-// 📦 PerfilCache RemapH V3
+// 📦 perfil_cache RemapH V3
 // ------------------------------------------------------
 // Modelo interno compilado.
 //
-// PerfilJson
+// perfil_json
 //     ↓
 // Compilador
 //     ↓
-// PerfilCache
+// perfil_cache
 //     ↓
 // Cache
 //     ↓

@@ -14,121 +14,39 @@ En cada uno de ellos agrega un ejemplo del formato de info que maneja o como se 
 
 El objetivo: cada archivo será una etapa. Cada etapa tendrá su resumen y detalle en el encabezado. Si queda algo pendiente de analizar lo notaremos al instante por incongruencias. Si hay que modificar algo luego sabremos al instante donde ubicarlo.
 
-////////resumen de 12 archivos en orden///////////////////////////////////////////////////
-Orden definitivo
-ETAPA 1 — Base del modelo
+////////resumen de 13 archivos en orden///////////////////////////////////////////////////
+Orden definitivo:
+Etapa 1 Base del modelo. Estos archivos definen las estructuras que utilizarán todos los demás.
+-instante.rs
+-eventos.rs
+-perfil_cache.rs
 
-Estos archivos definen las estructuras que utilizarán todos los demás.
+ETAPA 2 — Cache. Aquí definimos cómo responde la cache.
+-cache.rs
 
-eventos.rs
-evento_trigger.rs
-perfilcache.rs
-ETAPA 2 — Cache
+ETAPA 3 — Analizador (para runtime y captura).(coincidencias, prefijos, candidatos, doble, liberación,etc)
+-analizador_trigger.rs
+-evento_trigger.rs
 
-Aquí definimos cómo responde la cache.
-
-cache.rs
-
-Aquí desaparecerá la lógica antigua (buscar, tiene_condiciones_posibles, etc.) y quedará únicamente la API definitiva que utilizará el Analizador.
-
-ETAPA 3 — Analizador
-
-Es el corazón del sistema.
-
-analizador_trigger.rs
-
-Este será probablemente el archivo más grande de la migración.
-
-Aquí quedará toda la lógica de:
-
-coincidencias
-prefijos
-candidatos
-doble
-mantenido
-simple
-liberación
-
-Tanto Runtime como Captura usarán exactamente este motor.
-
-ETAPA 4 — Captura
-
-Ahora que el Analizador ya sabe interpretar secuencias completas.
-
-capturador_trigger.rs
-captura.rs
-
-Estos archivos quedarán muy pequeños.
-
-Captura solamente almacenará InputEvent.
-
-Nada más.
+ETAPA 4 — Captura. Ahora que el Analizador ya sabe interpretar secuencias completas.
+-capturador_trigger.rs
+-captura.rs
 
 ETAPA 5 — Entrada
+-entrada.rs
 
-Cuando todo lo anterior ya exista.
+ETAPA 6 — Runtime. Cuando el Analizador ya entregue un EventoTrigger definitivo.
 
-entrada.rs
+-runtime.rs
 
-Aquí simplemente elegirá:
-
-Modo captura
-
-↓
-
-guardar InputEvent
-
-↓
-
-timeout
-
-↓
-
-analizador
-
-o
-
-Modo runtime
-
-↓
-
-analizador
-
-No habrá lógica duplicada.
-
-ETAPA 6 — Runtime
-
-Cuando el Analizador ya entregue un EventoTrigger definitivo.
-
-runtime.rs
-
-Aquí prácticamente desaparecerá toda la lógica relacionada con triggers.
-
-Runtime solamente hará:
-
-EventoTrigger
-
-↓
-
-buscar acción
-
-↓
-
-emitir
 ETAPA 7 — Salida
-back_salida.rs
-
-Aquí probablemente no cambie casi nada.
+-back_salida.rs
 
 ETAPA 8 — Diccionarios
-pulsadores.rs
-
-Sólo si es necesario.
+-pulsadores.rs
 
 ETAPA 9 — Configuración
 config.rs
-
-Ajustar tiempos si hace falta.
 
 ////////////////////////////////////////////////////////////////
 PLAN — Refactorización Capturador / Analizador V3

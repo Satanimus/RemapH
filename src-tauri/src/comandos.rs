@@ -5,7 +5,7 @@
 //
 // UI
 //  ↓
-// PerfilJson
+// perfil_json
 //  ↓
 // Usuario
 //  ↓
@@ -22,7 +22,7 @@ use crate::cache;
 use crate::compilador;
 use crate::estado;
 use crate::evento_trigger::EventoTrigger;
-use crate::perfiljson::{AppJson, PerfilJson, RemapeoJson, TriggerJson};
+use crate::perfil_json::{perfil_json, AppJson, RemapeoJson, TriggerJson};
 use crate::persistencia;
 use crate::usuario;
 use serde::{Deserialize, Serialize};
@@ -127,7 +127,7 @@ pub struct TriggerCapturaUI {
 
 #[derive(Serialize)]
 pub struct ResultadoPerfil {
-    pub perfil: PerfilJson,
+    pub perfil: perfil_json,
 
     pub nombre: String,
 
@@ -207,11 +207,11 @@ pub fn compilar_perfil(filas: Vec<FilaUI>) -> Result<bool, String> {
 // ======================================================
 
 #[tauri::command]
-pub fn obtener_perfil_actual() -> Result<PerfilJson, String> {
+pub fn obtener_perfil_actual() -> Result<perfil_json, String> {
     let ruta = usuario::perfil_actual()?;
 
     if !ruta.exists() {
-        let perfil = PerfilJson::nuevo();
+        let perfil = perfil_json::nuevo();
 
         persistencia::guardar(&perfil, &ruta)?;
 
@@ -308,7 +308,7 @@ pub fn restaurar_perfil_actual() -> Result<ResultadoPerfil, String> {
     let ruta = usuario::perfil_actual()?;
 
     if !ruta.exists() {
-        let perfil = PerfilJson::nuevo();
+        let perfil = perfil_json::nuevo();
 
         persistencia::guardar(&perfil, &ruta)?;
     }
@@ -418,7 +418,7 @@ pub fn eliminar_perfil_actual() -> Result<ResultadoPerfil, String> {
 
     let nombre = "Default".to_string();
 
-    let perfil = PerfilJson::nuevo();
+    let perfil = perfil_json::nuevo();
 
     let ruta = usuario::ruta_perfil(&nombre)?;
 
@@ -439,7 +439,7 @@ pub fn crear_perfil_nuevo() -> Result<ResultadoPerfil, String> {
 
     let nombre = siguiente_nombre("Default")?;
 
-    let perfil = PerfilJson::nuevo();
+    let perfil = perfil_json::nuevo();
 
     let ruta = usuario::ruta_perfil(&nombre)?;
 
@@ -481,7 +481,7 @@ pub fn seleccionar_perfil(nombre: String) -> Result<ResultadoPerfil, String> {
 // 📦 CREAR RESULTADO
 // ======================================================
 
-fn resultado_perfil(perfil: PerfilJson, nombre: String) -> Result<ResultadoPerfil, String> {
+fn resultado_perfil(perfil: perfil_json, nombre: String) -> Result<ResultadoPerfil, String> {
     Ok(ResultadoPerfil {
         perfil,
 
@@ -523,7 +523,7 @@ fn siguiente_nombre(base: &str) -> Result<String, String> {
 // 🔄 SINCRONIZAR ESTADO CON CACHE
 // ======================================================
 
-fn sincronizar_estado_cache(perfil: &PerfilJson) {
+fn sincronizar_estado_cache(perfil: &perfil_json) {
     if perfil.remapeos.iter().any(|remapeo| remapeo.estado == "ON") {
         estado::activar();
     } else {
@@ -535,10 +535,10 @@ fn sincronizar_estado_cache(perfil: &PerfilJson) {
 // 🔄 CONVERTIR PERFIL
 // ======================================================
 
-fn convertir_perfil(filas: Vec<FilaUI>) -> PerfilJson {
+fn convertir_perfil(filas: Vec<FilaUI>) -> perfil_json {
     let remapeos = filas.into_iter().map(convertir_fila).collect();
 
-    PerfilJson { remapeos }
+    perfil_json { remapeos }
 }
 
 // ======================================================

@@ -16,7 +16,7 @@ use crate::capturador_trigger::CapturadorTrigger;
 use crate::cache;
 use crate::captura;
 use crate::eventos::InputEvent;
-use crate::perfilcache::AccionCache;
+use crate::perfil_cache::AccionCache;
 use crate::runtime;
 
 use std::collections::HashSet;

@@ -116,7 +116,7 @@ Mantener el Perfil que la interfaz está editando actualmente.
 
 Flujo:
 
-PerfilJson
+perfil_json
 ↓
 Conversión en Tauri
 ↓
@@ -614,13 +614,13 @@ El Runtime recibe InputEvent.
 
 No recibe directamente eventos de Interception ni Windows.
 
-📦 perfiljson.rs
+📦 perfil_json.rs
 
 Etapa: Modelo persistente.
 
 Contiene:
 
-PerfilJson
+perfil_json
 RemapeoJson
 TriggerJson
 
@@ -628,7 +628,7 @@ Representa el perfil almacenado en JSON.
 
 No es el modelo del Runtime.
 
-📦 perfilcache.rs
+📦 perfil_cache.rs
 
 Etapa: Modelo compilado.
 
@@ -650,11 +650,11 @@ Etapa: Compilación de perfiles.
 
 Flujo:
 
-PerfilJson
+perfil_json
 ↓
 Compilador
 ↓
-PerfilCache
+perfil_cache
 ↓
 Cache
 
@@ -742,7 +742,7 @@ No conoce Runtime.
 
 💾 persistencia.rs
 
-Etapa: Lectura y escritura de PerfilJson.
+Etapa: Lectura y escritura de perfil_json.
 
 Responsabilidad:
 
@@ -763,7 +763,7 @@ Responsabilidad:
 
 Recibir datos de la UI.
 
-Convertirlos a PerfilJson.
+Convertirlos a perfil_json.
 
 Exponer comandos para:
 
@@ -780,7 +780,7 @@ UI
 ↓
 Tauri
 ↓
-PerfilJson
+perfil_json
 ↓
 Persistencia / Compilador
 
@@ -894,13 +894,13 @@ Perfil UI
 ↓
 Tauri
 ↓
-PerfilJson
+perfil_json
 ↓
 Persistencia
 ↓
 Compilador
 ↓
-PerfilCache
+perfil_cache
 ↓
 Cache
 ↓
