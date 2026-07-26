@@ -1,12 +1,12 @@
 // ======================================================
 // 🎹 Capturador Trigger RemapH V3
 // ------------------------------------------------------
-// Construye un EventoTrigger para edición.
+// Graba InputEvent físicos durante una captura.
 //
+// No interpreta.
 // No consulta Cache.
 // No conoce Runtime.
-// No consume eventos.
-// No libera eventos.
+// No construye EventoTrigger.
 //
 // Flujo:
 //
@@ -14,13 +14,12 @@
 //      ↓
 // CapturadorTrigger
 //      ↓
-// EventoTrigger
+// Vec<InputEvent>
 //      ↓
-// Captura
+// AnalizadorTrigger
 // ======================================================
 
-use crate::evento_trigger::EventoTrigger;
-use crate::eventos::{InputEvent, InputId, InputState};
+use crate::eventos::InputEvent;
 
 use std::time::Instant;
 
@@ -58,10 +57,13 @@ impl CapturadorTrigger {
     }
 
     // ==================================================
-    // ⏱️ FINALIZAR CAPTURA
+    // ⏱️ ESPERAR SILENCIO
+    // --------------------------------------------------
+    // Devuelve true cuando no han llegado nuevos eventos
+    // durante el tiempo de espera configurado.
     // ==================================================
 
-    pub fn terminado(&self) -> bool {
+    pub fn comprobar_timeout(&self) -> bool {
         let Some(ultimo) = self.ultimo_evento else {
             return false;
         };
@@ -70,65 +72,19 @@ impl CapturadorTrigger {
     }
 
     // ==================================================
-    // 🧪 PRUEBA CAPTURA
+    // 📦 EVENTOS CAPTURADOS
     // ==================================================
 
-    pub fn eventos_completos(&self) -> bool {
-        !self.eventos.is_empty()
+    pub fn eventos(&self) -> &[InputEvent] {
+        &self.eventos
     }
 
     // ==================================================
-    // 🧪 Time out
+    // ❓ VACÍO
     // ==================================================
 
-    pub fn comprobar_timeout(&mut self) -> Option<EventoTrigger> {
-        let Some(ultimo) = self.ultimo_evento else {
-            return None;
-        };
-
-        if ultimo.elapsed().as_millis() < crate::config::tiempo_doble() as u128 {
-            return None;
-        }
-
-        let trigger = self.construir();
-
-        self.limpiar();
-
-        trigger
-    }
-
-    // ==================================================
-    // 🎯 CONSTRUIR TRIGGER
-    // ==================================================
-
-    pub fn construir(&self) -> Option<EventoTrigger> {
-        let activos = self.inputs_down();
-
-        if activos.is_empty() {
-            return None;
-        }
-
-        let gatillo = activos.last()?.clone();
-
-        let modificadores = if activos.len() > 1 {
-            activos[..activos.len() - 1].to_vec()
-        } else {
-            Vec::new()
-        };
-
-        Some(EventoTrigger::simple(modificadores, gatillo))
-    }
-
-    // ==================================================
-    // ⬇️ INPUTS DOWN
-    // ==================================================
-
-    fn inputs_down(&self) -> Vec<InputId> {
-        self.eventos
-            .iter()
-            .filter(|evento| evento.state == InputState::Down)
-            .map(|evento| evento.input.clone())
-            .collect()
+    pub fn esta_vacio(&self) -> bool {
+        self.eventos.is_empty()
     }
 
     // ==================================================

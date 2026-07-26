@@ -134,10 +134,14 @@ fn procesar_evento(
     if captura::activa() {
         capturador.recibir(evento);
 
-        if let Some(trigger) = capturador.comprobar_timeout() {
-            captura::recibir(trigger);
+        if capturador.comprobar_timeout() {
+            if let Some(trigger) = analizador.analizar_captura(capturador.eventos()) {
+                captura::recibir(trigger);
+            }
 
-            return runtime::Resultado::Consumir;
+            capturador.limpiar();
+
+            analizador.limpiar();
         }
 
         return runtime::Resultado::Pasar;

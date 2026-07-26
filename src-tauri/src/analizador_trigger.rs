@@ -113,10 +113,6 @@ impl AnalizadorTrigger {
     // ==================================================
 
     fn procesar_down(&mut self, evento: InputEvent) -> ResultadoTrigger {
-        // ----------------------------------------------
-        // ¿Estamos esperando segundo golpe?
-        // ----------------------------------------------
-
         if let Some(candidato) = &self.candidato {
             if candidato.condicion == CondicionTrigger::Doble && candidato.gatillo == evento.input {
                 let resultado = EventoTrigger::doble(
@@ -252,6 +248,50 @@ impl AnalizadorTrigger {
             }
 
             _ => ResultadoTrigger::Esperar,
+        }
+    }
+
+    // ==================================================
+    // 📦 ANALIZAR CAPTURA
+    // --------------------------------------------------
+    // Analiza eventos físicos sin consultar Cache.
+    //
+    // Uso:
+    // creación de triggers desde UI.
+    //
+    // No busca remapeos.
+    // No ejecuta Runtime.
+    // ==================================================
+
+    pub fn analizar_captura(&mut self, eventos: &[InputEvent]) -> Option<EventoTrigger> {
+        self.limpiar();
+
+        for evento in eventos {
+            match self.procesar(evento.clone()) {
+                ResultadoTrigger::Trigger(trigger) => {
+                    self.limpiar();
+
+                    return Some(trigger);
+                }
+
+                ResultadoTrigger::Liberar(_) => {
+                    self.limpiar();
+
+                    return None;
+                }
+
+                ResultadoTrigger::Esperar => {}
+            }
+        }
+
+        match self.comprobar_timeout() {
+            ResultadoTrigger::Trigger(trigger) => {
+                self.limpiar();
+
+                Some(trigger)
+            }
+
+            _ => None,
         }
     }
 
