@@ -1,3 +1,136 @@
+////////////////////Encabezado por archivo://////////////////////////////////////////////
+
+1-Nombre archivo
+
+2- Resumen general de qué hace
+
+3- Qué informacion recibe/quien lo llama/qué va antes
+
+4-Que información sale al final.
+
+5- una lista de cada función y lo que hace en pocas palabras
+
+En cada uno de ellos agrega un ejemplo del formato de info que maneja o como se transforma.
+
+El objetivo: cada archivo será una etapa. Cada etapa tendrá su resumen y detalle en el encabezado. Si queda algo pendiente de analizar lo notaremos al instante por incongruencias. Si hay que modificar algo luego sabremos al instante donde ubicarlo.
+
+////////resumen de 12 archivos en orden///////////////////////////////////////////////////
+Orden definitivo
+ETAPA 1 — Base del modelo
+
+Estos archivos definen las estructuras que utilizarán todos los demás.
+
+eventos.rs
+evento_trigger.rs
+perfilcache.rs
+ETAPA 2 — Cache
+
+Aquí definimos cómo responde la cache.
+
+cache.rs
+
+Aquí desaparecerá la lógica antigua (buscar, tiene_condiciones_posibles, etc.) y quedará únicamente la API definitiva que utilizará el Analizador.
+
+ETAPA 3 — Analizador
+
+Es el corazón del sistema.
+
+analizador_trigger.rs
+
+Este será probablemente el archivo más grande de la migración.
+
+Aquí quedará toda la lógica de:
+
+coincidencias
+prefijos
+candidatos
+doble
+mantenido
+simple
+liberación
+
+Tanto Runtime como Captura usarán exactamente este motor.
+
+ETAPA 4 — Captura
+
+Ahora que el Analizador ya sabe interpretar secuencias completas.
+
+capturador_trigger.rs
+captura.rs
+
+Estos archivos quedarán muy pequeños.
+
+Captura solamente almacenará InputEvent.
+
+Nada más.
+
+ETAPA 5 — Entrada
+
+Cuando todo lo anterior ya exista.
+
+entrada.rs
+
+Aquí simplemente elegirá:
+
+Modo captura
+
+↓
+
+guardar InputEvent
+
+↓
+
+timeout
+
+↓
+
+analizador
+
+o
+
+Modo runtime
+
+↓
+
+analizador
+
+No habrá lógica duplicada.
+
+ETAPA 6 — Runtime
+
+Cuando el Analizador ya entregue un EventoTrigger definitivo.
+
+runtime.rs
+
+Aquí prácticamente desaparecerá toda la lógica relacionada con triggers.
+
+Runtime solamente hará:
+
+EventoTrigger
+
+↓
+
+buscar acción
+
+↓
+
+emitir
+ETAPA 7 — Salida
+back_salida.rs
+
+Aquí probablemente no cambie casi nada.
+
+ETAPA 8 — Diccionarios
+pulsadores.rs
+
+Sólo si es necesario.
+
+ETAPA 9 — Configuración
+config.rs
+
+Ajustar tiempos si hace falta.
+
+////////////////////////////////////////////////////////////////
 PLAN — Refactorización Capturador / Analizador V3
 Objetivo general
 

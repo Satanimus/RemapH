@@ -132,6 +132,56 @@ pub fn es_modificador(input: &InputId) -> bool {
 }
 
 // ======================================================
+// 🎯 BUSCAR CANDIDATOS
+// ------------------------------------------------------
+// Devuelve todos los remapeos compatibles con:
+//
+// modificadores + gatillo
+//
+// Se utiliza para:
+//
+// - Captura.
+// - Analizador.
+// - Runtime.
+//
+// Luego el Analizador decidirá si corresponde:
+//
+// Simple
+// Doble
+// Mantenido
+// ======================================================
+
+pub fn buscar_candidatos(activos: &[InputId], gatillo: &InputId) -> Vec<RemapeoCache> {
+    let cache = obtener_cache_activa().lock().unwrap();
+
+    cache
+        .iter()
+        .filter(|r| {
+            r.trigger.gatillo == *gatillo
+                && activos.len() == r.trigger.modificadores.len() + 1
+                && &activos[..r.trigger.modificadores.len()] == r.trigger.modificadores.as_slice()
+        })
+        .cloned()
+        .collect()
+}
+
+// ======================================================
+// ❓ EXISTE CANDIDATO
+// ------------------------------------------------------
+// Sólo indica si existe alguna combinación posible.
+//
+// No importa todavía si será:
+//
+// - Simple
+// - Doble
+// - Mantenido
+// ======================================================
+
+pub fn existe_candidato(activos: &[InputId], gatillo: &InputId) -> bool {
+    !buscar_candidatos(activos, gatillo).is_empty()
+}
+
+// ======================================================
 // 🖥️ CONTEXTO
 // ======================================================
 
