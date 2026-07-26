@@ -1,21 +1,33 @@
 // ======================================================
 // 🧠 Analizador Trigger RemapH V3
 // ------------------------------------------------------
-// Buffer lógico de entrada.
-//
-// Recibe eventos físicos.
-// Retiene temporalmente.
-// Decide si existe trigger.
-// Si no existe, libera eventos originales.
+// Analiza únicamente posibles triggers.
 //
 // No ejecuta acciones.
 // No conoce Runtime.
+// No conoce Captura.
+//
+// Solo responde:
+//
+//   Esperar
+//   Trigger
+//   Liberar
+//
+// Maneja:
+//   - Simple.
+//   - Doble.
+//   - Mantenido.
+//
+// Mantiene:
+//   - Inputs físicamente presionados.
+//   - Candidatos temporales.
 // ======================================================
 
 use crate::evento_trigger::EventoTrigger;
 use crate::eventos::{InputEvent, InputId, InputState};
+use crate::perfilcache::CondicionTrigger;
 
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 // ======================================================
 // 🔎 RESULTADO
@@ -30,13 +42,31 @@ pub enum ResultadoTrigger {
 }
 
 // ======================================================
+// 🧠 CANDIDATO TEMPORAL
+// ======================================================
+
+struct CandidatoTrigger {
+    modificadores: Vec<InputId>,
+
+    gatillo: InputId,
+
+    condicion: CondicionTrigger,
+
+    instante_down: u64,
+
+    instante_up: Option<u64>,
+}
+
+// ======================================================
 // 🧠 ANALIZADOR
 // ======================================================
 
 pub struct AnalizadorTrigger {
     buffer: Vec<InputEvent>,
 
-    ultimo_evento: Option<Instant>,
+    presionados: Vec<InputId>,
+
+    candidato: Option<CandidatoTrigger>,
 }
 
 // ======================================================
@@ -48,7 +78,9 @@ impl AnalizadorTrigger {
         Self {
             buffer: Vec::new(),
 
-            ultimo_evento: None,
+            presionados: Vec::new(),
+
+            candidato: None,
         }
     }
 
@@ -57,11 +89,135 @@ impl AnalizadorTrigger {
     // ==================================================
 
     pub fn procesar(&mut self, evento: InputEvent) -> ResultadoTrigger {
-        self.buffer.push(evento);
+        self.buffer.push(evento.clone());
 
-        self.ultimo_evento = Some(Instant::now());
+        match evento.state {
+            InputState::Down => {
+                self.agregar_presionado(evento.input.clone());
 
-        self.analizar()
+                self.procesar_down(evento)
+            }
+
+            InputState::Up => {
+                self.quitar_presionado(&evento.input);
+
+                self.procesar_up(evento)
+            }
+
+            InputState::Pulse => ResultadoTrigger::Liberar(self.buffer.clone()),
+        }
+    }
+
+    // ==================================================
+    // ⬇️ DOWN
+    // ==================================================
+
+    fn procesar_down(&mut self, evento: InputEvent) -> ResultadoTrigger {
+        // ----------------------------------------------
+        // ¿Estamos esperando segundo golpe?
+        // ----------------------------------------------
+
+        if let Some(candidato) = &self.candidato {
+            if candidato.condicion == CondicionTrigger::Doble && candidato.gatillo == evento.input {
+                let resultado = EventoTrigger::doble(
+                    candidato.modificadores.clone(),
+                    candidato.gatillo.clone(),
+                );
+
+                self.limpiar();
+
+                return ResultadoTrigger::Trigger(resultado);
+            }
+        }
+
+        let activos = self.presionados.clone();
+
+        let gatillo = evento.input.clone();
+
+        let modificadores = activos
+            .iter()
+            .filter(|input| **input != gatillo)
+            .cloned()
+            .collect();
+
+        let Some(remapeo) = crate::cache::buscar(&activos, &gatillo) else {
+            if crate::cache::existe_prefijo(&activos) {
+                return ResultadoTrigger::Esperar;
+            }
+
+            let eventos = self.buffer.clone();
+
+            self.limpiar();
+
+            return ResultadoTrigger::Liberar(eventos);
+        };
+
+        match remapeo.trigger.condicion {
+            CondicionTrigger::Simple => {
+                self.limpiar();
+
+                ResultadoTrigger::Trigger(EventoTrigger::simple(modificadores, gatillo))
+            }
+
+            CondicionTrigger::Doble | CondicionTrigger::Mantenido => {
+                self.candidato = Some(CandidatoTrigger {
+                    modificadores,
+
+                    gatillo,
+
+                    condicion: remapeo.trigger.condicion,
+
+                    instante_down: evento.instante,
+
+                    instante_up: None,
+                });
+
+                ResultadoTrigger::Esperar
+            }
+        }
+    }
+
+    // ==================================================
+    // ⬆️ UP
+    // ==================================================
+
+    fn procesar_up(&mut self, evento: InputEvent) -> ResultadoTrigger {
+        let Some(candidato) = &mut self.candidato else {
+            return ResultadoTrigger::Esperar;
+        };
+
+        if candidato.gatillo != evento.input {
+            return ResultadoTrigger::Esperar;
+        }
+
+        candidato.instante_up = Some(evento.instante);
+
+        match candidato.condicion {
+            CondicionTrigger::Mantenido => {
+                let duracion = evento.instante - candidato.instante_down;
+
+                if duracion >= crate::config::tiempo_mantenido() {
+                    let resultado = EventoTrigger::mantenido(
+                        candidato.modificadores.clone(),
+                        candidato.gatillo.clone(),
+                    );
+
+                    self.limpiar();
+
+                    return ResultadoTrigger::Trigger(resultado);
+                }
+
+                let eventos = self.buffer.clone();
+
+                self.limpiar();
+
+                ResultadoTrigger::Liberar(eventos)
+            }
+
+            CondicionTrigger::Doble => ResultadoTrigger::Esperar,
+
+            CondicionTrigger::Simple => ResultadoTrigger::Esperar,
+        }
     }
 
     // ==================================================
@@ -69,57 +225,52 @@ impl AnalizadorTrigger {
     // ==================================================
 
     pub fn comprobar_timeout(&mut self) -> ResultadoTrigger {
-        let Some(instante) = self.ultimo_evento else {
+        let Some(candidato) = &self.candidato else {
             return ResultadoTrigger::Esperar;
         };
 
-        if instante.elapsed().as_millis() < crate::config::tiempo_doble() as u128 {
+        let Some(instante_up) = candidato.instante_up else {
             return ResultadoTrigger::Esperar;
-        }
-
-        let eventos = self.buffer.clone();
-
-        self.limpiar();
-
-        ResultadoTrigger::Liberar(eventos)
-    }
-
-    // ==================================================
-    // 🔎 ANALIZAR
-    // ==================================================
-
-    fn analizar(&self) -> ResultadoTrigger {
-        let activos = self.down_activos();
-
-        if activos.is_empty() {
-            return ResultadoTrigger::Esperar;
-        }
-
-        let gatillo = activos.last().unwrap().clone();
-
-        let modificadores = if activos.len() > 1 {
-            activos[..activos.len() - 1].to_vec()
-        } else {
-            Vec::new()
         };
 
-        if crate::cache::buscar(&activos, &gatillo).is_some() {
-            return ResultadoTrigger::Trigger(EventoTrigger::simple(modificadores, gatillo));
+        let ahora = crate::instante::ahora();
+
+        if ahora - instante_up < crate::config::tiempo_doble() {
+            return ResultadoTrigger::Esperar;
         }
 
-        ResultadoTrigger::Esperar
+        match candidato.condicion {
+            CondicionTrigger::Doble => {
+                let resultado = EventoTrigger::simple(
+                    candidato.modificadores.clone(),
+                    candidato.gatillo.clone(),
+                );
+
+                self.limpiar();
+
+                ResultadoTrigger::Trigger(resultado)
+            }
+
+            _ => ResultadoTrigger::Esperar,
+        }
     }
 
     // ==================================================
-    // ⬇️ DOWN ACTIVOS
+    // ➕ AGREGAR PRESIONADO
     // ==================================================
 
-    fn down_activos(&self) -> Vec<InputId> {
-        self.buffer
-            .iter()
-            .filter(|evento| evento.state == InputState::Down)
-            .map(|evento| evento.input.clone())
-            .collect()
+    fn agregar_presionado(&mut self, input: InputId) {
+        if !self.presionados.contains(&input) {
+            self.presionados.push(input);
+        }
+    }
+
+    // ==================================================
+    // ➖ QUITAR PRESIONADO
+    // ==================================================
+
+    fn quitar_presionado(&mut self, input: &InputId) {
+        self.presionados.retain(|actual| actual != input);
     }
 
     // ==================================================
@@ -129,6 +280,8 @@ impl AnalizadorTrigger {
     pub fn limpiar(&mut self) {
         self.buffer.clear();
 
-        self.ultimo_evento = None;
+        self.presionados.clear();
+
+        self.candidato = None;
     }
 }

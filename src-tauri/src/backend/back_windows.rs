@@ -208,7 +208,8 @@ unsafe extern "system" fn prueba_hook_teclado(
     let consumido = evaluar(evento);
 
     if consumido {
-        println!("[TECLADO RAW] Consumido");
+        println!("[TECLADO RAW] Bloqueado");
+        return 1;
     }
 
     println!("[TECLADO RAW] Pasando a Windows");
@@ -238,8 +239,11 @@ unsafe extern "system" fn hook_mouse(codigo: i32, wparam: WPARAM, lparam: LPARAM
     let consumido = evaluar(evento);
 
     if consumido {
-        println!("[MOUSE RAW] Consumido");
+        println!("[TECLADO RAW] Bloqueado");
+        return 1;
     }
+
+    println!("[TECLADO RAW] Pasando a Windows");
 
     CallNextHookEx(std::ptr::null_mut(), codigo, wparam, lparam)
 }
@@ -249,19 +253,33 @@ unsafe extern "system" fn hook_mouse(codigo: i32, wparam: WPARAM, lparam: LPARAM
 // ======================================================
 
 fn evaluar(evento: InputEvent) -> bool {
+    let mut procesador: Option<Procesador> = None;
+
     ESTADO.with(|estado| {
         let mut estado = estado.borrow_mut();
 
-        let Some(actual) = estado.as_mut() else {
-            return false;
-        };
+        if let Some(actual) = estado.take() {
+            procesador = Some(actual.procesar);
+        }
+    });
 
-        let mut emitir = |evento: InputEvent| {
-            emitir_evento(evento);
-        };
+    let Some(mut procesar) = procesador else {
+        return false;
+    };
 
-        (actual.procesar)(evento, &mut emitir)
-    })
+    let mut emitir = |evento: InputEvent| {
+        emitir_evento(evento);
+    };
+
+    let resultado = procesar(evento, &mut emitir);
+
+    ESTADO.with(|estado| {
+        let mut estado = estado.borrow_mut();
+
+        *estado = Some(Estado { procesar });
+    });
+
+    resultado
 }
 
 // ======================================================

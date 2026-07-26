@@ -2,14 +2,16 @@
 // 🚀 Entrada RemapH V3
 // ------------------------------------------------------
 // Orquesta:
+//
 // Input físico
 //      ↓
-// AnalizadorTrigger
+// CapturaTrigger / AnalizadorTrigger
 //      ↓
-// Captura / Runtime
+// Runtime
 // ======================================================
 
 use crate::analizador_trigger::{AnalizadorTrigger, ResultadoTrigger};
+use crate::capturador_trigger::CapturadorTrigger;
 
 use crate::cache;
 use crate::captura;
@@ -81,12 +83,15 @@ fn iniciar_portable(tx: mpsc::Sender<AccionCache>, rx: mpsc::Receiver<AccionCach
 
         let mut analizador = AnalizadorTrigger::nuevo();
 
+        let mut capturador = CapturadorTrigger::nuevo();
+
         let mut ultima_actualizacion = Instant::now() - Duration::from_secs(1);
 
         crate::backend::back_windows::iniciar(move |evento, _emitir| {
             let resultado = procesar_evento(
                 evento,
                 &mut analizador,
+                &mut capturador,
                 &mut runtime,
                 &tx,
                 &rx,
@@ -108,6 +113,8 @@ fn procesar_evento(
 
     analizador: &mut AnalizadorTrigger,
 
+    capturador: &mut CapturadorTrigger,
+
     runtime: &mut runtime::Estado,
 
     tx: &mpsc::Sender<AccionCache>,
@@ -120,45 +127,37 @@ fn procesar_evento(
 ) -> runtime::Resultado {
     actualizar_contexto_cache(ultima_actualizacion);
 
-    let resultado_trigger = analizador.procesar(evento);
+    // ==================================================
+    // CAPTURA DE NUEVO TRIGGER
+    // ==================================================
 
-    match resultado_trigger {
-        crate::analizador_trigger::ResultadoTrigger::Trigger(trigger) => {
-            if captura::activa() {
-                captura::recibir(trigger);
+    if captura::activa() {
+        capturador.recibir(evento);
 
-                return runtime::Resultado::Consumir;
-            }
+        if let Some(trigger) = capturador.construir() {
+            captura::recibir(trigger);
 
+            capturador.limpiar();
+        }
+
+        return runtime::Resultado::Consumir;
+    }
+
+    // ==================================================
+    // ANALIZADOR NORMAL
+    // ==================================================
+
+    match analizador.procesar(evento) {
+        ResultadoTrigger::Trigger(trigger) => {
             let resultado = runtime.procesar(trigger, tx);
 
-            while let Ok(accion) = rx.try_recv() {
-                match salida {
-                    Some(salida) => {
-                        salida.ejecutar(accion);
-                    }
-
-                    None => {
-                        ejecutar_portable(accion);
-                    }
-                }
-            }
-
-            println!("[ENTRADA] Resultado Runtime -> {:?}", resultado);
+            ejecutar_salidas(rx, salida);
 
             resultado
         }
 
-        // El analizador todavía no sabe si es trigger.
-        // Bloqueamos para evitar que Windows ejecute la tecla.
-        crate::analizador_trigger::ResultadoTrigger::Esperar => runtime::Resultado::Consumir,
-
-        // No era trigger.
-        // Liberamos los eventos físicos originales.
-        crate::analizador_trigger::ResultadoTrigger::Liberar(eventos) => {
+        ResultadoTrigger::Liberar(eventos) => {
             for evento in eventos {
-                println!("[ENTRADA] Liberando evento pendiente -> {:?}", evento);
-
                 crate::backend::back_windows::emitir_evento(evento);
             }
 
@@ -166,6 +165,28 @@ fn procesar_evento(
 
             runtime::Resultado::Consumir
         }
+
+        ResultadoTrigger::Esperar => match analizador.comprobar_timeout() {
+            ResultadoTrigger::Liberar(eventos) => {
+                for evento in eventos {
+                    crate::backend::back_windows::emitir_evento(evento);
+                }
+
+                analizador.limpiar();
+
+                runtime::Resultado::Consumir
+            }
+
+            ResultadoTrigger::Trigger(trigger) => {
+                let resultado = runtime.procesar(trigger, tx);
+
+                ejecutar_salidas(rx, salida);
+
+                resultado
+            }
+
+            ResultadoTrigger::Esperar => runtime::Resultado::Consumir,
+        },
     }
 }
 
@@ -173,9 +194,21 @@ fn procesar_evento(
 // ⚡ EJECUTAR SALIDAS
 // ======================================================
 
-fn ejecutar_salidas(rx: &mpsc::Receiver<AccionCache>) {
+fn ejecutar_salidas(
+    rx: &mpsc::Receiver<AccionCache>,
+
+    salida: Option<&crate::backend::back_salida::Salida>,
+) {
     while let Ok(accion) = rx.try_recv() {
-        ejecutar_portable(accion);
+        match salida {
+            Some(salida) => {
+                salida.ejecutar(accion);
+            }
+
+            None => {
+                ejecutar_portable(accion);
+            }
+        }
     }
 }
 

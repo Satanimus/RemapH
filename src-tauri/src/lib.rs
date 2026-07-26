@@ -11,6 +11,7 @@ mod backend;
 mod buffer_eventos;
 mod cache;
 mod captura;
+mod capturador_trigger;
 mod comandos;
 mod compilador;
 mod config;

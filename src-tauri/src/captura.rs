@@ -5,15 +5,15 @@
 //
 // No lee dispositivos.
 // No conoce Windows.
-// No conoce Interception.
+// No conoce Runtime.
 //
-// Recibe EventoTrigger ya analizado.
+// Recibe un EventoTrigger ya construido.
 //
 // Flujo:
 //
-// InputEvent
+// Input físico
 //      ↓
-// AnalizadorTrigger
+// CapturadorTrigger
 //      ↓
 // Captura
 //      ↓

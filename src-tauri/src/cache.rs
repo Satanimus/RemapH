@@ -3,7 +3,7 @@
 // ======================================================
 
 use crate::eventos::InputId;
-use crate::perfilcache::{AccionCache, AppCache, CondicionTrigger, RemapeoCache};
+use crate::perfilcache::{CondicionTrigger, RemapeoCache};
 
 use std::collections::HashSet;
 use std::sync::{Mutex, OnceLock};
@@ -29,7 +29,7 @@ pub fn bloquear_tests() -> std::sync::MutexGuard<'static, ()> {
 }
 
 // ======================================================
-// 📦 OBTENER CACHE
+// 📦 ACCESO
 // ======================================================
 
 fn obtener_cache() -> &'static Mutex<Vec<RemapeoCache>> {
@@ -46,7 +46,6 @@ fn obtener_cache_activa() -> &'static Mutex<Vec<RemapeoCache>> {
 
 pub fn reemplazar(remapeos: Vec<RemapeoCache>) {
     *obtener_cache().lock().unwrap() = remapeos.clone();
-
     *obtener_cache_activa().lock().unwrap() = remapeos;
 }
 
@@ -67,7 +66,7 @@ pub fn esta_vacia() -> bool {
 }
 
 // ======================================================
-// 🎯 BUSCAR TRIGGER EXACTO
+// 🎯 TRIGGER EXACTO
 // ======================================================
 
 pub fn buscar(activos: &[InputId], gatillo: &InputId) -> Option<RemapeoCache> {
@@ -75,52 +74,46 @@ pub fn buscar(activos: &[InputId], gatillo: &InputId) -> Option<RemapeoCache> {
 
     cache
         .iter()
-        .find(|remapeo| {
-            if remapeo.trigger.gatillo != *gatillo {
+        .find(|r| {
+            if r.trigger.gatillo != *gatillo {
                 return false;
             }
 
-            let modificadores = &remapeo.trigger.modificadores;
-
-            if activos.len() != modificadores.len() + 1 {
+            if activos.len() != r.trigger.modificadores.len() + 1 {
                 return false;
             }
 
-            &activos[..modificadores.len()] == modificadores.as_slice()
+            &activos[..r.trigger.modificadores.len()] == r.trigger.modificadores.as_slice()
         })
         .cloned()
 }
 
 // ======================================================
-// ⏳ PUEDE CONTINUAR
-// ------------------------------------------------------
-// Determina si la secuencia actual puede formar
-// algún trigger futuro.
+// 🔎 EXISTE PREFIJO
 // ======================================================
 
-pub fn puede_continuar(activos: &[InputId]) -> bool {
+pub fn existe_prefijo(activos: &[InputId]) -> bool {
     let cache = obtener_cache_activa().lock().unwrap();
 
-    cache.iter().any(|remapeo| {
-        let mut esperado = remapeo.trigger.modificadores.clone();
-
-        esperado.push(remapeo.trigger.gatillo.clone());
+    cache.iter().any(|r| {
+        let mut esperado = r.trigger.modificadores.clone();
+        esperado.push(r.trigger.gatillo.clone());
 
         esperado.starts_with(activos)
     })
 }
 
 // ======================================================
-// 🔎 EXISTEN CONDICIONES FUTURAS
+// ⏳ PUEDE EXISTIR DOBLE/MANTENIDO
 // ======================================================
 
 pub fn tiene_condiciones_posibles(gatillo: &InputId) -> bool {
     let cache = obtener_cache_activa().lock().unwrap();
 
-    cache.iter().any(|remapeo| {
-        remapeo.trigger.gatillo == *gatillo
+    cache.iter().any(|r| {
+        r.trigger.gatillo == *gatillo
             && matches!(
-                remapeo.trigger.condicion,
+                r.trigger.condicion,
                 CondicionTrigger::Doble | CondicionTrigger::Mantenido
             )
     })
@@ -135,19 +128,15 @@ pub fn es_modificador(input: &InputId) -> bool {
 
     cache
         .iter()
-        .any(|remapeo| remapeo.trigger.modificadores.contains(input))
+        .any(|r| r.trigger.modificadores.contains(input))
 }
 
 // ======================================================
-// 🖥️ CONTEXTO APP
+// 🖥️ CONTEXTO
 // ======================================================
 
-pub fn actualizar_contexto(programa_activo: Option<&str>, procesos_activos: &HashSet<String>) {
+pub fn actualizar_contexto(_programa_activo: Option<&str>, _procesos_activos: &HashSet<String>) {
     let cache = obtener_cache().lock().unwrap();
 
-    let activa = cache.iter().filter(|_| true).cloned().collect();
-
-    drop(cache);
-
-    *obtener_cache_activa().lock().unwrap() = activa;
+    *obtener_cache_activa().lock().unwrap() = cache.clone();
 }
