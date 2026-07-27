@@ -42,8 +42,7 @@
 // perfil_cache:
 // TriggerCache {
 //    app,
-//    modificadores,
-//    gatillo,
+//    entrada,
 //    condicion }
 // RespuestaCache {
 //    tipo,
@@ -112,16 +111,14 @@ fn compilar_remapeo(remapeo: &RemapeoJson) -> Option<RemapeoCache> {
         trigger: TriggerCache {
             app: convertir_app(&remapeo.trigger.app),
 
-            modificadores: remapeo
+            entrada: remapeo
                 .trigger
-                .modificadores
+                .entrada
                 .iter()
                 .map(convertir_input)
                 .collect(),
 
-            gatillo: convertir_input(&remapeo.trigger.gatillo),
-
-            condicion: remapeo.trigger.condicion.clone(),
+            condicion: convertir_condicion(&remapeo.trigger.condicion),
         },
 
         respuesta: RespuestaCache {

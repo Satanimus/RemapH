@@ -697,10 +697,10 @@ pub fn obtener_captura() -> Option<TriggerCapturaUI> {
 // 🖥️ PROCESOS Y ÍCONOS (columna App)
 // ------------------------------------------------------
 // Comandos delgados: la lógica real vive en
-// backend::back_procesos (capa Platform).
+// backend::back_app (capa Platform).
 // ======================================================
 
-use crate::backend::back_procesos;
+use crate::backend::back_app;
 
 use base64::engine::general_purpose::STANDARD as BASE64;
 use base64::Engine as _;
@@ -721,7 +721,7 @@ pub struct ProcesoIconoJson {
     pub icono: Option<IconoJson>,
 }
 
-fn convertir_icono(icono: back_procesos::IconoRaw) -> IconoJson {
+fn convertir_icono(icono: back_app::IconoRaw) -> IconoJson {
     IconoJson {
         ancho: icono.ancho,
 
@@ -737,10 +737,10 @@ fn convertir_icono(icono: back_procesos::IconoRaw) -> IconoJson {
 
 #[tauri::command]
 pub fn listar_procesos_ventana() -> Vec<ProcesoIconoJson> {
-    back_procesos::enumerar_procesos_ventana()
+    back_app::enumerar_procesos_ventana()
         .into_iter()
         .map(|proceso| {
-            let icono = back_procesos::extraer_icono(&proceso.ruta).map(convertir_icono);
+            let icono = back_app::extraer_icono(&proceso.ruta).map(convertir_icono);
 
             ProcesoIconoJson {
                 nombre: proceso.nombre,
@@ -761,9 +761,9 @@ pub fn listar_procesos_ventana() -> Vec<ProcesoIconoJson> {
 
 #[tauri::command]
 pub fn obtener_icono_programa(nombre: String) -> Option<IconoJson> {
-    let proceso = back_procesos::enumerar_procesos_ventana()
+    let proceso = back_app::enumerar_procesos_ventana()
         .into_iter()
         .find(|proceso| proceso.nombre.eq_ignore_ascii_case(&nombre))?;
 
-    back_procesos::extraer_icono(&proceso.ruta).map(convertir_icono)
+    back_app::extraer_icono(&proceso.ruta).map(convertir_icono)
 }

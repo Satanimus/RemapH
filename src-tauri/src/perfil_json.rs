@@ -34,8 +34,7 @@
 // {id: "001",
 //   trigger:
 //   { app: firefox,
-//      modificadores: CTRL,
-//      gatillo: A,
+//      entrada: CTRL, A,
 //      condicion: Doble},
 //   respuesta:
 //   { tipo: tecla_mouse,
@@ -108,9 +107,10 @@ pub struct RemapeoJson {
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct TriggerJson {
     pub app: AppJson,
-    pub modificadores: Vec<Input>,
-    pub gatillo: Input,
-    pub condicion: CondicionTrigger,
+
+    pub entrada: Vec<Input>,
+
+    pub condicion: String,
 }
 
 // ======================================================

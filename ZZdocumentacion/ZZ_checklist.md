@@ -1,3 +1,8 @@
+posible 0: liberar
+posible 1; exacta 1: match!
+posible=exacta, y exacta >1: analizar y comparar condiciones
+posible>exacta: esperar
+
 ////////////////////Encabezado por archivo://////////////////////////////////////////////
 
 1-Nombre archivo
@@ -24,6 +29,7 @@ ETAPA 1 — Modelo
 └── compilador.rs
 
 ETAPA 2 — Cache
+└── back_app (pendiente)
 └── cache.rs
 
 ETAPA 3 — Analizador
@@ -50,214 +56,6 @@ ETAPA 9 — Configuración
 └── config.rs
 
 ////////////////////////////////////////////////////////////////
-PLAN — Refactorización Capturador / Analizador V3
-Objetivo general
-
-Eliminar toda la lógica duplicada entre Capturador y Analizador.
-
-Al finalizar:
-
-existe un solo algoritmo que interpreta triggers.
-el Runtime y el botón Capturar usan exactamente el mismo analizador.
-el Capturador sólo graba InputEvents.
-ETAPA 1 — Simplificar Capturador
-Objetivo
-
-Convertir Capturador en un grabador de eventos.
-
-Archivos
-capturador_trigger.rs
-Cambios
-
-Eliminar completamente:
-
-construir()
-inputs_down()
-EventoTrigger::simple()
-cualquier decisión sobre modificadores
-cualquier decisión sobre gatillo
-
-Agregar solamente:
-
-eventos() -> &[InputEvent]
-
-para entregar el buffer completo.
-
-Debe conservar:
-
-recibir()
-comprobar_timeout()
-limpiar()
-Resultado esperado
-
-Capturador deja de conocer:
-
-Trigger
-Modificadores
-Gatilo
-Simple
-Doble
-Mantenido
-
-Sólo conoce:
-
-Vec<InputEvent>
-Punto crítico
-
-Ninguno.
-
-Sólo afecta un archivo.
-
-ETAPA 2 — Enseñar al Analizador a analizar capturas
-Objetivo
-
-Mover TODA la interpretación al Analizador.
-
-Archivos
-analizador_trigger.rs
-Cambios
-
-Agregar:
-
-analizar_captura(eventos)
-
-Esta función:
-
-recibe un Vec<InputEvent>
-reconstruye presionados
-aplica exactamente el mismo algoritmo
-devuelve EventoTrigger
-
-No consulta Runtime.
-
-No ejecuta acciones.
-
-No consulta captura.
-
-Sólo interpreta.
-
-Punto crítico
-
-Aquí desaparece definitivamente la lógica duplicada.
-
-ETAPA 3 — Conectar Captura
-Objetivo
-
-Cambiar Entrada.
-
-Archivos
-entrada.rs
-
-Actualmente:
-
-Capturador
-↓
-
-construir()
-↓
-
-Captura
-
-Debe quedar:
-
-Capturador
-
-↓
-
-timeout
-
-↓
-
-Analizador::analizar_captura()
-
-↓
-
-Captura
-Punto crítico
-
-Entrada deja de construir triggers.
-
-ETAPA 4 — Unificar algoritmo interno
-Objetivo
-
-Que Runtime y Captura usen exactamente el mismo motor.
-
-Archivo
-analizador_trigger.rs
-
-Hoy existen caminos distintos.
-
-Quedará:
-
-Runtime
-↓
-Motor
-
-Captura
-↓
-Motor
-
-Una sola implementación.
-
-Punto crítico
-
-No debe cambiar el comportamiento del Runtime.
-
-ETAPA 5 — Limpiar responsabilidades
-Archivos
-capturador_trigger.rs
-analizador_trigger.rs
-entrada.rs
-
-Eliminar código muerto.
-
-Eliminar funciones que ya no existen.
-
-Eliminar imports.
-
-Eliminar comentarios antiguos.
-
-ETAPA 6 — Compilación
-Revisar
-
-Todos los errores.
-
-No agregar hacks.
-
-No agregar variables temporales.
-
-No modificar Runtime.
-
-Resultado esperado
-
-La arquitectura queda así:
-
-Hook
-
-↓
-
-InputEvent
-
-↓
-
-Capturador (solo graba)
-│
-│ timeout
-▼
-
-AnalizadorTrigger
-│
-├──────────────► Runtime
-│
-└──────────────► Captura/UI
-Ventajas obtenidas
-✅ Una sola lógica de interpretación.
-✅ Un solo lugar donde se decide qué es un trigger.
-✅ El botón Capturar y el Runtime hablan exactamente el mismo lenguaje.
-✅ Se elimina la mayor fuente de inconsistencias del proyecto.
-✅ Facilita la futura optimización que comentaste: filtrar primero por caché y sólo analizar tiempos cuando realmente exista una combinación candidata con condición Doble o Mantenido.
-
-Creo que esta es una base mucho más sólida para seguir evolucionando el sistema sin volver a caer en duplicación de lógica.
 
 //////////////////////////////////////////////
 📌Solución BUG hook teclado: Agregar esta linea en src-tauri\src\lib.rs
@@ -277,7 +75,7 @@ Extensiones futuras
 
 ------ Recordar limpiar comandos.rs
 ------ igual captura.rs (eliminar)
-
+------ Commpletar back_app para informar cambios de App para el cache
 ------Documentar oficialmente el flujo del motor, igual que hicimos con el flujo Perfil → Compilador → Cache → Runtime.
 
 Algo como:

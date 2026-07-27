@@ -1,19 +1,72 @@
 // ======================================================
-// Back_Procesos
-// RemapH V3
+// 🖥️ back_app RemapH V3
+// ======================================================
+// ETAPA X DEL FLUJO
 // ------------------------------------------------------
-// Backend Platform.
+// 1. ¿Qué hace este archivo?
+// Backend encargado de comunicarse con Windows para
+// obtener información relacionada con procesos y aplicaciones.
+// Actualmente es responsable de:
+// • Enumerar procesos.
+// • Obtener la aplicación en primer plano.
+// • Obtener la ruta real del ejecutable.
+// • Extraer el ícono del ejecutable.
 //
-// Responsable de:
-// - Enumerar procesos actualmente ejecutándose.
-// - Excluir procesos propios de Windows.
-// - Obtener la ruta real del ejecutable.
-// - Extraer el ícono del ejecutable.
+// En el futuro también será responsable de:
+// • Detectar cambio de ventana activa.
+// • Detectar apertura de procesos.
+// • Detectar cierre de procesos.
+// • Informar esos cambios a cache.
 //
-// No conoce:
-// - Perfiles.
-// - Runtime.
-// - UI.
+// Flujo:
+// Windows
+//      ↓
+// back_procesos
+//      ↓
+// cache::actualizar_estado_app()
+// ------------------------------------------------------
+// 2. ¿Qué información recibe?
+// Recibe consultas realizadas por:
+// • UI. • Runtime.
+// La información proviene exclusivamente de Windows.
+// ------------------------------------------------------
+// 3. ¿Quién llama este archivo?
+// Es utilizado por:
+//
+// • UI (selector de aplicaciones).
+// • Cache (estado de aplicaciones).
+// • Runtime.
+// ------------------------------------------------------
+// 4. ¿Qué información entrega?
+//
+// Devuelve:
+// • Lista de procesos.
+// • Programa activo.
+// • Ruta del ejecutable.
+// • Ícono.
+// • (Futuro) cambios de estado de aplicaciones.
+// ------------------------------------------------------
+// 5. Funciones del archivo
+// enumerar_procesos_ventana()
+//     Lista procesos disponibles.
+// obtener_programa_activo()
+//     Devuelve la aplicación en primer plano.
+// obtener_ruta_proceso()
+//     Obtiene la ruta del ejecutable.
+// extraer_icono()
+//     Extrae el ícono del ejecutable.
+// es_proceso_windows()
+//     Filtra procesos propios de Windows.
+// iniciar_monitor() (futuro)
+//     Inicia escucha de cambios.
+// detener_monitor() (futuro)
+//     Detiene escucha.
+// cambio_ventana() (futuro)
+//     Notifica cambio de foco.
+// abrir_proceso() (futuro)
+//     Notifica apertura.
+// cerrar_proceso() (futuro)
+//     Notifica cierre.
 // ======================================================
 
 use std::collections::HashSet;

@@ -45,9 +45,9 @@ fn actualizar_contexto_cache(ultima: &mut Instant) {
         return;
     }
 
-    let programa = crate::backend::back_procesos::obtener_programa_activo();
+    let programa = crate::backend::back_app::obtener_programa_activo();
 
-    let procesos: HashSet<String> = crate::backend::back_procesos::enumerar_procesos_ventana()
+    let procesos: HashSet<String> = crate::backend::back_app::enumerar_procesos_ventana()
         .into_iter()
         .map(|p| p.nombre.to_lowercase())
         .collect();

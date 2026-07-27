@@ -23,8 +23,7 @@
 // Recibe información compilada desde perfil_json.
 // El Trigger llega optimizado:
 // - App.
-// - Modificadores.
-// - Gatillo.
+// - Entrada
 // - Condición.
 // La Respuesta mantiene prácticamente el mismo formato que perfil_json.
 //
@@ -125,9 +124,7 @@ pub struct RemapeoCache {
 pub struct TriggerCache {
     pub app: AppCache,
 
-    pub modificadores: Vec<InputId>,
-
-    pub gatillo: InputId,
+    pub entrada: Vec<InputId>,
 
     pub condicion: CondicionTrigger,
 }
