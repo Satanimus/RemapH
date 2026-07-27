@@ -1,133 +1,79 @@
 // ======================================================
-// 🔨 Compilador RemapH V3
+// 🔨 COMPILADOR RemapH V3
 // ======================================================
+// ETAPA X DEL FLUJO
+// ------------------------------------------------------
+// 1. ¿Qué hace este archivo?
+// Convierte un perfil editable (perfil_json) en un perfil optimizado para Runtime (perfil_cache).
+// No valida. No interpreta. No ejecuta.
+//  Su única responsabilidad es transformar estructuras.
 //
+// Flujo:
 // perfil_json
-//     ↓
+//      ↓
 // Compilador
-//     ↓
+//      ↓
 // perfil_cache
-//     ↓
+//      ↓
 // Cache
+// ------------------------------------------------------
+// 2. ¿Quién llama este archivo?
+// Sistema de activación de perfil.
+// Es utilizado por:
+// - Cache. - Runtime.
+// ------------------------------------------------------
+// 3. ¿Qué información recibe?
+// Recibe: perfil_json
+// Contiene: - Remapeos. - Trigger. - Respuesta.
+// Solo compila filas con estado ON.
+// ------------------------------------------------------
+// 4. ¿Qué información entrega?
+// Entrega:
+// Vec<RemapeoCache>
+//
+// Ejemplo:
+// perfil_json:
+//
+// CTRL + A
+// Doble
+// Firefox
+// Enviar B
+// ↓
+// perfil_cache:
+// TriggerCache {
+//    app,
+//    modificadores,
+//    gatillo,
+//    condicion }
+// RespuestaCache {
+//    tipo,
+//    accion,
+//    ejecucion }
+// ------------------------------------------------------
+// 5. Funciones del archivo
+// compilar()
+//     Compila perfil y actualiza Cache.
+// compilar_perfil()
+//     Convierte todas las filas activas.
+// compilar_remapeo()
+//     Convierte una fila.
+// convertir_app()
+//     Convierte AppJson → AppCache.
+// convertir_input()
+//     Convierte Input → InputId.
 // ======================================================
 
 use crate::cache;
 
 use crate::eventos::InputId;
 
-use crate::perfil_cache::{AccionCache, AppCache, CondicionTrigger, RemapeoCache, TriggerCache};
+use crate::perfil_cache::{AppCache, RemapeoCache, RespuestaCache, TriggerCache};
 
 use crate::perfil_json::{perfil_json, AppJson, RemapeoJson};
 
-use std::collections::HashSet;
-
 // ======================================================
-// ⚙️ COMPILAR PERFIL
+// ⚙️ COMPILAR PERFIL COMPLETO
 // ======================================================
-
-pub fn compilar_perfil(perfil: &perfil_json) -> Vec<RemapeoCache> {
-    let conflictivos = indices_conflictivos(perfil);
-
-    perfil
-        .remapeos
-        .iter()
-        .enumerate()
-        .filter_map(|(indice, remapeo)| {
-            if conflictivos.contains(&indice) {
-                return None;
-            }
-
-            compilar_remapeo(remapeo)
-        })
-        .collect()
-}
-// ======================================================
-// ⚡ COMPILAR
-// ======================================================
-
-// ======================================================
-// ⚠️ ÍNDICES CONFLICTIVOS
-// ======================================================
-
-fn indices_conflictivos(perfil: &perfil_json) -> HashSet<usize> {
-    let mut resultado = HashSet::new();
-
-    for indice_a in 0..perfil.remapeos.len() {
-        for indice_b in (indice_a + 1)..perfil.remapeos.len() {
-            let fila_a = &perfil.remapeos[indice_a];
-
-            let fila_b = &perfil.remapeos[indice_b];
-
-            if !triggers_iguales(fila_a, fila_b) {
-                continue;
-            }
-
-            if !apps_conflictivas(fila_a, fila_b) {
-                continue;
-            }
-
-            resultado.insert(indice_a);
-
-            resultado.insert(indice_b);
-        }
-    }
-
-    resultado
-}
-
-// ======================================================
-// 🎯 TRIGGER IDÉNTICO
-// ======================================================
-
-fn triggers_iguales(fila_a: &RemapeoJson, fila_b: &RemapeoJson) -> bool {
-    let trigger_a = &fila_a.trigger;
-
-    let trigger_b = &fila_b.trigger;
-
-    let Some(gatillo_a) = &trigger_a.gatillo else {
-        return false;
-    };
-
-    let Some(gatillo_b) = &trigger_b.gatillo else {
-        return false;
-    };
-
-    if trigger_a.condicion != trigger_b.condicion {
-        return false;
-    }
-
-    if trigger_a.modificadores.len() != trigger_b.modificadores.len() {
-        return false;
-    }
-
-    for indice in 0..trigger_a.modificadores.len() {
-        let entrada_a = &trigger_a.modificadores[indice];
-
-        let entrada_b = &trigger_b.modificadores[indice];
-
-        if entrada_a != entrada_b {
-            return false;
-        }
-    }
-
-    gatillo_a == gatillo_b
-}
-
-// ======================================================
-// 🖥️ APP INCOMPATIBLE
-// ======================================================
-
-fn apps_conflictivas(fila_a: &RemapeoJson, fila_b: &RemapeoJson) -> bool {
-    match (&fila_a.app.programa, &fila_b.app.programa) {
-        (None, None) => true,
-
-        (None, Some(_)) => fila_b.app.segundo_plano,
-
-        (Some(_), None) => fila_a.app.segundo_plano,
-
-        (Some(programa_a), Some(programa_b)) => programa_a.eq_ignore_ascii_case(programa_b),
-    }
-}
 
 pub fn compilar(perfil: &perfil_json) {
     let remapeos = compilar_perfil(perfil);
@@ -140,6 +86,18 @@ pub fn compilar(perfil: &perfil_json) {
 }
 
 // ======================================================
+// 📦 COMPILAR PERFIL
+// ======================================================
+
+pub fn compilar_perfil(perfil: &perfil_json) -> Vec<RemapeoCache> {
+    perfil
+        .remapeos
+        .iter()
+        .filter_map(compilar_remapeo)
+        .collect()
+}
+
+// ======================================================
 // 🧩 COMPILAR REMAPEO
 // ======================================================
 
@@ -148,30 +106,31 @@ fn compilar_remapeo(remapeo: &RemapeoJson) -> Option<RemapeoCache> {
         return None;
     }
 
-    let gatillo = remapeo.trigger.gatillo.as_ref()?;
-
-    let accion = remapeo.accion.as_ref()?;
-
-    let accion_gatillo = accion.gatillo.as_ref()?;
-
-    let modificadores = remapeo
-        .trigger
-        .modificadores
-        .iter()
-        .map(convertir_input)
-        .collect();
-
     Some(RemapeoCache {
-        app: convertir_app(&remapeo.app),
+        id: remapeo.id.clone(),
 
         trigger: TriggerCache {
-            modificadores,
+            app: convertir_app(&remapeo.trigger.app),
 
-            gatillo: convertir_input(gatillo),
+            modificadores: remapeo
+                .trigger
+                .modificadores
+                .iter()
+                .map(convertir_input)
+                .collect(),
 
-            condicion: convertir_condicion(&remapeo.trigger.condicion),
+            gatillo: convertir_input(&remapeo.trigger.gatillo),
+
+            condicion: remapeo.trigger.condicion.clone(),
         },
-        accion: AccionCache::Emitir(convertir_input(accion_gatillo)),
+
+        respuesta: RespuestaCache {
+            tipo: remapeo.respuesta.tipo.clone(),
+
+            accion: remapeo.respuesta.accion.clone(),
+
+            ejecucion: remapeo.respuesta.ejecucion.clone(),
+        },
     })
 }
 
@@ -197,20 +156,4 @@ fn convertir_app(app: &AppJson) -> AppCache {
 
 fn convertir_input(input: &crate::idioma::Input) -> InputId {
     InputId::new(&input.fuente, &input.control)
-}
-
-// ======================================================
-// 🎯 CONVERTIR CONDICIÓN
-// ======================================================
-
-fn convertir_condicion(condicion: &str) -> CondicionTrigger {
-    match condicion {
-        "Simple" => CondicionTrigger::Simple,
-
-        "Doble" => CondicionTrigger::Doble,
-
-        "Mantenido" => CondicionTrigger::Mantenido,
-
-        _ => CondicionTrigger::Simple,
-    }
 }

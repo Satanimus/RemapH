@@ -1,19 +1,82 @@
 // ======================================================
 // 👤 perfil_json RemapH V3
-// ------------------------------------------------------
-// Modelo persistente del perfil.
+// ======================================================
+// 1. ¿Qué hace este archivo?
+// Modelo persistente del perfil de usuario.
+// Guarda la configuración completa necesaria para:
+// - Reconstruir la UI. - Guardar perfiles.
+// - Cargar perfiles. - Entregar información al compilador.
 //
-// perfil_json representa la tabla de la UI.
+// perfil_json NO:
+// - Ejecuta remapeos. - Conoce Runtime. - Conoce dispositivos físicos.
 //
-// El número de fila no se guarda.
-// El orden dentro del Vec determina el número.
-//
-// JSON
+// Flujo:
+// UI
 //   ↓
 // perfil_json
-// ======================================================
+//   ↓
+// JSON guardado
+//   ↓
+// Compilador
+//   ↓
+// perfil_cache
+// ------------------------------------------------------
+// 2. ¿Qué información recibe?
+// Recibe la configuración creada o modificada por la UI.
+// Contiene:
+// Perfil: - Lista de remapeos.
+//
+//Remapeo:
+// - Identidad.- Estado.- Trigger.- Respuesta.- Personalización.
+//
+// Ejemplo:
+// RemapeoJson
+// {id: "001",
+//   trigger:
+//   { app: firefox,
+//      modificadores: CTRL,
+//      gatillo: A,
+//      condicion: Doble},
+//   respuesta:
+//   { tipo: tecla_mouse,
+//      accion: B,
+//      ejecucion: Simple }}
+// ------------------------------------------------------
+// 3. ¿Quién llama este archivo?
+// Recibe información desde:
+// - UI RemapH.
+// Es utilizado por:
+// - Sistema de guardado. - Sistema de carga.- Compilador hacia perfil_cache.
+// ------------------------------------------------------
+// 4. ¿Qué información entrega?
+// Entrega una estructura serializable/deserializable.
+// Ejemplo:
+// perfil_json
+// {remapeos:
+//    [RemapeoJson] }
+// Esta información posteriormente será transformada
+// por el compilador en una estructura optimizada
+// para Runtime.
+// ------------------------------------------------------
+// 5. Funciones y estructuras del archivo
+// perfil_json
+//     Contenedor principal del perfil.
+// RemapeoJson
+//     Representa una fila completa de la tabla UI.
+// TriggerJson
+//     Representa cómo se activa un remapeo.
+// AppJson
+//     Representa el contexto donde existe el trigger.
+// RespuestaJson
+//     Representa qué debe ocurrir después del trigger.
+// AccionJson
+//     Representa los datos necesarios para ejecutar.
+// perfil_json::nuevo()
+//     Crea un perfil vacío.
+// ------------------------------------------------------
 
 use crate::idioma::Input;
+use crate::perfil_cache::CondicionTrigger;
 
 // ======================================================
 // 👤 PERFIL JSON
@@ -31,23 +94,10 @@ pub struct perfil_json {
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct RemapeoJson {
     pub id: String,
-
     pub estado: String,
-
-    pub app: AppJson,
-
     pub trigger: TriggerJson,
-
-    pub tipo: String,
-
-    pub accion: Option<TriggerJson>,
-
-    pub condicion: String,
-
-    pub ejecucion: String,
-
+    pub respuesta: RespuestaJson,
     pub color: String,
-
     pub nota: String,
 }
 
@@ -57,11 +107,21 @@ pub struct RemapeoJson {
 
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct TriggerJson {
+    pub app: AppJson,
     pub modificadores: Vec<Input>,
+    pub gatillo: Input,
+    pub condicion: CondicionTrigger,
+}
 
-    pub gatillo: Option<Input>,
+// ======================================================
+// ⚡ RESPUESTA JSON
+// ======================================================
 
-    pub condicion: String,
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct RespuestaJson {
+    pub tipo: String,
+    pub accion: String,
+    pub ejecucion: String,
 }
 
 // ======================================================
@@ -77,7 +137,7 @@ impl perfil_json {
 }
 
 // ======================================================
-// APP JSON
+// 🖥️ APP JSON
 // ======================================================
 
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]

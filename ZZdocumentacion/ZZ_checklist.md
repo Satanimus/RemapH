@@ -16,37 +16,38 @@ El objetivo: cada archivo será una etapa. Cada etapa tendrá su resumen y detal
 
 ////////resumen de 13 archivos en orden///////////////////////////////////////////////////
 Orden definitivo:
-Etapa 1 Base del modelo. Estos archivos definen las estructuras que utilizarán todos los demás.
--instante.rs
--eventos.rs
--perfil_cache.rs
+ETAPA 1 — Modelo
+├── instante.rs
+├── eventos.rs
+├── perfil_json.rs
+├── perfil_cache.rs
+└── compilador.rs
 
-ETAPA 2 — Cache. Aquí definimos cómo responde la cache.
--cache.rs
+ETAPA 2 — Cache
+└── cache.rs
 
-ETAPA 3 — Analizador (para runtime y captura).(coincidencias, prefijos, candidatos, doble, liberación,etc)
--analizador_trigger.rs
--evento_trigger.rs
+ETAPA 3 — Analizador
+├── evento_trigger.rs
+└── analizador_trigger.rs
 
-ETAPA 4 — Captura. Ahora que el Analizador ya sabe interpretar secuencias completas.
--capturador_trigger.rs
--captura.rs
+ETAPA 4 — Captura
+├── capturador_trigger.rs
+└── captura.rs
 
 ETAPA 5 — Entrada
--entrada.rs
+└── entrada.rs
 
-ETAPA 6 — Runtime. Cuando el Analizador ya entregue un EventoTrigger definitivo.
-
--runtime.rs
+ETAPA 6 — Runtime
+└── runtime.rs
 
 ETAPA 7 — Salida
--back_salida.rs
+└── back_salida.rs
 
 ETAPA 8 — Diccionarios
--pulsadores.rs
+└── pulsadores.rs
 
 ETAPA 9 — Configuración
-config.rs
+└── config.rs
 
 ////////////////////////////////////////////////////////////////
 PLAN — Refactorización Capturador / Analizador V3
