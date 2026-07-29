@@ -434,9 +434,7 @@ filaPerfil.accion
 
 La captura física fue separada en:
 
-comp_capturador_trigger.ts
-
-⌨️ comp_capturador_trigger.ts
+⌨️ comp_capturador.ts
 
 Etapa: Captura de entradas de la UI.
 
@@ -871,7 +869,7 @@ Convertir eventos físicos de mouse a InputEvent.
 
 Convertir InputId a salida de mouse.
 
-▶️ back_salida.rs
+▶️ (ahora será runtime).rs
 
 Etapa: Salida física Full.
 

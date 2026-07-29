@@ -192,8 +192,6 @@ La captura se divide en dos etapas.
 
 ## Captura
 
-`comp_capturador_trigger.ts`
-
 Recibe eventos del DOM.
 
 Construye un bufferEventos.

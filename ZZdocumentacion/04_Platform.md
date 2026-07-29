@@ -165,14 +165,14 @@ La salida depende del modo físico.
 
 ## Full
 
-`back_salida.rs` utiliza Interception.
+`(ahora runtime).rs` utiliza Interception.
 
 Flujo:
 
 ```
 AccionCache
 ↓
-back_salida
+runtime
 ↓
 Interception
 ```

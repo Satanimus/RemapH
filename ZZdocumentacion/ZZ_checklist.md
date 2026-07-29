@@ -21,38 +21,31 @@ El objetivo: cada archivo será una etapa. Cada etapa tendrá su resumen y detal
 
 ////////resumen de 13 archivos en orden///////////////////////////////////////////////////
 Orden definitivo:
-ETAPA 1 — Modelo
+ETAPA 1 — Modelo (OK)
 ├── instante.rs
 ├── eventos.rs
 ├── perfil_json.rs
 ├── perfil_cache.rs
 └── compilador.rs
 
-ETAPA 2 — Cache
+ETAPA 2 — Analizador (OK)
+└── analizador_trigger.rs (¿debe enviar mensaje cuando deje de recibir inputs a cache para que pueda enviar detener a runtime?.. pensar)
+
+ETAPA 3 — Cache (OK)
 └── back_app (pendiente)
-└── cache.rs
+└── cache.rs (pendiente ver a quien envía PASAR)
 
-ETAPA 3 — Analizador
-├── evento_trigger.rs
-└── analizador_trigger.rs
-
-ETAPA 4 — Captura
-├── capturador_trigger.rs
-└── captura.rs
+ETAPA 4 — Runtime (OK)
+└── runtime.rs
+└── runt_extra.rs
 
 ETAPA 5 — Entrada
 └── entrada.rs
 
-ETAPA 6 — Runtime
-└── runtime.rs
-
-ETAPA 7 — Salida
-└── back_salida.rs
-
-ETAPA 8 — Diccionarios
+ETAPA 6 — Diccionarios
 └── pulsadores.rs
 
-ETAPA 9 — Configuración
+ETAPA 7 — Configuración
 └── config.rs
 
 ////////////////////////////////////////////////////////////////
@@ -74,15 +67,11 @@ Extensiones futuras
 ⬜ Evaluar soporte para nuevos tipos de triggers si fueran necesarios.
 
 ------ Recordar limpiar comandos.rs
------- igual captura.rs (eliminar)
 ------ Commpletar back_app para informar cambios de App para el cache
 ------Documentar oficialmente el flujo del motor, igual que hicimos con el flujo Perfil → Compilador → Cache → Runtime.
 
 Algo como:
 Windows / Interception
-│
-▼
-CapturadorTrigger
 │
 ▼
 BufferEventos
@@ -109,3 +98,4 @@ Ese diagrama será muy útil cuando dentro de unos meses tengamos que volver al 
 00.310 Ctrl Up
 
 Sería una herramienta excelente para depurar problemas de triggers sin tocar el resto del sistema.
+------ En la V2 agregar un indice de dispositivo para diferenciar joistick de joistick(1). Si no existe indice, se toma como predeterminado, si lleva (1), (2), etc... el runtime debe tomarlos como otro dispositivo y hacer los cambios necesarios para diferenciarlos.

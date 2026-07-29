@@ -1,22 +1,140 @@
 // ======================================================
-// 🎹 Capturador Trigger RemapH V3
+// 🎹 CapturadorTrigger RemapH V3
+// ======================================================
+// ETAPA 2 DEL FLUJO
 // ------------------------------------------------------
-// Graba InputEvent físicos durante una captura.
+// 1. ¿Qué hace este archivo?
 //
-// No interpreta.
-// No consulta Cache.
-// No conoce Runtime.
-// No construye EventoTrigger.
+// Almacena temporalmente eventos físicos durante una
+// captura de trigger.
+//
+// Su única responsabilidad es reunir los InputEvent
+// recibidos y mantener el orden en que ocurrieron.
+//
+// CapturadorTrigger NO interpreta:
+//
+// - Combinaciones.
+// - Doble pulsación.
+// - Pulsación mantenida.
+// - Condiciones.
+// - Triggers.
+//
+// Tampoco conoce:
+//
+// - Perfil.
+// - Cache.
+// - Runtime.
+// - Acciones.
+// - Macros.
+//
+// ------------------------------------------------------
+// 2. ¿Qué información recibe?
+//
+// Recibe:
+//
+// InputEvent:
+//
+// - InputId.
+// - Estado físico.
+// - Instante.
+//
+// Ejemplo:
+//
+// keyboard:A
+// Down
+// 105263 ms
+//
+// ------------------------------------------------------
+// 3. ¿Quién llama este archivo?
+//
+// Backend de captura:
+//
+// back_windows
+// back_interception
+// rdev
 //
 // Flujo:
 //
-// Input físico
+// Entrada física
 //      ↓
+// Backend captura
+//      ↓
+// InputEvent
+//      ↓
+// CapturadorTrigger
+//
+// ------------------------------------------------------
+// 4. ¿Qué información entrega?
+//
+// Entrega:
+//
+// Vec<InputEvent>
+//
+// Manteniendo:
+//
+// - Orden.
+// - Estado.
+// - Instante.
+//
+// Ejemplo:
+//
+// [
+//   Ctrl Down,
+//   A Down,
+//   A Up,
+//   Ctrl Up
+// ]
+//
+// ------------------------------------------------------
+// 5. ¿Quién recibe la información después?
+//
+// AnalizadorTrigger.
+//
+// Flujo:
+//
 // CapturadorTrigger
 //      ↓
 // Vec<InputEvent>
 //      ↓
 // AnalizadorTrigger
+//      ↓
+// Trigger interno
+//      ↓
+// Compilador
+//      ↓
+// Cache
+//
+// ------------------------------------------------------
+// 6. Funciones del archivo
+//
+// nuevo()
+//     Crea un capturador vacío.
+//
+// recibir()
+//     Agrega un InputEvent recibido.
+//
+// eventos()
+//     Devuelve los eventos acumulados.
+//
+// esta_vacio()
+//     Indica si existe una captura.
+//
+// limpiar()
+//     Elimina eventos almacenados.
+//
+// ------------------------------------------------------
+// Transformación:
+//
+// Input físico
+//      ↓
+// InputEvent
+//      ↓
+// CapturadorTrigger
+//      ↓
+// Lista ordenada de eventos
+//      ↓
+// AnalizadorTrigger
+//
 // ======================================================
 
 use crate::eventos::InputEvent;

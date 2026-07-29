@@ -19,5 +19,4 @@
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true
   },
-  "include": ["src", "ZZdocumentacion/backup_xsiak/Delet_comp_capturador_trigger.ts"]
 }

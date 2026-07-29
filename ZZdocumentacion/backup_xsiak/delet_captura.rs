@@ -22,8 +22,6 @@
 
 use std::sync::{Mutex, OnceLock};
 
-use crate::evento_trigger::EventoTrigger;
-
 // ======================================================
 // 🧠 ESTADO
 // ======================================================

@@ -1,69 +1,110 @@
 // ======================================================
-// 🗃️ cache RemapH V3
+// 🗃️ CACHE RemapH V3
 // ======================================================
 // ETAPA 2 DEL FLUJO
 // ------------------------------------------------------
 // 1. ¿Qué hace este archivo?
-// Mantiene en memoria todos los remapeos activos compilados y el estado de las aplicaciones.
-// cache NO interpreta condiciones. NO decide la respuesta. NO conoce Runtime.
 //
-// Su única responsabilidad es responder:
-// • ¿Existe alguna posible coincidencia?
-// • ¿Existe una coincidencia exacta?
+// Mantiene en memoria:
 //
-// Flujo:
-// perfil_json
-//     ↓
-// compilador
-//     ↓
-// perfil_cache
-//     ↓
-// cache
+// - Remapeos activos compilados.
+// - Estado actual de aplicaciones.
+//
+// Cache NO conoce:
+//
+// - Runtime.
+// - Captura.
+// - Condiciones de trigger.
+//
+// Su responsabilidad es resolver una entrada:
+//
+// • Sin coincidencia.
+// • Match único.
+// • Necesita análisis de condición.
+//
 // ------------------------------------------------------
 // 2. ¿Qué información recibe?
+//
 // Recibe:
-// • Remapeos compilados.
-// • Escritura o eliminación de filas.
-// • Actualización del estado de aplicaciones desde Windows.
-// • Entradas del Analizador.
+//
+// - Remapeos desde compilador.
+// - Escritura o eliminación de filas.
+// - Estado de aplicaciones desde back_app.
+// - Entradas analizadas desde AnalizadorTrigger.
+//
 // ------------------------------------------------------
 // 3. ¿Quién llama este archivo?
-// Recibe llamadas desde:
-// • compilador  • analizador_trigger • módulo de estado de aplicaciones
+//
+// - Compilador.
+// - AnalizadorTrigger.
+// - Módulo estado aplicaciones.
+//
 // ------------------------------------------------------
 // 4. ¿Qué información entrega?
-// Devuelve únicamente:
-// • Cantidad de coincidencias posibles.
-// • Cantidad de coincidencias exactas.
-// • El remapeo completo únicamente cuando existe un MATCH único.
 //
-// Nunca interpreta:   • Simple • Doble • Mantenido
-// Esa responsabilidad pertenece al Analizador Trigger.
+// Devuelve ResolucionEntrada:
+//
+// Pasar:
+//     La entrada física continúa. ***** (Pendiente definir módulo encargado de liberar)
+//
+// Iniciar:
+//     Envía una orden completa a Runtime.
+// Detener:
+//     Envía señal de liberación de instancia.
+//
+// AnalizarCondicion:
+//     Solicita al AnalizadorTrigger determinar
+//     Simple / Doble / Mantenido.
+//
 // ------------------------------------------------------
 // 5. Funciones del archivo
+//
 // escribir_cache()
-//     Reemplaza completamente la cache.
+//     Reemplaza toda la cache.
+//
 // escribir_fila()
-//     Agrega una fila.
+//     Agrega un remapeo.
+//
 // borrar_cache()
-//     Elimina toda la cache.
+//     Elimina todos los remapeos.
+//
 // borrar_fila()
-//     Elimina una fila.
+//     Elimina un remapeo por ID.
+//
 // actualizar_estado_app()
-//     Actualiza el estado de una aplicación.
-// buscar()
-//     Compara la entrada contra la cache.
+//     Actualiza estado de aplicación.
+//
+// resolver_entrada()
+//     Compara una entrada contra la cache.
+//
+//     Reglas:
+//
+//     posibles = 0
+//          → Pasar.
+//
+//     posibles = 1
+//     exactas = 1
+//          → Ejecutar acción.
+//
+//     posibles = exactas
+//     exactas > 1
+//          → Analizar condición.
+//
 // ------------------------------------------------------
 // Transformación:
+//
 // perfil_cache
-//        ↓
-//     cache
-//        ↓
-// Analizador Trigger
+//       ↓
+//    Cache
+//       ↓
+// Resolución de entrada
+//       ↓
+// Runtime
 // ======================================================
 
-use crate::eventos::InputId;
-use crate::perfil_cache::{AppCache, RemapeoCache};
+use crate::eventos::{InputEvent, InputId};
+
+use crate::perfil_cache::{AccionCache, AppCache, ExtraCache, RemapeoCache};
 
 use std::sync::{Mutex, OnceLock};
 
@@ -85,6 +126,38 @@ pub struct AppEstadoCache {
 }
 
 static APPS: OnceLock<Mutex<Vec<AppEstadoCache>>> = OnceLock::new();
+
+// ======================================================
+// 📤 ORDEN RUNTIME
+// ======================================================
+
+#[derive(Clone, Debug)]
+pub enum OrdenRuntime {
+    Iniciar {
+        id: String,
+
+        accion: AccionCache,
+
+        extra: Option<ExtraCache>,
+    },
+
+    Detener {
+        id: String,
+    },
+}
+
+// ======================================================
+// 📤 RESOLUCIÓN
+// ======================================================
+
+#[derive(Clone, Debug)]
+pub enum ResolucionEntrada {
+    Pasar(Vec<InputEvent>),
+
+    Ejecutar(OrdenRuntime),
+
+    AnalizarCondicion,
+}
 
 // ======================================================
 // 📦 ACCESO CACHE
@@ -135,32 +208,10 @@ pub fn borrar_fila(id: &str) {
 }
 
 // ======================================================
-// 🔎 RESULTADO BÚSQUEDA
+// 🔎 RESOLVER ENTRADA
 // ======================================================
 
-#[derive(Clone, Debug)]
-pub struct ResultadoBusqueda {
-    pub posibles: usize,
-
-    pub exactas: usize,
-
-    pub remapeo: Option<RemapeoCache>,
-}
-
-// ======================================================
-// 🔎 BUSCAR
-// ------------------------------------------------------
-// Compara la entrada recibida contra todos los
-// remapeos compatibles con el contexto actual.
-//
-// Devuelve:
-//
-// posibles
-// exactas
-// remapeo (solo si existe un MATCH único)
-// ======================================================
-
-pub fn buscar(entrada: &[InputId]) -> ResultadoBusqueda {
+pub fn resolver_entrada(entrada: &[InputId], eventos: Vec<InputEvent>) -> ResolucionEntrada {
     let cache = obtener_cache().lock().unwrap();
 
     let apps = obtener_apps().lock().unwrap();
@@ -169,7 +220,7 @@ pub fn buscar(entrada: &[InputId]) -> ResultadoBusqueda {
 
     let mut exactas = 0;
 
-    let mut remapeo = None;
+    let mut remapeo: Option<RemapeoCache> = None;
 
     for fila in cache.iter() {
         if !app_habilitada(&fila.trigger.app, &apps) {
@@ -191,26 +242,31 @@ pub fn buscar(entrada: &[InputId]) -> ResultadoBusqueda {
         }
     }
 
-    ResultadoBusqueda {
-        posibles,
-
-        exactas,
-
-        remapeo,
+    if posibles == 0 {
+        return ResolucionEntrada::Pasar(eventos);
     }
+
+    if posibles == 1 && exactas == 1 {
+        let remapeo = remapeo.unwrap();
+
+        return ResolucionEntrada::Ejecutar(OrdenRuntime::Iniciar {
+            id: remapeo.id,
+
+            accion: remapeo.accion,
+
+            extra: remapeo.extra,
+        });
+    }
+
+    if posibles == exactas && exactas > 1 {
+        return ResolucionEntrada::AnalizarCondicion;
+    }
+
+    ResolucionEntrada::AnalizarCondicion
 }
 
 // ======================================================
 // 🖥️ ACTUALIZAR ESTADO APP
-// ------------------------------------------------------
-// Windows informará:
-//
-// - abre
-// - cierra
-// - gana foco
-// - pierde foco
-//
-// Cache solamente actualiza el estado.
 // ======================================================
 
 pub fn actualizar_estado_app(app: &AppCache, activa: bool) {
@@ -231,14 +287,6 @@ pub fn actualizar_estado_app(app: &AppCache, activa: bool) {
 
 // ======================================================
 // ❓ APP HABILITADA
-// ------------------------------------------------------
-// Determina si un remapeo debe participar
-// en la búsqueda.
-//
-// Global siempre participa.
-//
-// Programa depende del estado almacenado
-// previamente por Windows.
 // ======================================================
 
 fn app_habilitada(app: &AppCache, estados: &[AppEstadoCache]) -> bool {

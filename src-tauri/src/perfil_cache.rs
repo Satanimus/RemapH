@@ -4,75 +4,124 @@
 // ETAPA 4 DEL FLUJO
 // ------------------------------------------------------
 // 1. ¿Qué hace este archivo?
-// Modelo interno compilado utilizado por Runtime.
-// El compilador solamente transforma la información necesaria para acelerar la detección de triggers.
-// La respuesta NO se interpreta.
-// De esta forma agregar nuevos tipos de respuesta no obliga a modificar todo el motor.
-// No guarda: Color. - Nota.- Remapeos OFF.
+//
+// Modelo interno compilado utilizado por Cache y Runtime.
+//
+// Guarda únicamente información necesaria para:
+//
+// • Buscar triggers rápidamente.
+// • Ejecutar acciones directamente.
+//
+// No guarda:
+// • Color.
+// • Nota.
+// • Remapeos OFF.
+//
+// El Trigger es optimizado.
+// La Acción ya viene preparada para ejecución.
 //
 // Flujo:
+//
 // perfil_json
 //      ↓
 // Compilador
 //      ↓
 // perfil_cache
 //      ↓
+// Cache
+//      ↓
 // Runtime
+//
 // ------------------------------------------------------
 // 2. ¿Qué información recibe?
+//
 // Recibe información compilada desde perfil_json.
-// El Trigger llega optimizado:
-// - App.
-// - Entrada
-// - Condición.
-// La Respuesta mantiene prácticamente el mismo formato que perfil_json.
+//
+// Trigger:
+//
+// • App.
+// • Entrada.
+// • Condición.
+//
+// Acción:
+//
+// • Acción física preparada.
 //
 // Ejemplo:
+//
 // Trigger:
+//
 // Firefox
-// CTRL
-// A
+// CTRL + A
 // Doble
 //
-// Respuesta:
-// Tipo = tecla_mouse
-// Acción = [keyboard:B]
-// Ejecución = turbo
+// Acción:
+//
+// Emitir keyboard:B
+//
 // ------------------------------------------------------
 // 3. ¿Quién llama este archivo?
+//
 // Recibe:
-// - Compilador.
+//
+// • Compilador.
 //
 // Lo utilizan:
-// - Cache.
-// - Runtime.
-// - AnalizadorTrigger.
+//
+// • Cache.
+// • Runtime.
+//
 // ------------------------------------------------------
 // 4. ¿Qué información entrega?
+//
 // TriggerCache:
-// Información optimizada para responder:"¿Existe coincidencia?"
-// RespuestaCache:
-// Información necesaria para responder:"¿Qué debo ejecutar?"
+//
+// Información optimizada para búsqueda.
+//
+// AccionCache:
+//
+// Información lista para ejecución.
 //
 // RemapeoCache:
-// { id,trigger,respuesta }
+//
+// {
+//    id,
+//    trigger,
+//    accion
+// }
+//
 // ------------------------------------------------------
 // 5. Funciones y estructuras
+//
 // AppCache
 //      Contexto de aplicación.
+//
 // CondicionTrigger
 //      Tipo de disparador.
+//
 // RemapeoCache
-//      Une Trigger + Respuesta.
+//      Une Trigger + Acción.
+//
 // TriggerCache
 //      Parte compilada del remapeo.
-// RespuestaCache
-//      Parte NO compilada del remapeo.
+//
+// AccionCache
+//      Orden física de ejecución.
+//
+// ExtraCache
+//      Como debe comportarse la Accion.
 // ------------------------------------------------------
-// Filosofía del compilador
-// ✔ Se compila únicamente aquello que mejora el rendimiento del motor de búsqueda del Trigger.
-// ✔ La Respuesta no se interpreta. Se transporta casi exactamente igual que en perfil_json.
-// Así el motor permanece estable mientras la cantidad de tipos de respuesta puede crecer libremente.
+// Filosofía:
+//
+// ✔ Cache decide coincidencias.
+//
+// ✔ Runtime ejecuta acciones.
+//
+// ✔ Ninguno interpreta respuestas.
+//
+// ✔ Agregar nuevos tipos de salida modifica únicamente
+//   AccionCache y Salida.
+//
 // ======================================================
 
 use crate::eventos::InputId;
@@ -113,7 +162,9 @@ pub struct RemapeoCache {
 
     pub trigger: TriggerCache,
 
-    pub respuesta: RespuestaCache,
+    pub accion: AccionCache,
+
+    pub extra: Option<ExtraCache>,
 }
 
 // ======================================================
@@ -130,14 +181,52 @@ pub struct TriggerCache {
 }
 
 // ======================================================
-// ⚡ RESPUESTA CACHE
+// ⚡ ACCIÓN CACHE
 // ======================================================
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct RespuestaCache {
-    pub tipo: String,
+pub enum AccionCache {
+    // Acción física directa
+    Emitir(InputId),
 
-    pub accion: String,
+    // Archivo de macro dentro de usuario/macros
+    Macro(String),
 
-    pub ejecucion: String,
+    // Abrir archivo o programa
+    AbrirArchivo { ruta: String },
+
+    // Elementos UI creados por usuario
+    Ui { ruta: String },
+}
+
+// ======================================================
+// 🧩 EXTRA CACHE
+// ======================================================
+//
+// Selecciona una receta de runt_extra.
+//
+// No ejecuta.
+// No contiene lógica.
+// Runtime solicita la receta.
+//
+
+#[derive(Clone, Debug, PartialEq)]
+pub enum ExtraCache {
+    // Teclado / mouse / joystick
+    Turbo,
+
+    Mantener,
+
+    Toggle,
+
+    // Mouse
+    DobleClick,
+
+    ClickSostenido,
+
+    // Windows
+    AbrirMinimizado,
+
+    // UI
+    PopupToggle,
 }

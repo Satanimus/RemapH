@@ -61,8 +61,8 @@ export const COLUMNAS: Columna[] = [
   },
 
   {
-    id: "ejecucion",
-    titulo: "Ejecución",
+    id: "ejecucion", // cambiar nombre a extra cuando compile
+    titulo: "Extra",
     grupo: "respuesta",
     ancho: "var(--col-behavior)",
   },

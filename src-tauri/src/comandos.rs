@@ -21,7 +21,6 @@ use std::fs;
 use crate::cache;
 use crate::compilador;
 use crate::estado;
-use crate::evento_trigger::EventoTrigger;
 use crate::perfil_json::{perfil_json, AppJson, RemapeoJson, TriggerJson};
 use crate::persistencia;
 use crate::usuario;

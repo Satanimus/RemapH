@@ -110,7 +110,7 @@ pub struct TriggerJson {
 
     pub entrada: Vec<Input>,
 
-    pub condicion: String,
+    pub condicion: CondicionTrigger,
 }
 
 // ======================================================
@@ -120,8 +120,10 @@ pub struct TriggerJson {
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct RespuestaJson {
     pub tipo: String,
+
     pub accion: String,
-    pub ejecucion: String,
+
+    pub extra: String,
 }
 
 // ======================================================

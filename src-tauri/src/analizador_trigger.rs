@@ -1,61 +1,63 @@
 // ======================================================
 // 🧠 Analizador Trigger RemapH V3
+// ======================================================
+// ETAPA 3 DEL FLUJO
 // ------------------------------------------------------
-// Analiza únicamente posibles triggers.
+// 1. ¿Qué hace este archivo?
+// Interpreta únicamente la secuencia física de entradas.
 //
-// No ejecuta acciones.
-// No conoce Runtime.
-// No conoce Captura.
+// No conoce: • Cache. • Runtime. • Remapeos. • Aplicaciones.
 //
-// Solo responde:
+// Mantiene temporalmente:
+// • Buffer de eventos. • Inputs actualmente presionados.
+// • Último Down. • Último Up.
 //
-//   Esperar
-//   Trigger
-//   Liberar
+// Cuando se solicita:
+// • Determina si el último gatillo corresponde a: Simple.  Doble. Mantenido.
+// ------------------------------------------------------
+// 2. ¿Qué información recibe?
+// Recibe:
+// • InputEvent.
 //
-// Maneja:
-//   - Simple.
-//   - Doble.
-//   - Mantenido.
+// Opcionalmente:
+// • Solicitud para analizar el último gatillo.
+// ------------------------------------------------------
+// 3. ¿Quién llama este archivo?
+// • Backend captura. • Módulo de captura UI.
+// ------------------------------------------------------
+// 4. ¿Qué información entrega?
+// En Runtime:
+// • Cache recibe cada down en orden de llegada para comparar.
+// • Resultado del análisis de condición cuando Cache lo solicita.
 //
-// Mantiene:
-//   - Inputs físicamente presionados.
-//   - Candidatos temporales.
+// En Captura:
+// • Trigger completo listo para guardar en el botón.
+// ------------------------------------------------------
+// 5. Funciones del archivo
+// procesar()
+//     Actualiza el estado interno con cada InputEvent.
+// obtener_entrada()
+//     Devuelve la entrada completa actualmente activa.
+// analizar_condicion()
+//     Determina Simple, Doble o Mantenido usando
+//     el historial del último gatillo.
+// comprobar_timeout()
+//     Limpia la memoria cuando vence el tiempo doble.
+// limpiar()
+//     Reinicia completamente el estado interno.
+// ------------------------------------------------------
+// Transformación:
+// InputEvent
+//      ↓
+// Analizador Trigger
+//      ↓-----------↓
+// Cache     o     perfil_ui
+//      ↓
+// Runtime
 // ======================================================
 
-use crate::evento_trigger::EventoTrigger;
 use crate::eventos::{InputEvent, InputId, InputState};
 use crate::perfil_cache::CondicionTrigger;
-
-use std::time::{Duration, Instant};
-
-// ======================================================
-// 🔎 RESULTADO
-// ======================================================
-
-pub enum ResultadoTrigger {
-    Esperar,
-
-    Trigger(EventoTrigger),
-
-    Liberar(Vec<InputEvent>),
-}
-
-// ======================================================
-// 🧠 CANDIDATO TEMPORAL
-// ======================================================
-
-struct CandidatoTrigger {
-    modificadores: Vec<InputId>,
-
-    gatillo: InputId,
-
-    condicion: CondicionTrigger,
-
-    instante_down: u64,
-
-    instante_up: Option<u64>,
-}
 
 // ======================================================
 // 🧠 ANALIZADOR
@@ -66,7 +68,9 @@ pub struct AnalizadorTrigger {
 
     presionados: Vec<InputId>,
 
-    candidato: Option<CandidatoTrigger>,
+    ultimo_down: Option<InputEvent>,
+
+    ultimo_up: Option<InputEvent>,
 }
 
 // ======================================================
@@ -80,237 +84,105 @@ impl AnalizadorTrigger {
 
             presionados: Vec::new(),
 
-            candidato: None,
+            ultimo_down: None,
+
+            ultimo_up: None,
         }
     }
 
     // ==================================================
-    // 📥 RECIBIR EVENTO
+    // 📥 PROCESAR
     // ==================================================
 
-    pub fn procesar(&mut self, evento: InputEvent) -> ResultadoTrigger {
+    pub fn procesar(&mut self, evento: InputEvent) {
         self.buffer.push(evento.clone());
 
         match evento.state {
             InputState::Down => {
-                self.agregar_presionado(evento.input.clone());
+                if !self.presionados.contains(&evento.input) {
+                    self.presionados.push(evento.input.clone());
+                }
 
-                self.procesar_down(evento)
+                self.ultimo_down = Some(evento);
             }
 
             InputState::Up => {
-                self.quitar_presionado(&evento.input);
+                self.presionados.retain(|i| i != &evento.input);
 
-                self.procesar_up(evento)
+                self.ultimo_up = Some(evento);
             }
 
-            InputState::Pulse => ResultadoTrigger::Liberar(self.buffer.clone()),
+            InputState::Pulse => {}
         }
     }
 
     // ==================================================
-    // ⬇️ DOWN
+    // 📦 ENTRADA ACTUAL
     // ==================================================
 
-    fn procesar_down(&mut self, evento: InputEvent) -> ResultadoTrigger {
-        if let Some(candidato) = &self.candidato {
-            if candidato.condicion == CondicionTrigger::Doble && candidato.gatillo == evento.input {
-                let resultado = EventoTrigger::doble(
-                    candidato.modificadores.clone(),
-                    candidato.gatillo.clone(),
-                );
+    pub fn obtener_entrada(&self) -> Vec<InputId> {
+        self.presionados.clone()
+    }
 
-                self.limpiar();
+    // ==================================================
+    // ⏱️ ANALIZAR CONDICIÓN
+    // ==================================================
 
-                return ResultadoTrigger::Trigger(resultado);
-            }
-        }
+    pub fn analizar_condicion(&self) -> Option<CondicionTrigger> {
+        let ultimo_down = self.ultimo_down.as_ref()?;
 
-        let activos = self.presionados.clone();
+        let gatillo = &ultimo_down.input;
 
-        let gatillo = evento.input.clone();
-
-        let modificadores = activos
+        let eventos: Vec<&InputEvent> = self
+            .buffer
             .iter()
-            .filter(|input| **input != gatillo)
-            .cloned()
+            .filter(|evento| evento.input == *gatillo)
             .collect();
 
-        let Some(remapeo) = crate::cache::buscar(&activos, &gatillo) else {
-            if crate::cache::existe_prefijo(&activos) {
-                return ResultadoTrigger::Esperar;
-            }
+        let down: Vec<&InputEvent> = eventos
+            .iter()
+            .filter(|evento| evento.state == InputState::Down)
+            .copied()
+            .collect();
 
-            let eventos = self.buffer.clone();
+        if down.len() >= 2 {
+            let diferencia = down[down.len() - 1].instante - down[down.len() - 2].instante;
 
-            self.limpiar();
-
-            return ResultadoTrigger::Liberar(eventos);
-        };
-
-        match remapeo.trigger.condicion {
-            CondicionTrigger::Simple => {
-                self.limpiar();
-
-                ResultadoTrigger::Trigger(EventoTrigger::simple(modificadores, gatillo))
-            }
-
-            CondicionTrigger::Doble | CondicionTrigger::Mantenido => {
-                self.candidato = Some(CandidatoTrigger {
-                    modificadores,
-
-                    gatillo,
-
-                    condicion: remapeo.trigger.condicion,
-
-                    instante_down: evento.instante,
-
-                    instante_up: None,
-                });
-
-                ResultadoTrigger::Esperar
+            if diferencia <= crate::config::tiempo_doble() {
+                return Some(CondicionTrigger::Doble);
             }
         }
+
+        let up = eventos
+            .iter()
+            .rev()
+            .find(|evento| evento.state == InputState::Up);
+
+        if let Some(up) = up {
+            let tiempo = up.instante - ultimo_down.instante;
+
+            if tiempo >= crate::config::tiempo_mantenido() {
+                return Some(CondicionTrigger::Mantenido);
+            }
+        }
+
+        Some(CondicionTrigger::Simple)
     }
 
     // ==================================================
-    // ⬆️ UP
+    // ⏳ TIMEOUT DOBLE
     // ==================================================
 
-    fn procesar_up(&mut self, evento: InputEvent) -> ResultadoTrigger {
-        let Some(candidato) = &mut self.candidato else {
-            return ResultadoTrigger::Esperar;
-        };
-
-        if candidato.gatillo != evento.input {
-            return ResultadoTrigger::Esperar;
-        }
-
-        candidato.instante_up = Some(evento.instante);
-
-        match candidato.condicion {
-            CondicionTrigger::Mantenido => {
-                let duracion = evento.instante - candidato.instante_down;
-
-                if duracion >= crate::config::tiempo_mantenido() {
-                    let resultado = EventoTrigger::mantenido(
-                        candidato.modificadores.clone(),
-                        candidato.gatillo.clone(),
-                    );
-
-                    self.limpiar();
-
-                    return ResultadoTrigger::Trigger(resultado);
-                }
-
-                let eventos = self.buffer.clone();
-
-                self.limpiar();
-
-                ResultadoTrigger::Liberar(eventos)
-            }
-
-            CondicionTrigger::Doble => ResultadoTrigger::Esperar,
-
-            CondicionTrigger::Simple => ResultadoTrigger::Esperar,
-        }
-    }
-
-    // ==================================================
-    // ⏱️ TIMEOUT
-    // ==================================================
-
-    pub fn comprobar_timeout(&mut self) -> ResultadoTrigger {
-        let Some(candidato) = &self.candidato else {
-            return ResultadoTrigger::Esperar;
-        };
-
-        let Some(instante_up) = candidato.instante_up else {
-            return ResultadoTrigger::Esperar;
+    pub fn comprobar_timeout(&mut self) {
+        let Some(up) = &self.ultimo_up else {
+            return;
         };
 
         let ahora = crate::instante::ahora();
 
-        if ahora - instante_up < crate::config::tiempo_doble() {
-            return ResultadoTrigger::Esperar;
+        if ahora - up.instante >= crate::config::tiempo_doble() {
+            self.limpiar();
         }
-
-        match candidato.condicion {
-            CondicionTrigger::Doble => {
-                let resultado = EventoTrigger::simple(
-                    candidato.modificadores.clone(),
-                    candidato.gatillo.clone(),
-                );
-
-                self.limpiar();
-
-                ResultadoTrigger::Trigger(resultado)
-            }
-
-            _ => ResultadoTrigger::Esperar,
-        }
-    }
-
-    // ==================================================
-    // 📦 ANALIZAR CAPTURA
-    // --------------------------------------------------
-    // Analiza eventos físicos sin consultar Cache.
-    //
-    // Uso:
-    // creación de triggers desde UI.
-    //
-    // No busca remapeos.
-    // No ejecuta Runtime.
-    // ==================================================
-
-    pub fn analizar_captura(&mut self, eventos: &[InputEvent]) -> Option<EventoTrigger> {
-        self.limpiar();
-
-        for evento in eventos {
-            match self.procesar(evento.clone()) {
-                ResultadoTrigger::Trigger(trigger) => {
-                    self.limpiar();
-
-                    return Some(trigger);
-                }
-
-                ResultadoTrigger::Liberar(_) => {
-                    self.limpiar();
-
-                    return None;
-                }
-
-                ResultadoTrigger::Esperar => {}
-            }
-        }
-
-        match self.comprobar_timeout() {
-            ResultadoTrigger::Trigger(trigger) => {
-                self.limpiar();
-
-                Some(trigger)
-            }
-
-            _ => None,
-        }
-    }
-
-    // ==================================================
-    // ➕ AGREGAR PRESIONADO
-    // ==================================================
-
-    fn agregar_presionado(&mut self, input: InputId) {
-        if !self.presionados.contains(&input) {
-            self.presionados.push(input);
-        }
-    }
-
-    // ==================================================
-    // ➖ QUITAR PRESIONADO
-    // ==================================================
-
-    fn quitar_presionado(&mut self, input: &InputId) {
-        self.presionados.retain(|actual| actual != input);
     }
 
     // ==================================================
@@ -322,6 +194,8 @@ impl AnalizadorTrigger {
 
         self.presionados.clear();
 
-        self.candidato = None;
+        self.ultimo_down = None;
+
+        self.ultimo_up = None;
     }
 }

@@ -3,6 +3,8 @@
 // ------------------------------------------------------
 // Diccionario interno de entradas.
 //
+// fuente
+//     ↓
 // nativo
 //     ↓
 // interno
@@ -23,6 +25,8 @@ use std::sync::OnceLock;
 
 #[derive(Clone, Debug)]
 pub struct Pulsador {
+    pub fuente: String,
+
     pub nativo: String,
 
     pub interno: String,
@@ -61,20 +65,26 @@ fn cargar() -> &'static Vec<Pulsador> {
 
             let columnas: Vec<&str> = linea.split('\t').collect();
 
-            if columnas.len() != 4 {
+            if columnas.len() != 5 {
                 panic!(
                     "❌ Error interno en pulsadores.tsv. Línea {}",
                     numero_linea + 1
                 );
             }
 
-            let nativo = columnas[0].trim();
+            let fuente = columnas[0].trim();
 
-            let interno = columnas[1].trim();
+            let nativo = columnas[1].trim();
 
-            let interception = columnas[2].trim();
+            let interno = columnas[2].trim();
 
-            let ui = columnas[3].trim();
+            let interception = columnas[3].trim();
+
+            let ui = columnas[4].trim();
+
+            if fuente.is_empty() {
+                panic!("❌ Pulsador sin fuente. Línea {}", numero_linea + 1);
+            }
 
             if interno.is_empty() {
                 panic!("❌ Pulsador sin interno. Línea {}", numero_linea + 1);
@@ -89,6 +99,8 @@ fn cargar() -> &'static Vec<Pulsador> {
             }
 
             pulsadores.push(Pulsador {
+                fuente: fuente.to_string(),
+
                 nativo: nativo.to_string(),
 
                 interno: interno.to_string(),
@@ -161,6 +173,10 @@ pub fn interno_a_interception(interno: &str) -> Option<&'static str> {
     por_interno(interno).map(|p| p.interception.as_str())
 }
 
+pub fn interno_a_fuente(interno: &str) -> Option<&'static str> {
+    por_interno(interno).map(|p| p.fuente.as_str())
+}
+
 pub fn interno_a_ui(interno: &str) -> Option<&'static str> {
     por_interno(interno).map(|p| p.ui.as_str())
 }
@@ -175,8 +191,6 @@ pub fn ui_a_interno(ui: &str) -> Option<&'static str> {
 
 // ======================================================
 // 🔤 INTERNO → UI
-// ------------------------------------------------------
-// Devuelve el nombre visible para la interfaz.
 // ======================================================
 
 pub fn ui_desde_interno(nombre: &str) -> String {

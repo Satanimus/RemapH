@@ -4,11 +4,21 @@
 // ETAPA X DEL FLUJO
 // ------------------------------------------------------
 // 1. ¿Qué hace este archivo?
-// Convierte un perfil editable (perfil_json) en un perfil optimizado para Runtime (perfil_cache).
-// No valida. No interpreta. No ejecuta.
-//  Su única responsabilidad es transformar estructuras.
+//
+// Convierte un perfil editable (perfil_json)
+// en un perfil optimizado para Runtime (perfil_cache).
+//
+// No ejecuta.
+// No conoce dispositivos físicos.
+// No conoce Runtime.
+//
+// Su responsabilidad:
+// • Convertir estructuras.
+// • Preparar triggers para búsqueda rápida.
+// • Convertir respuestas de usuario en AccionCache.
 //
 // Flujo:
+//
 // perfil_json
 //      ↓
 // Compilador
@@ -16,72 +26,102 @@
 // perfil_cache
 //      ↓
 // Cache
+//      ↓
+// Runtime
+//
 // ------------------------------------------------------
-// 2. ¿Quién llama este archivo?
+// 2. ¿Qué información recibe?
+//
+// Recibe:
+//
+// perfil_json
+//
+// Contiene:
+// • Remapeos.
+// • Trigger.
+// • Respuesta.
+//
+// Solo compila filas activas.
+// ------------------------------------------------------
+// 3. ¿Quién llama este archivo?
+//
 // Sistema de activación de perfil.
-// Es utilizado por:
-// - Cache. - Runtime.
-// ------------------------------------------------------
-// 3. ¿Qué información recibe?
-// Recibe: perfil_json
-// Contiene: - Remapeos. - Trigger. - Respuesta.
-// Solo compila filas con estado ON.
+//
+// Utilizado por:
+// • Cache.
+// • Sistema de perfiles.
+//
 // ------------------------------------------------------
 // 4. ¿Qué información entrega?
+//
 // Entrega:
+//
 // Vec<RemapeoCache>
 //
 // Ejemplo:
-// perfil_json:
+//
+// Trigger usuario:
 //
 // CTRL + A
 // Doble
 // Firefox
-// Enviar B
+//
 // ↓
-// perfil_cache:
-// TriggerCache {
-//    app,
-//    entrada,
-//    condicion }
-// RespuestaCache {
-//    tipo,
-//    accion,
-//    ejecucion }
+//
+// TriggerCache:
+//
+// app
+// entrada
+// condicion
+//
+// Acción usuario:
+//
+// Tecla B
+//
+// ↓
+//
+// AccionCache:
+//
+// Emitir keyboard:B
+//
 // ------------------------------------------------------
 // 5. Funciones del archivo
+//
 // compilar()
-//     Compila perfil y actualiza Cache.
+//     Compila perfil completo y reemplaza Cache.
+//
 // compilar_perfil()
 //     Convierte todas las filas activas.
+//
 // compilar_remapeo()
-//     Convierte una fila.
+//     Convierte una fila completa.
+//
 // convertir_app()
 //     Convierte AppJson → AppCache.
+//
 // convertir_input()
 //     Convierte Input → InputId.
-// ======================================================
+//
+// convertir_accion()
+//     Convierte RespuestaJson → AccionCache.
+// ------------------------------------------------------
 
 use crate::cache;
 
 use crate::eventos::InputId;
 
-use crate::perfil_cache::{AppCache, RemapeoCache, RespuestaCache, TriggerCache};
+use crate::perfil_cache::{AccionCache, AppCache, ExtraCache, RemapeoCache, TriggerCache};
 
 use crate::perfil_json::{perfil_json, AppJson, RemapeoJson};
 
 // ======================================================
-// ⚙️ COMPILAR PERFIL COMPLETO
+// ⚙️ COMPILAR
 // ======================================================
 
 pub fn compilar(perfil: &perfil_json) {
     let remapeos = compilar_perfil(perfil);
 
-    let cantidad = remapeos.len();
-
     cache::reemplazar(remapeos);
-
-    println!("🔨 {} remapeos compilados", cantidad);
 }
 
 // ======================================================
@@ -118,16 +158,12 @@ fn compilar_remapeo(remapeo: &RemapeoJson) -> Option<RemapeoCache> {
                 .map(convertir_input)
                 .collect(),
 
-            condicion: convertir_condicion(&remapeo.trigger.condicion),
+            condicion: remapeo.trigger.condicion.clone(),
         },
 
-        respuesta: RespuestaCache {
-            tipo: remapeo.respuesta.tipo.clone(),
+        accion: convertir_accion(&remapeo.respuesta),
 
-            accion: remapeo.respuesta.accion.clone(),
-
-            ejecucion: remapeo.respuesta.ejecucion.clone(),
-        },
+        extra: convertir_extra(&remapeo.respuesta.extra),
     })
 }
 
@@ -148,9 +184,49 @@ fn convertir_app(app: &AppJson) -> AppCache {
 }
 
 // ======================================================
-// 🆔 INPUT → INPUT ID
+// 🆔 CONVERTIR INPUT
 // ======================================================
 
 fn convertir_input(input: &crate::idioma::Input) -> InputId {
     InputId::new(&input.fuente, &input.control)
+}
+
+// ======================================================
+// ⚡ CONVERTIR ACCIÓN
+// ======================================================
+
+fn convertir_accion(respuesta: &crate::perfil_json::RespuestaJson) -> AccionCache {
+    match respuesta.tipo.as_str() {
+        "teclado" => AccionCache::Emitir(InputId::new("keyboard", &respuesta.accion)),
+
+        "mouse" => AccionCache::Emitir(InputId::new("mouse", &respuesta.accion)),
+
+        "macro" => AccionCache::Macro(respuesta.accion.clone()),
+
+        "archivo" => AccionCache::AbrirArchivo(respuesta.accion.clone()),
+
+        "ui" => AccionCache::Ui(respuesta.accion.clone()),
+
+        _ => {
+            panic!("Acción no soportada: {}", respuesta.tipo);
+        }
+    }
+}
+
+// ======================================================
+// 🧩 CONVERTIR EXTRA
+// ======================================================
+
+fn convertir_extra(extra: &str) -> Option<ExtraCache> {
+    match extra {
+        "" => None,
+
+        "turbo" => Some(ExtraCache::Turbo),
+
+        "mantener" => Some(ExtraCache::Mantener),
+
+        "toggle" => Some(ExtraCache::Toggle),
+
+        _ => None,
+    }
 }
