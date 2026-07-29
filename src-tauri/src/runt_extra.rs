@@ -1,106 +1,94 @@
 // ======================================================
 // 🧩 RUNT EXTRA RemapH V3
 // ======================================================
+// ETAPA 8 DEL FLUJO
+// ------------------------------------------------------
+// 1. ¿Qué hace este archivo?
 //
-// Biblioteca de plantillas de comportamiento.
+// Mantiene una biblioteca de comportamientos
+// prediseñados.
 //
-// Extra NO:
+// NO:
+//
 // - Ejecuta acciones.
 // - Conoce Runtime.
 // - Conoce Cache.
 // - Conoce dispositivos.
 //
-// Su única responsabilidad:
+// Su única responsabilidad es transformar
+// un ExtraCache en una receta de macro.
 //
-// Entregar macros prediseñadas.
+// ------------------------------------------------------
+// 2. ¿Qué información recibe?
 //
-// Runtime reemplaza los marcadores:
+// Recibe:
 //
-// [ACCION]
-// [ACCION_DOWN]
-// [ACCION_UP]
+// • ExtraCache.
 //
-// y luego ejecuta la macro resultante.
+// ------------------------------------------------------
+// 3. ¿Quién llama este archivo?
 //
-// Extra es una colección de macros
-// frecuentes simplificadas.
+// • Runtime.
 //
-// Flujo:
+// ------------------------------------------------------
+// 4. ¿Qué información entrega?
+//
+// Devuelve:
+//
+// Vec<String>
+//
+// Cada elemento corresponde a una instrucción
+// del lenguaje de macros.
+//
+// Runtime reemplazará posteriormente:
+//
+// • [ACCION]
+// • [ACCION_DOWN]
+// • [ACCION_UP]
+//
+// y ejecutará la receta resultante.
+//
+// ------------------------------------------------------
+// 5. Funciones del archivo
+//
+// obtener()
+//     Devuelve la receta correspondiente
+//     al Extra solicitado.
+//
+// ------------------------------------------------------
+// Transformación:
 //
 // ExtraCache
 //      ↓
-// runt_extra
+// Runt Extra
 //      ↓
 // Vec<String>
 //      ↓
 // Runtime
 //      ↓
 // Ejecutor Macro
-//      ↓
-// Backends físicos
-//
 // ======================================================
 
-// ======================================================
-// 🧩 EXTRA CACHE
-// ======================================================
-
-#[derive(Clone, Debug, PartialEq)]
-pub enum ExtraCache {
-    Turbo,
-
-    Mantener,
-
-    Toggle,
-
-    DobleClick,
-
-    ClickSostenido,
-
-    AbrirMinimizado,
-
-    PopupToggle,
-}
-
-// ======================================================
-// 📜 OBTENER MACRO EXTRA
-// ======================================================
-//
-// Devuelve líneas en lenguaje Runtime.
-//
-// Estas líneas todavía tienen
-// marcadores pendientes.
-//
-// ======================================================
-
+use crate::config;
 use crate::perfil_cache::ExtraCache;
 
 // ======================================================
-// 📜 OBTENER RECETA EXTRA
-// ======================================================
-//
-// Devuelve pasos en lenguaje Runtime.
-//
-// Los marcadores son reemplazados
-// posteriormente por Runtime.
-//
+// 📜 OBTENER RECETA
 // ======================================================
 
 pub fn obtener(extra: &ExtraCache) -> Vec<String> {
     match extra {
         // ==================================================
-        // 🔥 TURBO
-        //
-        // Acción
-        // Espera
-        // Repite
+        // ⚡ TURBO
         // ==================================================
-        ExtraCache::Turbo => vec!["[ACCION]".into(), "WAIT 30".into(), "LOOP".into()],
+        ExtraCache::Turbo => vec![
+            "[ACCION]".into(),
+            format!("WAIT {}", config::tiempo_repeticion()),
+            "LOOP".into(),
+        ],
 
         // ==================================================
         // 🔒 MANTENER
-        //
-        // Mantiene pulsado hasta recibir detener.
         // ==================================================
         ExtraCache::Mantener => vec![
             "[ACCION_DOWN]".into(),
@@ -110,10 +98,6 @@ pub fn obtener(extra: &ExtraCache) -> Vec<String> {
 
         // ==================================================
         // 🔀 TOGGLE
-        //
-        // Cambia estado de la acción.
-        //
-        // Runtime resolverá el estado.
         // ==================================================
         ExtraCache::Toggle => vec!["TOGGLE [ACCION]".into()],
 

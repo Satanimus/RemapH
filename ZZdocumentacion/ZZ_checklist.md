@@ -1,8 +1,3 @@
-posible 0: liberar
-posible 1; exacta 1: match!
-posible=exacta, y exacta >1: analizar y comparar condiciones
-posible>exacta: esperar
-
 ////////////////////Encabezado por archivo://////////////////////////////////////////////
 
 1-Nombre archivo
@@ -29,24 +24,30 @@ ETAPA 1 — Modelo (OK)
 └── compilador.rs
 
 ETAPA 2 — Analizador (OK)
-└── analizador_trigger.rs (¿debe enviar mensaje cuando deje de recibir inputs a cache para que pueda enviar detener a runtime?.. pensar)
+└── analizador_trigger.rs
 
 ETAPA 3 — Cache (OK)
 └── back_app (pendiente)
-└── cache.rs (pendiente ver a quien envía PASAR)
+└── cache.rs
 
 ETAPA 4 — Runtime (OK)
 └── runtime.rs
 └── runt_extra.rs
 
-ETAPA 5 — Entrada
+ETAPA 5 — Entrada (OK)
 └── entrada.rs
 
-ETAPA 6 — Diccionarios
+ETAPA 6 — Diccionarios (OK)
 └── pulsadores.rs
+└── pulsadores.tsv
 
-ETAPA 7 — Configuración
+ETAPA 7 — Configuración (OK)
 └── config.rs
+////////////////////////////////////////////////////////////////
+Otros (OK).
+-perfil.rs
+-perfil_ui.rs
+-comandos.rs
 
 ////////////////////////////////////////////////////////////////
 
@@ -56,41 +57,15 @@ ETAPA 7 — Configuración
 ////////////////////////////////////////////
 
 📌 Ideas pendientes (no hacer todavía)
-Arquitectura
-⬜ Evaluar si AnalizadorTrigger debe convertirse únicamente en el analizador lógico mientras BufferEventos decide cuándo una secuencia está completa.
+⬜ Verificar cambio de columna renombrada: ejecucion a > extra
 ⬜ Elaborar un diccionario oficial de términos del proyecto para evitar ambigüedades futuras.
-Rendimiento
-⬜ Revisar el tamaño óptimo del BufferEventos.
-⬜ Optimizar la reutilización de memoria del buffer.
-Extensiones futuras
 ⬜ Integrar joystick utilizando la misma arquitectura de captura.
 ⬜ Evaluar soporte para nuevos tipos de triggers si fueran necesarios.
 
------- Recordar limpiar comandos.rs
------- Commpletar back_app para informar cambios de App para el cache
-------Documentar oficialmente el flujo del motor, igual que hicimos con el flujo Perfil → Compilador → Cache → Runtime.
+⬜ Recordar limpiar comandos.rs
+⬜ Commpletar back_app para informar cambios de App para el cache
 
-Algo como:
-Windows / Interception
-│
-▼
-BufferEventos
-│
-▼
-AnalizadorTrigger
-│
-▼
-ProcesadorEventos
-│
-▼
-Runtime
-│
-▼
-Emisor
-
-Ese diagrama será muy útil cuando dentro de unos meses tengamos que volver al código.
-
------ Cuando terminemos el motor, podríamos hacer que BufferEventos tenga un modo de depuración que imprima la línea temporal completa. Algo como:
+⬜ Cuando terminemos el motor, podríamos hacer que BufferEventos tenga un modo de depuración que imprima la línea temporal completa. Algo como:
 
 00.000 Ctrl Down
 00.120 A Down
@@ -98,4 +73,23 @@ Ese diagrama será muy útil cuando dentro de unos meses tengamos que volver al 
 00.310 Ctrl Up
 
 Sería una herramienta excelente para depurar problemas de triggers sin tocar el resto del sistema.
------- En la V2 agregar un indice de dispositivo para diferenciar joistick de joistick(1). Si no existe indice, se toma como predeterminado, si lleva (1), (2), etc... el runtime debe tomarlos como otro dispositivo y hacer los cambios necesarios para diferenciarlos.
+⬜ En la V2 agregar un indice de dispositivo para diferenciar joistick de joistick(1). Si no existe indice, se toma como predeterminado, si lleva (1), (2), etc... el runtime debe tomarlos como otro dispositivo y hacer los cambios necesarios para diferenciarlos.
+⬜En la V2 agregar modo portable (windows sin interception).
+
+⬜ Config.rs > Posiblemente sea necesario crear:
+tiempo_mantenido_mouse() Si en el futuro mouse necesita una lógica distinta al teclado.
+sensibilidad_mouse() Si se separan parámetros por dispositivo.
+
+⬜ perfil.rs> Posiblemente sea necesario crear:
+cargar_perfil() Separar carga física de perfil.
+guardar_perfil_actual() Separar guardado directo.
+
+⬜ perfil_ui.rs > Posiblemente sea necesario crear:
+resultado_perfil() Mover construcción de respuesta completa.
+
+⬜ back_app: Posiblemente sea necesario crear:
+iniciar_monitor() Inicia escucha de cambios de aplicaciones.
+detener_monitor() Detiene escucha.
+cambio_ventana() Notifica cambio de aplicación activa.
+abrir_proceso() Notifica apertura de proceso.
+cerrar_proceso() Notifica cierre de proceso.

@@ -43,14 +43,12 @@
 // 4. ¿Qué información entrega?
 //
 // Devuelve ResolucionEntrada:
+// Consumir:
+//    El Input físico no debe volver al sistema.
+//    Cache envía inmediatamente la acción correspondiente a Runtime.
 //
 // Pasar:
-//     La entrada física continúa. ***** (Pendiente definir módulo encargado de liberar)
-//
-// Iniciar:
-//     Envía una orden completa a Runtime.
-// Detener:
-//     Envía señal de liberación de instancia.
+//     Entrada devuelve el Input físico.
 //
 // AnalizarCondicion:
 //     Solicita al AnalizadorTrigger determinar
@@ -128,33 +126,14 @@ pub struct AppEstadoCache {
 static APPS: OnceLock<Mutex<Vec<AppEstadoCache>>> = OnceLock::new();
 
 // ======================================================
-// 📤 ORDEN RUNTIME
-// ======================================================
-
-#[derive(Clone, Debug)]
-pub enum OrdenRuntime {
-    Iniciar {
-        id: String,
-
-        accion: AccionCache,
-
-        extra: Option<ExtraCache>,
-    },
-
-    Detener {
-        id: String,
-    },
-}
-
-// ======================================================
 // 📤 RESOLUCIÓN
 // ======================================================
 
 #[derive(Clone, Debug)]
 pub enum ResolucionEntrada {
-    Pasar(Vec<InputEvent>),
+    Pasar,
 
-    Ejecutar(OrdenRuntime),
+    Consumir,
 
     AnalizarCondicion,
 }
@@ -211,7 +190,7 @@ pub fn borrar_fila(id: &str) {
 // 🔎 RESOLVER ENTRADA
 // ======================================================
 
-pub fn resolver_entrada(entrada: &[InputId], eventos: Vec<InputEvent>) -> ResolucionEntrada {
+pub fn resolver_entrada(entrada: &[InputId]) -> ResolucionEntrada {
     let cache = obtener_cache().lock().unwrap();
 
     let apps = obtener_apps().lock().unwrap();
@@ -243,19 +222,15 @@ pub fn resolver_entrada(entrada: &[InputId], eventos: Vec<InputEvent>) -> Resolu
     }
 
     if posibles == 0 {
-        return ResolucionEntrada::Pasar(eventos);
+        return ResolucionEntrada::Pasar;
     }
 
     if posibles == 1 && exactas == 1 {
         let remapeo = remapeo.unwrap();
 
-        return ResolucionEntrada::Ejecutar(OrdenRuntime::Iniciar {
-            id: remapeo.id,
+        runtime::procesar(remapeo.id, remapeo.accion, remapeo.extra);
 
-            accion: remapeo.accion,
-
-            extra: remapeo.extra,
-        });
+        return ResolucionEntrada::Consumir;
     }
 
     if posibles == exactas && exactas > 1 {

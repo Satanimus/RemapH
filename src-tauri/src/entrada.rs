@@ -1,230 +1,149 @@
 // ======================================================
-// 🚀 Entrada RemapH V3
+// 🚪 Entrada RemapH V3
+// ======================================================
+// ETAPA 4 DEL FLUJO
 // ------------------------------------------------------
-// Orquesta:
+// 1. ¿Qué hace este archivo?
 //
-// Input físico
+// Es el portero del sistema.
+//
+// Recibe cada InputEvent generado por el backend
+// de captura y lo retiene temporalmente mientras
+// el resto del flujo decide su destino.
+//
+// Entrada NO interpreta:
+//
+// - Gatillos.
+// - Remapeos.
+// - Perfiles.
+// - Acciones.
+// - Runtime.
+//
+// Su única responsabilidad es decidir:
+//
+// • El evento continúa hacia Runtime.
+// • El evento vuelve al sistema operativo.
+//
+// ------------------------------------------------------
+// 2. ¿Qué información recibe?
+//
+// Recibe:
+//
+// InputEvent
+//
+// El evento ya contiene:
+//
+// - Input.
+// - Estado.
+// - Instante.
+//
+// ------------------------------------------------------
+// 3. ¿Quién llama este archivo?
+//
+// Backend de captura.
+//
+// Flujo:
+//
+// Dispositivo físico
+//      ↓
+// Backend captura
+//      ↓
+// Entrada
+//
+// ------------------------------------------------------
+// 4. ¿Qué información entrega?
+//
+// Puede enviar el InputEvent hacia:
+//
+// • AnalizadorTrigger.
+//
+// Finalmente el evento terminará en uno de dos caminos:
+//
+// A)
+// Runtime.
+//
+// B)
+// Backend Windows
+// para devolver el Input original.
+//
+// ------------------------------------------------------
+// 5. Funciones del archivo
+//
+// iniciar()
+//     Entrega el punto de entrada al backend
+//     de captura.
+//
+// procesar_evento()
+//     Recibe el InputEvent.
+//     Lo retiene temporalmente.
+//     Lo entrega al AnalizadorTrigger.
+//
+// consumir()
+//     Descarta el Input físico cuando
+//     Cache encuentra coincidencia.
+//
+// devolver()
+//     Devuelve el Input físico al backend
+//     para continuar hacia el sistema
+//     operativo.
+// ------------------------------------------------------
+// Transformación:
+//
+// Dispositivo físico
+//      ↓
+// Backend captura
+//      ↓
+// Entrada
 //      ↓
 // AnalizadorTrigger
 //      ↓
-// Runtime
+// Cache
+//      ↓
+//
+// ├── Runtime
+//
+// └── Windows
+//
 // ======================================================
 
-use crate::analizador_trigger::{AnalizadorTrigger, ResultadoTrigger};
+use crate::analizador_trigger::AnalizadorTrigger;
 
-use crate::cache;
 use crate::eventos::InputEvent;
-use crate::perfil_cache::AccionCache;
-use crate::runtime;
-
-use std::collections::HashSet;
-use std::sync::mpsc;
-use std::time::{Duration, Instant};
-
-// ======================================================
-// ⚙️ MODO
-// ======================================================
-
-#[derive(Clone, Copy)]
-pub enum Modo {
-    Full,
-
-    Portable,
-}
-
-const MODO: Modo = Modo::Portable;
-
-// ======================================================
-// 🖥️ CONTEXTO CACHE
-// ======================================================
-
-fn actualizar_contexto_cache(ultima: &mut Instant) {
-    if ultima.elapsed() < Duration::from_millis(250) {
-        return;
-    }
-
-    let programa = crate::backend::back_app::obtener_programa_activo();
-
-    let procesos: HashSet<String> = crate::backend::back_app::enumerar_procesos_ventana()
-        .into_iter()
-        .map(|p| p.nombre.to_lowercase())
-        .collect();
-
-    cache::actualizar_contexto(programa.as_deref(), &procesos);
-
-    *ultima = Instant::now();
-}
 
 // ======================================================
 // 🚀 INICIAR
 // ======================================================
 
 pub fn iniciar() {
-    let (tx, rx) = mpsc::channel::<AccionCache>();
+    let mut analizador = AnalizadorTrigger::nuevo();
 
-    match MODO {
-        Modo::Portable => iniciar_portable(tx, rx),
-
-        Modo::Full => {
-            println!("Modo Full pendiente");
-        }
-    }
-}
-
-// ======================================================
-// 🪟 PORTABLE
-// ======================================================
-
-fn iniciar_portable(tx: mpsc::Sender<AccionCache>, rx: mpsc::Receiver<AccionCache>) {
-    std::thread::spawn(move || {
-        let mut runtime = runtime::Estado::nuevo();
-
-        let mut analizador = AnalizadorTrigger::nuevo();
-
-        let mut capturador = CapturadorTrigger::nuevo();
-
-        let mut ultima_actualizacion = Instant::now() - Duration::from_secs(1);
-
-        crate::backend::back_windows::iniciar(move |evento, _emitir| {
-            let resultado = procesar_evento(
-                evento,
-                &mut analizador,
-                &mut capturador,
-                &mut runtime,
-                &tx,
-                &rx,
-                &mut ultima_actualizacion,
-                None,
-            );
-
-            matches!(resultado, runtime::Resultado::Consumir)
-        });
+    crate::back_interception::iniciar(move |evento| {
+        procesar_evento(evento, &mut analizador);
     });
 }
 
 // ======================================================
-// 🧠 PROCESAR EVENTO
+// 🚪 PROCESAR EVENTO
 // ======================================================
 
-fn procesar_evento(
-    evento: InputEvent,
+fn procesar_evento(evento: InputEvent, analizador: &mut AnalizadorTrigger) {
+    analizador.procesar(evento.clone());
 
-    analizador: &mut AnalizadorTrigger,
-
-    capturador: &mut CapturadorTrigger,
-
-    runtime: &mut runtime::Estado,
-
-    tx: &mpsc::Sender<AccionCache>,
-
-    rx: &mpsc::Receiver<AccionCache>,
-
-    ultima_actualizacion: &mut Instant,
-
-    salida: Option<&crate::backend::back_salida::Salida>,
-) -> runtime::Resultado {
-    actualizar_contexto_cache(ultima_actualizacion);
-
-    // ==================================================
-    // CAPTURA DE NUEVO TRIGGER
-    // ==================================================
-
-    if captura::activa() {
-        capturador.recibir(evento);
-
-        if capturador.comprobar_timeout() {
-            if let Some(trigger) = analizador.analizar_captura(capturador.eventos()) {
-                captura::recibir(trigger);
-            }
-
-            capturador.limpiar();
-
-            analizador.limpiar();
-        }
-
-        return runtime::Resultado::Pasar;
-    }
-
-    // ==================================================
-    // ANALIZADOR NORMAL
-    // ==================================================
-
-    match analizador.procesar(evento) {
-        ResultadoTrigger::Trigger(trigger) => {
-            let resultado = runtime.procesar(trigger, tx);
-
-            ejecutar_salidas(rx, salida);
-
-            resultado
-        }
-
-        ResultadoTrigger::Liberar(eventos) => {
-            for evento in eventos {
-                crate::backend::back_windows::emitir_evento(evento);
-            }
-
-            analizador.limpiar();
-
-            runtime::Resultado::Consumir
-        }
-
-        ResultadoTrigger::Esperar => match analizador.comprobar_timeout() {
-            ResultadoTrigger::Liberar(eventos) => {
-                for evento in eventos {
-                    crate::backend::back_windows::emitir_evento(evento);
-                }
-
-                analizador.limpiar();
-
-                runtime::Resultado::Consumir
-            }
-
-            ResultadoTrigger::Trigger(trigger) => {
-                let resultado = runtime.procesar(trigger, tx);
-
-                ejecutar_salidas(rx, salida);
-
-                resultado
-            }
-
-            ResultadoTrigger::Esperar => runtime::Resultado::Consumir,
-        },
-    }
+    let _ = evento;
 }
 
 // ======================================================
-// ⚡ EJECUTAR SALIDAS
+// ❌ CONSUMIR
 // ======================================================
 
-fn ejecutar_salidas(
-    rx: &mpsc::Receiver<AccionCache>,
-
-    salida: Option<&crate::backend::back_salida::Salida>,
-) {
-    while let Ok(accion) = rx.try_recv() {
-        match salida {
-            Some(salida) => {
-                salida.ejecutar(accion);
-            }
-
-            None => {
-                ejecutar_portable(accion);
-            }
-        }
-    }
+fn consumir() {
+    // El Input físico se descarta.
 }
 
 // ======================================================
-// 🪟 EMITIR PORTABLE
+// ↩️ DEVOLVER
 // ======================================================
 
-fn ejecutar_portable(accion: AccionCache) {
-    match accion {
-        AccionCache::Emitir(input) => {
-            crate::backend::back_windows::emitir_evento(InputEvent::pulse(
-                input,
-                crate::instante::ahora(),
-            ));
-        }
-    }
+fn devolver(evento: InputEvent) {
+    crate::back_interception::emitir_evento(evento);
 }

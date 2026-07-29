@@ -27,15 +27,12 @@
 // ------------------------------------------------------
 // 2. ¿Qué información recibe?
 // Recibe consultas realizadas por:
-// • UI. • Runtime.
-// La información proviene exclusivamente de Windows.
+// Solicitudes internas de información sobre Windows.
 // ------------------------------------------------------
 // 3. ¿Quién llama este archivo?
 // Es utilizado por:
-//
-// • UI (selector de aplicaciones).
-// • Cache (estado de aplicaciones).
-// • Runtime.
+// • Comandos Tauri.
+// • Cache (futuro estado de aplicaciones).
 // ------------------------------------------------------
 // 4. ¿Qué información entrega?
 //

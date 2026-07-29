@@ -1,40 +1,150 @@
 // ======================================================
 // 🎮 Comandos Tauri RemapH V3
+// ======================================================
+// ETAPA UI DEL FLUJO
 // ------------------------------------------------------
-// Comandos expuestos a la interfaz.
+// 1. ¿Qué hace este archivo?
 //
-// UI
-//  ↓
-// perfil_json
-//  ↓
-// Usuario
-//  ↓
-// Persistencia
-//  ↓
-// Compilador
-//  ↓
-// Cache
+// Punto de entrada entre TypeScript y el backend.
+//
+// Su responsabilidad:
+//
+// - Exponer funciones mediante Tauri.
+// - Recibir datos desde UI.
+// - Convertir modelos UI.
+// - Devolver resultados serializables.
+//
+// Comandos NO:
+//
+// - Gestiona perfiles.
+// - Gestiona cache.
+// - Ejecuta Runtime.
+// - Procesa entradas.
+// - Accede directamente a Windows.
+//
+// ------------------------------------------------------
+// 2. ¿Qué información recibe?
+//
+// Recibe:
+//
+// - Solicitudes Tauri.
+// - Datos enviados desde TypeScript.
+//
+// ------------------------------------------------------
+// 3. ¿Quién llama este archivo?
+//
+// Tauri.
+//
+// Flujo:
+//
+// TypeScript
+//      ↓
+// comandos.rs
+//      ↓
+// Módulo correspondiente
+//
+// ------------------------------------------------------
+// 4. ¿Qué información entrega?
+//
+// Entrega:
+//
+// - Respuestas serializables.
+// - Modelos preparados para UI.
+// - Datos de captura.
+// - Datos de aplicaciones.
+//
+// ------------------------------------------------------
+// 5. Funciones del archivo
+//
+// ======================================================
+// 🧩 MODELOS UI
+// ======================================================
+//
+// AppUI
+//     Modelo de aplicación recibido desde UI.
+//
+// FilaUI
+//     Modelo completo de una fila editable.
+//
+// TriggerUI
+//     Modelo de trigger recibido desde UI.
+//
+// EntradaUI
+//     Modelo de entrada recibido desde UI.
+//
+// EntradaCapturaUI
+//     Modelo de entrada mostrado en captura.
+//
+// TriggerCapturaUI
+//     Modelo de trigger mostrado en captura.
+//
+// ResultadoPerfil
+//     Respuesta de perfil hacia UI.
+//
+// EstadoCachePerfil
+//     Estado visual de cache de perfil.
+//
+// IconoJson
+//     Modelo serializable de icono.
+//
+// ProcesoIconoJson
+//     Modelo serializable de proceso.
+//
+// ======================================================
+// 🎹 CAPTURA
+// ======================================================
+//
+// iniciar_captura()
+//
+//     Solicita iniciar captura.
+//
+// obtener_captura()
+//
+//     Devuelve captura actual.
+//
+// convertir_input_captura()
+//
+//     Convierte InputId interno a formato UI.
+//
+// convertir_trigger_captura()
+//
+//     Convierte EventoTrigger interno a formato UI.
+//
+// ======================================================
+// 🖥️ APLICACIONES
+// ======================================================
+//
+// convertir_icono()
+//
+//     Convierte IconoRaw interno a formato UI.
+//
+// listar_procesos_ventana()
+//
+//     Entrega procesos disponibles para selector UI.
+//
+// obtener_icono_programa()
+//
+//     Entrega icono de programa.
+//
 // ======================================================
 
-use std::fs;
-
-use crate::cache;
-use crate::compilador;
-use crate::estado;
-use crate::perfil_json::{perfil_json, AppJson, RemapeoJson, TriggerJson};
-use crate::persistencia;
+use crate::back_app;
+use crate::captura;
+use crate::perfil;
+use crate::perfil_json::perfil_json;
+use crate::perfil_ui::{
+    EntradaCapturaUI, EstadoCachePerfil, IconoJson, ProcesoIconoJson, ResultadoPerfil,
+    TriggerCapturaUI,
+};
 use crate::usuario;
+
+use base64::engine::general_purpose::STANDARD as BASE64;
+use base64::Engine as _;
+
 use serde::{Deserialize, Serialize};
 
 // ======================================================
-// 🧩 MODELO UI
-// ======================================================
-
-// ======================================================
-// APP UI
-// ======================================================
-// Representa la configuración de la columna App
-// recibida desde TypeScript.
+// 🧩 MODELOS UI
 // ======================================================
 
 #[derive(Deserialize)]
@@ -59,18 +169,14 @@ pub struct FilaUI {
 
     pub accion: Option<TriggerUI>,
 
-    pub condicion: String,
+    pub extra: String,
 
-    pub ejecucion: String,
+    pub condicion: String,
 
     pub color: String,
 
     pub nota: String,
 }
-
-// ======================================================
-// 🎯 TRIGGER UI
-// ======================================================
 
 #[derive(Deserialize)]
 pub struct TriggerUI {
@@ -81,10 +187,6 @@ pub struct TriggerUI {
     pub condicion: String,
 }
 
-// ======================================================
-// 🆔 ENTRADA UI
-// ======================================================
-
 #[derive(Deserialize)]
 pub struct EntradaUI {
     pub tipo: String,
@@ -93,540 +195,97 @@ pub struct EntradaUI {
 }
 
 // ======================================================
-// 🎹 CAPTURA UI
-// ------------------------------------------------------
-// Formato que entiende TypeScript.
-// ======================================================
-
-#[derive(Serialize)]
-pub struct EntradaCapturaUI {
-    pub tipo: String,
-
-    pub codigo: String,
-
-    pub nombre: String,
-}
-
-// ======================================================
-// 🎯 TRIGGER CAPTURA UI
-// ======================================================
-
-#[derive(Serialize)]
-pub struct TriggerCapturaUI {
-    pub modificadores: Vec<EntradaCapturaUI>,
-
-    pub gatillo: Option<EntradaCapturaUI>,
-
-    pub condicion: String,
-}
-
-// ======================================================
-// 📦 RESULTADO PERFIL
-// ======================================================
-
-#[derive(Serialize)]
-pub struct ResultadoPerfil {
-    pub perfil: perfil_json,
-
-    pub nombre: String,
-
-    pub perfiles: Vec<String>,
-
-    pub cache_activo: bool,
-}
-
-// ======================================================
-// 🟢🔴 ESTADO CACHE DE PERFIL
-// ======================================================
-
-#[derive(Serialize)]
-pub struct EstadoCachePerfil {
-    pub nombre: String,
-
-    pub cache_activo: bool,
-}
-
-// ======================================================
-// 🟢 ACTIVAR PERFIL
+// 🎹 COMANDOS PERFIL
 // ======================================================
 
 #[tauri::command]
 pub fn activar_perfil() -> Result<bool, String> {
-    let ruta = usuario::perfil_actual()?;
-
-    let perfil = persistencia::cargar(&ruta)?;
-
-    compilador::compilar(&perfil);
-
-    sincronizar_estado_cache(&perfil);
-
-    println!("🟢 Perfil activado");
-
-    Ok(!cache::esta_vacia())
+    perfil::activar_perfil()
 }
-
-// ======================================================
-// 🔴 DESACTIVAR PERFIL
-// ======================================================
 
 #[tauri::command]
 pub fn desactivar_perfil() {
-    cache::borrar();
-
-    estado::desactivar();
-
-    println!("🔴 Perfil desactivado");
+    perfil::desactivar_perfil();
 }
-
-// ======================================================
-// 🔨 GUARDAR Y COMPILAR PERFIL
-// ======================================================
-
-#[tauri::command]
-pub fn compilar_perfil(filas: Vec<FilaUI>) -> Result<bool, String> {
-    let perfil = convertir_perfil(filas);
-
-    let ruta = usuario::perfil_actual()?;
-
-    persistencia::guardar(&perfil, &ruta)?;
-
-    compilador::compilar(&perfil);
-
-    sincronizar_estado_cache(&perfil);
-
-    let cache_activo = !cache::esta_vacia();
-
-    println!("📦 Perfil guardado y compilado");
-
-    Ok(cache_activo)
-}
-
-// ======================================================
-// 📂 CARGAR PERFIL ACTUAL
-// ======================================================
 
 #[tauri::command]
 pub fn obtener_perfil_actual() -> Result<perfil_json, String> {
-    let ruta = usuario::perfil_actual()?;
-
-    if !ruta.exists() {
-        let perfil = perfil_json::nuevo();
-
-        persistencia::guardar(&perfil, &ruta)?;
-
-        compilador::compilar(&perfil);
-
-        sincronizar_estado_cache(&perfil);
-
-        return Ok(perfil);
-    }
-
-    let perfil = persistencia::cargar(&ruta)?;
-
-    compilador::compilar(&perfil);
-
-    sincronizar_estado_cache(&perfil);
-
-    Ok(perfil)
+    perfil::obtener_perfil_actual()
 }
-
-// ======================================================
-// 📋 OBTENER PERFILES
-// ======================================================
 
 #[tauri::command]
 pub fn obtener_perfiles() -> Result<Vec<String>, String> {
-    usuario::perfiles()
+    perfil::obtener_perfiles()
 }
-
-// ======================================================
-// 🟢🔴 OBTENER ESTADO CACHE DE PERFILES
-// ======================================================
-
-#[tauri::command]
-pub fn obtener_estados_cache_perfiles() -> Result<Vec<EstadoCachePerfil>, String> {
-    let nombres = usuario::perfiles()?;
-
-    let mut resultado = Vec::new();
-
-    for nombre in nombres {
-        let ruta = usuario::ruta_perfil(&nombre)?;
-
-        let perfil = persistencia::cargar(&ruta)?;
-
-        let cache = compilador::compilar_perfil(&perfil);
-
-        resultado.push(EstadoCachePerfil {
-            nombre,
-
-            cache_activo: !cache.is_empty(),
-        });
-    }
-
-    Ok(resultado)
-}
-
-// ======================================================
-// 🆔 OBTENER NOMBRE ACTUAL
-// ======================================================
 
 #[tauri::command]
 pub fn obtener_nombre_perfil_actual() -> Result<String, String> {
-    usuario::nombre_actual()
+    perfil::obtener_nombre_actual()
 }
-
-// ======================================================
-// 🟢 OBTENER ESTADO CACHE
-// ======================================================
 
 #[tauri::command]
 pub fn obtener_estado_cache() -> bool {
-    !cache::esta_vacia()
+    perfil::obtener_estado_cache()
 }
-
-// ======================================================
-// ⏱️ CONFIGURACIÓN TIEMPO DOBLE
-// ======================================================
-
-#[tauri::command]
-pub fn obtener_tiempo_doble() -> u64 {
-    crate::config::tiempo_doble()
-}
-
-#[tauri::command]
-pub fn establecer_tiempo_doble(valor: u64) {
-    crate::config::establecer_tiempo_doble(valor);
-}
-
-// ======================================================
-// 🔄 RESTAURAR PERFIL ACTUAL
-// ======================================================
 
 #[tauri::command]
 pub fn restaurar_perfil_actual() -> Result<ResultadoPerfil, String> {
-    let ruta = usuario::perfil_actual()?;
-
-    if !ruta.exists() {
-        let perfil = perfil_json::nuevo();
-
-        persistencia::guardar(&perfil, &ruta)?;
-    }
-
-    let perfil = persistencia::cargar(&ruta)?;
-
-    let nombre = usuario::nombre_actual()?;
-
-    resultado_perfil(perfil, nombre)
+    perfil::restaurar_perfil_actual()
 }
-
-// ======================================================
-// 📋 CLONAR PERFIL ACTUAL
-// ======================================================
-
-#[tauri::command]
-pub fn clonar_perfil(filas: Vec<FilaUI>) -> Result<ResultadoPerfil, String> {
-    let nombre_actual = usuario::nombre_actual()?;
-
-    let nombre = siguiente_nombre(&nombre_actual)?;
-
-    let perfil = convertir_perfil(filas);
-
-    cache::borrar();
-
-    estado::desactivar();
-
-    let ruta = usuario::ruta_perfil(&nombre)?;
-
-    persistencia::guardar(&perfil, &ruta)?;
-
-    compilador::compilar(&perfil);
-
-    sincronizar_estado_cache(&perfil);
-
-    resultado_perfil(perfil, nombre)
-}
-
-// ======================================================
-// ✏️ RENOMBRAR PERFIL ACTUAL
-// ======================================================
-
-#[tauri::command]
-pub fn renombrar_perfil(nuevo_nombre: String) -> Result<ResultadoPerfil, String> {
-    let nombre_actual = usuario::nombre_actual()?;
-
-    let nuevo_nombre = nuevo_nombre.trim();
-
-    if nuevo_nombre.is_empty() {
-        return Err("El nombre del perfil está vacío".to_string());
-    }
-
-    if nuevo_nombre == nombre_actual {
-        return Err("El perfil ya tiene ese nombre".to_string());
-    }
-
-    let nuevo_nombre = siguiente_nombre(nuevo_nombre)?;
-
-    let ruta_actual = usuario::perfil_actual()?;
-
-    let nueva_ruta = usuario::ruta_perfil(&nuevo_nombre)?;
-
-    cache::borrar();
-
-    estado::desactivar();
-
-    fs::rename(&ruta_actual, &nueva_ruta).map_err(|error| error.to_string())?;
-
-    let perfil = persistencia::cargar(&nueva_ruta)?;
-
-    compilador::compilar(&perfil);
-
-    sincronizar_estado_cache(&perfil);
-
-    resultado_perfil(perfil, nuevo_nombre)
-}
-
-// ======================================================
-// 🗑️ ELIMINAR PERFIL ACTUAL
-// ======================================================
-
-#[tauri::command]
-pub fn eliminar_perfil_actual() -> Result<ResultadoPerfil, String> {
-    let ruta_actual = usuario::perfil_actual()?;
-
-    cache::borrar();
-
-    estado::desactivar();
-
-    if ruta_actual.exists() {
-        fs::remove_file(ruta_actual).map_err(|error| error.to_string())?;
-    }
-
-    let perfiles = usuario::perfiles()?;
-
-    if let Some(nombre) = perfiles.first() {
-        let ruta = usuario::ruta_perfil(nombre)?;
-
-        let perfil = persistencia::cargar(&ruta)?;
-
-        compilador::compilar(&perfil);
-
-        sincronizar_estado_cache(&perfil);
-
-        return resultado_perfil(perfil, nombre.to_string());
-    }
-
-    let nombre = "Default".to_string();
-
-    let perfil = perfil_json::nuevo();
-
-    let ruta = usuario::ruta_perfil(&nombre)?;
-
-    persistencia::guardar(&perfil, &ruta)?;
-
-    resultado_perfil(perfil, nombre)
-}
-
-// ======================================================
-// 🆕 CREAR PERFIL NUEVO
-// ======================================================
 
 #[tauri::command]
 pub fn crear_perfil_nuevo() -> Result<ResultadoPerfil, String> {
-    cache::borrar();
-
-    estado::desactivar();
-
-    let nombre = siguiente_nombre("Default")?;
-
-    let perfil = perfil_json::nuevo();
-
-    let ruta = usuario::ruta_perfil(&nombre)?;
-
-    persistencia::guardar(&perfil, &ruta)?;
-
-    resultado_perfil(perfil, nombre)
+    perfil::crear_perfil_nuevo()
 }
-
-// ======================================================
-// 🔄 SELECCIONAR PERFIL
-// ======================================================
 
 #[tauri::command]
 pub fn seleccionar_perfil(nombre: String) -> Result<ResultadoPerfil, String> {
-    let ruta = usuario::ruta_perfil(&nombre)?;
+    perfil::seleccionar_perfil(nombre)
+}
 
-    if !ruta.exists() {
-        return Err("El perfil seleccionado no existe".to_string());
-    }
+#[tauri::command]
+pub fn renombrar_perfil(nuevo_nombre: String) -> Result<ResultadoPerfil, String> {
+    perfil::renombrar_perfil(nuevo_nombre)
+}
 
-    cache::borrar();
-
-    estado::desactivar();
-
-    let perfil = persistencia::cargar(&ruta)?;
-
-    persistencia::guardar(&perfil, &ruta)?;
-
-    compilador::compilar(&perfil);
-
-    sincronizar_estado_cache(&perfil);
-
-    println!("📂 Perfil seleccionado: {}", nombre);
-
-    resultado_perfil(perfil, nombre)
+#[tauri::command]
+pub fn eliminar_perfil_actual() -> Result<ResultadoPerfil, String> {
+    perfil::eliminar_perfil_actual()
 }
 
 // ======================================================
-// 📦 CREAR RESULTADO
+// 🎹 CAPTURA
 // ======================================================
 
-fn resultado_perfil(perfil: perfil_json, nombre: String) -> Result<ResultadoPerfil, String> {
-    Ok(ResultadoPerfil {
-        perfil,
+#[tauri::command]
+pub fn iniciar_captura() {
+    captura::iniciar();
 
-        nombre,
+    println!("🎹 Captura iniciada");
+}
 
-        perfiles: usuario::perfiles()?,
-
-        cache_activo: !cache::esta_vacia(),
-    })
+#[tauri::command]
+pub fn obtener_captura() -> Option<TriggerCapturaUI> {
+    captura::obtener().map(convertir_trigger_captura)
 }
 
 // ======================================================
-// 🔢 SIGUIENTE NOMBRE DISPONIBLE
+// 🔄 CONVERTIR CAPTURA → UI
 // ======================================================
 
-fn siguiente_nombre(base: &str) -> Result<String, String> {
-    let ruta = usuario::ruta_perfil(base)?;
-
-    if !ruta.exists() {
-        return Ok(base.to_string());
-    }
-
-    let mut numero = 2;
-
-    loop {
-        let nombre = format!("{} ({})", base, numero);
-
-        let ruta = usuario::ruta_perfil(&nombre)?;
-
-        if !ruta.exists() {
-            return Ok(nombre);
-        }
-
-        numero += 1;
-    }
-}
-
-// ======================================================
-// 🔄 SINCRONIZAR ESTADO CON CACHE
-// ======================================================
-
-fn sincronizar_estado_cache(perfil: &perfil_json) {
-    if perfil.remapeos.iter().any(|remapeo| remapeo.estado == "ON") {
-        estado::activar();
-    } else {
-        estado::desactivar();
-    }
-}
-
-// ======================================================
-// 🔄 CONVERTIR PERFIL
-// ======================================================
-
-fn convertir_perfil(filas: Vec<FilaUI>) -> perfil_json {
-    let remapeos = filas.into_iter().map(convertir_fila).collect();
-
-    perfil_json { remapeos }
-}
-
-// ======================================================
-// 🧩 CONVERTIR FILA
-// ======================================================
-
-fn convertir_fila(fila: FilaUI) -> RemapeoJson {
-    RemapeoJson {
-        id: fila.id,
-
-        estado: fila.estado,
-
-        app: convertir_app(fila.app),
-
-        trigger: convertir_trigger(fila.trigger),
-
-        tipo: fila.tipo,
-
-        accion: fila.accion.map(convertir_trigger),
-
-        condicion: fila.condicion,
-
-        ejecucion: fila.ejecucion,
-
-        color: fila.color,
-
-        nota: fila.nota,
-    }
-}
-
-// ======================================================
-// CONVERTIR APP
-// ======================================================
-
-fn convertir_app(app: AppUI) -> AppJson {
-    AppJson {
-        programa: app.programa,
-
-        segundo_plano: app.segundo_plano,
-    }
-}
-
-// ======================================================
-// 🎯 CONVERTIR TRIGGER
-// ======================================================
-
-fn convertir_trigger(trigger: TriggerUI) -> TriggerJson {
-    TriggerJson {
+fn convertir_trigger_captura(trigger: crate::eventos::EventoTrigger) -> TriggerCapturaUI {
+    TriggerCapturaUI {
         modificadores: trigger
             .modificadores
-            .into_iter()
-            .map(convertir_entrada)
+            .iter()
+            .map(convertir_input_captura)
             .collect(),
 
-        gatillo: trigger.gatillo.map(convertir_entrada),
+        gatillo: Some(convertir_input_captura(&trigger.gatillo)),
 
-        condicion: trigger.condicion,
+        condicion: format!("{:?}", trigger.condicion),
     }
 }
-
-// ======================================================
-// 🆔 CONVERTIR ENTRADA
-// ======================================================
-
-fn convertir_entrada(entrada: EntradaUI) -> crate::idioma::Input {
-    crate::idioma::Input::nuevo(convertir_fuente(&entrada.tipo), &entrada.codigo)
-}
-
-// ======================================================
-// 🌐 TIPO UI → FUENTE INTERNA
-// ======================================================
-
-fn convertir_fuente(tipo: &str) -> &'static str {
-    match tipo {
-        "Teclado" => "keyboard",
-
-        "Mouse" => "mouse",
-
-        "Multimedia" => "multimedia",
-
-        "Joystick" => "joystick",
-
-        _ => "unknown",
-    }
-}
-
-// ======================================================
-// 🔄 INPUTID → ENTRADA UI
-// ======================================================
 
 fn convertir_input_captura(input: &crate::eventos::InputId) -> EntradaCapturaUI {
     let fuente = match input.fuente().unwrap_or("") {
@@ -655,70 +314,8 @@ fn convertir_input_captura(input: &crate::eventos::InputId) -> EntradaCapturaUI 
 }
 
 // ======================================================
-// 🔄 EVENTOTRIGGER → TRIGGER UI
+// 🖥️ APLICACIONES / ICONOS
 // ======================================================
-
-fn convertir_trigger_captura(trigger: EventoTrigger) -> TriggerCapturaUI {
-    TriggerCapturaUI {
-        modificadores: trigger
-            .modificadores
-            .iter()
-            .map(convertir_input_captura)
-            .collect(),
-
-        gatillo: Some(convertir_input_captura(&trigger.gatillo)),
-
-        condicion: format!("{:?}", trigger.condicion),
-    }
-}
-
-// ======================================================
-// 🎹 INICIAR CAPTURA
-// ======================================================
-
-#[tauri::command]
-pub fn iniciar_captura() {
-    crate::captura::iniciar();
-
-    println!("🎹 Captura iniciada");
-}
-
-// ======================================================
-// 📥 OBTENER CAPTURA
-// ======================================================
-
-#[tauri::command]
-pub fn obtener_captura() -> Option<TriggerCapturaUI> {
-    crate::captura::obtener().map(convertir_trigger_captura)
-}
-
-// ======================================================
-// 🖥️ PROCESOS Y ÍCONOS (columna App)
-// ------------------------------------------------------
-// Comandos delgados: la lógica real vive en
-// backend::back_app (capa Platform).
-// ======================================================
-
-use crate::backend::back_app;
-
-use base64::engine::general_purpose::STANDARD as BASE64;
-use base64::Engine as _;
-
-#[derive(Serialize)]
-pub struct IconoJson {
-    pub ancho: u32,
-
-    pub alto: u32,
-
-    pub pixeles: String,
-}
-
-#[derive(Serialize)]
-pub struct ProcesoIconoJson {
-    pub nombre: String,
-
-    pub icono: Option<IconoJson>,
-}
 
 fn convertir_icono(icono: back_app::IconoRaw) -> IconoJson {
     IconoJson {
@@ -731,7 +328,7 @@ fn convertir_icono(icono: back_app::IconoRaw) -> IconoJson {
 }
 
 // ======================================================
-// 📋 LISTAR PROCESOS CON VENTANA VISIBLE
+// 📋 LISTAR PROCESOS
 // ======================================================
 
 #[tauri::command]
@@ -751,11 +348,7 @@ pub fn listar_procesos_ventana() -> Vec<ProcesoIconoJson> {
 }
 
 // ======================================================
-// 🎨 OBTENER ÍCONO DE UN PROGRAMA PUNTUAL
-// ------------------------------------------------------
-// Busca el proceso en ejecución cuyo nombre coincide y
-// devuelve su ícono. Si no está corriendo, devuelve None
-// (la UI usa el ícono genérico como respaldo).
+// 🎨 OBTENER ICONO PROGRAMA
 // ======================================================
 
 #[tauri::command]

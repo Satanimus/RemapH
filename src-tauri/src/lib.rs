@@ -8,7 +8,6 @@
 
 mod analizador_trigger;
 mod backend;
-mod buffer_eventos;
 mod cache;
 mod comandos;
 mod compilador;

@@ -1,20 +1,99 @@
 // ======================================================
 // 🎛️ Pulsadores RemapH V3
+// ======================================================
+// ETAPA 0 DEL FLUJO
 // ------------------------------------------------------
-// Diccionario interno de entradas.
+// 1. ¿Qué hace este archivo?
+//
+// Mantiene el diccionario único de todos
+// los pulsadores compatibles con RemapH.
+//
+// Traduce entre:
+//
+// • Nativo.
+// • Interno.
+// • Interception.
+// • UI.
+//
+// También identifica el tipo de dispositivo
+// al que pertenece cada pulsador.
+//
+// ------------------------------------------------------
+// 2. ¿Qué información recibe?
+//
+// Carga pulsadores.tsv.
+//
+// ------------------------------------------------------
+// 3. ¿Quién llama este archivo?
+//
+// Cualquier módulo que necesite traducir
+// nombres de pulsadores.
+//
+// Principalmente:
+//
+// • Backends.
+// • Runtime.
+// • Compilador.
+// • UI.
+//
+// ------------------------------------------------------
+// 4. ¿Qué información entrega?
+//
+// Devuelve:
+//
+// • Pulsador.
+// • Conversiones entre formatos.
+// • Fuente del dispositivo.
+//
+// ------------------------------------------------------
+// 5. Funciones del archivo
+//
+// cargar()
+//     Carga el diccionario.
+//
+// por_nativo()
+//     Busca un pulsador por código nativo.
+//
+// por_interno()
+//     Busca un pulsador por nombre interno.
+//
+// por_interception()
+//     Busca un pulsador por nombre
+//     Interception.
+//
+// por_ui()
+//     Busca un pulsador por nombre visible.
+//
+// todos()
+//     Devuelve el diccionario completo.
+//
+// nativo_a_interno()
+// interno_a_nativo()
+// interno_a_interception()
+// interno_a_fuente()
+// interno_a_ui()
+// interception_a_interno()
+// ui_a_interno()
+//     Conversiones entre formatos.
+//
+// ui_desde_interno()
+//     Devuelve el nombre visible.
+// ------------------------------------------------------
+// Transformación:
 //
 // fuente
-//     ↓
+//      ↓
 // nativo
-//     ↓
+//      ↓
+// Pulsadores
+//      ↓
 // interno
-//     ↓
+//      ↓
 // interception
-//     ↓
-// ui
 //
-// El archivo TSV es interno al programa.
-// No se modifica desde la interfaz.
+// o
+//
+// ui
 // ======================================================
 
 use std::sync::OnceLock;
