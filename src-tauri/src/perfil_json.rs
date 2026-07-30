@@ -64,6 +64,11 @@
 //     Representa una fila completa de la tabla UI.
 // TriggerJson
 //     Representa cómo se activa un remapeo.
+// Input
+//     Representa una entrada física (fuente + control)
+//     tal como se guarda dentro de TriggerJson.entrada.
+// Input::nuevo()
+//     Crea un Input a partir de fuente y control.
 // AppJson
 //     Representa el contexto donde existe el trigger.
 // RespuestaJson
@@ -74,8 +79,28 @@
 //     Crea un perfil vacío.
 // ------------------------------------------------------
 
-use crate::idioma::Input;
 use crate::perfil_cache::CondicionTrigger;
+
+// ======================================================
+// 🆔 INPUT
+// ======================================================
+
+#[derive(Clone, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+pub struct Input {
+    pub fuente: String,
+
+    pub control: String,
+}
+
+impl Input {
+    pub fn nuevo(fuente: &str, control: &str) -> Self {
+        Self {
+            fuente: fuente.to_string(),
+
+            control: control.to_string(),
+        }
+    }
+}
 
 // ======================================================
 // 👤 PERFIL JSON

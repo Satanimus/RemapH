@@ -136,7 +136,6 @@ use crate::perfil_ui::{
     EntradaCapturaUI, EstadoCachePerfil, IconoJson, ProcesoIconoJson, ResultadoPerfil,
     TriggerCapturaUI,
 };
-use crate::usuario;
 
 use base64::engine::general_purpose::STANDARD as BASE64;
 use base64::Engine as _;

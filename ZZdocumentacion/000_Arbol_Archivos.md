@@ -829,26 +829,6 @@ Reenviar eventos originales.
 
 No conoce el Runtime.
 
-🪟 back_windows.rs
-
-Etapa: Backend Portable.
-
-Utiliza:
-
-WH_KEYBOARD_LL
-WH_MOUSE_LL
-SendInput
-
-Responsabilidad:
-
-Capturar eventos físicos.
-
-Convertirlos a InputEvent.
-
-Emitir eventos físicos.
-
-No conoce Cache ni Runtime.
-
 ⌨️ back_teclas.rs
 
 Etapa: Conversión de teclado.

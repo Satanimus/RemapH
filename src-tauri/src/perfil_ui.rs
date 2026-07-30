@@ -273,8 +273,8 @@ fn convertir_trigger(trigger: TriggerUI) -> TriggerJson {
 // 🆔 CONVERTIR ENTRADA
 // ======================================================
 
-fn convertir_entrada(entrada: EntradaUI) -> crate::idioma::Input {
-    crate::idioma::Input::nuevo(convertir_fuente(&entrada.tipo), &entrada.codigo)
+fn convertir_entrada(entrada: EntradaUI) -> crate::perfil_json::Input {
+    crate::perfil_json::Input::nuevo(convertir_fuente(&entrada.tipo), &entrada.codigo)
 }
 
 // ======================================================

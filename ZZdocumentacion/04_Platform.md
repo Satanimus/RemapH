@@ -142,7 +142,7 @@ Flujo:
 ```
 Windows Hook
 ↓
-back_windows
+back_interception
 ↓
 InputEvent
 ↓
@@ -176,24 +176,6 @@ runtime
 ↓
 Interception
 ```
-
-## Portable
-
-`back_windows.rs` utiliza SendInput.
-
-Flujo:
-
-```
-AccionCache
-↓
-entrada.rs
-↓
-back_windows
-↓
-SendInput
-```
-
-La acción sigue siendo genérica antes de llegar al backend físico.
 
 ---
 

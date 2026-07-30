@@ -12,7 +12,7 @@
 // 2. ¿Quién llama este archivo?
 // Backend de captura.
 // Actualmente:
-// - back_windows
+// - back_interception ¿?
 // Futuro:
 // - back_entrada (Full)
 // - cualquier backend físico de entrada.

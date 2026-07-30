@@ -97,13 +97,11 @@ pub fn reenviar(ict: &Interception, device: interception::Device, stroke: Stroke
 
 pub fn traducir(stroke: &Stroke) -> Option<crate::eventos::Evento> {
     match stroke {
-        Stroke::Keyboard { code, state, .. } => Some(crate::backend::back_teclas::convertir(
+        Stroke::Keyboard { code, state, .. } => Some(crate::back_teclas::convertir(
             *code,
             *state == interception::KeyState::DOWN,
         )),
 
-        Stroke::Mouse { state, rolling, .. } => {
-            crate::backend::back_mouse::convertir(*state, *rolling)
-        }
+        Stroke::Mouse { state, rolling, .. } => crate::back_mouse::convertir(*state, *rolling),
     }
 }

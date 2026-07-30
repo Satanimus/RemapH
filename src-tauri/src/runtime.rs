@@ -168,8 +168,6 @@
 //
 // ======================================================
 
-use crate::back_windows;
-
 use crate::cache::OrdenRuntime;
 
 use crate::eventos::InputId;
@@ -233,7 +231,6 @@ fn ejecutar_accion(id: String, accion: AccionCache, extra: Option<ExtraCache>) {
 // ======================================================
 
 fn abrir_archivo(ruta: String) {
-    // Enviar al Back_Windows.
     // El backend decide cómo abrir la ruta
     // según corresponda (programa, documento,
     // carpeta, URL, etc.).
@@ -453,5 +450,5 @@ fn ejecutar_pulse(identificador: &str) {
 // ======================================================
 
 fn emitir_evento(evento: crate::eventos::InputEvent) {
-    back_windows::emitir_evento(evento);
+    back_windows::emitir_evento(evento); // ahora solo existe interception, ver quien lo reemplazará en la v1
 }

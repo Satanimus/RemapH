@@ -28,7 +28,8 @@ ETAPA 2 — Analizador (OK)
 
 ETAPA 3 — Cache (OK)
 └── back_app (pendiente)
-└── cache.rs
+└── cache.rs (Pendiente: crate::runtime::ejecutar(...) asume que runtime.rs expone esa función recibiendo OrdenRuntime — ya lo hace, pero ahora OrdenRuntime vive acá en cache.rs (antes runtime.rs lo importaba de un lugar que no lo definía). Cuando llegues a runtime.rs, el use crate::cache::OrdenRuntime; que ya tenía ahora sí va a encontrar el tipo.
+Nadie llama todavía a cache::resolver_entrada() desde entrada.rs — eso sigue pendiente de la etapa de conexión, como ya hablamos.)
 
 ETAPA 4 — Runtime (OK)
 └── runtime.rs
@@ -48,6 +49,8 @@ Otros (OK).
 -perfil.rs
 -perfil_ui.rs
 -comandos.rs
+-usuario.rs
+-persistencia.rs
 
 ////////////////////////////////////////////////////////////////
 

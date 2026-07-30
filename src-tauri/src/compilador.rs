@@ -187,7 +187,7 @@ fn convertir_app(app: &AppJson) -> AppCache {
 // 🆔 CONVERTIR INPUT
 // ======================================================
 
-fn convertir_input(input: &crate::idioma::Input) -> InputId {
+fn convertir_input(input: &crate::perfil_json::Input) -> InputId {
     InputId::new(&input.fuente, &input.control)
 }
 

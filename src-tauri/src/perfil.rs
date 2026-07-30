@@ -29,8 +29,6 @@
 // ↓
 // perfil
 // ↓
-// persistencia
-// ↓
 // perfil_json
 //
 // ======================================================
@@ -85,18 +83,18 @@
 // siguiente_nombre()
 //     Genera nombre disponible.
 //
-// sincronizar_estado_cache()
-//     Actualiza estado global según perfil.
+// guardar_en_disco()
+//     Guarda perfil json en disco
 //
+// cargar_desde_disco()
+//     Carga perfil json en disco
 // ======================================================
 
 use std::fs;
 
 use crate::cache;
 use crate::compilador;
-use crate::estado;
 use crate::perfil_json::perfil_json;
-use crate::persistencia;
 use crate::usuario;
 
 use crate::perfil_ui::ResultadoPerfil;
@@ -108,11 +106,9 @@ use crate::perfil_ui::ResultadoPerfil;
 pub fn activar_perfil() -> Result<bool, String> {
     let ruta = usuario::perfil_actual()?;
 
-    let perfil = persistencia::cargar(&ruta)?;
+    let perfil = cargar_desde_disco(&ruta)?;
 
     compilador::compilar(&perfil);
-
-    sincronizar_estado_cache(&perfil);
 
     Ok(!cache::esta_vacia())
 }
@@ -123,8 +119,6 @@ pub fn activar_perfil() -> Result<bool, String> {
 
 pub fn desactivar_perfil() {
     cache::borrar();
-
-    estado::desactivar();
 }
 
 // ======================================================
@@ -137,20 +131,16 @@ pub fn obtener_perfil_actual() -> Result<perfil_json, String> {
     if !ruta.exists() {
         let perfil = perfil_json::nuevo();
 
-        persistencia::guardar(&perfil, &ruta)?;
+        guardar_en_disco(&perfil, &ruta)?;
 
         compilador::compilar(&perfil);
-
-        sincronizar_estado_cache(&perfil);
 
         return Ok(perfil);
     }
 
-    let perfil = persistencia::cargar(&ruta)?;
+    let perfil = cargar_desde_disco(&ruta)?;
 
     compilador::compilar(&perfil);
-
-    sincronizar_estado_cache(&perfil);
 
     Ok(perfil)
 }
@@ -162,11 +152,9 @@ pub fn obtener_perfil_actual() -> Result<perfil_json, String> {
 pub fn guardar_perfil(perfil: perfil_json) -> Result<bool, String> {
     let ruta = usuario::perfil_actual()?;
 
-    persistencia::guardar(&perfil, &ruta)?;
+    guardar_en_disco(&perfil, &ruta)?;
 
     compilador::compilar(&perfil);
-
-    sincronizar_estado_cache(&perfil);
 
     Ok(!cache::esta_vacia())
 }
@@ -205,10 +193,10 @@ pub fn restaurar_perfil_actual() -> Result<ResultadoPerfil, String> {
     if !ruta.exists() {
         let perfil = perfil_json::nuevo();
 
-        persistencia::guardar(&perfil, &ruta)?;
+        guardar_en_disco(&perfil, &ruta)?;
     }
 
-    let perfil = persistencia::cargar(&ruta)?;
+    let perfil = cargar_desde_disco(&ruta)?;
 
     let nombre = usuario::nombre_actual()?;
 
@@ -226,15 +214,11 @@ pub fn clonar_perfil(perfil: perfil_json) -> Result<ResultadoPerfil, String> {
 
     cache::borrar();
 
-    estado::desactivar();
-
     let ruta = usuario::ruta_perfil(&nombre)?;
 
-    persistencia::guardar(&perfil, &ruta)?;
+    guardar_en_disco(&perfil, &ruta)?;
 
     compilador::compilar(&perfil);
-
-    sincronizar_estado_cache(&perfil);
 
     resultado_perfil(perfil, nombre)
 }
@@ -264,15 +248,11 @@ pub fn renombrar_perfil(nuevo_nombre: String) -> Result<ResultadoPerfil, String>
 
     cache::borrar();
 
-    estado::desactivar();
-
     fs::rename(&ruta_actual, &nueva_ruta).map_err(|error| error.to_string())?;
 
-    let perfil = persistencia::cargar(&nueva_ruta)?;
+    let perfil = cargar_desde_disco(&nueva_ruta)?;
 
     compilador::compilar(&perfil);
-
-    sincronizar_estado_cache(&perfil);
 
     resultado_perfil(perfil, nuevo_nombre)
 }
@@ -285,8 +265,6 @@ pub fn eliminar_perfil_actual() -> Result<ResultadoPerfil, String> {
     let ruta_actual = usuario::perfil_actual()?;
 
     cache::borrar();
-
-    estado::desactivar();
 
     if ruta_actual.exists() {
         fs::remove_file(ruta_actual).map_err(|error| error.to_string())?;
@@ -302,15 +280,13 @@ pub fn eliminar_perfil_actual() -> Result<ResultadoPerfil, String> {
 pub fn crear_perfil_nuevo() -> Result<ResultadoPerfil, String> {
     cache::borrar();
 
-    estado::desactivar();
-
     let nombre = siguiente_nombre("Default")?;
 
     let perfil = perfil_json::nuevo();
 
     let ruta = usuario::ruta_perfil(&nombre)?;
 
-    persistencia::guardar(&perfil, &ruta)?;
+    guardar_en_disco(&perfil, &ruta)?;
 
     resultado_perfil(perfil, nombre)
 }
@@ -328,13 +304,9 @@ pub fn seleccionar_perfil(nombre: String) -> Result<ResultadoPerfil, String> {
 
     cache::borrar();
 
-    estado::desactivar();
-
-    let perfil = persistencia::cargar(&ruta)?;
+    let perfil = cargar_desde_disco(&ruta)?;
 
     compilador::compilar(&perfil);
-
-    sincronizar_estado_cache(&perfil);
 
     resultado_perfil(perfil, nombre)
 }
@@ -382,13 +354,21 @@ fn siguiente_nombre(base: &str) -> Result<String, String> {
 }
 
 // ======================================================
-// 🔄 SINCRONIZAR ESTADO
+// 💾 GUARDAR EN DISCO
 // ======================================================
+fn guardar_en_disco(perfil: &perfil_json, ruta: &Path) -> Result<(), String> {
+    let json = serde_json::to_string_pretty(perfil).map_err(|error| error.to_string())?;
 
-fn sincronizar_estado_cache(perfil: &perfil_json) {
-    if perfil.remapeos.iter().any(|remapeo| remapeo.estado == "ON") {
-        estado::activar();
-    } else {
-        estado::desactivar();
-    }
+    fs::write(ruta, json).map_err(|error| error.to_string())?;
+
+    Ok(())
+}
+
+// ======================================================
+// 📂 CARGAR DESDE DISCO
+// ======================================================
+fn cargar_desde_disco(ruta: &Path) -> Result<perfil_json, String> {
+    let json = fs::read_to_string(ruta).map_err(|error| error.to_string())?;
+
+    serde_json::from_str(&json).map_err(|error| error.to_string())
 }

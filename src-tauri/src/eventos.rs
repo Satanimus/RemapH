@@ -12,7 +12,7 @@
 // ------------------------------------------------------
 // 2. ¿Quién llama este archivo?
 // Backend de captura
-// (back_windows / Interception / rdev)
+// (Interception / rdev)
 // ------------------------------------------------------
 // 3. ¿Qué información recibe?
 // Construye un InputEvent a partir de información proporcionada por el backend de captura.

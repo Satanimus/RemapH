@@ -7,20 +7,23 @@
 // ======================================================
 
 mod analizador_trigger;
-mod backend;
+mod back_app;
+mod back_interception;
+mod back_mouse;
+mod back_teclas;
 mod cache;
 mod comandos;
 mod compilador;
 mod config;
 mod entrada;
-mod estado;
 mod eventos;
-pub mod idioma;
 mod instante;
+mod perfil;
 mod perfil_cache;
 mod perfil_json;
-mod persistencia;
+mod perfil_ui;
 mod pulsadores;
+mod runt_extra;
 mod runtime;
 mod usuario;
 
