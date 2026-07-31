@@ -89,7 +89,7 @@
 //
 // compilar()
 //     Compila perfil completo y reemplaza Cache.
-//
+//     Ademas ejecuta orden revisar_app() para conocer si Apps del filtro están activas
 // compilar_perfil()
 //     Convierte todas las filas activas.
 //
@@ -122,6 +122,8 @@ pub fn compilar(perfil: &perfil_json) {
     let remapeos = compilar_perfil(perfil);
 
     cache::reemplazar(remapeos);
+
+    crate::back_app::revisar_apps();
 }
 
 // ======================================================

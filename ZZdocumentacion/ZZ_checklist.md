@@ -59,22 +59,15 @@ Otros (OK).
 .device_event_filter(tauri::DeviceEventFilter::Always)
 ////////////////////////////////////////////
 
-📌 Ideas pendientes (no hacer todavía)
+📌 Pendientes V1
 ⬜ Verificar cambio de columna renombrada: ejecucion a > extra
+
+📌 Pendientes V2
 ⬜ Elaborar un diccionario oficial de términos del proyecto para evitar ambigüedades futuras.
 ⬜ Integrar joystick utilizando la misma arquitectura de captura.
 ⬜ Evaluar soporte para nuevos tipos de triggers si fueran necesarios.
 
-⬜ Recordar limpiar comandos.rs
-⬜ Commpletar back_app para informar cambios de App para el cache
-
-⬜ Cuando terminemos el motor, podríamos hacer que BufferEventos tenga un modo de depuración que imprima la línea temporal completa. Algo como:
-
-00.000 Ctrl Down
-00.120 A Down
-00.145 A Up
-00.310 Ctrl Up
-
+⬜ Cuando terminemos el motor, podríamos hacer que BufferEventos tenga un modo de depuración que imprima la línea temporal completa. Algo como: 00.000 Ctrl Down 00.120 A Down 00.145 A Up 00.310 Ctrl Up
 Sería una herramienta excelente para depurar problemas de triggers sin tocar el resto del sistema.
 ⬜ En la V2 agregar un indice de dispositivo para diferenciar joistick de joistick(1). Si no existe indice, se toma como predeterminado, si lleva (1), (2), etc... el runtime debe tomarlos como otro dispositivo y hacer los cambios necesarios para diferenciarlos.
 ⬜En la V2 agregar modo portable (windows sin interception).
@@ -96,3 +89,5 @@ detener_monitor() Detiene escucha.
 cambio_ventana() Notifica cambio de aplicación activa.
 abrir_proceso() Notifica apertura de proceso.
 cerrar_proceso() Notifica cierre de proceso.
+
+⬜ back_interception > necesita un numero de dispositivo para enviar las salidas, ahora cada vez que inicia obtien ese numero del input y lo guarda hasta que se cierra remaph. Para la v2, ese numero debe poder guardarse en el archivo config, asi el usuario elige cual dispositivo es el principal y cual secundario cuando haya mas de uno.

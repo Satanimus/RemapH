@@ -35,7 +35,7 @@ mod usuario;
 
 pub fn run() {
     entrada::iniciar();
-
+    back_app::iniciar_monitor();
     tauri::Builder::default()
         .device_event_filter(tauri::DeviceEventFilter::Always)
         .invoke_handler(tauri::generate_handler![

@@ -155,6 +155,8 @@
 // resolver_entrada()
 //     Compara una entrada (y opcionalmente la condición)
 //     contra la cache y aplica las reglas del punto 5.
+// apps_a_vigilar()
+//     Devuelve Apps de columna App bajo demanda de back_app para actualizar su estado.
 // ------------------------------------------------------
 // Transformación:
 //
@@ -444,4 +446,26 @@ pub fn resolver_entrada(
     }
 
     ResolucionEntrada::AnalizarCondicion
+}
+
+// ======================================================
+// 🖥️ APPS A VIGILAR
+// ======================================================
+
+pub fn apps_a_vigilar() -> Vec<AppCache> {
+    let cache = obtener_cache().lock().unwrap();
+
+    let mut vistas = Vec::new();
+
+    for remapeo in cache.iter() {
+        if matches!(remapeo.app, AppCache::Global) {
+            continue;
+        }
+
+        if !vistas.contains(&remapeo.app) {
+            vistas.push(remapeo.app.clone());
+        }
+    }
+
+    vistas
 }

@@ -1,21 +1,72 @@
 // ======================================================
 // 🖱️ Back_Mouse RemapH V3
 // ------------------------------------------------------
-// Traduce mouse físico a InputEvent genérico.
-// También describe outputs físicos de mouse.
+// 1. ¿Qué hace este archivo?
+// Traduce entre el mouse físico (flags MouseFilter +
+// rueda, de la librería interception) y el idioma
+// interno del motor (InputId).
+//
+// El nombre de cada botón/rueda lo decide únicamente la
+// columna "interception" de pulsadores.tsv. Este archivo
+// no inventa nombres — solo sabe reconocer qué flag
+// físico corresponde a qué nombre, y consulta el
+// diccionario para confirmar el interno.
+//
+// No conoce AnalizadorTrigger.
+// No conoce Cache.
+// No conoce Runtime.
+// ------------------------------------------------------
+// 2. ¿Quién llama este archivo?
+// back_interception (traducir(), para la entrada)
+// back_interception, para la salida (convertir_salida())
+// ------------------------------------------------------
+// 3. ¿Qué información recibe?
+// convertir(): el estado de flags del mouse (MouseFilter)
+// + el valor de rueda (rolling) de un Stroke.
+// convertir_salida(): un InputId (interno) a emitir.
+// ------------------------------------------------------
+// 4. ¿Qué información entrega?
+// convertir(): Option<Evento>. None si el flag no
+// corresponde a nada reconocido.
+// convertir_salida(): Option<MouseOutput>. None si el
+// InputId no es de mouse, o no tiene control asociado.
+// ------------------------------------------------------
+// 5. Funciones del archivo
+// MouseOutput
+//     Describe qué emitir: un botón (flags Down/Up) o
+//     un movimiento de rueda (magnitud con signo).
+// construir()
+//     Arma el Evento para un nombre de interception dado,
+//     consultando pulsadores.tsv. Registra en consola los
+//     controles no soportados.
+// convertir()
+//     Flags + rueda → Evento (vía pulsadores.tsv).
+// convertir_salida()
+//     InputId → MouseOutput (vía pulsadores.tsv).
+// ------------------------------------------------------
+// Transformación:
+//
+// ENTRADA:
+// MouseFilter + rolling (interception)
+//     ↓
+// pulsadores::interception_a_interno()
+//     ↓
+// InputId (interno)
+//     ↓
+// Evento
+//
+// SALIDA:
+// InputId (interno)
+//     ↓
+// pulsadores::interno_a_interception()
+//     ↓
+// MouseOutput (interception)
 // ======================================================
 
-use crate::eventos::{Evento, InputId};
+use crate::eventos::{InputEvent, InputId};
 use crate::instante::ahora;
+use crate::pulsadores;
 use interception::MouseFilter;
-
-// ======================================================
-// 🆔 CREAR INPUT DE MOUSE
-// ======================================================
-
-fn mouse(control: &str) -> InputId {
-    InputId::new("mouse", control)
-}
 
 // ======================================================
 // 📤 OUTPUT DE MOUSE
@@ -28,20 +79,34 @@ pub enum MouseOutput {
 }
 
 // ======================================================
+// 🏗️ CONSTRUIR EVENTO
+// ======================================================
+
+fn construir(interception: &str, armar: impl FnOnce(InputId) -> InputEvent) -> Option<InputEvent> {
+    let Some(interno) = pulsadores::interception_a_interno(interception) else {
+        println!("⚠️ Control de mouse no soportado: {}", interception);
+
+        return None;
+    };
+
+    Some(armar(InputId::new("mouse", interno)))
+}
+
+// ======================================================
 // 📥 CONVERTIR ENTRADA
 // ======================================================
 
-pub fn convertir(state: MouseFilter, rolling: i16) -> Option<Evento> {
+pub fn convertir(state: MouseFilter, rolling: i16) -> Option<InputEvent> {
     // ----------------------------------------------
     // 🖱️ RUEDA
     // ----------------------------------------------
 
     if rolling > 0 {
-        return Some(Evento::pulse(mouse("WheelUp"), ahora()));
+        return construir("WheelUp", |input| InputEvent::pulse(input, ahora()));
     }
 
     if rolling < 0 {
-        return Some(Evento::pulse(mouse("WheelDown"), ahora()));
+        return construir("WheelDown", |input| InputEvent::pulse(input, ahora()));
     }
 
     // ----------------------------------------------
@@ -49,43 +114,43 @@ pub fn convertir(state: MouseFilter, rolling: i16) -> Option<Evento> {
     // ----------------------------------------------
 
     if state.contains(MouseFilter::LEFT_BUTTON_DOWN) {
-        return Some(Evento::down(mouse("LeftButton"), ahora()));
+        return construir("LeftButton", |input| InputEvent::down(input, ahora()));
     }
 
     if state.contains(MouseFilter::LEFT_BUTTON_UP) {
-        return Some(Evento::up(mouse("LeftButton"), ahora()));
+        return construir("LeftButton", |input| InputEvent::up(input, ahora()));
     }
 
     if state.contains(MouseFilter::RIGHT_BUTTON_DOWN) {
-        return Some(Evento::down(mouse("RightButton"), ahora()));
+        return construir("RightButton", |input| InputEvent::down(input, ahora()));
     }
 
     if state.contains(MouseFilter::RIGHT_BUTTON_UP) {
-        return Some(Evento::up(mouse("RightButton"), ahora()));
+        return construir("RightButton", |input| InputEvent::up(input, ahora()));
     }
 
     if state.contains(MouseFilter::MIDDLE_BUTTON_DOWN) {
-        return Some(Evento::down(mouse("MiddleButton"), ahora()));
+        return construir("MiddleButton", |input| InputEvent::down(input, ahora()));
     }
 
     if state.contains(MouseFilter::MIDDLE_BUTTON_UP) {
-        return Some(Evento::up(mouse("MiddleButton"), ahora()));
+        return construir("MiddleButton", |input| InputEvent::up(input, ahora()));
     }
 
     if state.contains(MouseFilter::BUTTON_4_DOWN) {
-        return Some(Evento::down(mouse("Button4"), ahora()));
+        return construir("Button4", |input| InputEvent::down(input, ahora()));
     }
 
     if state.contains(MouseFilter::BUTTON_4_UP) {
-        return Some(Evento::up(mouse("Button4"), ahora()));
+        return construir("Button4", |input| InputEvent::up(input, ahora()));
     }
 
     if state.contains(MouseFilter::BUTTON_5_DOWN) {
-        return Some(Evento::down(mouse("Button5"), ahora()));
+        return construir("Button5", |input| InputEvent::down(input, ahora()));
     }
 
     if state.contains(MouseFilter::BUTTON_5_UP) {
-        return Some(Evento::up(mouse("Button5"), ahora()));
+        return construir("Button5", |input| InputEvent::up(input, ahora()));
     }
 
     // ----------------------------------------------
@@ -104,9 +169,11 @@ pub fn convertir_salida(input: &InputId) -> Option<MouseOutput> {
         return None;
     }
 
-    let control = input.control()?;
+    let interno = input.control()?;
 
-    match control {
+    let interception = pulsadores::interno_a_interception(interno)?;
+
+    match interception {
         // ----------------------------------------------
         // 🖱️ BOTONES
         // ----------------------------------------------

@@ -7,7 +7,8 @@
 // Backend encargado de comunicarse con Windows para
 // obtener información relacionada con procesos y aplicaciones.
 // Actualmente es responsable de:
-// • Enumerar procesos.
+// • Enumerar procesos (todos, tengan o no ventana propia;
+//   la UI decide cómo separarlos en las dos listas).
 // • Obtener la aplicación en primer plano.
 // • Obtener la ruta real del ejecutable.
 // • Extraer el ícono del ejecutable.
@@ -54,23 +55,19 @@
 //     Extrae el ícono del ejecutable.
 // es_proceso_windows()
 //     Filtra procesos propios de Windows.
-// iniciar_monitor() (futuro)
-//     Inicia escucha de cambios.
-// detener_monitor() (futuro)
-//     Detiene escucha.
-// cambio_ventana() (futuro)
-//     Notifica cambio de foco.
-// abrir_proceso() (futuro)
-//     Notifica apertura.
-// cerrar_proceso() (futuro)
-//     Notifica cierre.
+// iniciar_monitor()
+//     Instala el aviso de cambio de foco de Windows (una sola vez) y arranca su loop de mensajes en un hilo aparte.
+// revisar_apps()
+//     Reevalúa el estado de todas las apps vigiladas y actualiza cache.
+// esta_abierta()
+//     Indica si un ejecutable aparece entre los procesos corriendo ahora mismo.
 // ======================================================
 
 use std::collections::HashSet;
 
 use std::path::Path;
 
-use windows_sys::Win32::Foundation::CloseHandle;
+use windows_sys::Win32::Foundation::{CloseHandle, INVALID_HANDLE_VALUE};
 
 use windows_sys::Win32::Graphics::Gdi::{
     CreateCompatibleDC, DeleteDC, DeleteObject, GetDIBits, GetObjectW, BITMAP, BITMAPINFO,
@@ -102,9 +99,7 @@ pub struct ProcesoVentana {
 }
 
 // ======================================================
-// ÍCONO CRUDO
-// ------------------------------------------------------
-// Píxeles en formato RGBA.
+// ÍCONO CRUDO - Píxeles en formato RGBA.
 // ======================================================
 
 pub struct IconoRaw {
@@ -117,11 +112,6 @@ pub struct IconoRaw {
 
 // ======================================================
 // ENUMERAR PROCESOS
-// ------------------------------------------------------
-// Mantiene el nombre público original para no romper
-// comandos.rs.
-//
-// La implementación ya no depende de ventanas visibles.
 // ======================================================
 
 pub fn enumerar_procesos_ventana() -> Vec<ProcesoVentana> {
@@ -130,7 +120,7 @@ pub fn enumerar_procesos_ventana() -> Vec<ProcesoVentana> {
     unsafe {
         let snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
 
-        if snapshot == std::ptr::null_mut() {
+        if snapshot == INVALID_HANDLE_VALUE {
             return lista;
         }
 
@@ -178,7 +168,7 @@ pub fn enumerar_procesos_ventana() -> Vec<ProcesoVentana> {
 pub fn obtener_programa_activo() -> Option<String> {
     let ventana = unsafe { GetForegroundWindow() };
 
-    if ventana.is_null() {
+    if ventana == 0 {
         return None;
     }
 
@@ -197,11 +187,6 @@ pub fn obtener_programa_activo() -> Option<String> {
 
 // ======================================================
 // DETERMINAR SI ES PROCESO DE WINDOWS
-// ------------------------------------------------------
-// Se excluyen ejecutables ubicados dentro de la carpeta
-// principal de Windows.
-//
-// No usamos el nombre del proceso para decidir esto.
 // ======================================================
 
 fn es_proceso_windows(ruta: &str) -> bool {
@@ -221,7 +206,7 @@ fn es_proceso_windows(ruta: &str) -> bool {
 unsafe fn obtener_ruta_proceso(pid: u32) -> Option<String> {
     let handle = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, 0, pid);
 
-    if handle == std::ptr::null_mut() {
+    if handle == 0 {
         return None;
     }
 
@@ -242,20 +227,15 @@ unsafe fn obtener_ruta_proceso(pid: u32) -> Option<String> {
 
 // ======================================================
 // EXTRAER ÍCONO
-// ------------------------------------------------------
-// Extrae el ícono pequeño del ejecutable.
-//
-// ExtractIconExW crea el HICON.
-// DestroyIcon libera el HICON.
 // ======================================================
 
 pub fn extraer_icono(ruta: &str) -> Option<IconoRaw> {
     unsafe {
         let ruta_ancha: Vec<u16> = ruta.encode_utf16().chain(std::iter::once(0)).collect();
 
-        let mut icono_grande = std::ptr::null_mut();
+        let mut icono_grande: isize = 0;
 
-        let mut icono_pequeno = std::ptr::null_mut();
+        let mut icono_pequeno: isize = 0;
 
         let extraidos = ExtractIconExW(
             ruta_ancha.as_ptr(),
@@ -269,8 +249,8 @@ pub fn extraer_icono(ruta: &str) -> Option<IconoRaw> {
             return None;
         }
 
-        if icono_pequeno == std::ptr::null_mut() {
-            if icono_grande != std::ptr::null_mut() {
+        if icono_pequeno == 0 {
+            if icono_grande != 0 {
                 DestroyIcon(icono_grande);
             }
 
@@ -284,7 +264,7 @@ pub fn extraer_icono(ruta: &str) -> Option<IconoRaw> {
         if GetIconInfo(hicon, &mut icon_info) == 0 {
             DestroyIcon(hicon);
 
-            if icono_grande != std::ptr::null_mut() {
+            if icono_grande != 0 {
                 DestroyIcon(icono_grande);
             }
 
@@ -295,12 +275,12 @@ pub fn extraer_icono(ruta: &str) -> Option<IconoRaw> {
 
         let hbm_mask = icon_info.hbmMask;
 
-        if hbm_color == std::ptr::null_mut() {
+        if hbm_color == 0 {
             DeleteObject(hbm_mask);
 
             DestroyIcon(hicon);
 
-            if icono_grande != std::ptr::null_mut() {
+            if icono_grande != 0 {
                 DestroyIcon(icono_grande);
             }
 
@@ -324,7 +304,7 @@ pub fn extraer_icono(ruta: &str) -> Option<IconoRaw> {
 
             DestroyIcon(hicon);
 
-            if icono_grande != std::ptr::null_mut() {
+            if icono_grande != 0 {
                 DestroyIcon(icono_grande);
             }
 
@@ -342,23 +322,23 @@ pub fn extraer_icono(ruta: &str) -> Option<IconoRaw> {
 
             DestroyIcon(hicon);
 
-            if icono_grande != std::ptr::null_mut() {
+            if icono_grande != 0 {
                 DestroyIcon(icono_grande);
             }
 
             return None;
         }
 
-        let hdc = CreateCompatibleDC(std::ptr::null_mut());
+        let hdc = CreateCompatibleDC(0);
 
-        if hdc == std::ptr::null_mut() {
+        if hdc == 0 {
             DeleteObject(hbm_color);
 
             DeleteObject(hbm_mask);
 
             DestroyIcon(hicon);
 
-            if icono_grande != std::ptr::null_mut() {
+            if icono_grande != 0 {
                 DestroyIcon(icono_grande);
             }
 
@@ -399,7 +379,7 @@ pub fn extraer_icono(ruta: &str) -> Option<IconoRaw> {
 
         DestroyIcon(hicon);
 
-        if icono_grande != std::ptr::null_mut() {
+        if icono_grande != 0 {
             DestroyIcon(icono_grande);
         }
 
@@ -425,4 +405,89 @@ pub fn extraer_icono(ruta: &str) -> Option<IconoRaw> {
             pixeles,
         })
     }
+}
+
+// ======================================================
+// 👁️ MONITOR DE APPS (foco)
+// ======================================================
+
+use crate::cache::{self, AppCache};
+use windows_sys::Win32::Foundation::HWND;
+use windows_sys::Win32::UI::Accessibility::{SetWinEventHook, HWINEVENTHOOK};
+use windows_sys::Win32::UI::WindowsAndMessaging::{
+    DispatchMessageW, GetMessageW, TranslateMessage, EVENT_SYSTEM_FOREGROUND, MSG,
+    WINEVENT_OUTOFCONTEXT,
+};
+
+pub fn iniciar_monitor() {
+    std::thread::spawn(|| unsafe {
+        let hook = SetWinEventHook(
+            EVENT_SYSTEM_FOREGROUND,
+            EVENT_SYSTEM_FOREGROUND,
+            0,
+            Some(en_cambio_foco),
+            0,
+            0,
+            WINEVENT_OUTOFCONTEXT,
+        );
+
+        if hook == 0 {
+            println!("⚠️ No se pudo instalar el monitor de apps.");
+
+            return;
+        }
+
+        let mut mensaje: MSG = std::mem::zeroed();
+
+        while GetMessageW(&mut mensaje, 0, 0, 0) > 0 {
+            TranslateMessage(&mensaje);
+            DispatchMessageW(&mensaje);
+        }
+    });
+}
+
+unsafe extern "system" fn en_cambio_foco(
+    _hook: HWINEVENTHOOK,
+    _evento: u32,
+    _hwnd: HWND,
+    _id_objeto: i32,
+    _id_hijo: i32,
+    _hilo_generador: u32,
+    _instante: u32,
+) {
+    revisar_apps();
+}
+
+pub fn revisar_apps() {
+    let vigiladas = cache::apps_a_vigilar();
+
+    if vigiladas.is_empty() {
+        return;
+    }
+
+    let activo = obtener_programa_activo();
+
+    for app in vigiladas {
+        let AppCache::Programa {
+            nombre,
+            segundo_plano,
+        } = &app
+        else {
+            continue;
+        };
+
+        let activa = if *segundo_plano {
+            esta_abierta(nombre)
+        } else {
+            activo.as_deref() == Some(nombre.as_str())
+        };
+
+        cache::actualizar_estado_app(&app, activa);
+    }
+}
+
+fn esta_abierta(nombre: &str) -> bool {
+    enumerar_procesos_ventana()
+        .iter()
+        .any(|proceso| proceso.nombre.eq_ignore_ascii_case(nombre))
 }
