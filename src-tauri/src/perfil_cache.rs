@@ -186,17 +186,13 @@ pub struct TriggerCache {
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum AccionCache {
-    // Acción física directa
     Emitir(InputId),
 
-    // Archivo de macro dentro de usuario/macros
     Macro(String),
 
-    // Abrir archivo o programa
-    AbrirArchivo { ruta: String },
+    AbrirArchivo(String),
 
-    // Elementos UI creados por usuario
-    Ui { ruta: String },
+    Ui(String),
 }
 
 // ======================================================

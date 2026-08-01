@@ -1,471 +1,400 @@
 // ======================================================
-// 🗃️ CACHE RemapH V3
+// 🗃️ Cache RemapH V3
 // ======================================================
-// ETAPA 2 DEL FLUJO
-// ------------------------------------------------------
 // 1. ¿Qué hace este archivo?
 //
-// Mantiene en memoria:
+// Mantiene en memoria los remapeos compilados y el estado
+// de aplicaciones. Su trabajo central es recibir Downs
+// desde AnalizadorTrigger (modo Runtime), decidir si eso
+// coincide con algún remapeo, y avisarle a entrada.rs qué
+// hacer con el input físico (dejarlo pasar, retenerlo, o
+// darlo por consumido).
 //
-// - Remapeos activos compilados.
-// - Estado actual de aplicaciones.
-// - La instancia activa actual (si hay una entrada
-//   con match en curso).
+// Mantiene DOS memorias separadas y de vida distinta:
 //
-// Cache NO conoce:
+// a) Lista de comparación — se arma con los Down que le
+//    llegan del analizador. Se vacía POR COMPLETO cada vez
+//    que Cache resuelve algo (Pasar, Consumir, o al
+//    confirmar un match vía condición).
 //
-// - Runtime (más allá de mandarle órdenes).
-// - Captura.
-// - Cómo se clasifica una condición.
+// b) Ninguna memoria propia de "qué sigue presionado" —
+//    en vez de eso, la CONSULTA puntualmente al analizador
+//    (obtener_presionados()) justo cuando necesita
+//    reiniciar su lista de comparación tras resolver. Así
+//    hereda lo que sigue físicamente abajo (soporta
+//    Ctrl+C → Ctrl+V: al resolver Ctrl+C, la nueva lista
+//    arranca ya sabiendo que Ctrl sigue presionado).
 //
-// Su responsabilidad es resolver una entrada:
+// Debe soportar más de una lista de comparación en
+// simultáneo, una por cada "grupo" físico independiente
+// que el analizador le esté reportando a la vez (ver
+// analizador_trigger.rs).
 //
-// • Sin coincidencia.
-// • Match único.
-// • Necesita análisis de condición.
-//
-// Y sostener el ciclo de vida de esa coincidencia:
-// avisarle a Runtime cuándo empieza (iniciar) y cuándo
-// termina (finalizar).
-//
+// Cache NO conoce Runtime más allá de mandarle órdenes. No
+// conoce Captura ni perfil_ui.
 // ------------------------------------------------------
-// 2. ¿Qué información recibe?
-//
-// Recibe:
-//
-// - Remapeos desde compilador.
-// - Escritura o eliminación de filas.
-// - Estado de aplicaciones desde back_app.
-// - Entrada acumulada (Vec<InputId>) desde Entrada:
-//   el conjunto de inputs físicos actualmente
-//   presionados, en cada ciclo.
-// - Opcionalmente, la condición (Simple/Doble/Mantenido)
-//   ya clasificada por AnalizadorTrigger, cuando Entrada
-//   vuelve a preguntar tras un AnalizarCondicion.
-//
+// 2. ¿Quién llama este archivo?
+// entrada.rs — le entrega cada Down (a través del
+//     analizador) y actúa según la ResolucionEntrada que
+//     Cache le devuelve.
+// AnalizadorTrigger — le entrega el resultado del timer
+//     (CondicionTrigger) cuando lo pidió.
+// Compilador — le entrega los remapeos al compilar.
+// back_app — le avisa cambios de foco de ventana.
 // ------------------------------------------------------
-// 3. ¿Quién llama este archivo?
-//
-// - Compilador.
-// - Entrada (el portero, con la entrada acumulada
-//   del ciclo actual, y opcionalmente la condición).
-// - Módulo estado aplicaciones.
-//
+// 3. ¿Qué información recibe?
+// recibir_down(input: InputId) — un Down nuevo (no
+//     repeat) del analizador.
+// recibir_condicion(condicion: CondicionTrigger) —
+//     resultado del timer que Cache había pedido.
+// recibir_up(input: InputId) — SOLO llega durante la
+//     ventana de espera de un Mantenido activo (ver
+//     analizador_trigger.rs) — se usa para detectar
+//     "se perdió el match".
+// escribir_cache() / escribir_fila() / borrar_* — desde
+//     Compilador.
+// actualizar_estado_app() — desde back_app.
 // ------------------------------------------------------
 // 4. ¿Qué información entrega?
+// ResolucionEntrada, a entrada.rs, con cada Down:
+//   Pasar — no hay ningún match posible con esto. Se
+//     vacía la lista de comparación y se le ordena
+//     limpiar() al analizador.
+//   Retener — todavía puede llegar a ser un match (sigue
+//     habiendo posibles, o se está esperando la
+//     condición). No se avisa nada a Runtime todavía.
+//   Consumir — ya hubo match confirmado y se le avisó a
+//     Runtime (Iniciar, y si corresponde, Finalizar).
 //
-// Devuelve ResolucionEntrada:
-//
-// Pasar:
-//     El Input físico no coincide con nada.
-//     Entrada devuelve el Input físico.
-//
-// Consumir:
-//     El Input físico no debe volver al sistema.
-//     Cache ya envió la orden Iniciar a Runtime.
-//
-// AnalizarCondicion:
-//     Solicita al AnalizadorTrigger determinar
-//     Simple / Doble / Mantenido. Entrada debe volver
-//     a llamar a resolver_entrada con esa condición.
-//
+// A Runtime: OrdenRuntime::Iniciar{id, accion, extra} y
+//     OrdenRuntime::Detener{id}.
 // ------------------------------------------------------
-// 5. Reglas de resolución (resolver_entrada)
+// 5. Reglas de resolución, por cada Down nuevo
 //
-// Si viene con condicion = None:
-//
-//   posibles = 0
-//        → Pasar.
-//
-//   posibles = 1
-//   exactas = 1
-//        → Iniciar. Solo hay una fila candidata: se
-//          manda "iniciar" de inmediato, sin esperar la
-//          condición (la condición es información para
-//          Runtime, no un criterio de match adicional).
-//
-//   posibles = exactas
-//   exactas > 1
-//        → AnalizarCondicion. Varias filas con la misma
-//          entrada física pero distinta condición.
-//
-// Si viene con condicion = Some(x) (ya se pidió
-// desambiguar):
-//
-//   exactas = 1 (filtrando también por condicion = x)
-//        → Iniciar.
-//
-//   exactas = 0
-//        → Pasar. Ninguna fila calzó con esa condición.
-//
+// 1. Se agrega a la lista de comparación de su grupo.
+// 2. Se calculan posibles/exactas contra las filas
+//    habilitadas (filtradas por app activa).
+// 3. posibles == 0
+//        → Pasar. Vaciar lista. limpiar() al analizador.
+// 4. posibles == exactas == 1, y la fila candidata es
+//    Simple
+//        → Iniciar + Finalizar juntos a Runtime (sin
+//          pedir condición, no hace falta desambiguar).
+//          Vaciar lista y reiniciarla con
+//          obtener_presionados().
+// 5. posibles == exactas (≥1), y la(s) candidata(s) no
+//    son trivialmente Simple (una sola candidata que no es
+//    Simple, o varias con distinta condición)
+//        → Retener. Pedirle iniciar_timer() al analizador
+//          sobre la tecla candidata a gatillo, si no se
+//          le pidió ya para esta misma situación.
+// 6. posibles > exactas (sigue habiendo prefijos posibles
+//    sin match exacto todavía)
+//        → Retener. Seguir esperando más Downs.
 // ------------------------------------------------------
-// 6. Iniciar / Finalizar
+// 6. Al recibir la condición del timer (recibir_condicion)
 //
-// Cache siempre envía dos órdenes por id a Runtime:
-// iniciar y finalizar, sin importar la condición
-// (Simple / Doble / Mantenido).
-//
-// - iniciar: se envía apenas se resuelve el match
-//   (ver Reglas de resolución arriba). Cache guarda el
-//   id y la entrada de esa instancia como "activa".
-//
-// - finalizar: se envía cuando el match se pierde, es
-//   decir, cuando la entrada actual ya no contiene todos
-//   los inputs de la instancia activa (se soltó alguno).
-//   Se revisa al principio de cada resolver_entrada.
-//
-// Runtime decide qué hacer con ese par según el extra
-// de la acción:
-//
-// - Simple / Doble: ejecuta una vez; espera el
-//   finalizar solo para descartar la instancia.
-//
-// - Mantenido: repite en turbo mientras no llegue
-//   el finalizar.
-//
-// Cache se limpia (deja de recordar la instancia activa)
-// apenas envía el finalizar.
-//
+// - Si la condición recibida coincide con una fila
+//   candidata exacta:
+//     - Simple o Doble → Iniciar + Finalizar juntos a
+//       Runtime. Vaciar lista, reiniciar con
+//       obtener_presionados().
+//     - Mantenido → Iniciar (sin Finalizar) a Runtime.
+//       Queda "esperando finalizar" para ese id — a partir
+//       de acá empieza a recibir recibir_up() del
+//       analizador.
+// - Si no coincide con ninguna candidata → Pasar. Vaciar
+//   lista. limpiar() al analizador.
 // ------------------------------------------------------
-// 7. Funciones del archivo
+// 7. Mientras está "esperando finalizar" un Mantenido
 //
-// obtener_cache()
-//     Acceso interno a la cache de remapeos.
-// obtener_apps()
-//     Acceso interno al estado de aplicaciones.
-// obtener_activa()
-//     Acceso interno a la instancia activa actual.
-// escribir_cache()
-//     Reemplaza toda la cache.
-// escribir_fila()
-//     Agrega un remapeo.
-// borrar_cache()
-//     Elimina todos los remapeos.
+// Cada recibir_up(input) que llegue: si ese input formaba
+// parte de la entrada que generó el match activo → se
+// perdió el match. Se manda Finalizar a Runtime, se vacía
+// la lista, se ordena limpiar() al analizador, y se
+// reinicia la lista con obtener_presionados().
+// ------------------------------------------------------
+// 8. Funciones del archivo
+//
+// recibir_down(input: InputId) -> ResolucionEntrada
+//     Punto de entrada principal, ver reglas 1 a 6.
+// recibir_condicion(condicion: CondicionTrigger)
+//     -> ResolucionEntrada
+//     Ver regla 6.
+// recibir_up(input: InputId)
+//     Ver regla 7. No devuelve ResolucionEntrada — actúa
+//     directo sobre Runtime si corresponde.
+// escribir_cache() / escribir_fila() / borrar_cache() /
 // borrar_fila()
-//     Elimina un remapeo por ID.
-// actualizar_estado_app()
-//     Actualiza estado de aplicación.
-// app_habilitada()
-//     Determina si una fila aplica según la app activa.
-// revisar_finalizacion()
-//     Si la instancia activa perdió alguno de sus
-//     inputs, manda Detener y limpia la instancia.
-// iniciar_instancia()
-//     Guarda la instancia activa y manda Iniciar.
-// resolver_entrada()
-//     Compara una entrada (y opcionalmente la condición)
-//     contra la cache y aplica las reglas del punto 5.
-// apps_a_vigilar()
-//     Devuelve Apps de columna App bajo demanda de back_app para actualizar su estado.
+//     Igual que antes, sin cambios de diseño.
+// actualizar_estado_app() / app_habilitada()
+//     Igual que antes, sin cambios de diseño.
 // ------------------------------------------------------
 // Transformación:
 //
-// perfil_cache
-//       ↓
-//    Cache
-//       ↓
-// Resolución de entrada
-//       ↓
-// Runtime (iniciar / finalizar)
+// Down (AnalizadorTrigger)
+//     ↓
+// Lista de comparación del grupo
+//     ↓
+// posibles / exactas contra filas habilitadas
+//     ↓
+// Pasar | Retener (+ timer si hace falta) | Consumir
+//     ↓
+// Runtime (Iniciar / Finalizar)
 // ======================================================
 
 use crate::eventos::InputId;
-
 use crate::perfil_cache::{AccionCache, AppCache, CondicionTrigger, ExtraCache, RemapeoCache};
+use crate::{analizador_trigger, entrada, runtime};
+use std::sync::Mutex;
 
-use std::sync::{Mutex, OnceLock};
-
-// ======================================================
-// 📦 CACHE REMAPEOS
-// ======================================================
-
-static CACHE: OnceLock<Mutex<Vec<RemapeoCache>>> = OnceLock::new();
-
-fn obtener_cache() -> &'static Mutex<Vec<RemapeoCache>> {
-    CACHE.get_or_init(|| Mutex::new(Vec::new()))
+#[derive(Clone)]
+struct Lista {
+    entrada: Vec<InputId>,
+    esperando_condicion: bool,
 }
-
-// ======================================================
-// 🖥️ ESTADO APLICACIONES
-// ======================================================
-
-#[derive(Clone, Debug, PartialEq)]
-pub struct AppEstadoCache {
-    pub app: AppCache,
-
-    pub activa: bool,
-}
-
-static APPS: OnceLock<Mutex<Vec<AppEstadoCache>>> = OnceLock::new();
-
-fn obtener_apps() -> &'static Mutex<Vec<AppEstadoCache>> {
-    APPS.get_or_init(|| Mutex::new(Vec::new()))
-}
-
-// ======================================================
-// 🟢 INSTANCIA ACTIVA
-// ======================================================
 
 struct InstanciaActiva {
     id: String,
-
     entrada: Vec<InputId>,
 }
 
-static ACTIVA: OnceLock<Mutex<Option<InstanciaActiva>>> = OnceLock::new();
-
-fn obtener_activa() -> &'static Mutex<Option<InstanciaActiva>> {
-    ACTIVA.get_or_init(|| Mutex::new(None))
+#[derive(Clone, PartialEq)]
+pub struct AppEstadoCache {
+    pub app: AppCache,
+    pub activa: bool,
 }
 
-// ======================================================
-// 📤 ORDEN RUNTIME
-// ======================================================
-
-#[derive(Clone, Debug)]
-pub enum OrdenRuntime {
-    Iniciar {
-        id: String,
-
-        accion: AccionCache,
-
-        extra: Option<ExtraCache>,
-    },
-
-    Detener {
-        id: String,
-    },
-}
-
-// ======================================================
-// 📤 RESOLUCIÓN
-// ======================================================
-
-#[derive(Clone, Debug, PartialEq)]
-pub enum ResolucionEntrada {
-    Pasar,
-
-    Consumir,
-
-    AnalizarCondicion,
-}
-
-// ======================================================
-// ✍️ ESCRIBIR CACHE
-// ======================================================
+static CACHE: Mutex<Vec<RemapeoCache>> = Mutex::new(Vec::new());
+static APPS: Mutex<Vec<AppEstadoCache>> = Mutex::new(Vec::new());
+static LISTAS: Mutex<Vec<Lista>> = Mutex::new(Vec::new());
+static ACTIVAS: Mutex<Vec<InstanciaActiva>> = Mutex::new(Vec::new());
+static PREGUNTA_PENDIENTE: Mutex<Option<usize>> = Mutex::new(None);
 
 pub fn escribir_cache(remapeos: Vec<RemapeoCache>) {
-    *obtener_cache().lock().unwrap() = remapeos;
+    *CACHE.lock().unwrap() = remapeos;
 }
-
-// ======================================================
-// ✍️ ESCRIBIR FILA
-// ======================================================
 
 pub fn escribir_fila(remapeo: RemapeoCache) {
-    obtener_cache().lock().unwrap().push(remapeo);
+    CACHE.lock().unwrap().push(remapeo);
 }
-
-// ======================================================
-// 🗑️ BORRAR CACHE
-// ======================================================
 
 pub fn borrar_cache() {
-    obtener_cache().lock().unwrap().clear();
+    CACHE.lock().unwrap().clear();
 }
-
-// ======================================================
-// 🗑️ BORRAR FILA
-// ======================================================
 
 pub fn borrar_fila(id: &str) {
-    obtener_cache()
-        .lock()
-        .unwrap()
-        .retain(|remapeo| remapeo.id != id);
+    CACHE.lock().unwrap().retain(|r| r.id != id);
 }
 
-// ======================================================
-// 🖥️ ACTUALIZAR ESTADO APP
-// ======================================================
-
 pub fn actualizar_estado_app(app: AppCache, activa: bool) {
-    let mut apps = obtener_apps().lock().unwrap();
-
-    if let Some(existente) = apps.iter_mut().find(|estado| estado.app == app) {
-        existente.activa = activa;
+    let mut apps = APPS.lock().unwrap();
+    if let Some(e) = apps.iter_mut().find(|e| e.app == app) {
+        e.activa = activa;
     } else {
         apps.push(AppEstadoCache { app, activa });
     }
 }
 
-// ======================================================
-// 🖥️ APP HABILITADA
-// ======================================================
-
 fn app_habilitada(app: &AppCache, apps: &[AppEstadoCache]) -> bool {
-    match apps.iter().find(|estado| estado.app == *app) {
-        Some(estado) => estado.activa,
-
-        None => true,
-    }
+    apps.iter()
+        .find(|e| &e.app == app)
+        .map(|e| e.activa)
+        .unwrap_or(true)
 }
 
-// ======================================================
-// 🟢 REVISAR FINALIZACIÓN
-// ======================================================
-
-fn revisar_finalizacion(entrada: &[InputId]) {
-    let mut activa = obtener_activa().lock().unwrap();
-
-    let Some(instancia) = activa.as_ref() else {
-        return;
-    };
-
-    let sigue_completa = instancia
-        .entrada
-        .iter()
-        .all(|input| entrada.contains(input));
-
-    if sigue_completa {
-        return;
-    }
-
-    let id = instancia.id.clone();
-
-    *activa = None;
-
-    drop(activa);
-
-    crate::runtime::ejecutar(OrdenRuntime::Detener { id });
-}
-
-// ======================================================
-// 🟢 INICIAR INSTANCIA
-// ======================================================
-
-fn iniciar_instancia(remapeo: RemapeoCache, entrada: &[InputId]) {
-    *obtener_activa().lock().unwrap() = Some(InstanciaActiva {
-        id: remapeo.id.clone(),
-
-        entrada: entrada.to_vec(),
-    });
-
-    crate::runtime::ejecutar(OrdenRuntime::Iniciar {
-        id: remapeo.id,
-
-        accion: remapeo.accion,
-
-        extra: remapeo.extra,
-    });
-}
-
-// ======================================================
-// 🔎 RESOLVER ENTRADA
-// ======================================================
-
-pub fn resolver_entrada(
-    entrada: &[InputId],
-
-    condicion: Option<CondicionTrigger>,
-) -> ResolucionEntrada {
-    revisar_finalizacion(entrada);
-
-    if entrada.is_empty() {
-        return ResolucionEntrada::Pasar;
-    }
-
-    let cache = obtener_cache().lock().unwrap();
-
-    let apps = obtener_apps().lock().unwrap();
+/// Cuenta posibles/exactas de `entrada` contra la cache. exactas ignora
+/// la condición de la fila (eso se filtra aparte, según necesite).
+fn contar(entrada: &[InputId]) -> (usize, usize, Vec<RemapeoCache>) {
+    let cache = CACHE.lock().unwrap();
+    let apps = APPS.lock().unwrap();
 
     let mut posibles = 0;
-
-    let mut exactas = 0;
-
-    let mut candidato: Option<RemapeoCache> = None;
+    let mut candidatas = Vec::new();
 
     for fila in cache.iter() {
         if !app_habilitada(&fila.trigger.app, &apps) {
             continue;
         }
-
         if fila.trigger.entrada.starts_with(entrada) {
             posibles += 1;
         }
-
-        if fila.trigger.entrada.as_slice() != entrada {
-            continue;
-        }
-
-        if let Some(condicion_pedida) = &condicion {
-            if fila.trigger.condicion != *condicion_pedida {
-                continue;
-            }
-        }
-
-        exactas += 1;
-
-        if exactas == 1 {
-            candidato = Some(fila.clone());
-        } else {
-            candidato = None;
+        if fila.trigger.entrada.as_slice() == entrada {
+            candidatas.push(fila.clone());
         }
     }
 
-    drop(cache);
-
-    drop(apps);
-
-    if condicion.is_some() {
-        return match (exactas, candidato) {
-            (1, Some(remapeo)) => {
-                iniciar_instancia(remapeo, entrada);
-
-                ResolucionEntrada::Consumir
-            }
-
-            _ => ResolucionEntrada::Pasar,
-        };
-    }
-
-    if posibles == 0 {
-        return ResolucionEntrada::Pasar;
-    }
-
-    if posibles == exactas && exactas == 1 {
-        if let Some(remapeo) = candidato {
-            iniciar_instancia(remapeo, entrada);
-
-            return ResolucionEntrada::Consumir;
-        }
-    }
-
-    if posibles == exactas && exactas > 1 {
-        return ResolucionEntrada::AnalizarCondicion;
-    }
-
-    ResolucionEntrada::AnalizarCondicion
+    (posibles, candidatas.len(), candidatas)
 }
 
-// ======================================================
-// 🖥️ APPS A VIGILAR
-// ======================================================
+/// Nunca devuelve nada — avisa directo a entrada.rs (pasar / retener /
+/// consumir), igual que recibir_condicion(). Ningún componente pregunta,
+/// quien tiene la respuesta avisa.
+pub fn recibir_down(input: InputId) {
+    let mut listas = LISTAS.lock().unwrap();
 
-pub fn apps_a_vigilar() -> Vec<AppCache> {
-    let cache = obtener_cache().lock().unwrap();
-
-    let mut vistas = Vec::new();
-
-    for remapeo in cache.iter() {
-        if matches!(remapeo.app, AppCache::Global) {
-            continue;
-        }
-
-        if !vistas.contains(&remapeo.app) {
-            vistas.push(remapeo.app.clone());
+    // ¿Alguna lista existente acepta esto como continuación válida?
+    let mut indice = None;
+    for (i, lista) in listas.iter().enumerate() {
+        let mut probable = lista.entrada.clone();
+        probable.push(input.clone());
+        let (posibles, _, _) = contar(&probable);
+        if posibles > 0 {
+            indice = Some(i);
+            break;
         }
     }
 
-    vistas
+    let indice = match indice {
+        Some(i) => {
+            listas[i].entrada.push(input.clone());
+            i
+        }
+        None => {
+            listas.push(Lista {
+                entrada: vec![input.clone()],
+                esperando_condicion: false,
+            });
+            listas.len() - 1
+        }
+    };
+
+    let entrada_actual = listas[indice].entrada.clone();
+    drop(listas);
+
+    let (posibles, exactas, candidatas) = contar(&entrada_actual);
+
+    if posibles == 0 {
+        limpiar_lista(indice);
+        analizador_trigger::limpiar();
+        entrada::pasar();
+        return;
+    }
+
+    if posibles == exactas
+        && exactas == 1
+        && candidatas[0].trigger.condicion == CondicionTrigger::Simple
+    {
+        iniciar_y_finalizar(candidatas[0].clone());
+        limpiar_lista(indice);
+        reiniciar_desde_presionados();
+        entrada::consumir();
+        return;
+    }
+
+    if posibles == exactas && exactas >= 1 {
+        marcar_esperando_condicion(indice);
+        let gatillo = entrada_actual.last().cloned().unwrap();
+        analizador_trigger::iniciar_timer(gatillo);
+        entrada::retener();
+        return;
+    }
+
+    entrada::retener();
+}
+
+/// Llamada por el timer del analizador (hilo aparte). No hay nadie
+/// esperando un valor de retorno: avisa directo a quien corresponda.
+pub fn recibir_condicion(condicion: CondicionTrigger) {
+    let indice = match *PREGUNTA_PENDIENTE.lock().unwrap() {
+        Some(i) => i,
+        None => return,
+    };
+
+    let entrada_actual = {
+        let listas = LISTAS.lock().unwrap();
+        match listas.get(indice) {
+            Some(l) => l.entrada.clone(),
+            None => return,
+        }
+    };
+
+    let (posibles, exactas, candidatas) = contar(&entrada_actual);
+    let match_final = candidatas
+        .into_iter()
+        .find(|c| c.trigger.condicion == condicion);
+
+    match match_final {
+        Some(remapeo) if posibles == exactas => {
+            if condicion == CondicionTrigger::Mantenido {
+                iniciar_solamente(remapeo, entrada_actual);
+            } else {
+                iniciar_y_finalizar(remapeo);
+            }
+            limpiar_lista(indice);
+            reiniciar_desde_presionados();
+            entrada::consumir();
+        }
+        _ => {
+            limpiar_lista(indice);
+            analizador_trigger::limpiar();
+            entrada::pasar();
+        }
+    }
+}
+
+/// Solo llega mientras hay una instancia Mantenido activa esperando su
+/// Up (ver analizador_trigger.rs, reenviando_ups).
+pub fn recibir_up(input: InputId) {
+    let mut activas = ACTIVAS.lock().unwrap();
+    let Some(pos) = activas.iter().position(|a| a.entrada.contains(&input)) else {
+        return;
+    };
+
+    let instancia = activas.remove(pos);
+    drop(activas);
+
+    runtime::ejecutar(runtime::OrdenRuntime::Detener { id: instancia.id });
+    analizador_trigger::limpiar();
+    reiniciar_desde_presionados();
+}
+
+fn iniciar_y_finalizar(remapeo: RemapeoCache) {
+    runtime::ejecutar(runtime::OrdenRuntime::Iniciar {
+        id: remapeo.id.clone(),
+        accion: remapeo.accion,
+        extra: remapeo.extra,
+    });
+    runtime::ejecutar(runtime::OrdenRuntime::Detener { id: remapeo.id });
+}
+
+fn iniciar_solamente(remapeo: RemapeoCache, entrada: Vec<InputId>) {
+    ACTIVAS.lock().unwrap().push(InstanciaActiva {
+        id: remapeo.id.clone(),
+        entrada,
+    });
+    runtime::ejecutar(runtime::OrdenRuntime::Iniciar {
+        id: remapeo.id,
+        accion: remapeo.accion,
+        extra: remapeo.extra,
+    });
+}
+
+fn marcar_esperando_condicion(indice: usize) {
+    if let Some(l) = LISTAS.lock().unwrap().get_mut(indice) {
+        l.esperando_condicion = true;
+    }
+    *PREGUNTA_PENDIENTE.lock().unwrap() = Some(indice);
+}
+
+fn limpiar_lista(indice: usize) {
+    let mut listas = LISTAS.lock().unwrap();
+    if indice < listas.len() {
+        listas.remove(indice);
+    }
+    let mut pregunta = PREGUNTA_PENDIENTE.lock().unwrap();
+    if *pregunta == Some(indice) {
+        *pregunta = None;
+    }
+}
+
+/// Hereda lo que sigue físicamente presionado (soporta Ctrl+C -> Ctrl+V).
+fn reiniciar_desde_presionados() {
+    let presionados = analizador_trigger::obtener_presionados();
+    if !presionados.is_empty() {
+        LISTAS.lock().unwrap().push(Lista {
+            entrada: presionados,
+            esperando_condicion: false,
+        });
+    }
 }

@@ -130,68 +130,14 @@
 
 use crate::back_app;
 use crate::captura;
+use crate::config;
 use crate::perfil;
 use crate::perfil_json::perfil_json;
-use crate::perfil_ui::{
-    EntradaCapturaUI, EstadoCachePerfil, IconoJson, ProcesoIconoJson, ResultadoPerfil,
-    TriggerCapturaUI,
-};
+use crate::perfil_ui::{EntradaCapturaUI, ResultadoPerfil, TriggerCapturaUI};
 
 use base64::engine::general_purpose::STANDARD as BASE64;
 use base64::Engine as _;
-
-use serde::{Deserialize, Serialize};
-
-// ======================================================
-// 🧩 MODELOS UI
-// ======================================================
-
-#[derive(Deserialize)]
-pub struct AppUI {
-    pub programa: Option<String>,
-
-    #[serde(rename = "segundoPlano")]
-    pub segundo_plano: bool,
-}
-
-#[derive(Deserialize)]
-pub struct FilaUI {
-    pub id: String,
-
-    pub estado: String,
-
-    pub app: AppUI,
-
-    pub trigger: TriggerUI,
-
-    pub tipo: String,
-
-    pub accion: Option<TriggerUI>,
-
-    pub extra: String,
-
-    pub condicion: String,
-
-    pub color: String,
-
-    pub nota: String,
-}
-
-#[derive(Deserialize)]
-pub struct TriggerUI {
-    pub modificadores: Vec<EntradaUI>,
-
-    pub gatillo: Option<EntradaUI>,
-
-    pub condicion: String,
-}
-
-#[derive(Deserialize)]
-pub struct EntradaUI {
-    pub tipo: String,
-
-    pub codigo: String,
-}
+use serde::Serialize;
 
 // ======================================================
 // 🎹 COMANDOS PERFIL
@@ -252,6 +198,30 @@ pub fn eliminar_perfil_actual() -> Result<ResultadoPerfil, String> {
     perfil::eliminar_perfil_actual()
 }
 
+#[tauri::command]
+pub fn compilar_perfil(filas: Vec<FilaUI>) -> Result<bool, String> {
+    let perfil = convertir_perfil(filas);
+
+    perfil::guardar_perfil(perfil)
+}
+
+#[tauri::command]
+pub fn clonar_perfil(filas: Vec<FilaUI>) -> Result<ResultadoPerfil, String> {
+    let perfil = convertir_perfil(filas);
+
+    perfil::clonar_perfil(perfil)
+}
+
+#[tauri::command]
+pub fn obtener_tiempo_doble() -> u64 {
+    config::tiempo_doble()
+}
+
+#[tauri::command]
+pub fn establecer_tiempo_doble(valor: u64) {
+    config::establecer_tiempo_doble(valor)
+}
+
 // ======================================================
 // 🎹 CAPTURA
 // ======================================================
@@ -310,6 +280,26 @@ fn convertir_input_captura(input: &crate::eventos::InputId) -> EntradaCapturaUI 
 
         nombre,
     }
+}
+
+// ======================================================
+// 🖼️ MODELOS DE ÍCONO
+// ======================================================
+
+#[derive(Serialize)]
+pub struct IconoJson {
+    pub ancho: u32,
+
+    pub alto: u32,
+
+    pub pixeles: String,
+}
+
+#[derive(Serialize)]
+pub struct ProcesoIconoJson {
+    pub nombre: String,
+
+    pub icono: Option<IconoJson>,
 }
 
 // ======================================================

@@ -45,7 +45,6 @@ pub fn run() {
             comandos::iniciar_captura,
             comandos::obtener_captura,
             comandos::obtener_perfil_actual,
-            comandos::obtener_estados_cache_perfiles,
             comandos::obtener_perfiles,
             comandos::obtener_nombre_perfil_actual,
             comandos::obtener_estado_cache,

@@ -168,7 +168,7 @@ pub fn enumerar_procesos_ventana() -> Vec<ProcesoVentana> {
 pub fn obtener_programa_activo() -> Option<String> {
     let ventana = unsafe { GetForegroundWindow() };
 
-    if ventana == 0 {
+    if ventana.is_null() {
         return None;
     }
 
@@ -206,7 +206,7 @@ fn es_proceso_windows(ruta: &str) -> bool {
 unsafe fn obtener_ruta_proceso(pid: u32) -> Option<String> {
     let handle = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, 0, pid);
 
-    if handle == 0 {
+    if handle.is_null() {
         return None;
     }
 
@@ -233,9 +233,9 @@ pub fn extraer_icono(ruta: &str) -> Option<IconoRaw> {
     unsafe {
         let ruta_ancha: Vec<u16> = ruta.encode_utf16().chain(std::iter::once(0)).collect();
 
-        let mut icono_grande: isize = 0;
+        let mut icono_grande: *mut std::ffi::c_void = std::ptr::null_mut();
 
-        let mut icono_pequeno: isize = 0;
+        let mut icono_pequeno: *mut std::ffi::c_void = std::ptr::null_mut();
 
         let extraidos = ExtractIconExW(
             ruta_ancha.as_ptr(),
@@ -249,8 +249,8 @@ pub fn extraer_icono(ruta: &str) -> Option<IconoRaw> {
             return None;
         }
 
-        if icono_pequeno == 0 {
-            if icono_grande != 0 {
+        if icono_pequeno.is_null() {
+            if !icono_grande.is_null() {
                 DestroyIcon(icono_grande);
             }
 
@@ -264,7 +264,7 @@ pub fn extraer_icono(ruta: &str) -> Option<IconoRaw> {
         if GetIconInfo(hicon, &mut icon_info) == 0 {
             DestroyIcon(hicon);
 
-            if icono_grande != 0 {
+            if !icono_grande.is_null() {
                 DestroyIcon(icono_grande);
             }
 
@@ -275,12 +275,12 @@ pub fn extraer_icono(ruta: &str) -> Option<IconoRaw> {
 
         let hbm_mask = icon_info.hbmMask;
 
-        if hbm_color == 0 {
+        if hbm_color.is_null() {
             DeleteObject(hbm_mask);
 
             DestroyIcon(hicon);
 
-            if icono_grande != 0 {
+            if !icono_grande.is_null() {
                 DestroyIcon(icono_grande);
             }
 
@@ -304,7 +304,7 @@ pub fn extraer_icono(ruta: &str) -> Option<IconoRaw> {
 
             DestroyIcon(hicon);
 
-            if icono_grande != 0 {
+            if !icono_grande.is_null() {
                 DestroyIcon(icono_grande);
             }
 
@@ -322,23 +322,23 @@ pub fn extraer_icono(ruta: &str) -> Option<IconoRaw> {
 
             DestroyIcon(hicon);
 
-            if icono_grande != 0 {
+            if !icono_grande.is_null() {
                 DestroyIcon(icono_grande);
             }
 
             return None;
         }
 
-        let hdc = CreateCompatibleDC(0);
+        let hdc = CreateCompatibleDC(std::ptr::null_mut());
 
-        if hdc == 0 {
+        if hdc.is_null() {
             DeleteObject(hbm_color);
 
             DeleteObject(hbm_mask);
 
             DestroyIcon(hicon);
 
-            if icono_grande != 0 {
+            if !icono_grande.is_null() {
                 DestroyIcon(icono_grande);
             }
 
@@ -379,7 +379,7 @@ pub fn extraer_icono(ruta: &str) -> Option<IconoRaw> {
 
         DestroyIcon(hicon);
 
-        if icono_grande != 0 {
+        if !icono_grande.is_null() {
             DestroyIcon(icono_grande);
         }
 
@@ -411,7 +411,8 @@ pub fn extraer_icono(ruta: &str) -> Option<IconoRaw> {
 // 👁️ MONITOR DE APPS (foco)
 // ======================================================
 
-use crate::cache::{self, AppCache};
+use crate::cache;
+use crate::perfil_cache::AppCache;
 use windows_sys::Win32::Foundation::HWND;
 use windows_sys::Win32::UI::Accessibility::{SetWinEventHook, HWINEVENTHOOK};
 use windows_sys::Win32::UI::WindowsAndMessaging::{
@@ -424,14 +425,14 @@ pub fn iniciar_monitor() {
         let hook = SetWinEventHook(
             EVENT_SYSTEM_FOREGROUND,
             EVENT_SYSTEM_FOREGROUND,
-            0,
+            std::ptr::null_mut(),
             Some(en_cambio_foco),
             0,
             0,
             WINEVENT_OUTOFCONTEXT,
         );
 
-        if hook == 0 {
+        if hook.is_null() {
             println!("⚠️ No se pudo instalar el monitor de apps.");
 
             return;
@@ -439,7 +440,7 @@ pub fn iniciar_monitor() {
 
         let mut mensaje: MSG = std::mem::zeroed();
 
-        while GetMessageW(&mut mensaje, 0, 0, 0) > 0 {
+        while GetMessageW(&mut mensaje, std::ptr::null_mut(), 0, 0) > 0 {
             TranslateMessage(&mensaje);
             DispatchMessageW(&mensaje);
         }
@@ -482,7 +483,7 @@ pub fn revisar_apps() {
             activo.as_deref() == Some(nombre.as_str())
         };
 
-        cache::actualizar_estado_app(&app, activa);
+        cache::actualizar_estado_app(app, activa);
     }
 }
 

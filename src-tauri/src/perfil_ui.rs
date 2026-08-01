@@ -25,6 +25,13 @@
 // - Modifica cache.
 // - Ejecuta acciones.
 //
+// EXCEPCIÓN: sí guarda el estado transitorio de una
+// captura en curso (CapturaEnCurso / RESULTADO_CAPTURA) —
+// es el destino de AnalizadorTrigger en modo Captura. No
+// toca el perfil guardado ni la cache; solo arma el
+// TriggerCapturaUI final y lo deja listo para que la UI
+// lo retire.
+//
 // ======================================================
 //
 // Estructuras:
@@ -80,6 +87,21 @@
 //
 // convertir_trigger_captura()
 //     Convierte trigger capturado.
+//
+// iniciar_captura()
+//     Abre una captura nueva: fila/columna destino, secuencia vacía.
+//
+// recibir_down()
+//     Agrega un Down a la secuencia en curso (llamada por
+//     AnalizadorTrigger, modo Captura).
+//
+// recibir_condicion()
+//     Arma el TriggerCapturaUI final con la condición recibida
+//     y cierra la captura (llamada por AnalizadorTrigger).
+//
+// obtener_captura()
+//     La UI la consulta (polling) para retirar el resultado
+//     cuando ya esté listo.
 // ======================================================
 
 use serde::{Deserialize, Serialize};
@@ -329,16 +351,79 @@ pub fn convertir_input_captura(input: &crate::eventos::InputId) -> EntradaCaptur
 // 🔄 EVENTOTRIGGER → UI
 // ======================================================
 
-pub fn convertir_trigger_captura(trigger: crate::captura::EventoTrigger) -> TriggerCapturaUI {
+pub fn convertir_trigger_captura(
+    modificadores: Vec<crate::eventos::InputId>,
+    gatillo: crate::eventos::InputId,
+    condicion: crate::perfil_cache::CondicionTrigger,
+) -> TriggerCapturaUI {
     TriggerCapturaUI {
-        modificadores: trigger
-            .modificadores
-            .iter()
-            .map(convertir_input_captura)
-            .collect(),
+        modificadores: modificadores.iter().map(convertir_input_captura).collect(),
 
-        gatillo: Some(convertir_input_captura(&trigger.gatillo)),
+        gatillo: Some(convertir_input_captura(&gatillo)),
 
-        condicion: format!("{:?}", trigger.condicion),
+        condicion: format!("{:?}", condicion),
     }
+}
+
+// ======================================================
+// 🎬 ESTADO DE CAPTURA (modo Captura de AnalizadorTrigger)
+// ------------------------------------------------------
+// Único estado con vida propia de este archivo: mientras
+// dura una captura, guarda la secuencia de Down que van
+// llegando y a qué fila/columna del perfil corresponden.
+// Se cierra solo al recibir la condición final.
+// ======================================================
+
+struct CapturaEnCurso {
+    fila_id: String,
+    columna: String,
+    secuencia: Vec<crate::eventos::InputId>,
+}
+
+static CAPTURA: std::sync::Mutex<Option<CapturaEnCurso>> = std::sync::Mutex::new(None);
+static RESULTADO_CAPTURA: std::sync::Mutex<Option<(String, String, TriggerCapturaUI)>> =
+    std::sync::Mutex::new(None);
+
+/// Llamada por el botón de captura, antes de arrancar el analizador en
+/// modo Captura.
+pub fn iniciar_captura(fila_id: String, columna: String) {
+    *CAPTURA.lock().unwrap() = Some(CapturaEnCurso {
+        fila_id,
+        columna,
+        secuencia: Vec::new(),
+    });
+    *RESULTADO_CAPTURA.lock().unwrap() = None;
+}
+
+/// Llamada por AnalizadorTrigger (modo Captura) con cada Down nuevo.
+pub fn recibir_down(input: crate::eventos::InputId) {
+    if let Some(captura) = CAPTURA.lock().unwrap().as_mut() {
+        captura.secuencia.push(input);
+    }
+}
+
+/// Llamada por AnalizadorTrigger (modo Captura) al terminar el gesto.
+/// Arma el TriggerCapturaUI final y lo deja listo para que la UI lo
+/// retire (ver obtener_captura). Cierra la captura.
+pub fn recibir_condicion(condicion: crate::perfil_cache::CondicionTrigger) {
+    let Some(captura) = CAPTURA.lock().unwrap().take() else {
+        return;
+    };
+
+    let Some((modificadores, gatillo)) = captura
+        .secuencia
+        .split_last()
+        .map(|(g, m)| (m.to_vec(), g.clone()))
+    else {
+        return;
+    };
+
+    let trigger = convertir_trigger_captura(modificadores, gatillo, condicion);
+
+    *RESULTADO_CAPTURA.lock().unwrap() = Some((captura.fila_id, captura.columna, trigger));
+}
+
+/// La UI lo consulta (polling) para saber si ya hay un resultado listo.
+pub fn obtener_captura() -> Option<(String, String, TriggerCapturaUI)> {
+    RESULTADO_CAPTURA.lock().unwrap().take()
 }
