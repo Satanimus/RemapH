@@ -203,6 +203,25 @@ fn app_habilitada(app: &AppCache, apps: &[AppEstadoCache]) -> bool {
         .unwrap_or(true)
 }
 
+/// Apps distintas (sin contar Global) que aparecen en algún remapeo
+/// cargado — es lo que back_app::revisar_apps() necesita para saber
+/// qué vigilar.
+pub fn apps_a_vigilar() -> Vec<AppCache> {
+    let cache = CACHE.lock().unwrap();
+    let mut vistas = Vec::new();
+
+    for fila in cache.iter() {
+        if fila.trigger.app == AppCache::Global {
+            continue;
+        }
+        if !vistas.contains(&fila.trigger.app) {
+            vistas.push(fila.trigger.app.clone());
+        }
+    }
+
+    vistas
+}
+
 /// Cuenta posibles/exactas de `entrada` contra la cache. exactas ignora
 /// la condición de la fila (eso se filtra aparte, según necesite).
 fn contar(entrada: &[InputId]) -> (usize, usize, Vec<RemapeoCache>) {
