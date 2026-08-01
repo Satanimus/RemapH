@@ -121,7 +121,8 @@ use crate::perfil_json::{perfil_json, AppJson, RemapeoJson};
 pub fn compilar(perfil: &perfil_json) {
     let remapeos = compilar_perfil(perfil);
 
-    cache::reemplazar(remapeos);
+    cache::borrar_cache();
+    cache::escribir_cache(remapeos);
 
     crate::back_app::revisar_apps();
 }

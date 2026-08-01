@@ -159,6 +159,19 @@ struct InstanciaActiva {
     entrada: Vec<InputId>,
 }
 
+/// Orden que Cache le manda a Runtime para iniciar o detener la
+/// ejecución de una acción.
+pub enum OrdenRuntime {
+    Iniciar {
+        id: String,
+        accion: AccionCache,
+        extra: Option<ExtraCache>,
+    },
+    Detener {
+        id: String,
+    },
+}
+
 #[derive(Clone, PartialEq)]
 pub struct AppEstadoCache {
     pub app: AppCache,

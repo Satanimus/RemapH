@@ -129,11 +129,10 @@
 // ======================================================
 
 use crate::back_app;
-use crate::captura;
 use crate::config;
 use crate::perfil;
 use crate::perfil_json::perfil_json;
-use crate::perfil_ui::{EntradaCapturaUI, ResultadoPerfil, TriggerCapturaUI};
+use crate::perfil_ui::{convertir_perfil, FilaUI, ResultadoPerfil, TriggerCapturaUI};
 
 use base64::engine::general_purpose::STANDARD as BASE64;
 use base64::Engine as _;
@@ -227,59 +226,15 @@ pub fn establecer_tiempo_doble(valor: u64) {
 // ======================================================
 
 #[tauri::command]
-pub fn iniciar_captura() {
-    captura::iniciar();
+pub fn iniciar_captura(fila_id: String, columna: String) {
+    crate::perfil_ui::iniciar_captura(fila_id, columna);
 
     println!("🎹 Captura iniciada");
 }
 
 #[tauri::command]
-pub fn obtener_captura() -> Option<TriggerCapturaUI> {
-    captura::obtener().map(convertir_trigger_captura)
-}
-
-// ======================================================
-// 🔄 CONVERTIR CAPTURA → UI
-// ======================================================
-
-fn convertir_trigger_captura(trigger: crate::eventos::EventoTrigger) -> TriggerCapturaUI {
-    TriggerCapturaUI {
-        modificadores: trigger
-            .modificadores
-            .iter()
-            .map(convertir_input_captura)
-            .collect(),
-
-        gatillo: Some(convertir_input_captura(&trigger.gatillo)),
-
-        condicion: format!("{:?}", trigger.condicion),
-    }
-}
-
-fn convertir_input_captura(input: &crate::eventos::InputId) -> EntradaCapturaUI {
-    let fuente = match input.fuente().unwrap_or("") {
-        "keyboard" => "Teclado",
-
-        "mouse" => "Mouse",
-
-        "multimedia" => "Multimedia",
-
-        "joystick" => "Joystick",
-
-        _ => "Desconocido",
-    };
-
-    let codigo = input.control().unwrap_or("").to_string();
-
-    let nombre = crate::pulsadores::ui_desde_interno(&codigo);
-
-    EntradaCapturaUI {
-        tipo: fuente.to_string(),
-
-        codigo,
-
-        nombre,
-    }
+pub fn obtener_captura() -> Option<(String, String, TriggerCapturaUI)> {
+    crate::perfil_ui::obtener_captura()
 }
 
 // ======================================================

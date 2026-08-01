@@ -34,7 +34,9 @@ mod usuario;
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 
 pub fn run() {
-    entrada::iniciar();
+    std::thread::spawn(|| {
+        back_interception::iniciar(entrada::procesar_evento);
+    });
     back_app::iniciar_monitor();
     tauri::Builder::default()
         .device_event_filter(tauri::DeviceEventFilter::Always)
