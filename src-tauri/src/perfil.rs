@@ -118,7 +118,7 @@ pub fn activar_perfil() -> Result<bool, String> {
 // ======================================================
 
 pub fn desactivar_perfil() {
-    cache::borrar();
+    cache::borrar_cache();
 }
 
 // ======================================================
@@ -212,7 +212,7 @@ pub fn clonar_perfil(perfil: perfil_json) -> Result<ResultadoPerfil, String> {
 
     let nombre = siguiente_nombre(&nombre_actual)?;
 
-    cache::borrar();
+    cache::borrar_cache();
 
     let ruta = usuario::ruta_perfil(&nombre)?;
 
@@ -246,7 +246,7 @@ pub fn renombrar_perfil(nuevo_nombre: String) -> Result<ResultadoPerfil, String>
 
     let nueva_ruta = usuario::ruta_perfil(&nuevo_nombre)?;
 
-    cache::borrar();
+    cache::borrar_cache();
 
     fs::rename(&ruta_actual, &nueva_ruta).map_err(|error| error.to_string())?;
 
@@ -264,7 +264,7 @@ pub fn renombrar_perfil(nuevo_nombre: String) -> Result<ResultadoPerfil, String>
 pub fn eliminar_perfil_actual() -> Result<ResultadoPerfil, String> {
     let ruta_actual = usuario::perfil_actual()?;
 
-    cache::borrar();
+    cache::borrar_cache();
 
     if ruta_actual.exists() {
         fs::remove_file(ruta_actual).map_err(|error| error.to_string())?;
@@ -278,7 +278,7 @@ pub fn eliminar_perfil_actual() -> Result<ResultadoPerfil, String> {
 // ======================================================
 
 pub fn crear_perfil_nuevo() -> Result<ResultadoPerfil, String> {
-    cache::borrar();
+    cache::borrar_cache();
 
     let nombre = siguiente_nombre("Default")?;
 
@@ -302,7 +302,7 @@ pub fn seleccionar_perfil(nombre: String) -> Result<ResultadoPerfil, String> {
         return Err("El perfil seleccionado no existe".into());
     }
 
-    cache::borrar();
+    cache::borrar_cache();
 
     let perfil = cargar_desde_disco(&ruta)?;
 

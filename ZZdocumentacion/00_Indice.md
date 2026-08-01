@@ -32,7 +32,7 @@ Toda decisión arquitectónica importante debe quedar documentada en alguno de l
 
 # 🎯 1. Objetivos del proyecto
 
-RemapH V3 es un remapeador de dispositivos de entrada para Windows.
+RemapH es un remapeador de dispositivos de entrada para Windows.
 
 Su objetivo es traducir entradas físicas en acciones configurables por el usuario mediante una arquitectura modular.
 

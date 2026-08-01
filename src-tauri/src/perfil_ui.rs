@@ -76,6 +76,9 @@
 // convertir_trigger()
 //     Convierte trigger UI.
 //
+// convertir_condicion()
+//     Convierte condición UI (String) a CondicionTrigger.
+//
 // convertir_entrada()
 //     Convierte entrada UI.
 //
@@ -137,8 +140,6 @@ pub struct FilaUI {
     pub tipo: String,
 
     pub accion: Option<TriggerUI>,
-
-    pub condicion: String,
 
     pub extra: String,
 
@@ -249,9 +250,13 @@ fn convertir_fila(fila: FilaUI) -> RemapeoJson {
 
         tipo: fila.tipo,
 
-        accion: fila.accion.map(convertir_trigger),
+        // FilaUI todavía no tiene un campo para la referencia
+        // (macro/archivo/ui) — la UI hoy solo arma accion como
+        // TriggerUI (teclado/mouse). Queda en None hasta que se
+        // conecte esa parte de la UI.
+        accion_trigger: fila.accion.map(convertir_trigger),
 
-        condicion: fila.condicion,
+        accion_referencia: None,
 
         extra: fila.extra,
 
@@ -287,7 +292,23 @@ fn convertir_trigger(trigger: TriggerUI) -> TriggerJson {
 
         gatillo: trigger.gatillo.map(convertir_entrada),
 
-        condicion: trigger.condicion,
+        condicion: convertir_condicion(&trigger.condicion),
+    }
+}
+
+// ======================================================
+// 🎯 CONVERTIR CONDICIÓN
+// ======================================================
+
+fn convertir_condicion(condicion: &str) -> crate::perfil_cache::CondicionTrigger {
+    match condicion {
+        "Simple" => crate::perfil_cache::CondicionTrigger::Simple,
+
+        "Doble" => crate::perfil_cache::CondicionTrigger::Doble,
+
+        "Mantenido" => crate::perfil_cache::CondicionTrigger::Mantenido,
+
+        _ => panic!("Condición no soportada: {}", condicion),
     }
 }
 

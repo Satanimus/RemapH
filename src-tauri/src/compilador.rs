@@ -102,8 +102,13 @@
 // convertir_input()
 //     Convierte Input → InputId.
 //
+// convertir_entrada()
+//     Aplana modificadores + gatillo de un TriggerJson
+//     en un solo Vec<InputId>.
+//
 // convertir_accion()
-//     Convierte RespuestaJson → AccionCache.
+//     Resuelve accion_trigger/accion_referencia según
+//     tipo → AccionCache.
 // ------------------------------------------------------
 
 use crate::cache;
@@ -152,21 +157,16 @@ fn compilar_remapeo(remapeo: &RemapeoJson) -> Option<RemapeoCache> {
         id: remapeo.id.clone(),
 
         trigger: TriggerCache {
-            app: convertir_app(&remapeo.trigger.app),
+            app: convertir_app(&remapeo.app),
 
-            entrada: remapeo
-                .trigger
-                .entrada
-                .iter()
-                .map(convertir_input)
-                .collect(),
+            entrada: convertir_entrada(&remapeo.trigger),
 
             condicion: remapeo.trigger.condicion.clone(),
         },
 
-        accion: convertir_accion(&remapeo.respuesta),
+        accion: convertir_accion(remapeo),
 
-        extra: convertir_extra(&remapeo.respuesta.extra),
+        extra: convertir_extra(&remapeo.extra),
     })
 }
 
@@ -195,25 +195,72 @@ fn convertir_input(input: &crate::perfil_json::Input) -> InputId {
 }
 
 // ======================================================
-// ⚡ CONVERTIR ACCIÓN
+// ⌨️ CONVERTIR ENTRADA (aplanar trigger)
+// ------------------------------------------------------
+// modificadores + gatillo, en ese orden, a un solo
+// Vec<InputId> — es lo único que Cache necesita para
+// comparar (no distingue modificador de gatillo).
 // ======================================================
 
-fn convertir_accion(respuesta: &crate::perfil_json::RespuestaJson) -> AccionCache {
-    match respuesta.tipo.as_str() {
-        "teclado" => AccionCache::Emitir(InputId::new("keyboard", &respuesta.accion)),
+fn convertir_entrada(trigger: &crate::perfil_json::TriggerJson) -> Vec<InputId> {
+    trigger
+        .modificadores
+        .iter()
+        .map(convertir_input)
+        .chain(trigger.gatillo.iter().map(convertir_input))
+        .collect()
+}
 
-        "mouse" => AccionCache::Emitir(InputId::new("mouse", &respuesta.accion)),
+// ======================================================
+// ⚡ CONVERTIR ACCIÓN
+// ------------------------------------------------------
+// accion_trigger / accion_referencia es una caja cuyo
+// contenido depende de tipo: para teclado/mouse se usa
+// solo el gatillo del accion_trigger (Emitir es un único
+// control, sin modificadores ni condición). Para
+// macro/archivo/ui se usa accion_referencia tal cual.
+// ======================================================
 
-        "macro" => AccionCache::Macro(respuesta.accion.clone()),
+fn convertir_accion(remapeo: &RemapeoJson) -> AccionCache {
+    match remapeo.tipo.as_str() {
+        "teclado" | "mouse" => {
+            let gatillo = remapeo
+                .accion_trigger
+                .as_ref()
+                .and_then(|trigger| trigger.gatillo.as_ref())
+                .unwrap_or_else(|| {
+                    panic!(
+                        "Remapeo '{}': tipo '{}' sin gatillo en accion_trigger",
+                        remapeo.id, remapeo.tipo
+                    )
+                });
 
-        "archivo" => AccionCache::AbrirArchivo(respuesta.accion.clone()),
+            AccionCache::Emitir(convertir_input(gatillo))
+        }
 
-        "ui" => AccionCache::Ui(respuesta.accion.clone()),
+        "macro" => AccionCache::Macro(referencia(remapeo)),
+
+        "archivo" => AccionCache::AbrirArchivo(referencia(remapeo)),
+
+        "ui" => AccionCache::Ui(referencia(remapeo)),
 
         _ => {
-            panic!("Acción no soportada: {}", respuesta.tipo);
+            panic!("Acción no soportada: {}", remapeo.tipo);
         }
     }
+}
+
+// ======================================================
+// 📎 REFERENCIA (accion_referencia obligatoria)
+// ======================================================
+
+fn referencia(remapeo: &RemapeoJson) -> String {
+    remapeo.accion_referencia.clone().unwrap_or_else(|| {
+        panic!(
+            "Remapeo '{}': tipo '{}' sin accion_referencia",
+            remapeo.id, remapeo.tipo
+        )
+    })
 }
 
 // ======================================================

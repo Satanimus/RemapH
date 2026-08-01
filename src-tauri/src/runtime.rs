@@ -202,7 +202,8 @@ use std::time::Duration;
 // de ejecución consulta esto antes de cada REPETIR.
 // ======================================================
 
-static INSTANCIAS: Mutex<HashMap<String, bool>> = Mutex::new(HashMap::new());
+static INSTANCIAS: std::sync::LazyLock<Mutex<HashMap<String, bool>>> =
+    std::sync::LazyLock::new(|| Mutex::new(HashMap::new()));
 
 // ======================================================
 // 🚀 EJECUTAR ORDEN

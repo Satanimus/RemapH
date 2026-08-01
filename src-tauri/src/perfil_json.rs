@@ -32,14 +32,17 @@
 // Ejemplo:
 // RemapeoJson
 // {id: "001",
+//   app: firefox,
 //   trigger:
-//   { app: firefox,
-//      entrada: CTRL, A,
+//   { modificadores: [CTRL],
+//      gatillo: A,
 //      condicion: Doble},
-//   respuesta:
-//   { tipo: tecla_mouse,
-//      accion: B,
-//      ejecucion: Simple }}
+//   tipo: teclado,
+//   accion_trigger:
+//   { modificadores: [],
+//      gatillo: B,
+//      condicion: Simple},
+//   accion_referencia: null}
 // ------------------------------------------------------
 // 3. ¿Quién llama este archivo?
 // Recibe información desde:
@@ -63,18 +66,16 @@
 // RemapeoJson
 //     Representa una fila completa de la tabla UI.
 // TriggerJson
-//     Representa cómo se activa un remapeo.
+//     Representa cómo se activa un remapeo (o, reutilizada
+//     en accion_trigger, cómo se ejecuta una acción de
+//     tipo teclado/mouse). modificadores + gatillo + condicion.
 // Input
 //     Representa una entrada física (fuente + control)
-//     tal como se guarda dentro de TriggerJson.entrada.
+//     tal como se guarda dentro de TriggerJson.
 // Input::nuevo()
 //     Crea un Input a partir de fuente y control.
 // AppJson
 //     Representa el contexto donde existe el trigger.
-// RespuestaJson
-//     Representa qué debe ocurrir después del trigger.
-// AccionJson
-//     Representa los datos necesarios para ejecutar.
 // perfil_json::nuevo()
 //     Crea un perfil vacío.
 // ------------------------------------------------------
@@ -119,8 +120,16 @@ pub struct perfil_json {
 pub struct RemapeoJson {
     pub id: String,
     pub estado: String,
+    pub app: AppJson,
     pub trigger: TriggerJson,
-    pub respuesta: RespuestaJson,
+    pub tipo: String,
+    // Caja cuyo contenido depende de `tipo`:
+    // - "teclado" / "mouse" -> accion_trigger (mod + gatillo + condicion)
+    // - "macro" / "archivo" / "ui" -> accion_referencia (ruta / valor)
+    // Nunca los dos a la vez.
+    pub accion_trigger: Option<TriggerJson>,
+    pub accion_referencia: Option<String>,
+    pub extra: String,
     pub color: String,
     pub nota: String,
 }
@@ -131,24 +140,11 @@ pub struct RemapeoJson {
 
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct TriggerJson {
-    pub app: AppJson,
+    pub modificadores: Vec<Input>,
 
-    pub entrada: Vec<Input>,
+    pub gatillo: Option<Input>,
 
     pub condicion: CondicionTrigger,
-}
-
-// ======================================================
-// ⚡ RESPUESTA JSON
-// ======================================================
-
-#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
-pub struct RespuestaJson {
-    pub tipo: String,
-
-    pub accion: String,
-
-    pub extra: String,
 }
 
 // ======================================================

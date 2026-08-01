@@ -65,6 +65,8 @@ Otros (OK).
 Hay que verificar que nuestros trigger hagan algo asi y no interfieran con otros atajos de windows.
 ⬜ Comprobar si despues de un trigger aceptado, si te demoras un poco en soltar las teclas presionadas, los toma como una nueva entrada por error y hace falta un tiempo de enfriamiento.
 ⬜ Actualizar en fronted iniciar_captura/obtener_captura (se movió a perfil_ui.rs)
+⬜ En fronted verificar coneccion a boton accion a accion_referencia cuando tipo no sea tecla/mouse, sino un acceso directo a macro,ui, etc
+⬜
 
 📌 Pendientes V2
 ⬜ Elaborar un diccionario oficial de términos del proyecto para evitar ambigüedades futuras.

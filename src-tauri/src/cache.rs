@@ -127,6 +127,10 @@
 // escribir_cache() / escribir_fila() / borrar_cache() /
 // borrar_fila()
 //     Igual que antes, sin cambios de diseño.
+// esta_vacia()
+//     true si no quedó ningún remapeo compilado (perfil
+//     vacío o todo OFF). La consulta perfil.rs para
+//     informar cache_activo a la UI.
 // actualizar_estado_app() / app_habilitada()
 //     Igual que antes, sin cambios de diseño.
 // ------------------------------------------------------
@@ -194,6 +198,14 @@ pub fn escribir_fila(remapeo: RemapeoCache) {
 
 pub fn borrar_cache() {
     CACHE.lock().unwrap().clear();
+}
+
+/// true si el perfil compilado no dejó ningún remapeo activo (perfil
+/// vacío, o todas sus filas en estado != "ON"). Lo consulta perfil.rs
+/// justo después de compilar, para informarle a la UI si el perfil
+/// actual tiene algo funcionando o no (cache_activo).
+pub fn esta_vacia() -> bool {
+    CACHE.lock().unwrap().is_empty()
 }
 
 pub fn borrar_fila(id: &str) {
