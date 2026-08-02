@@ -66,6 +66,15 @@
 // sensibilidad_rueda()
 // establecer_sensibilidad_rueda()
 //     Cantidad de movimientos minimos necesarios para considerar una acción mantenida.
+//
+// tiempo_maximo_retenido()
+// establecer_tiempo_maximo_retenido()
+//     Red de seguridad de entrada.rs: si un RETENIDO lleva más de
+//     este tiempo sin resolverse (nunca debería pasar — indica un
+//     bug en cache.rs/analizador_trigger.rs), se fuerza a soltarlo
+//     en vez de dejar el teclado/mouse trabado para siempre. Un log
+//     de advertencia avisa por consola cuando esto se activa, para
+//     poder distinguir "activó la red de seguridad" de "otra cosa".
 // ------------------------------------------------------
 // Transformación:
 //
@@ -172,4 +181,25 @@ pub fn tiempo_repeticion() -> u64 {
 
 pub fn establecer_tiempo_repeticion(valor: u64) {
     TIEMPO_REPETICION.store(valor, Ordering::Relaxed);
+}
+
+// ======================================================
+// 🛟 TIEMPO MÁXIMO RETENIDO (red de seguridad)
+// ------------------------------------------------------
+// entrada.rs nunca debería necesitar esto — es un "por las dudas"
+// para que un RETENIDO jamás quede trabado para siempre por un bug
+// que todavía no vimos. Separado en su propia constante (no
+// reutiliza tiempo_mantenido/tiempo_doble) justo para poder
+// distinguir, si algún día se activa, si fue esta red de seguridad
+// la que actuó o si el problema es otro.
+// ======================================================
+
+static TIEMPO_MAXIMO_RETENIDO: AtomicU64 = AtomicU64::new(5000);
+
+pub fn tiempo_maximo_retenido() -> u64 {
+    TIEMPO_MAXIMO_RETENIDO.load(Ordering::Relaxed)
+}
+
+pub fn establecer_tiempo_maximo_retenido(valor: u64) {
+    TIEMPO_MAXIMO_RETENIDO.store(valor, Ordering::Relaxed);
 }

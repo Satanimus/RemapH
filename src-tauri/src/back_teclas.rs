@@ -11,6 +11,18 @@
 // no inventa nombres — solo sabe convertir ese nombre al
 // tipo ScanCode que pide la librería, y viceversa.
 //
+// OJO — el crate `interception` NO tiene una variante de
+// ScanCode propia para las teclas extendidas (flechas,
+// Inicio/Fin, Insert/Supr, RePág/AvPág, Ctrl/Alt derecho):
+// comparten el mismo código crudo que su par del teclado
+// numérico (Flecha izquierda = mismo código que NumPad4,
+// etc.) y la ÚNICA diferencia real es el bit E0 del
+// stroke — no viaja en el ScanCode. Por eso toda función
+// acá recibe/devuelve también `es_extendida: bool`, y
+// TABLA_EXTENDIDA existe aparte de TABLA para resolver esa
+// ambigüedad ANTES de mirar pulsadores.tsv (si no, Flecha
+// izquierda se confunde con NumPad4 sin que nada avise).
+//
 // No conoce AnalizadorTrigger.
 // No conoce Cache.
 // No conoce Runtime.
@@ -20,30 +32,40 @@
 // back_interception, para la salida (convertir_salida())
 // ------------------------------------------------------
 // 3. ¿Qué información recibe?
-// convertir(): un ScanCode crudo de interception + si
-// fue Down o Up.
+// convertir(): un ScanCode crudo de interception + si es
+// extendida (bit E0) + si fue Down o Up.
 // convertir_salida(): un InputId (interno) a emitir.
 // ------------------------------------------------------
 // 4. ¿Qué información entrega?
 // convertir(): Option<Evento>. None si la tecla no está
 // en pulsadores.tsv (no soportada).
-// convertir_salida(): Option<ScanCode>. None si el
-// InputId no es de teclado, o no tiene ScanCode asociado.
+// convertir_salida(): Option<(ScanCode, bool)> — el bool
+// es "es_extendida", para que quien emite sepa si tiene
+// que mandar también el bit E0. None si el InputId no es
+// de teclado, o no tiene ScanCode asociado.
 // ------------------------------------------------------
 // 5. Funciones del archivo
 // TABLA
-//     Única lista de pares texto ↔ ScanCode. Fuente para
-//     las dos direcciones de conversión.
+//     Pares texto ↔ ScanCode para teclas SIN ambigüedad
+//     (su código crudo no lo comparte nadie más).
+// TABLA_EXTENDIDA
+//     Pares texto ↔ ScanCode para teclas que SÍ comparten
+//     código con otra (numpad, o Ctrl/Alt izquierdo) — acá
+//     el bit E0 es lo único que las distingue.
 // convertir()
-//     ScanCode + estado → Evento (vía pulsadores.tsv).
-//     Registra en consola las teclas no soportadas.
+//     ScanCode + es_extendida + estado → Evento (vía
+//     pulsadores.tsv). Registra en consola las teclas no
+//     soportadas.
 // convertir_salida()
-//     InputId → ScanCode (vía pulsadores.tsv + TABLA).
+//     InputId → (ScanCode, es_extendida) (vía
+//     pulsadores.tsv + TABLA/TABLA_EXTENDIDA).
 // ------------------------------------------------------
 // Transformación:
 //
 // ENTRADA:
-// ScanCode (interception)
+// ScanCode + es_extendida (interception)
+//     ↓
+// nombre_interception() [ve TABLA_EXTENDIDA primero]
 //     ↓
 // pulsadores::interception_a_interno()
 //     ↓
@@ -56,9 +78,9 @@
 //     ↓
 // pulsadores::interno_a_interception()
 //     ↓
-// TABLA
+// TABLA_EXTENDIDA o, si no, TABLA
 //     ↓
-// ScanCode (interception)
+// (ScanCode, es_extendida) (interception)
 // ======================================================
 
 use crate::eventos::{InputEvent, InputId};
@@ -165,11 +187,37 @@ const TABLA: &[(&str, ScanCode)] = &[
 ];
 
 // ======================================================
+// 📖 TABLA_EXTENDIDA texto ↔ ScanCode (comparten código, se
+// distinguen solo por el bit E0)
+// ------------------------------------------------------
+// El crate `interception` no tiene un ScanCode propio para
+// estas — reutiliza el mismo código crudo que la tecla del
+// numpad (o, para Ctrl/Alt derecho, el mismo que su par
+// izquierdo) y el bit E0 del stroke es la única diferencia
+// real entre una y otra.
+// ======================================================
+
+const TABLA_EXTENDIDA: &[(&str, ScanCode)] = &[
+    ("Home", ScanCode::Numpad7),
+    ("Up", ScanCode::Numpad8),
+    ("PageUp", ScanCode::Numpad9),
+    ("Left", ScanCode::Numpad4),
+    ("Right", ScanCode::Numpad6),
+    ("End", ScanCode::Numpad1),
+    ("Down", ScanCode::Numpad2),
+    ("PageDown", ScanCode::Numpad3),
+    ("Insert", ScanCode::Numpad0),
+    ("Delete", ScanCode::NumpadPeriod),
+    ("RightControl", ScanCode::LeftControl),
+    ("RightAlt", ScanCode::LeftAlt),
+];
+
+// ======================================================
 // 📥 ENTRADA
 // ======================================================
 
-pub fn convertir(code: ScanCode, presionado: bool) -> Option<InputEvent> {
-    let interception = format!("{:?}", code);
+pub fn convertir(code: ScanCode, es_extendida: bool, presionado: bool) -> Option<InputEvent> {
+    let interception = nombre_interception(code, es_extendida);
 
     let Some(interno) = pulsadores::interception_a_interno(&interception) else {
         println!("⚠️ Tecla de teclado no soportada: {}", interception);
@@ -186,11 +234,26 @@ pub fn convertir(code: ScanCode, presionado: bool) -> Option<InputEvent> {
     })
 }
 
+/// Resuelve el nombre "interception" real de una tecla. Si es
+/// extendida y su ScanCode está en TABLA_EXTENDIDA, ese nombre gana
+/// (es la única forma de no confundirla con la tecla de numpad que
+/// comparte su mismo ScanCode). Si no, es el nombre del ScanCode tal
+/// cual lo entrega el crate.
+fn nombre_interception(code: ScanCode, es_extendida: bool) -> String {
+    if es_extendida {
+        if let Some((nombre, _)) = TABLA_EXTENDIDA.iter().find(|(_, c)| *c == code) {
+            return (*nombre).to_string();
+        }
+    }
+
+    format!("{:?}", code)
+}
+
 // ======================================================
 // 📤 SALIDA
 // ======================================================
 
-pub fn convertir_salida(input: &InputId) -> Option<ScanCode> {
+pub fn convertir_salida(input: &InputId) -> Option<(ScanCode, bool)> {
     if input.fuente() != Some("keyboard") {
         return None;
     }
@@ -199,8 +262,15 @@ pub fn convertir_salida(input: &InputId) -> Option<ScanCode> {
 
     let interception = pulsadores::interno_a_interception(interno)?;
 
+    if let Some((_, code)) = TABLA_EXTENDIDA
+        .iter()
+        .find(|(nombre, _)| *nombre == interception)
+    {
+        return Some((*code, true));
+    }
+
     TABLA
         .iter()
         .find(|(nombre, _)| *nombre == interception)
-        .map(|(_, code)| *code)
+        .map(|(_, code)| (*code, false))
 }

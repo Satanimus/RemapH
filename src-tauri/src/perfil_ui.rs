@@ -96,19 +96,20 @@
 //     Activa el modo Captura en analizador_trigger (a partir de acá,
 //     entrada.rs empieza a consumir todo hacia este archivo).
 //
-// cancelar_captura()
-//     Aborta la captura en curso, si había una: descarta el estado
-//     (sin armar RESULTADO_CAPTURA) y desactiva el modo Captura en
-//     analizador_trigger, para que los eventos físicos vuelvan a
-//     fluir normal.
-//
 // recibir_down()
 //     Agrega un Down a la secuencia en curso (llamada por
 //     AnalizadorTrigger, modo Captura).
 //
 // recibir_condicion()
-//     Arma el TriggerCapturaUI final con la condición recibida
-//     y cierra la captura (llamada por AnalizadorTrigger).
+//     Arma el TriggerCapturaUI final con la condición recibida y
+//     cierra la captura (llamada por AnalizadorTrigger). Si columna
+//     es "Trigger" y el resultado es únicamente Click izquierdo sin
+//     ningún modificador (remapearía TODO clic izquierdo de
+//     Windows), se descarta: el resultado queda con el trigger en
+//     None en vez de Some(...) — es una señal distinta de "todavía
+//     nada" (ver obtener_captura), para que la UI pueda resetear el
+//     botón a "Capturar" con feedback en vez de quedarse esperando
+//     en silencio.
 //
 // obtener_captura()
 //     La UI la consulta (polling) para retirar el resultado
@@ -428,7 +429,13 @@ struct CapturaEnCurso {
 }
 
 static CAPTURA: std::sync::Mutex<Option<CapturaEnCurso>> = std::sync::Mutex::new(None);
-static RESULTADO_CAPTURA: std::sync::Mutex<Option<(String, String, TriggerCapturaUI)>> =
+
+// El trigger interno es Option: None es una señal distinta de "todavía
+// no hay nada" (ver obtener_captura) — significa "hubo un resultado,
+// pero se descartó" (ver recibir_condicion, filtro de Click izquierdo
+// solo). La UI usa esa diferencia para resetear el botón en vez de
+// seguir esperando.
+static RESULTADO_CAPTURA: std::sync::Mutex<Option<(String, String, Option<TriggerCapturaUI>)>> =
     std::sync::Mutex::new(None);
 
 /// Llamada por el botón de captura. Arma el estado transitorio y
@@ -443,17 +450,6 @@ pub fn iniciar_captura(fila_id: String, columna: String) {
     *RESULTADO_CAPTURA.lock().unwrap() = None;
 
     crate::analizador_trigger::activar_captura();
-}
-
-/// Llamada por el botón ✕ ("cancelar") mientras la captura sigue en
-/// "Esperando...". Descarta el estado en curso sin armar ningún
-/// resultado, y desactiva el modo Captura para que los eventos
-/// físicos vuelvan a fluir normal de inmediato.
-pub fn cancelar_captura() {
-    *CAPTURA.lock().unwrap() = None;
-    *RESULTADO_CAPTURA.lock().unwrap() = None;
-
-    crate::analizador_trigger::desactivar_captura();
 }
 
 /// Llamada por AnalizadorTrigger (modo Captura) con cada Down nuevo.
@@ -479,12 +475,25 @@ pub fn recibir_condicion(condicion: crate::perfil_cache::CondicionTrigger) {
         return;
     };
 
+    // El Trigger no puede ser únicamente Click izquierdo sin ningún
+    // modificador — de lo contrario el perfil activo remapea TODO clic
+    // izquierdo de Windows. Se descarta: el resultado va con trigger en
+    // None, no con el TriggerCapturaUI armado.
+    let es_click_izquierdo_solo = captura.columna == "Trigger"
+        && modificadores.is_empty()
+        && gatillo == crate::eventos::InputId::new("mouse", "LeftButton");
+
+    if es_click_izquierdo_solo {
+        *RESULTADO_CAPTURA.lock().unwrap() = Some((captura.fila_id, captura.columna, None));
+        return;
+    }
+
     let trigger = convertir_trigger_captura(modificadores, gatillo, condicion);
 
-    *RESULTADO_CAPTURA.lock().unwrap() = Some((captura.fila_id, captura.columna, trigger));
+    *RESULTADO_CAPTURA.lock().unwrap() = Some((captura.fila_id, captura.columna, Some(trigger)));
 }
 
 /// La UI lo consulta (polling) para saber si ya hay un resultado listo.
-pub fn obtener_captura() -> Option<(String, String, TriggerCapturaUI)> {
+pub fn obtener_captura() -> Option<(String, String, Option<TriggerCapturaUI>)> {
     RESULTADO_CAPTURA.lock().unwrap().take()
 }

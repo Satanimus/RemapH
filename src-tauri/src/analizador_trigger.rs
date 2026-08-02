@@ -331,6 +331,10 @@ struct Grupo {
     presionados: Vec<InputId>,
     timer: Option<Timer>,
     reenviando_ups: bool,
+
+    // Solo lo usa la rueda (InputState::Pulse): cuántos pulsos lleva la
+    // ráfaga actual. Nunca se toca para teclas/clics normales.
+    pulsos: u64,
 }
 
 impl Grupo {
@@ -339,6 +343,7 @@ impl Grupo {
             presionados: Vec::new(),
             timer: None,
             reenviando_ups: false,
+            pulsos: 0,
         }
     }
 }
@@ -384,7 +389,15 @@ impl AnalizadorTrigger {
                     let _ = generacion;
                     drop(grupos);
 
-                    self.reenviar_down(evento.input.clone());
+                    // OJO: acá NO se reenvía este segundo Down (a
+                    // diferencia del primero, más abajo). Cache/perfil_ui
+                    // ya se enteraron de esta tecla con el primer Down —
+                    // este segundo Down es la MISMA tecla confirmando el
+                    // doble, no una tecla nueva que agregar a la
+                    // secuencia. Reenviarlo de nuevo duplicaba la tecla
+                    // en Captura (quedaba como "modificador + gatillo x2")
+                    // y en Cache generaba una lista extra de la nada —
+                    // ver el punto de índices inestables en cache.rs.
                     Self::enviar_condicion(self.modo, CondicionTrigger::Doble);
                     return Some(());
                 }
@@ -459,8 +472,52 @@ impl AnalizadorTrigger {
             }
 
             InputState::Pulse => {
+                let clave = evento.input.clone();
+                let es_primero = !grupos.contains_key(&clave);
+
+                let generacion = {
+                    let grupo = grupos.entry(clave.clone()).or_insert_with(Grupo::nuevo);
+                    grupo.pulsos += 1;
+
+                    let generacion = grupo.timer.as_ref().map(|t| t.generacion + 1).unwrap_or(0);
+
+                    grupo.timer = Some(Timer {
+                        generacion,
+                        objetivo: clave.clone(),
+                    });
+
+                    generacion
+                };
+
                 drop(grupos);
-                self.reenviar_down(evento.input.clone());
+
+                if es_primero {
+                    // Solo el primer pulso de la ráfaga se reenvía —
+                    // Cache/perfil_ui ya se enteran de la rueda con este.
+                    // Los pulsos siguientes de la MISMA ráfaga solo suman
+                    // al conteo (ver cerrar_rueda) para decidir si termina
+                    // siendo Simple o Mantenida — reenviarlos todos
+                    // generaría el mismo problema que el Doble duplicado
+                    // de más arriba. Nunca se agrega al grupo.presionados
+                    // (a propósito: así iniciar_timer(), que busca por
+                    // presionados, no encuentra nada y no arranca -de
+                    // pedo- su propio timer de Mantenido de tecla — el
+                    // cierre de la rueda lo maneja únicamente
+                    // cerrar_rueda, más abajo).
+                    match self.modo {
+                        ModoAnalizador::Runtime => cache::recibir_down(clave.clone()),
+                        ModoAnalizador::Captura => perfil_ui::recibir_down(clave.clone()),
+                    }
+                }
+
+                let grupos_arc = Arc::clone(&self.grupos);
+                let modo = self.modo;
+                let objetivo = clave.clone();
+
+                std::thread::spawn(move || {
+                    Self::cerrar_rueda(grupos_arc, objetivo, generacion, modo);
+                });
+
                 Some(())
             }
         }
@@ -578,6 +635,40 @@ impl AnalizadorTrigger {
         drop(grupos_g);
 
         Self::enviar_condicion(modo, CondicionTrigger::Simple);
+    }
+
+    /// Cierre de una ráfaga de rueda (InputState::Pulse). Cada pulso
+    /// nuevo reprograma este cierre (por generación, igual que
+    /// esperar_mantenido/esperar_doble). Si pasa config::tiempo_doble()
+    /// sin que llegue un pulso nuevo, se cuenta cuántos hubo en total y
+    /// se decide: menos de config::sensibilidad_rueda() -> Simple, esa
+    /// cantidad o más -> Mantenido. La rueda no tiene Doble — no hay
+    /// forma física de "soltarla y volver a apretarla" como una tecla.
+    fn cerrar_rueda(
+        grupos: Arc<Mutex<HashMap<InputId, Grupo>>>,
+        clave: InputId,
+        generacion: u64,
+        modo: ModoAnalizador,
+    ) {
+        std::thread::sleep(Duration::from_millis(config::tiempo_doble()));
+
+        let mut grupos_g = grupos.lock().unwrap();
+
+        if !Self::vigente(&grupos_g, &clave, generacion) {
+            return; // llegó un pulso nuevo antes de terminar de esperar
+        }
+
+        let pulsos = grupos_g.get(&clave).map(|g| g.pulsos).unwrap_or(0);
+        grupos_g.remove(&clave);
+        drop(grupos_g);
+
+        let condicion = if pulsos >= config::sensibilidad_rueda() {
+            CondicionTrigger::Mantenido
+        } else {
+            CondicionTrigger::Simple
+        };
+
+        Self::enviar_condicion(modo, condicion);
     }
 
     fn enviar_condicion(modo: ModoAnalizador, condicion: CondicionTrigger) {

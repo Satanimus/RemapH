@@ -17,6 +17,21 @@
 //     una "pregunta al timer" en simultáneo (ver
 //     PREGUNTA_PENDIENTE en cache.rs) — acá se refleja la
 //     misma regla, no es una limitación nueva.
+//
+//     Red de seguridad: nunca debería quedar abierto para
+//     siempre (Cache siempre termina llamando a pasar() o
+//     consumir()) — pero si algún bug hiciera que eso no
+//     pase, CADA evento físico nuevo (de lo que sea) se
+//     seguiría sumando a este mismo buffer sin límite,
+//     dejando el teclado y el mouse completamente mudos.
+//     Por eso, cada vez que se abre un RETENIDO nuevo, se
+//     arranca un vigía en otro hilo
+//     (config::tiempo_maximo_retenido(), 5s por defecto):
+//     si para entonces sigue sin resolverse, se fuerza a
+//     soltar todo el buffer tal cual — y se avisa por
+//     consola, para poder distinguir "se activó la red de
+//     seguridad" (hay un bug real en otro lado) de
+//     cualquier otra cosa.
 // DEVOLVIENDO — una lista, uno por cada grupo de teclas que
 //     YA se dejó pasar a Windows (con match o sin él da lo
 //     mismo el motivo) y todavía no soltó todas sus teclas.
@@ -128,12 +143,20 @@
 use crate::analizador_trigger;
 use crate::back_interception;
 use crate::cache;
+use crate::config;
 use crate::eventos::{InputEvent, InputId, InputState};
 use std::cell::RefCell;
 use std::sync::Mutex;
+use std::time::Duration;
 
 struct GrupoRetenido {
     buffer: Vec<InputEvent>,
+
+    // Identifica esta apertura puntual de RETENIDO, para que el
+    // vigía de la red de seguridad (ver retener()) sepa si todavía
+    // está hablando del mismo RETENIDO que abrió, o si ya se
+    // resolvió y se volvió a abrir otro distinto mientras dormía.
+    generacion: u64,
 }
 
 struct GrupoDevolviendo {
@@ -142,6 +165,7 @@ struct GrupoDevolviendo {
 
 static RETENIDO: Mutex<Option<GrupoRetenido>> = Mutex::new(None);
 static DEVOLVIENDO: Mutex<Vec<GrupoDevolviendo>> = Mutex::new(Vec::new());
+static SIGUIENTE_GENERACION_RETENIDO: Mutex<u64> = Mutex::new(0);
 
 thread_local! {
     // El evento que está siendo procesado ahora mismo en este hilo.
@@ -278,17 +302,58 @@ pub fn pasar() {
 }
 
 /// Llamada por Cache: todavía puede llegar a ser un match. Abre (si no
-/// existía) el RETENIDO, sembrado con el evento en curso.
+/// existía) el RETENIDO, sembrado con el evento en curso, y arranca su
+/// vigía de red de seguridad (ver vigilar_retenido()).
 pub fn retener() {
     let mut retenido = RETENIDO.lock().unwrap();
 
     if retenido.is_none() {
         let evento_inicial = EVENTO_EN_CURSO.with(|c| c.borrow().clone());
 
+        let generacion = {
+            let mut g = SIGUIENTE_GENERACION_RETENIDO.lock().unwrap();
+            *g += 1;
+            *g
+        };
+
         *retenido = Some(GrupoRetenido {
             buffer: evento_inicial.into_iter().collect(),
+            generacion,
+        });
+        drop(retenido);
+
+        std::thread::spawn(move || {
+            vigilar_retenido(generacion);
         });
     }
+}
+
+/// Red de seguridad: si el RETENIDO abierto con esta generación sigue
+/// siendo el mismo (nadie lo resolvió) después de
+/// config::tiempo_maximo_retenido(), se fuerza a soltar su buffer tal
+/// cual — un bug en otro lado no debería poder dejar el teclado o el
+/// mouse mudos para siempre. El aviso por consola permite distinguir
+/// esto de cualquier otro problema.
+fn vigilar_retenido(generacion: u64) {
+    std::thread::sleep(Duration::from_millis(config::tiempo_maximo_retenido()));
+
+    let sigue_siendo_este = RETENIDO
+        .lock()
+        .unwrap()
+        .as_ref()
+        .map(|g| g.generacion == generacion)
+        .unwrap_or(false);
+
+    if !sigue_siendo_este {
+        return; // ya se resolvió (o se abrió otro distinto) antes de esto
+    }
+
+    eprintln!(
+        "⚠️ Red de seguridad: un RETENIDO llevaba más de {} ms sin resolverse — se fuerza a soltar. Esto NO debería pasar; revisar cache.rs/analizador_trigger.rs.",
+        config::tiempo_maximo_retenido()
+    );
+
+    pasar();
 }
 
 /// Llamada por Cache: hubo match real y ya se avisó a Runtime. Lo

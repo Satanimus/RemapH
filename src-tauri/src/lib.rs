@@ -46,7 +46,6 @@ pub fn run() {
             comandos::desactivar_perfil,
             comandos::iniciar_captura,
             comandos::obtener_captura,
-            comandos::cancelar_captura,
             comandos::obtener_perfil_actual,
             comandos::obtener_perfiles,
             comandos::obtener_nombre_perfil_actual,

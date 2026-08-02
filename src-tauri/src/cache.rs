@@ -15,7 +15,16 @@
 // a) Lista de comparación — se arma con los Down que le
 //    llegan del analizador. Se vacía POR COMPLETO cada vez
 //    que Cache resuelve algo (Pasar, Consumir, o al
-//    confirmar un match vía condición).
+//    confirmar un match vía condición). Cada lista tiene un
+//    ID propio (contador incremental, no su posición en el
+//    Vec) — importante: si se identificara por posición y
+//    otra lista (de otro grupo físico) se eliminara del medio
+//    mientras esta seguía esperando su timer, la posición de
+//    ESTA cambiaría por debajo suyo sin que nadie se entere,
+//    y el timer terminaría resolviendo (o no encontrando) la
+//    lista equivocada — dejando el RETENIDO de entrada.rs
+//    abierto para siempre (ver su red de seguridad). Con ID
+//    fijo, ninguna remoción ajena puede afectar a esta lista.
 //
 // b) Ninguna memoria propia de "qué sigue presionado" —
 //    en vez de eso, la CONSULTA puntualmente al analizador
@@ -154,7 +163,12 @@ use std::sync::Mutex;
 
 #[derive(Clone)]
 struct Lista {
+    // Identidad estable de esta lista — nunca cambia con el tiempo,
+    // a diferencia de su posición en LISTAS (ver header, punto 1a).
+    id: u64,
+
     entrada: Vec<InputId>,
+
     esperando_condicion: bool,
 }
 
@@ -185,8 +199,18 @@ pub struct AppEstadoCache {
 static CACHE: Mutex<Vec<RemapeoCache>> = Mutex::new(Vec::new());
 static APPS: Mutex<Vec<AppEstadoCache>> = Mutex::new(Vec::new());
 static LISTAS: Mutex<Vec<Lista>> = Mutex::new(Vec::new());
+static SIGUIENTE_ID_LISTA: Mutex<u64> = Mutex::new(0);
 static ACTIVAS: Mutex<Vec<InstanciaActiva>> = Mutex::new(Vec::new());
-static PREGUNTA_PENDIENTE: Mutex<Option<usize>> = Mutex::new(None);
+static PREGUNTA_PENDIENTE: Mutex<Option<u64>> = Mutex::new(None);
+
+/// Da de alta un ID nuevo, único y estable, para una lista. Nunca se
+/// reutiliza ni se reordena — es lo que reemplaza a la posición en el
+/// Vec como identidad (ver header, punto 1a).
+fn nuevo_id_lista() -> u64 {
+    let mut id = SIGUIENTE_ID_LISTA.lock().unwrap();
+    *id += 1;
+    *id
+}
 
 pub fn escribir_cache(remapeos: Vec<RemapeoCache>) {
     *CACHE.lock().unwrap() = remapeos;
@@ -278,38 +302,46 @@ pub fn recibir_down(input: InputId) {
     let mut listas = LISTAS.lock().unwrap();
 
     // ¿Alguna lista existente acepta esto como continuación válida?
-    let mut indice = None;
-    for (i, lista) in listas.iter().enumerate() {
+    let mut id_encontrado = None;
+    for lista in listas.iter() {
         let mut probable = lista.entrada.clone();
         probable.push(input.clone());
         let (posibles, _, _) = contar(&probable);
         if posibles > 0 {
-            indice = Some(i);
+            id_encontrado = Some(lista.id);
             break;
         }
     }
 
-    let indice = match indice {
-        Some(i) => {
-            listas[i].entrada.push(input.clone());
-            i
+    let id = match id_encontrado {
+        Some(id) => {
+            if let Some(lista) = listas.iter_mut().find(|l| l.id == id) {
+                lista.entrada.push(input.clone());
+            }
+            id
         }
         None => {
+            let id = nuevo_id_lista();
             listas.push(Lista {
+                id,
                 entrada: vec![input.clone()],
                 esperando_condicion: false,
             });
-            listas.len() - 1
+            id
         }
     };
 
-    let entrada_actual = listas[indice].entrada.clone();
+    let entrada_actual = listas
+        .iter()
+        .find(|l| l.id == id)
+        .map(|l| l.entrada.clone())
+        .unwrap_or_default();
     drop(listas);
 
     let (posibles, exactas, candidatas) = contar(&entrada_actual);
 
     if posibles == 0 {
-        limpiar_lista(indice);
+        limpiar_lista(id);
         analizador_trigger::limpiar();
         entrada::pasar();
         return;
@@ -320,14 +352,14 @@ pub fn recibir_down(input: InputId) {
         && candidatas[0].trigger.condicion == CondicionTrigger::Simple
     {
         iniciar_y_finalizar(candidatas[0].clone());
-        limpiar_lista(indice);
+        limpiar_lista(id);
         reiniciar_desde_presionados();
         entrada::consumir();
         return;
     }
 
     if posibles == exactas && exactas >= 1 {
-        marcar_esperando_condicion(indice);
+        marcar_esperando_condicion(id);
         let gatillo = entrada_actual.last().cloned().unwrap();
         analizador_trigger::iniciar_timer(gatillo);
         entrada::retener();
@@ -340,14 +372,14 @@ pub fn recibir_down(input: InputId) {
 /// Llamada por el timer del analizador (hilo aparte). No hay nadie
 /// esperando un valor de retorno: avisa directo a quien corresponda.
 pub fn recibir_condicion(condicion: CondicionTrigger) {
-    let indice = match *PREGUNTA_PENDIENTE.lock().unwrap() {
-        Some(i) => i,
+    let id = match *PREGUNTA_PENDIENTE.lock().unwrap() {
+        Some(id) => id,
         None => return,
     };
 
     let entrada_actual = {
         let listas = LISTAS.lock().unwrap();
-        match listas.get(indice) {
+        match listas.iter().find(|l| l.id == id) {
             Some(l) => l.entrada.clone(),
             None => return,
         }
@@ -365,12 +397,12 @@ pub fn recibir_condicion(condicion: CondicionTrigger) {
             } else {
                 iniciar_y_finalizar(remapeo);
             }
-            limpiar_lista(indice);
+            limpiar_lista(id);
             reiniciar_desde_presionados();
             entrada::consumir();
         }
         _ => {
-            limpiar_lista(indice);
+            limpiar_lista(id);
             analizador_trigger::limpiar();
             entrada::pasar();
         }
@@ -414,20 +446,18 @@ fn iniciar_solamente(remapeo: RemapeoCache, entrada: Vec<InputId>) {
     });
 }
 
-fn marcar_esperando_condicion(indice: usize) {
-    if let Some(l) = LISTAS.lock().unwrap().get_mut(indice) {
+fn marcar_esperando_condicion(id: u64) {
+    if let Some(l) = LISTAS.lock().unwrap().iter_mut().find(|l| l.id == id) {
         l.esperando_condicion = true;
     }
-    *PREGUNTA_PENDIENTE.lock().unwrap() = Some(indice);
+    *PREGUNTA_PENDIENTE.lock().unwrap() = Some(id);
 }
 
-fn limpiar_lista(indice: usize) {
-    let mut listas = LISTAS.lock().unwrap();
-    if indice < listas.len() {
-        listas.remove(indice);
-    }
+fn limpiar_lista(id: u64) {
+    LISTAS.lock().unwrap().retain(|l| l.id != id);
+
     let mut pregunta = PREGUNTA_PENDIENTE.lock().unwrap();
-    if *pregunta == Some(indice) {
+    if *pregunta == Some(id) {
         *pregunta = None;
     }
 }
@@ -436,7 +466,9 @@ fn limpiar_lista(indice: usize) {
 fn reiniciar_desde_presionados() {
     let presionados = analizador_trigger::obtener_presionados();
     if !presionados.is_empty() {
+        let id = nuevo_id_lista();
         LISTAS.lock().unwrap().push(Lista {
+            id,
             entrada: presionados,
             esperando_condicion: false,
         });

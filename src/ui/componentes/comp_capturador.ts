@@ -68,42 +68,6 @@ export function crearCapturador(
 
   let capturando = false;
 
-  // ==================================================
-  // ✕ CANCELAR CAPTURA
-  // ==================================================
-  // Aparte del botón grande — un click ahí, mientras se está
-  // capturando, es una entrada válida más (puede ser justo lo que se
-  // quiere capturar) y NO debe cancelar nada.
-  // ==================================================
-
-  const cancelarCaptura = async () => {
-    capturando = false;
-
-    await invoke("cancelar_captura");
-
-    reconstruirFila(contexto.id);
-  };
-
-  const mostrarEsperando = () => {
-    boton.textContent = "";
-
-    const texto = document.createElement("span");
-    texto.className = "capturador-esperando-texto";
-    texto.textContent = "Esperando...";
-
-    const botonCancelar = document.createElement("span");
-    botonCancelar.className = "capturador-cancelar";
-    botonCancelar.textContent = "✕";
-    botonCancelar.title = "Cancelar captura";
-
-    botonCancelar.addEventListener("click", (evento) => {
-      evento.stopPropagation();
-      cancelarCaptura();
-    });
-
-    boton.append(texto, botonCancelar);
-  };
-
   boton.addEventListener("click", async () => {
     if (capturando) {
       return;
@@ -113,7 +77,7 @@ export function crearCapturador(
 
     capturando = true;
 
-    mostrarEsperando();
+    boton.textContent = "Esperando...";
 
     // ==============================================
     // 🚀 ACTIVAR CAPTURA BACKEND
@@ -130,7 +94,7 @@ export function crearCapturador(
 
     const esperar = async () => {
       while (capturando) {
-        const capturado = await invoke<[string, string, unknown] | null>(
+        const capturado = await invoke<[string, string, unknown | null] | null>(
           "obtener_captura",
         );
 
@@ -147,13 +111,24 @@ export function crearCapturador(
             continue;
           }
 
+          capturando = false;
+
+          if (trigger === null) {
+            // Captura inválida (ej: Click izquierdo solo como
+            // Trigger, sin ningún modificador) — se descarta. Se
+            // reconstruye igual para que el botón vuelva a
+            // "Capturar" en vez de quedarse en "Esperando..." sin
+            // ningún aviso.
+            reconstruirFila(contexto.id);
+
+            return;
+          }
+
           if (destino === "Trigger") {
             filaPerfil.trigger = trigger as FilaPerfil["trigger"];
           } else {
             filaPerfil.accion = trigger as FilaPerfil["accion"];
           }
-
-          capturando = false;
 
           reconstruirFila(contexto.id);
 

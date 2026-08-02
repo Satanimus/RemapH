@@ -234,7 +234,17 @@ fn recibir(ict: &Interception) -> Option<(Device, Stroke)> {
 fn traducir(stroke: &Stroke) -> Option<InputEvent> {
     match stroke {
         Stroke::Keyboard { code, state, .. } => {
-            back_teclas::convertir(*code, *state == KeyState::DOWN)
+            // OJO: NO comparar `*state == KeyState::DOWN` — state es un
+            // bitflag y una tecla extendida (flechas, Insert/Supr,
+            // etc.) SIEMPRE trae también el bit E0 prendido, así que
+            // esa igualdad exacta daba falso incluso estando presionada
+            // (todo E0 se leía como "Up", nunca como "Down", y el
+            // evento se perdía por completo). Hay que preguntar por
+            // cada bit por separado.
+            let es_extendida = state.contains(KeyState::E0);
+            let presionado = !state.contains(KeyState::UP);
+
+            back_teclas::convertir(*code, es_extendida, presionado)
         }
 
         Stroke::Mouse { state, rolling, .. } => back_mouse::convertir(*state, *rolling),
@@ -297,7 +307,7 @@ pub fn emitir_evento(evento: InputEvent) {
 }
 
 fn emitir_teclado(evento: &InputEvent) {
-    let Some(code) = back_teclas::convertir_salida(&evento.input) else {
+    let Some((code, es_extendida)) = back_teclas::convertir_salida(&evento.input) else {
         return;
     };
 
@@ -306,13 +316,13 @@ fn emitir_teclado(evento: &InputEvent) {
     };
 
     con_sesion_salida(|ict| match evento.state {
-        InputState::Down => enviar_tecla(ict, device, code, KeyState::DOWN),
+        InputState::Down => enviar_tecla(ict, device, code, KeyState::DOWN, es_extendida),
 
-        InputState::Up => enviar_tecla(ict, device, code, KeyState::UP),
+        InputState::Up => enviar_tecla(ict, device, code, KeyState::UP, es_extendida),
 
         InputState::Pulse => {
-            enviar_tecla(ict, device, code, KeyState::DOWN);
-            enviar_tecla(ict, device, code, KeyState::UP);
+            enviar_tecla(ict, device, code, KeyState::DOWN, es_extendida);
+            enviar_tecla(ict, device, code, KeyState::UP, es_extendida);
         }
     });
 }
@@ -322,7 +332,17 @@ fn enviar_tecla(
     device: Device,
     code: interception::ScanCode,
     estado: KeyState,
+    es_extendida: bool,
 ) {
+    // Mismo motivo que en traducir(): sin el bit E0 en lo que se
+    // manda, esto saldría como si fuera la tecla de numpad que
+    // comparte su mismo ScanCode (ver back_teclas.rs, TABLA_EXTENDIDA).
+    let estado = if es_extendida {
+        estado | KeyState::E0
+    } else {
+        estado
+    };
+
     let stroke = Stroke::Keyboard {
         code,
         state: estado,
