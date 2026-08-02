@@ -136,6 +136,27 @@ const TABLA: &[(&str, ScanCode)] = &[
     ("Num9", ScanCode::Num9),
     ("Num0", ScanCode::Num0),
     // ------------------------------------------------
+    // 🔢 NUMPAD (números y operadores) — comparten ScanCode con
+    // TABLA_EXTENDIDA (Home/Up/Insert/etc.) pero acá van bajo su
+    // propio nombre "Numpad*", que es como los identifica
+    // pulsadores.tsv cuando NO son extendidas (es_extendida=false,
+    // el caso normal de la tecla física de numpad).
+    // ------------------------------------------------
+    ("Numpad0", ScanCode::Numpad0),
+    ("Numpad1", ScanCode::Numpad1),
+    ("Numpad2", ScanCode::Numpad2),
+    ("Numpad3", ScanCode::Numpad3),
+    ("Numpad4", ScanCode::Numpad4),
+    ("Numpad5", ScanCode::Numpad5),
+    ("Numpad6", ScanCode::Numpad6),
+    ("Numpad7", ScanCode::Numpad7),
+    ("Numpad8", ScanCode::Numpad8),
+    ("Numpad9", ScanCode::Numpad9),
+    ("NumpadMultiply", ScanCode::NumpadMultiply),
+    ("NumpadPlus", ScanCode::NumpadPlus),
+    ("NumpadMinus", ScanCode::NumpadMinus),
+    ("NumpadPeriod", ScanCode::NumpadPeriod),
+    // ------------------------------------------------
     // ⌨️ BÁSICAS
     // ------------------------------------------------
     ("Enter", ScanCode::Enter),

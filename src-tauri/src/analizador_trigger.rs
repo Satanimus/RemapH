@@ -429,8 +429,17 @@ impl AnalizadorTrigger {
                     grupo.presionados.retain(|i| i != &evento.input);
                 }
 
+                // OJO: hay que soltar el lock de `grupos` ANTES de avisarle a
+                // Cache. cache::recibir_up() puede terminar llamando de vuelta
+                // a este mismo AnalizadorTrigger (limpiar() / obtener_presionados()),
+                // que también piden self.grupos.lock() — con el lock todavía
+                // tomado acá, ese re-lock en el mismo hilo es un deadlock
+                // (Mutex de std no es reentrante), y deja el hilo que procesa
+                // cada InputEvent físico trabado para siempre.
                 if reenviar_up && self.modo == ModoAnalizador::Runtime {
+                    drop(grupos);
                     cache::recibir_up(evento.input.clone());
+                    grupos = self.grupos.lock().unwrap();
                 }
 
                 if era_objetivo_mantenido_pendiente {
