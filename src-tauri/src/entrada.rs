@@ -190,6 +190,16 @@ pub fn procesar_evento(evento: InputEvent) {
                 if devolviendo[indice].faltan_soltar.is_empty() {
                     devolviendo.remove(indice);
                 }
+
+                drop(devolviendo);
+
+                // Este Up nunca llega a analizador_trigger::procesar()
+                // (cortamos acá con el return de abajo) — sin este
+                // aviso, su conjunto interno de "presionados ahora"
+                // queda pensando que la tecla sigue abajo para
+                // siempre, y la próxima Down de esa tecla se descarta
+                // como si fuera un repeat.
+                analizador_trigger::soltar_fisico(evento.input.clone());
             }
             return;
         }

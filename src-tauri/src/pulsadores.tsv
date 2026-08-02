@@ -73,25 +73,25 @@ keyboard	0x37	Num7	Num7	7
 keyboard	0x38	Num8	Num8	8
 keyboard	0x39	Num9	Num9	9
 
-keyboard	0x60	NumPad0	NumPad0	NumPad 0
-keyboard	0x61	NumPad1	NumPad1	NumPad 1
-keyboard	0x62	NumPad2	NumPad2	NumPad 2
-keyboard	0x63	NumPad3	NumPad3	NumPad 3
-keyboard	0x64	NumPad4	NumPad4	NumPad 4
-keyboard	0x65	NumPad5	NumPad5	NumPad 5
-keyboard	0x66	NumPad6	NumPad6	NumPad 6
-keyboard	0x67	NumPad7	NumPad7	NumPad 7
-keyboard	0x68	NumPad8	NumPad8	NumPad 8
-keyboard	0x69	NumPad9	NumPad9	NumPad 9
+keyboard	0x60	NumPad0	Numpad0	NumPad 0
+keyboard	0x61	NumPad1	Numpad1	NumPad 1
+keyboard	0x62	NumPad2	Numpad2	NumPad 2
+keyboard	0x63	NumPad3	Numpad3	NumPad 3
+keyboard	0x64	NumPad4	Numpad4	NumPad 4
+keyboard	0x65	NumPad5	Numpad5	NumPad 5
+keyboard	0x66	NumPad6	Numpad6	NumPad 6
+keyboard	0x67	NumPad7	Numpad7	NumPad 7
+keyboard	0x68	NumPad8	Numpad8	NumPad 8
+keyboard	0x69	NumPad9	Numpad9	NumPad 9
 
 
-keyboard	0x6A	Multiply	Multiply	*
-keyboard	0x6B	Add	Add	+
-keyboard	0x6D	Subtract	Subtract	-
-keyboard	0x6E	Decimal	Decimal	.
+keyboard	0x6A	Multiply	NumpadMultiply	*
+keyboard	0x6B	Add	NumpadPlus	+
+keyboard	0x6D	Subtract	NumpadMinus	-
+keyboard	0x6E	Decimal	NumpadPeriod	.
 keyboard	0x6F	Divide	Divide	/
 keyboard	0xD	Enter	Enter	Enter
-keyboard	0x1B	Escape	Escape	Escape
+keyboard	0x1B	Escape	Esc	Escape
 keyboard	0x8	Backspace	Backspace	Backspace
 keyboard	0x9	Tab	Tab	Tab
 keyboard	0x20	Space	Space	Espacio

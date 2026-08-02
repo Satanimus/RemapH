@@ -265,6 +265,15 @@ pub fn obtener_presionados() -> Vec<InputId> {
     instancia_runtime().obtener_presionados()
 }
 
+/// Llamada por entrada.rs cuando un Up se resuelve por el atajo de
+/// grupos DEVOLVIENDO (pasa derecho, sin pasar por procesar_evento_runtime).
+/// Sin esto, el conjunto interno de "presionados ahora" nunca se entera
+/// de ese Up, y el filtro de repeats trata la próxima Down de esa misma
+/// tecla como si siguiera abajo — la descarta en vez de reenviarla.
+pub fn soltar_fisico(input: InputId) {
+    instancia_runtime().soltar(input);
+}
+
 // ======================================================
 // 🎬 INSTANCIA GLOBAL DE MODO CAPTURA
 // ------------------------------------------------------
@@ -611,5 +620,32 @@ impl AnalizadorTrigger {
             .values()
             .flat_map(|g| g.presionados.clone())
             .collect()
+    }
+
+    /// Saca `input` de "presionados ahora" sin pasar por el pipeline
+    /// completo de Up (sin timer, sin avisar a Cache/perfil_ui). Lo
+    /// usa entrada.rs cuando un Up nunca llega hasta acá (atajo de
+    /// grupos DEVOLVIENDO) — mantiene el conjunto interno sincronizado
+    /// con la realidad física para que el filtro de repeats no se
+    /// desincronice.
+    pub fn soltar(&self, input: InputId) {
+        let mut grupos = self.grupos.lock().unwrap();
+
+        let Some(clave) = Self::clave_grupo(&grupos, &input) else {
+            return;
+        };
+
+        if let Some(grupo) = grupos.get_mut(&clave) {
+            grupo.presionados.retain(|i| i != &input);
+        }
+
+        let vacio = grupos
+            .get(&clave)
+            .map(|g| g.presionados.is_empty())
+            .unwrap_or(false);
+
+        if vacio {
+            grupos.remove(&clave);
+        }
     }
 }

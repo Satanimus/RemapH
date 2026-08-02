@@ -174,7 +174,12 @@ fn crear() -> Interception {
 
     ict.set_filter(
         interception::is_keyboard,
-        Filter::KeyFilter(KeyFilter::DOWN | KeyFilter::UP),
+        // E0/E1: sin esto, el driver descarta antes de llegar acá
+        // cualquier tecla de scancode extendido — flechas, Insert,
+        // Supr, Inicio/Fin, RePág/AvPág, el "/" del numpad, Pause,
+        // etc. Las del numpad normal (0-9, *, +, -, .) no son
+        // extendidas, por eso esas sí funcionaban sin este flag.
+        Filter::KeyFilter(KeyFilter::DOWN | KeyFilter::UP | KeyFilter::E0 | KeyFilter::E1),
     );
 
     ict.set_filter(
