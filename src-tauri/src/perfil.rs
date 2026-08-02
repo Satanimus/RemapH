@@ -69,7 +69,9 @@
 //     Cambia nombre perfil.
 //
 // eliminar_perfil_actual()
-//     Elimina perfil actual.
+//     Elimina perfil actual. Si quedan otros perfiles, pasa al
+//     primero en orden alfabético. Si no queda ninguno, crea un
+//     Default vacío (misma lógica que crear_perfil_nuevo()).
 //
 // crear_perfil_nuevo()
 //     Crea perfil vacío.
@@ -270,7 +272,23 @@ pub fn eliminar_perfil_actual() -> Result<ResultadoPerfil, String> {
         fs::remove_file(ruta_actual).map_err(|error| error.to_string())?;
     }
 
-    Err("Pendiente definir creación automática después de eliminar último perfil".into())
+    // ¿Queda algún otro perfil? usuario::perfiles() ya los devuelve
+    // ordenados alfabéticamente — el primero de la lista pasa a ser el
+    // nuevo actual, sin más criterio que ese.
+    let restantes = usuario::perfiles()?;
+
+    let Some(siguiente_nombre) = restantes.into_iter().next() else {
+        // No quedó ninguno: mismo camino que crear_perfil_nuevo().
+        return crear_perfil_nuevo();
+    };
+
+    let ruta = usuario::ruta_perfil(&siguiente_nombre)?;
+
+    let perfil = cargar_desde_disco(&ruta)?;
+
+    compilador::compilar(&perfil);
+
+    resultado_perfil(perfil, siguiente_nombre)
 }
 
 // ======================================================

@@ -23,7 +23,7 @@
 
     padding: 0 var(--gap8);
 
-    background:  var(--button-bg);
+    background: var(--button-bg);
 
     color: var(--text);
 
@@ -181,6 +181,45 @@
     padding-left: 0;
 }
 
+.capturador-esperando-texto {
+
+    flex: 1;
+}
+
+.capturador-cancelar {
+
+    display: inline-flex;
+
+    align-items: center;
+
+    justify-content: center;
+
+    width: 18px;
+
+    height: 18px;
+
+    margin-left: 6px;
+
+    border-radius: 4px;
+
+    color: var(--red);
+
+    font-size: var(--fs12);
+
+    font-weight: 700;
+
+    cursor: pointer;
+
+    transition: background var(--speed);
+}
+
+.capturador-cancelar:hover {
+
+    background: var(--red);
+
+    color: var(--text);
+}
+
 .trigger-extra:hover {
 
     color: var(--text);
@@ -267,7 +306,7 @@
     margin: 0;
 }
 
- /* ======================================================
+/* ======================================================
     🧾 POPUPS — LISTAS DE OPCIONES
     ------------------------------------------------------
     Visual tipo menú de Visual Studio.
@@ -416,8 +455,7 @@
     line-height: 1;
 }
 
-.popup-perfil-item:hover
-.popup-perfil-revertir-icono {
+.popup-perfil-item:hover .popup-perfil-revertir-icono {
 
     color: var(--highlight);
 }
@@ -522,8 +560,7 @@
     line-height: 1;
 }
 
-.popup-perfil-item:hover
-.popup-perfil-revertir-icono {
+.popup-perfil-item:hover .popup-perfil-revertir-icono {
 
     color: var(--highlight);
 }

@@ -102,6 +102,10 @@
 //
 //     Devuelve captura actual.
 //
+// cancelar_captura()
+//
+//     Aborta la captura en curso (botón ✕).
+//
 // convertir_input_captura()
 //
 //     Convierte InputId interno a formato UI.
@@ -235,6 +239,13 @@ pub fn iniciar_captura(fila_id: String, columna: String) {
 #[tauri::command]
 pub fn obtener_captura() -> Option<(String, String, TriggerCapturaUI)> {
     crate::perfil_ui::obtener_captura()
+}
+
+#[tauri::command]
+pub fn cancelar_captura() {
+    crate::perfil_ui::cancelar_captura();
+
+    println!("🎹 Captura cancelada");
 }
 
 // ======================================================

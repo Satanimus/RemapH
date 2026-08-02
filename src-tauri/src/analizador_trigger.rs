@@ -36,10 +36,22 @@
 // ------------------------------------------------------
 // 2. ¿Quién llama este archivo?
 // entrada.rs (modo Runtime): le entrega cada InputEvent
-//     físico a medida que llega.
-// comp_capturador / botón de captura (modo Captura):
-//     entrega cada InputEvent físico mientras el modo
-//     captura está activo.
+//     físico a medida que llega, vía
+//     procesar_evento_runtime().
+// entrada.rs (modo Captura): mientras hay una captura
+//     activa (ver captura_activa()), le entrega cada
+//     InputEvent físico vía procesar_evento_captura(), en
+//     vez de procesar_evento_runtime(). entrada.rs no
+//     emite esos eventos a Windows — este archivo decide
+//     el consumo simplemente por estar en esa rama, sin
+//     que nadie se lo pida explícitamente (no hay
+//     protocolo retener/pasar/consumir en Captura: acá
+//     SIEMPRE se consume, no hay ambigüedad que resolver).
+// perfil_ui (modo Captura): llama activar_captura() al
+//     arrancar una captura y desactivar_captura() al
+//     cancelarla. Este archivo también se
+//     autodesactiva solo, apenas termina de resolver y
+//     avisar el resultado final (ver enviar_condicion).
 // Cache: le pide el timer cuando detecta ambigüedad, y le
 //     pide el conjunto de "presionados ahora" cuando
 //     necesita reiniciar su lista de comparación.
@@ -174,6 +186,30 @@
 //     Orden de Cache: descarta el timer en curso y sale
 //     de la fase de reenvío de Ups. No toca "presionados
 //     ahora".
+// limpiar_grupos()
+//     Vacía por completo "grupos" (a diferencia de
+//     limpiar(), acá no queda ni "presionados ahora").
+//     Se usa solo para dejar la instancia de Captura en
+//     cero antes de una captura nueva.
+// ------------------------------------------------------
+// Funciones libres — instancia de modo Captura
+//
+// captura_activa() -> bool
+//     True mientras haya una captura en curso. Lo consulta
+//     entrada.rs antes que cualquier otra cosa.
+// activar_captura()
+//     Llamada por perfil_ui al arrancar una captura: limpia
+//     la instancia de Captura y marca captura_activa() en
+//     true.
+// desactivar_captura()
+//     Marca captura_activa() en false y limpia la
+//     instancia. Se llama sola apenas se resuelve y avisa
+//     el resultado final (ver enviar_condicion), y también
+//     la llama perfil_ui al cancelar una captura a mitad
+//     de camino.
+// procesar_evento_captura(evento: InputEvent) -> Option<()>
+//     Entrega el evento a la instancia de modo Captura.
+//     Llamada por entrada.rs mientras captura_activa().
 // ------------------------------------------------------
 // Transformación:
 //
@@ -227,6 +263,48 @@ pub fn limpiar() {
 
 pub fn obtener_presionados() -> Vec<InputId> {
     instancia_runtime().obtener_presionados()
+}
+
+// ======================================================
+// 🎬 INSTANCIA GLOBAL DE MODO CAPTURA
+// ------------------------------------------------------
+// Una única instancia por proceso, igual que Runtime — pero
+// a diferencia de Runtime, esta se activa y desactiva una y
+// otra vez (una vez por cada captura que se hace). Mientras
+// está inactiva, entrada.rs ni la toca: sigue todo por el
+// camino normal de Runtime.
+// ======================================================
+
+static INSTANCIA_CAPTURA: OnceLock<AnalizadorTrigger> = OnceLock::new();
+static CAPTURA_ACTIVA: Mutex<bool> = Mutex::new(false);
+
+fn instancia_captura() -> &'static AnalizadorTrigger {
+    INSTANCIA_CAPTURA.get_or_init(|| AnalizadorTrigger::nuevo(ModoAnalizador::Captura))
+}
+
+/// Consultada por entrada.rs antes que cualquier otra cosa: mientras
+/// esté en true, TODO evento físico se consume y se reenvía acá,
+/// nunca a Windows ni a Cache.
+pub fn captura_activa() -> bool {
+    *CAPTURA_ACTIVA.lock().unwrap()
+}
+
+/// Llamada por perfil_ui al arrancar una captura nueva.
+pub fn activar_captura() {
+    instancia_captura().limpiar_grupos();
+    *CAPTURA_ACTIVA.lock().unwrap() = true;
+}
+
+/// Se llama sola al terminar (ver enviar_condicion) y también la
+/// llama perfil_ui si el usuario cancela la captura a mitad de camino.
+pub fn desactivar_captura() {
+    *CAPTURA_ACTIVA.lock().unwrap() = false;
+    instancia_captura().limpiar_grupos();
+}
+
+/// Llamada por entrada.rs, evento por evento, mientras captura_activa().
+pub fn procesar_evento_captura(evento: InputEvent) -> Option<()> {
+    instancia_captura().procesar(evento)
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -496,7 +574,15 @@ impl AnalizadorTrigger {
     fn enviar_condicion(modo: ModoAnalizador, condicion: CondicionTrigger) {
         match modo {
             ModoAnalizador::Runtime => cache::recibir_condicion(condicion),
-            ModoAnalizador::Captura => perfil_ui::recibir_condicion(condicion),
+            ModoAnalizador::Captura => {
+                perfil_ui::recibir_condicion(condicion);
+
+                // La captura ya se resolvió y perfil_ui tiene el
+                // resultado final: a partir de acá, cualquier evento
+                // físico nuevo debe volver a fluir normal (Runtime),
+                // no seguir siendo tragado por Captura.
+                desactivar_captura();
+            }
         }
     }
 
@@ -508,6 +594,14 @@ impl AnalizadorTrigger {
             grupo.timer = None;
             grupo.reenviando_ups = false;
         }
+    }
+
+    /// A diferencia de limpiar(), acá no queda nada: ni timers ni
+    /// "presionados ahora". Se usa para dejar la instancia de Captura
+    /// en cero antes de (o después de) cada captura.
+    pub fn limpiar_grupos(&self) {
+        let mut grupos = self.grupos.lock().unwrap();
+        grupos.clear();
     }
 
     /// Consulta puntual de Cache tras resolver, para reiniciar su lista.

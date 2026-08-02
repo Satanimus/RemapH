@@ -93,6 +93,14 @@
 //
 // iniciar_captura()
 //     Abre una captura nueva: fila/columna destino, secuencia vacía.
+//     Activa el modo Captura en analizador_trigger (a partir de acá,
+//     entrada.rs empieza a consumir todo hacia este archivo).
+//
+// cancelar_captura()
+//     Aborta la captura en curso, si había una: descarta el estado
+//     (sin armar RESULTADO_CAPTURA) y desactiva el modo Captura en
+//     analizador_trigger, para que los eventos físicos vuelvan a
+//     fluir normal.
 //
 // recibir_down()
 //     Agrega un Down a la secuencia en curso (llamada por
@@ -423,8 +431,9 @@ static CAPTURA: std::sync::Mutex<Option<CapturaEnCurso>> = std::sync::Mutex::new
 static RESULTADO_CAPTURA: std::sync::Mutex<Option<(String, String, TriggerCapturaUI)>> =
     std::sync::Mutex::new(None);
 
-/// Llamada por el botón de captura, antes de arrancar el analizador en
-/// modo Captura.
+/// Llamada por el botón de captura. Arma el estado transitorio y
+/// activa el modo Captura en analizador_trigger — desde ese momento,
+/// entrada.rs empieza a consumir todo lo que llegue y reenviarlo acá.
 pub fn iniciar_captura(fila_id: String, columna: String) {
     *CAPTURA.lock().unwrap() = Some(CapturaEnCurso {
         fila_id,
@@ -432,6 +441,19 @@ pub fn iniciar_captura(fila_id: String, columna: String) {
         secuencia: Vec::new(),
     });
     *RESULTADO_CAPTURA.lock().unwrap() = None;
+
+    crate::analizador_trigger::activar_captura();
+}
+
+/// Llamada por el botón ✕ ("cancelar") mientras la captura sigue en
+/// "Esperando...". Descarta el estado en curso sin armar ningún
+/// resultado, y desactiva el modo Captura para que los eventos
+/// físicos vuelvan a fluir normal de inmediato.
+pub fn cancelar_captura() {
+    *CAPTURA.lock().unwrap() = None;
+    *RESULTADO_CAPTURA.lock().unwrap() = None;
+
+    crate::analizador_trigger::desactivar_captura();
 }
 
 /// Llamada por AnalizadorTrigger (modo Captura) con cada Down nuevo.

@@ -29,6 +29,19 @@
 // Una tecla físicamente nueva, sin relación con nada de lo
 // anterior, no espera a que nada termine: se manda derecho
 // al analizador (comportamiento normal).
+//
+// EXCEPCIÓN — Modo Captura: mientras haya una captura activa
+// (analizador_trigger::captura_activa()), este archivo no
+// aplica NADA de lo anterior. Ni RETENIDO, ni DEVOLVIENDO, ni
+// el corte por cache::esta_vacia(). Todo evento se reenvía
+// directo a analizador_trigger::procesar_evento_captura() y
+// NUNCA se emite a Windows — la captura consume físicamente
+// todo lo que llega (así un clic derecho capturado no abre
+// menú contextual, ni un atajo ya guardado se dispara durante
+// la captura de uno nuevo). Es el primer chequeo de la
+// función, antes que cualquier otra cosa (incluido el corte
+// de cache vacía: con captura activa, da igual si hay algo
+// compilado o no).
 // ------------------------------------------------------
 // 2. ¿Quién llama este archivo?
 // back_interception::iniciar() — le entrega cada
@@ -140,9 +153,19 @@ thread_local! {
 }
 
 pub fn procesar_evento(evento: InputEvent) {
+    // EXCEPCIÓN — Modo Captura: se consume TODO, incondicionalmente, y
+    // ni se mira RETENIDO/DEVOLVIENDO ni el estado de la cache. Esto va
+    // primero que cualquier otra cosa (ver header, punto 5).
+    if analizador_trigger::captura_activa() {
+        analizador_trigger::procesar_evento_captura(evento);
+        return;
+    }
+
     // Diagnóstico + optimización: sin ningún remapeo compilado, no hay
     // nada que evaluar — se devuelve directo, sin tocar RETENIDO,
-    // DEVOLVIENDO ni el analizador.
+    // DEVOLVIENDO ni el analizador. (Solo aplica fuera de una captura:
+    // si hay captura activa, la rama de arriba ya se hizo cargo y esta
+    // línea ni se evalúa.)
     if cache::esta_vacia() {
         back_interception::emitir_evento(evento);
         return;

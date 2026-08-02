@@ -108,8 +108,12 @@
 //
 // convertir_accion()
 //     Resuelve accion_trigger/accion_referencia según
-//     tipo → Option<AccionCache>. None (tipo decorativo
-//     todavía no soportado) descarta la fila entera.
+//     tipo → Option<AccionCache>. None si el tipo es
+//     decorativo (todavía no soportado) O si la fila está
+//     en "ON" pero le faltan datos requeridos para su tipo
+//     (ej: tecla_mouse sin gatillo capturado todavía) — en
+//     los dos casos la fila se descarta de la cache, nunca
+//     se panickea por datos incompletos.
 // ------------------------------------------------------
 
 use crate::cache;
@@ -224,6 +228,14 @@ fn convertir_entrada(trigger: &crate::perfil_json::TriggerJson) -> Vec<InputId> 
 // macro/archivo/ui se usa accion_referencia tal cual.
 // Cualquier otro tipo (decorativo, sin implementar todavía
 // en Rust) hace que la fila se descarte al compilar.
+//
+// Una fila puede estar en "ON" y aun así no tener todavía
+// el dato que su tipo necesita (ej: se capturó el Trigger
+// pero no la Acción). Eso NO es un error del programa —
+// pasa mientras se arma la fila — así que se descarta de
+// la cache en silencio, igual que un tipo decorativo. Antes
+// esto panicaba y tiraba abajo toda la app al arrancar con
+// cualquier perfil que tuviera una fila así guardada.
 // ======================================================
 
 fn convertir_accion(remapeo: &RemapeoJson) -> Option<AccionCache> {
@@ -232,22 +244,16 @@ fn convertir_accion(remapeo: &RemapeoJson) -> Option<AccionCache> {
             let gatillo = remapeo
                 .accion_trigger
                 .as_ref()
-                .and_then(|trigger| trigger.gatillo.as_ref())
-                .unwrap_or_else(|| {
-                    panic!(
-                        "Remapeo '{}': tipo '{}' sin gatillo en accion_trigger",
-                        remapeo.id, remapeo.tipo
-                    )
-                });
+                .and_then(|trigger| trigger.gatillo.as_ref())?;
 
             Some(AccionCache::Emitir(convertir_input(gatillo)))
         }
 
-        "macro" => Some(AccionCache::Macro(referencia(remapeo))),
+        "macro" => Some(AccionCache::Macro(referencia(remapeo)?)),
 
-        "archivo" => Some(AccionCache::AbrirArchivo(referencia(remapeo))),
+        "archivo" => Some(AccionCache::AbrirArchivo(referencia(remapeo)?)),
 
-        "ui" => Some(AccionCache::Ui(referencia(remapeo))),
+        "ui" => Some(AccionCache::Ui(referencia(remapeo)?)),
 
         // Tipos todavía decorativos en la UI (Multimedia, Click
         // coordenada, Portapapeles, etc.): no producen ninguna acción
@@ -258,16 +264,14 @@ fn convertir_accion(remapeo: &RemapeoJson) -> Option<AccionCache> {
 }
 
 // ======================================================
-// 📎 REFERENCIA (accion_referencia obligatoria)
+// 📎 REFERENCIA (accion_referencia requerida)
+// ------------------------------------------------------
+// None si falta — la fila se descarta (ver nota arriba),
+// nunca se panickea por un dato incompleto.
 // ======================================================
 
-fn referencia(remapeo: &RemapeoJson) -> String {
-    remapeo.accion_referencia.clone().unwrap_or_else(|| {
-        panic!(
-            "Remapeo '{}': tipo '{}' sin accion_referencia",
-            remapeo.id, remapeo.tipo
-        )
-    })
+fn referencia(remapeo: &RemapeoJson) -> Option<String> {
+    remapeo.accion_referencia.clone()
 }
 
 // ======================================================
