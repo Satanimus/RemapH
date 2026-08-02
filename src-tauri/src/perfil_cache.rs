@@ -144,6 +144,7 @@ pub enum AppCache {
 // ======================================================
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
 pub enum CondicionTrigger {
     Simple,
 

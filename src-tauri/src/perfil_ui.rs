@@ -302,11 +302,11 @@ fn convertir_trigger(trigger: TriggerUI) -> TriggerJson {
 
 fn convertir_condicion(condicion: &str) -> crate::perfil_cache::CondicionTrigger {
     match condicion {
-        "Simple" => crate::perfil_cache::CondicionTrigger::Simple,
+        "simple" => crate::perfil_cache::CondicionTrigger::Simple,
 
-        "Doble" => crate::perfil_cache::CondicionTrigger::Doble,
+        "doble" => crate::perfil_cache::CondicionTrigger::Doble,
 
-        "Mantenido" => crate::perfil_cache::CondicionTrigger::Mantenido,
+        "mantenido" => crate::perfil_cache::CondicionTrigger::Mantenido,
 
         _ => panic!("Condición no soportada: {}", condicion),
     }
@@ -382,7 +382,25 @@ pub fn convertir_trigger_captura(
 
         gatillo: Some(convertir_input_captura(&gatillo)),
 
-        condicion: format!("{:?}", condicion),
+        condicion: condicion_a_texto(&condicion),
+    }
+}
+
+// ======================================================
+// 🎯 CONDICIÓN → TEXTO (para la UI)
+// ------------------------------------------------------
+// Conversión explícita, en minúscula (coherente con el
+// resto del proyecto) — no se usa format!("{:?}", ...)
+// porque eso ata la UI al nombre interno del enum en Rust.
+// ======================================================
+
+fn condicion_a_texto(condicion: &crate::perfil_cache::CondicionTrigger) -> String {
+    match condicion {
+        crate::perfil_cache::CondicionTrigger::Simple => "simple".to_string(),
+
+        crate::perfil_cache::CondicionTrigger::Doble => "doble".to_string(),
+
+        crate::perfil_cache::CondicionTrigger::Mantenido => "mantenido".to_string(),
     }
 }
 

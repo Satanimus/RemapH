@@ -44,7 +44,7 @@ export interface FilaPerfil {
 
   condicion: string;
 
-  ejecucion: string;
+  extra: string;
 
   app: AppPerfil;
 
@@ -65,13 +65,13 @@ export function crearFila(): FilaPerfil {
 
     trigger: crearTrigger(),
 
-    tipo: "Teclado",
+    tipo: "tecla_mouse",
 
     accion: null,
 
     condicion: "Normal",
 
-    ejecucion: "Normal",
+    extra: "",
 
     app: {
       programa: null,

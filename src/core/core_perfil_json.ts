@@ -24,6 +24,8 @@ import type { Entrada, TipoEntrada } from "./core_entrada";
 
 import { crearTrigger } from "./core_trigger";
 
+import type { Trigger } from "./core_trigger";
+
 // ======================================================
 // 📦 MODELO JSON
 // ======================================================
@@ -42,6 +44,11 @@ interface AppJson {
   segundoPlano: boolean;
 }
 
+// Nombres de campo tal cual los serializa Rust (snake_case,
+// sin #[serde(rename)]) — accion_trigger/accion_referencia
+// no siguen la convención camelCase del resto de la UI a
+// propósito, para que el nombre coincida exacto con el JSON
+// real y no dependa de una traducción adicional.
 interface RemapeoJson {
   id: string;
 
@@ -53,11 +60,11 @@ interface RemapeoJson {
 
   tipo: string;
 
-  accion: TriggerJson | null;
+  accion_trigger: TriggerJson | null;
 
-  condicion: string;
+  accion_referencia: string | null;
 
-  ejecucion: string;
+  extra: string;
 
   color: string;
 
@@ -68,6 +75,8 @@ interface TriggerJson {
   modificadores: InputJson[];
 
   gatillo: InputJson | null;
+
+  condicion: string;
 }
 
 interface InputJson {
@@ -93,6 +102,8 @@ export function convertirperfil_json(perfil_json: perfil_json): Perfil {
 // ======================================================
 
 function convertirRemapeo(remapeo: RemapeoJson): FilaPerfil {
+  const trigger = convertirTrigger(remapeo.trigger);
+
   return {
     id: remapeo.id,
 
@@ -100,25 +111,19 @@ function convertirRemapeo(remapeo: RemapeoJson): FilaPerfil {
 
     app: remapeo.app,
 
-    trigger: convertirTrigger(
-      remapeo.trigger,
-
-      remapeo.condicion,
-    ),
+    trigger,
 
     tipo: remapeo.tipo,
 
-    accion: remapeo.accion
-      ? convertirTrigger(
-          remapeo.accion,
-
-          "Simple",
-        )
+    accion: remapeo.accion_trigger
+      ? convertirTrigger(remapeo.accion_trigger)
       : null,
 
-    condicion: remapeo.condicion,
+    // Vestigial (duplica trigger.condicion) — nada la lee hoy,
+    // se mantiene solo porque FilaPerfil todavía declara el campo.
+    condicion: trigger.condicion,
 
-    ejecucion: remapeo.ejecucion,
+    extra: remapeo.extra,
 
     color: remapeo.color,
 
@@ -130,11 +135,7 @@ function convertirRemapeo(remapeo: RemapeoJson): FilaPerfil {
 // 🎯 CONVERTIR TRIGGER
 // ======================================================
 
-function convertirTrigger(
-  triggerJson: TriggerJson,
-
-  condicion: string,
-) {
+function convertirTrigger(triggerJson: TriggerJson): Trigger {
   const trigger = crearTrigger();
 
   trigger.modificadores = triggerJson.modificadores.map(convertirEntrada);
@@ -143,7 +144,7 @@ function convertirTrigger(
     ? convertirEntrada(triggerJson.gatillo)
     : null;
 
-  trigger.condicion = convertirCondicion(condicion);
+  trigger.condicion = convertirCondicion(triggerJson.condicion);
 
   return trigger;
 }
@@ -191,15 +192,15 @@ function convertirTipo(fuente: string): TipoEntrada {
 
 function convertirCondicion(
   condicion: string,
-): "Simple" | "Mantenido" | "Doble" {
+): "simple" | "mantenido" | "doble" {
   switch (condicion) {
-    case "Mantenido":
-      return "Mantenido";
+    case "mantenido":
+      return "mantenido";
 
-    case "Doble":
-      return "Doble";
+    case "doble":
+      return "doble";
 
     default:
-      return "Simple";
+      return "simple";
   }
 }

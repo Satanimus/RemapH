@@ -12,7 +12,9 @@ import {
   abrirPopupCondicion,
   abrirPopupTipo,
   abrirPopupColor,
-  abrirPopupEjecucion,
+  abrirPopupExtra,
+  tipoATexto,
+  extraATexto,
 } from "./comp_popup_abrir";
 
 import { abrirPopupApp } from "./comp_popup_app";
@@ -104,12 +106,12 @@ export function crearTipo(
   filaPerfil: FilaPerfil,
 ): HTMLButtonElement {
   return crearPopup({
-    texto: filaPerfil.tipo,
+    texto: tipoATexto(filaPerfil.tipo),
     onClick: (evento) => {
       abrirPopupTipo(
         evento,
-        (texto) => {
-          filaPerfil.tipo = texto;
+        (valor) => {
+          filaPerfil.tipo = valor;
 
           reconstruirFila(contexto.id);
         },
@@ -135,14 +137,14 @@ export function crearNota(filaPerfil: FilaPerfil): HTMLInputElement {
   return input;
 }
 
-export function crearEjecucion(
+export function crearExtra(
   contexto: ContextoFila,
   filaPerfil: FilaPerfil,
 ): HTMLButtonElement {
   return crearPopup({
-    texto: filaPerfil.ejecucion,
+    texto: extraATexto(filaPerfil.extra),
     onClick: (evento) => {
-      abrirPopupEjecucion(evento, contexto, filaPerfil);
+      abrirPopupExtra(evento, contexto, filaPerfil);
     },
   });
 }

@@ -83,7 +83,10 @@ export function crearCapturador(
     // 🚀 ACTIVAR CAPTURA BACKEND
     // ==============================================
 
-    await invoke("iniciar_captura");
+    await invoke("iniciar_captura", {
+      filaId: contexto.id,
+      columna: destino,
+    });
 
     // ==============================================
     // ⏳ ESPERAR RESULTADO
@@ -91,15 +94,27 @@ export function crearCapturador(
 
     const esperar = async () => {
       while (capturando) {
-        const capturado = await invoke("obtener_captura");
-
-        console.log(capturado);
+        const capturado = await invoke<[string, string, unknown] | null>(
+          "obtener_captura",
+        );
 
         if (capturado) {
+          const [filaId, columna, trigger] = capturado;
+
+          // Puede haber quedado un resultado de una captura
+          // anterior (fila/columna distinta) si esta se abrió
+          // muy rápido después de otra. Se ignora y se sigue
+          // esperando el que corresponde.
+          if (filaId !== contexto.id || columna !== destino) {
+            await new Promise((resolver) => setTimeout(resolver, 50));
+
+            continue;
+          }
+
           if (destino === "Trigger") {
-            filaPerfil.trigger = capturado;
+            filaPerfil.trigger = trigger as FilaPerfil["trigger"];
           } else {
-            filaPerfil.accion = capturado;
+            filaPerfil.accion = trigger as FilaPerfil["accion"];
           }
 
           capturando = false;

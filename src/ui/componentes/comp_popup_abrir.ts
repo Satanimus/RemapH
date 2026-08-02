@@ -57,6 +57,90 @@ function abrirLista(
   );
 }
 
+// ======================================================
+// 🏷️ LISTA CON VALOR SEPARADO DEL TEXTO
+// ------------------------------------------------------
+// Para popups donde lo que se muestra (label, con mayúscula,
+// legible) no es lo que se guarda (valor, en minúscula — el
+// mismo formato que espera Rust).
+// ======================================================
+
+function crearListaConValor(
+  opciones: { texto: string; valor: string }[],
+  seleccion?: (valor: string) => void,
+): HTMLElement {
+  const lista = document.createElement("div");
+
+  lista.className = "popup-lista";
+
+  opciones.forEach((opcion) => {
+    const boton = document.createElement("button");
+
+    boton.className = "ui-btn";
+
+    boton.textContent = opcion.texto;
+
+    boton.addEventListener("click", () => {
+      if (seleccion) {
+        seleccion(opcion.valor);
+      }
+
+      ocultarPopup();
+    });
+
+    lista.append(boton);
+  });
+
+  return lista;
+}
+
+function abrirListaConValor(
+  evento: MouseEvent,
+  opciones: { texto: string; valor: string }[],
+  actualizar: (valor: string) => void,
+): void {
+  mostrarPopup(
+    crearListaConValor(opciones, actualizar),
+    evento.clientX,
+    evento.clientY,
+  );
+}
+
+// ======================================================
+// 🧭 VOCABULARIO tipo / extra
+// ------------------------------------------------------
+// Única fuente de verdad para las opciones y sus valores
+// reales (los que espera Rust — ver compilador.rs). Los
+// tipos que no son "tecla_mouse" son decorativos por ahora:
+// el botón de Acción no hace nada, y compilador.rs descarta
+// la fila entera al compilar (no existe implementación real
+// todavía del lado Rust para esos tipos).
+// ======================================================
+
+const TIPO_OPCIONES: { texto: string; valor: string }[] = [
+  { texto: "Tecla/Mouse", valor: "tecla_mouse" },
+  { texto: "Click coordenada", valor: "click_coordenada" },
+  { texto: "Multimedia", valor: "multimedia" },
+  { texto: "Macro", valor: "macro" },
+  { texto: "Portapapeles", valor: "portapapeles" },
+];
+
+const EXTRA_OPCIONES: { texto: string; valor: string }[] = [
+  { texto: "Normal", valor: "" },
+  { texto: "Turbo", valor: "turbo" },
+  { texto: "Mantener", valor: "mantener" },
+];
+
+export function tipoATexto(valor: string): string {
+  return TIPO_OPCIONES.find((opcion) => opcion.valor === valor)?.texto ?? valor;
+}
+
+export function extraATexto(valor: string): string {
+  return (
+    EXTRA_OPCIONES.find((opcion) => opcion.valor === valor)?.texto ?? valor
+  );
+}
+
 export function abrirPopupCondicion(
   evento: MouseEvent,
   actualizar: (texto: string) => void,
@@ -66,21 +150,10 @@ export function abrirPopupCondicion(
 
 export function abrirPopupTipo(
   evento: MouseEvent,
-  actualizar: (texto: string) => void,
+  actualizar: (valor: string) => void,
   _contexto: ContextoFila,
 ): void {
-  abrirLista(
-    evento,
-    [
-      "Teclado",
-      "Mouse",
-      "Click coordenada",
-      "Multimedia",
-      "Macro",
-      "Portapapeles",
-    ],
-    actualizar,
-  );
+  abrirListaConValor(evento, TIPO_OPCIONES, actualizar);
 }
 
 export function abrirPopupEstado(
@@ -194,13 +267,13 @@ export function abrirPopupColor(
   });
 }
 
-export function abrirPopupEjecucion(
+export function abrirPopupExtra(
   evento: MouseEvent,
   contexto: ContextoFila,
   filaPerfil: FilaPerfil,
 ): void {
-  abrirLista(evento, ["Normal", "Turbo", "Mantener"], (texto) => {
-    filaPerfil.ejecucion = texto;
+  abrirListaConValor(evento, EXTRA_OPCIONES, (valor) => {
+    filaPerfil.extra = valor;
 
     reconstruirFila(contexto.id);
   });

@@ -16,7 +16,7 @@ import type { FilaPerfil } from "../core/core_perfil";
 import {
   crearEstado,
   crearTipo,
-  crearEjecucion,
+  crearExtra,
   crearApp,
   crearColor,
   crearNota,
@@ -90,10 +90,10 @@ export function crearFila(
 
         break;
 
-      case "ejecucion":
-        celda.dataset.control = "ejecucion";
+      case "extra":
+        celda.dataset.control = "extra";
 
-        celda.append(crearEjecucion(contexto, filaPerfil));
+        celda.append(crearExtra(contexto, filaPerfil));
 
         break;
 

@@ -31,3 +31,10 @@ export function crearAccionCoordenada(): HTMLButtonElement {
     clase: "capturador",
   });
 }
+
+export function crearAccionPortapapeles(): HTMLButtonElement {
+  return crearBoton({
+    texto: "Portapapeles",
+    clase: "capturador",
+  });
+}

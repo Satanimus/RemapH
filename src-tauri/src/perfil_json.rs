@@ -36,12 +36,12 @@
 //   trigger:
 //   { modificadores: [CTRL],
 //      gatillo: A,
-//      condicion: Doble},
-//   tipo: teclado,
+//      condicion: doble},
+//   tipo: tecla_mouse,
 //   accion_trigger:
 //   { modificadores: [],
 //      gatillo: B,
-//      condicion: Simple},
+//      condicion: simple},
 //   accion_referencia: null}
 // ------------------------------------------------------
 // 3. ¿Quién llama este archivo?
@@ -68,7 +68,7 @@
 // TriggerJson
 //     Representa cómo se activa un remapeo (o, reutilizada
 //     en accion_trigger, cómo se ejecuta una acción de
-//     tipo teclado/mouse). modificadores + gatillo + condicion.
+//     tipo tecla_mouse). modificadores + gatillo + condicion.
 // Input
 //     Representa una entrada física (fuente + control)
 //     tal como se guarda dentro de TriggerJson.
@@ -124,7 +124,7 @@ pub struct RemapeoJson {
     pub trigger: TriggerJson,
     pub tipo: String,
     // Caja cuyo contenido depende de `tipo`:
-    // - "teclado" / "mouse" -> accion_trigger (mod + gatillo + condicion)
+    // - "tecla_mouse" -> accion_trigger (mod + gatillo + condicion)
     // - "macro" / "archivo" / "ui" -> accion_referencia (ruta / valor)
     // Nunca los dos a la vez.
     pub accion_trigger: Option<TriggerJson>,

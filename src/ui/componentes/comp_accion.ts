@@ -11,6 +11,7 @@ import {
   crearAccionMultimedia,
   crearAccionMacro,
   crearAccionCoordenada,
+  crearAccionPortapapeles,
 } from "./comp_accion_contenido";
 
 import { crearCapturador } from "./comp_capturador";
@@ -25,14 +26,17 @@ export function crearAccion(
   alModificar: () => void,
 ): HTMLButtonElement {
   switch (filaPerfil.tipo) {
-    case "Multimedia":
+    case "multimedia":
       return crearAccionMultimedia();
 
-    case "Macro":
+    case "macro":
       return crearAccionMacro();
 
-    case "Click coordenada":
+    case "click_coordenada":
       return crearAccionCoordenada();
+
+    case "portapapeles":
+      return crearAccionPortapapeles();
 
     default:
       return crearCapturador(contexto, filaPerfil, "Accion", alModificar);

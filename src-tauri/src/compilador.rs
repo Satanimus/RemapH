@@ -108,7 +108,8 @@
 //
 // convertir_accion()
 //     Resuelve accion_trigger/accion_referencia según
-//     tipo → AccionCache.
+//     tipo → Option<AccionCache>. None (tipo decorativo
+//     todavía no soportado) descarta la fila entera.
 // ------------------------------------------------------
 
 use crate::cache;
@@ -153,6 +154,8 @@ fn compilar_remapeo(remapeo: &RemapeoJson) -> Option<RemapeoCache> {
         return None;
     }
 
+    let accion = convertir_accion(remapeo)?;
+
     Some(RemapeoCache {
         id: remapeo.id.clone(),
 
@@ -164,7 +167,7 @@ fn compilar_remapeo(remapeo: &RemapeoJson) -> Option<RemapeoCache> {
             condicion: remapeo.trigger.condicion.clone(),
         },
 
-        accion: convertir_accion(remapeo),
+        accion,
 
         extra: convertir_extra(&remapeo.extra),
     })
@@ -215,15 +218,17 @@ fn convertir_entrada(trigger: &crate::perfil_json::TriggerJson) -> Vec<InputId> 
 // ⚡ CONVERTIR ACCIÓN
 // ------------------------------------------------------
 // accion_trigger / accion_referencia es una caja cuyo
-// contenido depende de tipo: para teclado/mouse se usa
+// contenido depende de tipo: para tecla_mouse se usa
 // solo el gatillo del accion_trigger (Emitir es un único
 // control, sin modificadores ni condición). Para
 // macro/archivo/ui se usa accion_referencia tal cual.
+// Cualquier otro tipo (decorativo, sin implementar todavía
+// en Rust) hace que la fila se descarte al compilar.
 // ======================================================
 
-fn convertir_accion(remapeo: &RemapeoJson) -> AccionCache {
+fn convertir_accion(remapeo: &RemapeoJson) -> Option<AccionCache> {
     match remapeo.tipo.as_str() {
-        "teclado" | "mouse" => {
+        "tecla_mouse" => {
             let gatillo = remapeo
                 .accion_trigger
                 .as_ref()
@@ -235,18 +240,20 @@ fn convertir_accion(remapeo: &RemapeoJson) -> AccionCache {
                     )
                 });
 
-            AccionCache::Emitir(convertir_input(gatillo))
+            Some(AccionCache::Emitir(convertir_input(gatillo)))
         }
 
-        "macro" => AccionCache::Macro(referencia(remapeo)),
+        "macro" => Some(AccionCache::Macro(referencia(remapeo))),
 
-        "archivo" => AccionCache::AbrirArchivo(referencia(remapeo)),
+        "archivo" => Some(AccionCache::AbrirArchivo(referencia(remapeo))),
 
-        "ui" => AccionCache::Ui(referencia(remapeo)),
+        "ui" => Some(AccionCache::Ui(referencia(remapeo))),
 
-        _ => {
-            panic!("Acción no soportada: {}", remapeo.tipo);
-        }
+        // Tipos todavía decorativos en la UI (Multimedia, Click
+        // coordenada, Portapapeles, etc.): no producen ninguna acción
+        // real todavía. La fila entera se descarta al compilar (ver
+        // compilar_remapeo), igual que una fila en OFF.
+        _ => None,
     }
 }
 

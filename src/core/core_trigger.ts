@@ -5,7 +5,7 @@
 import type { Entrada } from "./core_entrada";
 import { normalizarEntrada } from "./core_normalizar_trigger";
 
-export type CondicionTrigger = "Simple" | "Mantenido" | "Doble";
+export type CondicionTrigger = "simple" | "mantenido" | "doble";
 
 export interface Trigger {
   modificadores: Entrada[];
@@ -21,7 +21,7 @@ export function crearTrigger(): Trigger {
 
     gatillo: null,
 
-    condicion: "Simple",
+    condicion: "simple",
   };
 }
 
@@ -44,11 +44,11 @@ export function triggerATexto(trigger: Trigger): string {
   let texto = gatillo.nombre;
 
   switch (trigger.condicion) {
-    case "Mantenido":
+    case "mantenido":
       texto = `[${texto}]`;
       break;
 
-    case "Doble":
+    case "doble":
       texto = `${texto} ×2`;
       break;
   }
@@ -94,17 +94,17 @@ export function triggerAHTML(trigger: Trigger): string {
 
   let nombreGatillo = gatillo.nombre;
 
-  if (trigger.condicion === "Mantenido") {
+  if (trigger.condicion === "mantenido") {
     partes.push(`<span class="trigger-sintaxis">[</span>`);
   }
 
   partes.push(`<span class="trigger-tecla">${nombreGatillo}</span>`);
 
-  if (trigger.condicion === "Mantenido") {
+  if (trigger.condicion === "mantenido") {
     partes.push(`<span class="trigger-sintaxis">]</span>`);
   }
 
-  if (trigger.condicion === "Doble") {
+  if (trigger.condicion === "doble") {
     partes.push(`<span class="trigger-sintaxis"> ×2</span>`);
   }
 
