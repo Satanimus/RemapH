@@ -26,13 +26,17 @@
 // cuándo arranca el timer.
 //
 // ⚠️ DECISIÓN RECONCILIADA (revisar si algo no cuadra):
-// Durante la espera de un Mantenido confirmado (ver Cache,
-// estado "esperando finalizar"), este archivo reenvía a
-// Cache TODOS los Up que ocurran (de cualquier tecla, no
-// solo del gatillo) — es la única forma de que Cache se
-// entere en el momento en que se suelta cualquier pieza
-// involucrada, para poder finalizar la instancia. Fuera de
-// esa ventana, ningún Up se reenvía nunca a Cache.
+// Este archivo reenvía a Cache TODOS los Up reales, siempre
+// (no solo durante la espera de un Mantenido confirmado).
+// Cache decide qué hacer con cada uno: si hay una instancia
+// Mantenido esperando justo ese Up, lo usa para finalizarla;
+// si no, lo usa para mantener sincronizadas sus listas de
+// comparación en reposo (sacar una tecla que ya se soltó,
+// para que no quede como fantasma bloqueando el próximo
+// match real de esa misma tecla). Antes, fuera de la ventana
+// de Mantenido, ningún Up llegaba nunca a Cache — eso dejaba
+// listas fantasma con teclas ya sueltas (ver cache.rs,
+// recibir_up).
 // ------------------------------------------------------
 // 2. ¿Quién llama este archivo?
 // entrada.rs (modo Runtime): le entrega cada InputEvent
@@ -347,7 +351,6 @@ struct Timer {
 struct Grupo {
     presionados: Vec<InputId>,
     timer: Option<Timer>,
-    reenviando_ups: bool,
 
     // Solo lo usa la rueda (InputState::Pulse): cuántos pulsos lleva la
     // ráfaga actual. Nunca se toca para teclas/clics normales.
@@ -359,7 +362,6 @@ impl Grupo {
         Self {
             presionados: Vec::new(),
             timer: None,
-            reenviando_ups: false,
             pulsos: 0,
         }
     }
@@ -431,11 +433,6 @@ impl AnalizadorTrigger {
             InputState::Up => {
                 let clave = Self::clave_grupo(&grupos, &evento.input)?;
 
-                let reenviar_up = grupos
-                    .get(&clave)
-                    .map(|g| g.reenviando_ups)
-                    .unwrap_or(false);
-
                 // Si hay timer corriendo sobre ESTA tecla puntual, nos
                 // interesa además si pedía disambiguar Doble
                 // (necesita_doble) — de eso depende si hace falta la
@@ -457,7 +454,7 @@ impl AnalizadorTrigger {
                 // tomado acá, ese re-lock en el mismo hilo es un deadlock
                 // (Mutex de std no es reentrante), y deja el hilo que procesa
                 // cada InputEvent físico trabado para siempre.
-                if reenviar_up && self.modo == ModoAnalizador::Runtime {
+                if self.modo == ModoAnalizador::Runtime {
                     drop(grupos);
                     cache::recibir_up(evento.input.clone());
                     grupos = self.grupos.lock().unwrap();
@@ -684,7 +681,6 @@ impl AnalizadorTrigger {
 
         if let Some(g) = grupos_g.get_mut(&clave) {
             g.timer = None;
-            g.reenviando_ups = modo == ModoAnalizador::Runtime;
         }
         drop(grupos_g);
 
@@ -764,13 +760,13 @@ impl AnalizadorTrigger {
         }
     }
 
-    /// Orden de Cache: descarta timer en curso y sale de la fase de
-    /// reenvío de Ups. No toca "presionados ahora".
+    /// Orden de Cache: descarta timer en curso. No toca "presionados
+    /// ahora" (ver header: los Up siempre se reenvían a Cache, ya no
+    /// depende de una fase especial).
     pub fn limpiar(&self) {
         let mut grupos = self.grupos.lock().unwrap();
         for grupo in grupos.values_mut() {
             grupo.timer = None;
-            grupo.reenviando_ups = false;
         }
     }
 

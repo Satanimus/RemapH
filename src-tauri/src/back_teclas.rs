@@ -209,6 +209,7 @@ const TABLA: &[(&str, ScanCode)] = &[
     // ------------------------------------------------
     ("LeftControl", ScanCode::LeftControl),
     ("LeftShift", ScanCode::LeftShift),
+    ("RightShift", ScanCode::RightShift),
     ("LeftAlt", ScanCode::LeftAlt),
 ];
 

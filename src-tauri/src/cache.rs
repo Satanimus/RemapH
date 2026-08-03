@@ -56,10 +56,13 @@
 //     repeat) del analizador.
 // recibir_condicion(condicion: CondicionTrigger) —
 //     resultado del timer que Cache había pedido.
-// recibir_up(input: InputId) — SOLO llega durante la
-//     ventana de espera de un Mantenido activo (ver
-//     analizador_trigger.rs) — se usa para detectar
-//     "se perdió el match".
+// recibir_up(input: InputId) — llega con CADA Up real (el
+//     analizador ya no filtra por ventana de Mantenido). Si
+//     hay una instancia Mantenido esperando ese Up, se usa
+//     para detectar "se perdió el match"; si no, para
+//     mantener sincronizadas las listas de comparación en
+//     reposo (sacar una tecla que ya se soltó, ver la
+//     función).
 // escribir_cache() / escribir_fila() / borrar_* — desde
 //     Compilador.
 // actualizar_estado_app() — desde back_app.
@@ -115,13 +118,16 @@
 // - Si no coincide con ninguna candidata → Pasar. Vaciar
 //   lista. limpiar() al analizador.
 // ------------------------------------------------------
-// 7. Mientras está "esperando finalizar" un Mantenido
+// 7. Cada Up real que llega (recibir_up)
 //
-// Cada recibir_up(input) que llegue: si ese input formaba
-// parte de la entrada que generó el match activo → se
-// perdió el match. Se manda Finalizar a Runtime, se vacía
-// la lista, se ordena limpiar() al analizador, y se
-// reinicia la lista con obtener_presionados().
+// - Si formaba parte de la entrada de un Mantenido activo
+//   esperando finalizar → se perdió el match. Se manda
+//   Finalizar a Runtime, se ordena limpiar() al analizador,
+//   y se reinicia la lista con obtener_presionados().
+// - Si no, y esa tecla está en alguna lista en reposo (no
+//   esperando_condicion) → se saca de esa lista (y si queda
+//   vacía, se descarta). Evita listas fantasma con teclas ya
+//   sueltas (ver recibir_up).
 // ------------------------------------------------------
 // 8. Funciones del archivo
 //
@@ -416,20 +422,48 @@ pub fn recibir_condicion(condicion: CondicionTrigger) {
     }
 }
 
-/// Solo llega mientras hay una instancia Mantenido activa esperando su
-/// Up (ver analizador_trigger.rs, reenviando_ups).
+/// Llega con CADA Up real (el analizador ya no filtra por ventana de
+/// Mantenido, ver analizador_trigger.rs). Dos casos:
+///
+/// 1. Hay una instancia Mantenido activa esperando justo este Up ->
+///    se perdió el match: finalizar esa instancia (como antes).
+/// 2. Si no, es un Up "normal": sacar esta tecla de cualquier lista de
+///    comparación en reposo (esperando_condicion == false) que la
+///    tenga. Las listas esperando_condicion NO se tocan acá — todavía
+///    necesitan ver esa tecla en su entrada para que recibir_condicion()
+///    las compare bien; se resuelven solas por su propio camino.
+///    Sin este paso 2, una lista recién sembrada por
+///    reiniciar_desde_presionados() con una tecla que en ese instante
+///    todavía estaba físicamente abajo (el propio gatillo que acababa
+///    de hacer match) quedaba con esa tecla fantasma para siempre,
+///    bloqueando el próximo match real de esa misma tecla.
 pub fn recibir_up(input: InputId) {
     let mut activas = ACTIVAS.lock().unwrap();
-    let Some(pos) = activas.iter().position(|a| a.entrada.contains(&input)) else {
-        return;
-    };
+    if let Some(pos) = activas.iter().position(|a| a.entrada.contains(&input)) {
+        let instancia = activas.remove(pos);
+        drop(activas);
 
-    let instancia = activas.remove(pos);
+        runtime::ejecutar(runtime::OrdenRuntime::Detener { id: instancia.id });
+        analizador_trigger::limpiar();
+        reiniciar_desde_presionados();
+        return;
+    }
     drop(activas);
 
-    runtime::ejecutar(runtime::OrdenRuntime::Detener { id: instancia.id });
-    analizador_trigger::limpiar();
-    reiniciar_desde_presionados();
+    let mut listas = LISTAS.lock().unwrap();
+    let mut vaciadas = Vec::new();
+
+    for lista in listas.iter_mut() {
+        if lista.esperando_condicion || !lista.entrada.contains(&input) {
+            continue;
+        }
+        lista.entrada.retain(|i| i != &input);
+        if lista.entrada.is_empty() {
+            vaciadas.push(lista.id);
+        }
+    }
+
+    listas.retain(|l| !vaciadas.contains(&l.id));
 }
 
 fn iniciar_y_finalizar(remapeo: RemapeoCache) {
