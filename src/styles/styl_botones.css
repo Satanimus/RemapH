@@ -45,6 +45,23 @@
         background var(--speed);
 }
 
+/* ======================================================
+   🎨 COLOR DE FILA
+   ------------------------------------------------------
+   Cuando la fila tiene un color guardado (--fila-color,
+   asignado en ui_fila.ts), sus botones principales usan
+   ese color como borde en reposo, en vez del gris por
+   defecto. El toggle ON/OFF/editado queda afuera (ya tiene
+   su propio color de fondo/borde). El resaltado cyan al
+   pasar el mouse NO cambia: la regla de abajo (.ui-btn:hover)
+   se declara después y gana el empate de especificidad.
+   ====================================================== */
+
+.fila .ui-btn:not(:where(.estado-toggle)) {
+
+    border-color: var(--fila-color, var(--border-light));
+}
+
 .ui-btn:hover {
 
     background: transparent;
@@ -246,6 +263,43 @@
 .trigger-sintaxis {
 
     color: var(--color-trigger-sintaxis);
+}
+
+/* ======================================================
+   🎨 BOTÓN COLOR — MUESTRA
+   ====================================================== */
+
+.color-control-muestra {
+
+    width: 14px;
+
+    height: 14px;
+
+    border-radius: 50%;
+
+    display: inline-block;
+}
+
+.popup-color-item {
+
+    display: flex;
+
+    align-items: center;
+
+    gap: var(--gap8);
+}
+
+.popup-color-muestra {
+
+    width: 12px;
+
+    height: 12px;
+
+    border-radius: 50%;
+
+    display: inline-block;
+
+    flex: none;
 }
 
 /* ======================================================

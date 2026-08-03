@@ -42,6 +42,12 @@ export function crearFila(
 
   fila.dataset.id = contexto.id;
 
+  if (filaPerfil.color) {
+    fila.style.setProperty("--fila-color", `var(--tag-${filaPerfil.color})`);
+  } else {
+    fila.style.removeProperty("--fila-color");
+  }
+
   COLUMNAS.forEach((col) => {
     const celda = document.createElement("div");
 

@@ -255,16 +255,85 @@ export function abrirPopupNumero(
   mostrarPopup(lista, evento.clientX, evento.clientY);
 }
 
+// ======================================================
+// 🎨 PALETA DE COLORES DE FILA
+// ------------------------------------------------------
+// El valor guardado (`valor`) es la clave usada para armar
+// la variable CSS --tag-<valor> (ver styl_variables.css).
+// No es un color literal: así el estilo queda editable
+// desde un solo lugar sin tocar este archivo.
+// ======================================================
+
+const COLOR_OPCIONES: { texto: string; valor: string }[] = [
+  { texto: "Rojo", valor: "red" },
+  { texto: "Naranja", valor: "orange" },
+  { texto: "Amarillo", valor: "yellow" },
+  { texto: "Verde", valor: "green" },
+  { texto: "Cian", valor: "cyan" },
+  { texto: "Azul", valor: "blue" },
+  { texto: "Morado", valor: "purple" },
+  { texto: "Rosa", valor: "pink" },
+  { texto: "Gris", valor: "gray" },
+];
+
 export function abrirPopupColor(
   evento: MouseEvent,
   contexto: ContextoFila,
   filaPerfil: FilaPerfil,
 ): void {
-  abrirLista(evento, ["🔴", "🟢", "🔵", "🟡"], (texto) => {
-    filaPerfil.color = texto;
+  const lista = document.createElement("div");
+
+  lista.className = "popup-lista";
+
+  // ----------------------------------
+  // 🎨 LIMPIAR
+  // ----------------------------------
+
+  const botonLimpiar = document.createElement("button");
+
+  botonLimpiar.className = "ui-btn";
+  botonLimpiar.textContent = "🎨 Limpiar";
+
+  botonLimpiar.addEventListener("click", () => {
+    filaPerfil.color = "";
 
     reconstruirFila(contexto.id);
+    ocultarPopup();
   });
+
+  lista.append(botonLimpiar);
+
+  // ----------------------------------
+  // 🎨 OPCIONES DE COLOR
+  // ----------------------------------
+
+  COLOR_OPCIONES.forEach((opcion) => {
+    const boton = document.createElement("button");
+
+    boton.className = "ui-btn popup-color-item";
+
+    const muestra = document.createElement("span");
+
+    muestra.className = "popup-color-muestra";
+    muestra.style.background = `var(--tag-${opcion.valor})`;
+
+    const texto = document.createElement("span");
+
+    texto.textContent = opcion.texto;
+
+    boton.append(muestra, texto);
+
+    boton.addEventListener("click", () => {
+      filaPerfil.color = opcion.valor;
+
+      reconstruirFila(contexto.id);
+      ocultarPopup();
+    });
+
+    lista.append(boton);
+  });
+
+  mostrarPopup(lista, evento.clientX, evento.clientY);
 }
 
 export function abrirPopupExtra(

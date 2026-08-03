@@ -270,11 +270,25 @@ export function crearColor(
   contexto: ContextoFila,
   filaPerfil: FilaPerfil,
 ): HTMLButtonElement {
-  return crearPopup({
-    texto: filaPerfil.color || "🎨",
-    titulo: "Color",
-    onClick: (evento) => {
-      abrirPopupColor(evento, contexto, filaPerfil);
-    },
+  const boton = document.createElement("button");
+
+  boton.className = "ui-btn color-control";
+  boton.title = "Color";
+
+  if (filaPerfil.color) {
+    const muestra = document.createElement("span");
+
+    muestra.className = "color-control-muestra";
+    muestra.style.background = `var(--tag-${filaPerfil.color})`;
+
+    boton.append(muestra);
+  } else {
+    boton.textContent = "🎨";
+  }
+
+  boton.addEventListener("click", (evento) => {
+    abrirPopupColor(evento, contexto, filaPerfil);
   });
+
+  return boton;
 }
