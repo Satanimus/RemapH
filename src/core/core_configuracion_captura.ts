@@ -1,5 +1,5 @@
 // ======================================================
-// ⚙️ core_Configuracion_Captura RemapH V3
+// ⚙️ core_Configuracion_Captura
 // ======================================================
 
 export const CONFIG_CAPTURA = {

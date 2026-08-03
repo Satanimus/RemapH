@@ -1,5 +1,5 @@
 // ======================================================
-// 🔄 core_Perfil_Json RemapH V3
+// 🔄 core_Perfil_Json
 // ------------------------------------------------------
 // Convierte perfil_json recibido desde Rust
 // al modelo Perfil utilizado por la UI.

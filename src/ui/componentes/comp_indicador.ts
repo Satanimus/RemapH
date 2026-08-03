@@ -1,5 +1,5 @@
 // ======================================================
-// 🔵 comp_Indicador RemapH V3
+// 🔵 comp_Indicador
 // ------------------------------------------------------
 // Lucecita de estado reutilizable (verde/rojo).
 // No sabe qué representa: solo pinta según el booleano

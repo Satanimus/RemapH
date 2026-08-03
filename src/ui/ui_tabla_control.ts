@@ -1,5 +1,5 @@
 // ======================================================
-// ui_Tabla_Control RemapH V3
+// ui_Tabla_Control
 // ======================================================
 
 let reconstruirTablaCallback: (() => void) | null = null;

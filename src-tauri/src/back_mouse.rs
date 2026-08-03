@@ -1,5 +1,5 @@
 // ======================================================
-// 🖱️ Back_Mouse RemapH V3
+// 🖱️ Back_Mouse
 // ------------------------------------------------------
 // 1. ¿Qué hace este archivo?
 // Traduce entre el mouse físico (flags MouseFilter +

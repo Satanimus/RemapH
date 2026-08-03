@@ -1,5 +1,5 @@
 // ======================================================
-// 🎛️ comp_Controles RemapH V3
+// 🎛️ comp_Controles
 // ======================================================
 
 import type { ContextoFila } from "../../core/core_contexto_fila";

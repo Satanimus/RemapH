@@ -1,5 +1,5 @@
 // ======================================================
-// ❓ comp_Popup_Confirmar RemapH V3
+// ❓ comp_Popup_Confirmar
 // ------------------------------------------------------
 // Diálogo genérico Sí/No, reutilizable.
 //

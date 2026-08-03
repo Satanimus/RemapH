@@ -1,7 +1,6 @@
 // ======================================================
-// 👤 USUARIO RemapH V3
+// 👤 USUARIO
 // ======================================================
-// ------------------------------------------------------
 // 1. ¿Qué hace este archivo?
 // Dueño de las rutas y archivos del usuario:
 //
@@ -74,7 +73,7 @@ use std::time::SystemTime;
 fn carpeta() -> Result<PathBuf, String> {
     let appdata = std::env::var("APPDATA").map_err(|error| error.to_string())?;
 
-    let carpeta = PathBuf::from(appdata).join("RemapH V3").join("Usuario");
+    let carpeta = PathBuf::from(appdata).join("RemapH").join("Usuario");
 
     fs::create_dir_all(&carpeta).map_err(|error| error.to_string())?;
 

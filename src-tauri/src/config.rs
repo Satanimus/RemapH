@@ -1,7 +1,5 @@
 // ======================================================
-// ⚙️ Config RemapH V3
-// ======================================================
-// ETAPA 0 DEL FLUJO
+// ⚙️ Config ETAPA 0 DEL FLUJO
 // ------------------------------------------------------
 // 1. ¿Qué hace este archivo?
 //
@@ -93,7 +91,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 // 📦 APP
 // ======================================================
 
-pub const NOMBRE_APP: &str = "RemapH V3";
+pub const NOMBRE_APP: &str = "RemapH";
 
 // ======================================================
 // ⏱️ TIEMPO DOBLE

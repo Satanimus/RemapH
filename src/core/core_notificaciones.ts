@@ -1,5 +1,5 @@
 // ======================================================
-// 🔔 core_Notificaciones RemapH V3
+// 🔔 core_Notificaciones
 // ------------------------------------------------------
 // Todos los textos de notificaciones de la aplicación.
 //

@@ -1,5 +1,5 @@
 // ======================================================
-// 🚀 src-tauri/src Lib.rs RemapH V3
+// 🚀 src-tauri/src Lib.rs
 // ------------------------------------------------------
 // Punto de entrada del backend.
 //

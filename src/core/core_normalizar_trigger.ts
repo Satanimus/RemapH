@@ -1,5 +1,5 @@
 // ======================================================
-// 🔤 core_Normalizar_Trigger RemapH V3
+// 🔤 core_Normalizar_Trigger
 // ------------------------------------------------------
 // Compatibilidad.
 //

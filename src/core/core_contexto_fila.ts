@@ -1,5 +1,5 @@
 // ======================================================
-// 🧩 core_Contexto_Fila RemapH V3
+// 🧩 core_Contexto_Fila
 // ======================================================
 
 export interface ContextoFila {

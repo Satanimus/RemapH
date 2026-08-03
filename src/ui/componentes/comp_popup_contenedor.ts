@@ -1,5 +1,5 @@
 // ======================================================
-// 🪟 comp_Popup_Contenedor RemapH V3
+// 🪟 comp_Popup_Contenedor
 // ------------------------------------------------------
 // Capa compartida por TODOS los popups.
 //

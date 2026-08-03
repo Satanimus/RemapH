@@ -1,5 +1,5 @@
 // ======================================================
-// 🎹 Back_Teclas RemapH V3
+// 🎹 Back_Teclas
 // ------------------------------------------------------
 // 1. ¿Qué hace este archivo?
 // Traduce entre el teclado físico (ScanCode de la

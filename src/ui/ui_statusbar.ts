@@ -1,5 +1,5 @@
 // ======================================================
-// ui_Statusbar RemapH V3
+// ui_Statusbar
 // ======================================================
 
 import type { FilaPerfil } from "../core/core_perfil";

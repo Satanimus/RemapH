@@ -1,5 +1,5 @@
 // ======================================================
-// 🔢 comp_Numero RemapH V3
+// 🔢 comp_Numero
 // ------------------------------------------------------
 // Columna número: botón "N ▾" con popup (Mover/Clonar/
 // Eliminar) en modo normal, o flechas ▲▼ de reordenar

@@ -1,5 +1,5 @@
 // ======================================================
-// ⚠️ core_Conflictos RemapH V3
+// ⚠️ core_Conflictos
 // ------------------------------------------------------
 // Detecta conflictos entre filas.
 //

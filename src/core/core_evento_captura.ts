@@ -1,5 +1,5 @@
 // ======================================================
-// ⏱️ core_Evento_Captura RemapH V3
+// ⏱️ core_Evento_Captura
 // ======================================================
 
 import type { Entrada } from "./core_entrada";

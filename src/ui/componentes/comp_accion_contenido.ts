@@ -1,5 +1,5 @@
 // ======================================================
-// ⚙️ comp_Accion_Contenido RemapH V3
+// ⚙️ comp_Accion_Contenido
 // ======================================================
 
 import { crearBoton } from "./comp_boton";

@@ -1,6 +1,5 @@
 // ======================================================
 // ui_Toolbar
-// RemapH V3
 // ======================================================
 //
 // Estados del perfil:
@@ -38,9 +37,7 @@ import {
 // CREAR TOOLBAR
 // ======================================================
 
-export function crearToolbar(
-  alGuardar: () => Promise<void>,
-): HTMLElement {
+export function crearToolbar(alGuardar: () => Promise<void>): HTMLElement {
   const toolbar = document.createElement("header");
 
   toolbar.className = "toolbar";
@@ -50,7 +47,7 @@ export function crearToolbar(
         <div class="toolbar-left">
 
             <div class="titulo">
-                RemapH V3
+                RemapH
             </div>
 
         </div>

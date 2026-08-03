@@ -1,5 +1,5 @@
 // ======================================================
-// 📝 vite-env.d.ts - Declaraciones Vite RemapH V3
+// 📝 vite-env.d.ts - Declaraciones Vite
 // ------------------------------------------------------
 // Permite importar archivos estáticos como CSS.
 // ======================================================

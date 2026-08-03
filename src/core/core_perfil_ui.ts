@@ -1,5 +1,5 @@
 // ======================================================
-// 📄 core_Perfil_UI RemapH V3
+// 📄 core_Perfil_UI
 // ------------------------------------------------------
 // Estado temporal editable de la interfaz.
 //

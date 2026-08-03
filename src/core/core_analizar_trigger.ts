@@ -1,6 +1,6 @@
 // ======================================================
 // 🧠 core_Analizar_trigger
-// RemapH V3
+//
 // ======================================================
 
 import type { EventoBuffer } from "./core_evento_captura";

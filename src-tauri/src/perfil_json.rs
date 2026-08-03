@@ -1,5 +1,5 @@
 // ======================================================
-// 👤 perfil_json RemapH V3
+// 👤 perfil_json  
 // ======================================================
 // 1. ¿Qué hace este archivo?
 // Modelo persistente del perfil de usuario.

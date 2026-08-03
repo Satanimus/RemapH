@@ -1,5 +1,5 @@
 // ======================================================
-// 🪟 comp_Popup_Abrir RemapH V3
+// 🪟 comp_Popup_Abrir
 // ======================================================
 
 import { mostrarPopup, ocultarPopup } from "./comp_popup_contenedor";

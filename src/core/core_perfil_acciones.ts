@@ -1,5 +1,5 @@
 // ======================================================
-// 📋 core_Perfil_Acciones RemapH V3
+// 📋 core_Perfil_Acciones
 // ======================================================
 
 import { obtenerPerfilUi } from "./core_perfil_ui";

@@ -1,5 +1,5 @@
 // ======================================================
-// ↔️ ui_Redimension_Columnas RemapH V3
+// ↔️ ui_Redimension_Columnas
 // ======================================================
 
 import { COLUMNAS } from "./ui_columnas";
