@@ -222,10 +222,14 @@ fn convertir_entrada(trigger: &crate::perfil_json::TriggerJson) -> Vec<InputId> 
 // ⚡ CONVERTIR ACCIÓN
 // ------------------------------------------------------
 // accion_trigger / accion_referencia es una caja cuyo
-// contenido depende de tipo: para tecla_mouse se usa
-// solo el gatillo del accion_trigger (Emitir es un único
-// control, sin modificadores ni condición). Para
-// macro/archivo/ui se usa accion_referencia tal cual.
+// contenido depende de tipo: para tecla_mouse se usan
+// modificadores + gatillo del accion_trigger, aplanados
+// en un solo Vec<InputId> con convertir_input (misma
+// convención que convertir_entrada del lado trigger:
+// modificadores primero, gatillo al final). La condición
+// del accion_trigger no se usa — Emitir no tiene condición
+// propia. Para macro/archivo/ui se usa accion_referencia
+// tal cual.
 // Cualquier otro tipo (decorativo, sin implementar todavía
 // en Rust) hace que la fila se descarte al compilar.
 //
@@ -241,12 +245,18 @@ fn convertir_entrada(trigger: &crate::perfil_json::TriggerJson) -> Vec<InputId> 
 fn convertir_accion(remapeo: &RemapeoJson) -> Option<AccionCache> {
     match remapeo.tipo.as_str() {
         "tecla_mouse" => {
-            let gatillo = remapeo
-                .accion_trigger
-                .as_ref()
-                .and_then(|trigger| trigger.gatillo.as_ref())?;
+            let trigger = remapeo.accion_trigger.as_ref()?;
 
-            Some(AccionCache::Emitir(convertir_input(gatillo)))
+            let gatillo = trigger.gatillo.as_ref()?;
+
+            let inputs = trigger
+                .modificadores
+                .iter()
+                .map(convertir_input)
+                .chain(std::iter::once(convertir_input(gatillo)))
+                .collect();
+
+            Some(AccionCache::Emitir(inputs))
         }
 
         "macro" => Some(AccionCache::Macro(referencia(remapeo)?)),

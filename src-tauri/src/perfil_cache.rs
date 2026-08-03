@@ -187,7 +187,12 @@ pub struct TriggerCache {
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum AccionCache {
-    Emitir(InputId),
+    // Modificadores + gatillo, en ese orden (misma convención que
+    // TriggerCache::entrada) — el último elemento es siempre el
+    // gatillo, los anteriores son modificadores que van DOWN antes
+    // y UP después (en orden inverso). Nunca vacío: convertir_accion
+    // garantiza al menos el gatillo.
+    Emitir(Vec<InputId>),
 
     Macro(String),
 

@@ -42,19 +42,31 @@
 //    sabe.
 //
 // B) AccionCache — las 4 variantes son tupla, no struct
-//    (Emitir(InputId), Macro(String), AbrirArchivo(String),
+//    (Emitir(Vec<InputId>), Macro(String), AbrirArchivo(String),
 //    Ui(String)). Si algún día se reescribe perfil_cache.rs,
 //    no volver a variantes struct sin revisar compilador.rs
 //    y este archivo — ya se rompió una vez por esto.
+//    Emitir guarda modificadores + gatillo en ese orden
+//    (último elemento = gatillo, ver perfil_cache.rs) — nunca
+//    un InputId suelto, para no perder el Mod de un combo
+//    A+B en la salida (bug 3-A).
 //
 // C) Extra (Turbo/Mantener/Toggle/etc.) SIEMPRE pasa por
 //    runt_extra::obtener(&extra), que devuelve un molde en
 //    Idioma Runtime con placeholders [ACCION] /
 //    [ACCION_DOWN] / [ACCION_UP]. Runtime sustituye esos
-//    placeholders por el control real de la Acción de esa
+//    placeholders por los pasos reales de la Acción de esa
 //    fila (sustituir_accion()) y lo corre como una macro
-//    más. La sustitución SOLO tiene efecto si la Acción es
-//    Emitir — para Macro/AbrirArchivo/Ui no hay down/up
+//    más. Con un combo como Acción, cada placeholder puede
+//    expandirse a VARIAS líneas (no es un simple reemplazo
+//    de texto): [ACCION] → DOWN de cada mod (en orden) → DOWN
+//    gatillo → UP gatillo → UP de cada mod (orden inverso).
+//    [ACCION_DOWN] → solo la mitad de abajo (DOWN mods + DOWN
+//    gatillo); [ACCION_UP] → solo la mitad de arriba (UP
+//    gatillo + UP mods en reversa). Así Turbo repite el combo
+//    completo en cada vuelta, y Mantener no suelta nada hasta
+//    el final. La sustitución SOLO tiene efecto si la Acción
+//    es Emitir — para Macro/AbrirArchivo/Ui no hay down/up
 //    físico que poner ahí, los placeholders quedan sin
 //    reemplazar (línea inofensiva, no rompe nada, pero
 //    tampoco hace lo que probablemente se esperaba: esa
@@ -115,8 +127,14 @@
 //     placeholders, corre el resultado como macro en un
 //     hilo nuevo.
 // sustituir_accion(lineas, accion)
-//     Reemplaza [ACCION]/[ACCION_DOWN]/[ACCION_UP] por el
-//     control real, solo si accion es Emitir.
+//     Expande [ACCION]/[ACCION_DOWN]/[ACCION_UP] a los pasos
+//     DOWN/UP reales del combo (mods + gatillo), solo si
+//     accion es Emitir. Una línea con placeholder puede
+//     convertirse en varias líneas.
+// emitir_combo(inputs)
+//     Ejecuta un Emitir directo (sin Extra): DOWN de los
+//     mods en orden, DOWN+UP del gatillo, UP de los mods en
+//     orden inverso.
 // ejecutar_macro_en_hilo(id, ruta)
 //     Lee un archivo de macro de usuario, lo corre en un
 //     hilo nuevo (mismo intérprete que un Extra).
@@ -241,8 +259,8 @@ fn ejecutar_accion(id: String, accion: AccionCache, extra: Option<ExtraCache>) {
     }
 
     match accion {
-        AccionCache::Emitir(input) => {
-            emitir(input);
+        AccionCache::Emitir(inputs) => {
+            emitir_combo(&inputs);
         }
 
         AccionCache::Macro(ruta) => {
@@ -289,6 +307,44 @@ fn mostrar_ui(valor: String) {
 
 fn emitir(input: InputId) {
     let evento = crate::eventos::InputEvent::pulse(input, crate::instante::ahora());
+
+    emitir_evento(evento);
+}
+
+// ======================================================
+// 📤 EMITIR COMBO (Emitir directo, sin Extra)
+// ------------------------------------------------------
+// inputs = [mod1, mod2, ..., gatillo] (último = gatillo,
+// ver perfil_cache.rs). DOWN de los mods en orden → DOWN+UP
+// del gatillo → UP de los mods en orden inverso. Con un solo
+// elemento (sin modificadores) es equivalente a un pulse.
+// ======================================================
+
+fn emitir_combo(inputs: &[InputId]) {
+    let Some((gatillo, mods)) = inputs.split_last() else {
+        return;
+    };
+
+    for modificador in mods {
+        emitir_down_input(modificador.clone());
+    }
+
+    emitir_down_input(gatillo.clone());
+    emitir_up_input(gatillo.clone());
+
+    for modificador in mods.iter().rev() {
+        emitir_up_input(modificador.clone());
+    }
+}
+
+fn emitir_down_input(input: InputId) {
+    let evento = crate::eventos::InputEvent::down(input, crate::instante::ahora());
+
+    emitir_evento(evento);
+}
+
+fn emitir_up_input(input: InputId) {
+    let evento = crate::eventos::InputEvent::up(input, crate::instante::ahora());
 
     emitir_evento(evento);
 }
@@ -342,28 +398,80 @@ fn ejecutar_extra_en_hilo(id: String, extra: ExtraCache, accion: AccionCache) {
 // 🔤 SUSTITUIR [ACCION] / [ACCION_DOWN] / [ACCION_UP]
 // ------------------------------------------------------
 // Solo tiene sentido cuando la acción es Emitir (una
-// tecla/botón física). Los demás tipos de acción no
-// tienen un down/up que sustituir — la línea queda como
-// está (no hace nada al ejecutarse, no rompe nada).
+// tecla/botón física, o un combo mod+gatillo). Los demás
+// tipos de acción no tienen un down/up que sustituir — la
+// línea queda como está (no hace nada al ejecutarse, no
+// rompe nada).
+//
+// Con un combo, un placeholder que ocupa toda la línea se
+// expande a VARIAS líneas (no un simple reemplazo de texto):
+// • [ACCION_DOWN] → DOWN de cada mod (orden) + DOWN gatillo
+// • [ACCION_UP]   → UP gatillo + UP de cada mod (orden inverso)
+// • [ACCION]      → la secuencia [ACCION_DOWN] + [ACCION_UP]
+//   seguida, para que un solo pulso incluya el combo entero
+//   (así Turbo repite mod+gatillo completos en cada vuelta).
+//
+// Un placeholder que viene mezclado con más texto en la
+// misma línea (ej. "TOGGLE [ACCION]") no se puede expandir a
+// varias líneas sin romper esa línea, así que ahí se sustituye
+// solo por el control del gatillo — igual que antes de este
+// cambio. Toggle hoy no distingue combos con modificador.
 // ======================================================
 
 fn sustituir_accion(lineas: Vec<String>, accion: &AccionCache) -> Vec<String> {
-    let AccionCache::Emitir(input) = accion else {
+    let AccionCache::Emitir(inputs) = accion else {
         return lineas;
     };
 
-    let Some(control) = input.control() else {
-        return lineas;
+    let controles: Vec<&str> = inputs.iter().filter_map(InputId::control).collect();
+
+    let (gatillo, mods) = match controles.split_last() {
+        Some((gatillo, mods)) => (*gatillo, mods),
+
+        None => return lineas,
     };
 
     lineas
         .into_iter()
-        .map(|linea| {
-            linea
-                .replace("[ACCION_DOWN]", &format!("DOWN {control}"))
-                .replace("[ACCION_UP]", &format!("UP {control}"))
-                .replace("[ACCION]", control)
-        })
+        .flat_map(|linea| expandir_placeholder(linea, mods, gatillo))
+        .collect()
+}
+
+fn expandir_placeholder(linea: String, mods: &[&str], gatillo: &str) -> Vec<String> {
+    match linea.as_str() {
+        "[ACCION_DOWN]" => lineas_abajo(mods, gatillo),
+
+        "[ACCION_UP]" => lineas_arriba(mods, gatillo),
+
+        "[ACCION]" => {
+            let mut pasos = lineas_abajo(mods, gatillo);
+
+            pasos.extend(lineas_arriba(mods, gatillo));
+
+            pasos
+        }
+
+        _ => vec![linea
+            .replace("[ACCION_DOWN]", &format!("DOWN {gatillo}"))
+            .replace("[ACCION_UP]", &format!("UP {gatillo}"))
+            .replace("[ACCION]", gatillo)],
+    }
+}
+
+fn lineas_abajo(mods: &[&str], gatillo: &str) -> Vec<String> {
+    mods.iter()
+        .map(|modificador| format!("DOWN {modificador}"))
+        .chain(std::iter::once(format!("DOWN {gatillo}")))
+        .collect()
+}
+
+fn lineas_arriba(mods: &[&str], gatillo: &str) -> Vec<String> {
+    std::iter::once(format!("UP {gatillo}"))
+        .chain(
+            mods.iter()
+                .rev()
+                .map(|modificador| format!("UP {modificador}")),
+        )
         .collect()
 }
 
