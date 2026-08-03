@@ -90,10 +90,13 @@
 //        → Pasar. Vaciar lista. limpiar() al analizador.
 // 4. posibles == exactas == 1, y la fila candidata es
 //    Simple
-//        → Iniciar + Finalizar juntos a Runtime (sin
-//          pedir condición, no hace falta desambiguar).
-//          Vaciar lista y reiniciarla con
-//          obtener_presionados().
+//        → Resuelve sin pedir condición (no hace falta
+//          desambiguar). Igual que en recibir_condicion: si
+//          el Extra de la fila requiere_up_real() (Turbo,
+//          Mantener, Click Sostenido) → Iniciar sin
+//          Finalizar, queda esperando recibir_up(); si no →
+//          Iniciar + Finalizar juntos. Vaciar lista y
+//          reiniciarla con obtener_presionados().
 // 5. posibles == exactas (≥1), y la(s) candidata(s) no
 //    son trivialmente Simple (una sola candidata que no es
 //    Simple, o varias con distinta condición)
@@ -108,13 +111,18 @@
 //
 // - Si la condición recibida coincide con una fila
 //   candidata exacta:
-//     - Simple o Doble → Iniciar + Finalizar juntos a
-//       Runtime. Vaciar lista, reiniciar con
-//       obtener_presionados().
-//     - Mantenido → Iniciar (sin Finalizar) a Runtime.
-//       Queda "esperando finalizar" para ese id — a partir
-//       de acá empieza a recibir recibir_up() del
-//       analizador.
+//     - Si el Extra de esa fila requiere Up real
+//       (ExtraCache::requiere_up_real — Turbo, Mantener,
+//       Click Sostenido) → Iniciar (sin Finalizar) a
+//       Runtime. Queda "esperando finalizar" para ese id —
+//       a partir de acá empieza a recibir recibir_up() del
+//       analizador. Esto NO depende de qué Condición lo
+//       disparó (Simple/Doble/Mantenido): un Mantenido sin
+//       Extra de este tipo igual se Finaliza de una — lo que
+//       importa es si el Extra necesita que alguien le avise
+//       cuándo soltar, no cómo se armó el trigger.
+//     - Si no, Iniciar + Finalizar juntos a Runtime. Vaciar
+//       lista, reiniciar con obtener_presionados().
 // - Si no coincide con ninguna candidata → Pasar. Vaciar
 //   lista. limpiar() al analizador.
 // ------------------------------------------------------
@@ -357,7 +365,17 @@ pub fn recibir_down(input: InputId) {
         && exactas == 1
         && candidatas[0].trigger.condicion == CondicionTrigger::Simple
     {
-        iniciar_y_finalizar(candidatas[0].clone());
+        let remapeo = candidatas[0].clone();
+        let diferido = remapeo
+            .extra
+            .as_ref()
+            .is_some_and(|extra| extra.requiere_up_real());
+
+        if diferido {
+            iniciar_solamente(remapeo, entrada_actual);
+        } else {
+            iniciar_y_finalizar(remapeo);
+        }
         limpiar_lista(id);
         reiniciar_desde_presionados();
         entrada::consumir();
@@ -405,7 +423,12 @@ pub fn recibir_condicion(condicion: CondicionTrigger) {
 
     match match_final {
         Some(remapeo) if posibles == exactas => {
-            if condicion == CondicionTrigger::Mantenido {
+            let diferido = remapeo
+                .extra
+                .as_ref()
+                .is_some_and(|extra| extra.requiere_up_real());
+
+            if diferido {
                 iniciar_solamente(remapeo, entrada_actual);
             } else {
                 iniciar_y_finalizar(remapeo);

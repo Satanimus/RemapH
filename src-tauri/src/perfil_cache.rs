@@ -227,3 +227,19 @@ pub enum ExtraCache {
     // UI
     PopupToggle,
 }
+
+impl ExtraCache {
+    /// true si la receta de runt_extra para este Extra termina en
+    /// "ESPERAR DETENER" — necesita que Cache espere el Up físico
+    /// real (vía Iniciar sin Finalizar) en vez de mandar Iniciar +
+    /// Detener juntos apenas se confirma el trigger. Independiente
+    /// de la Condición que lo disparó (Simple/Doble/Mantenido): lo
+    /// que decide si el final es diferido es el Extra, no el
+    /// trigger.
+    pub fn requiere_up_real(&self) -> bool {
+        matches!(
+            self,
+            ExtraCache::Turbo | ExtraCache::Mantener | ExtraCache::ClickSostenido
+        )
+    }
+}

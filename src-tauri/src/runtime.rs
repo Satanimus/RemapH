@@ -131,6 +131,12 @@
 //     intercepta ejecutar_lineas() antes de llegar aquí,
 //     porque necesita controlar el loop completo, no solo
 //     un paso.
+// esperar_detener(id)
+//     Caso especial de ESPERAR: en vez de dormir un tiempo
+//     fijo, bloquea sondeando debe_detenerse() hasta que
+//     llegue la orden de detener. Usado por Mantener/Click
+//     Sostenido para no soltar la acción hasta que Cache
+//     avise que el físico se soltó.
 // detener(id) / debe_detenerse(id) / limpiar_instancia(id)
 //     Manejo de la bandera compartida en INSTANCIAS.
 // resolver_input(interno) / ejecutar_down() /
@@ -144,9 +150,11 @@
 // ------------------------------------------------------
 // Idioma Runtime:
 //
-// Una línea = un paso. Vocabulario fijo, en español:
+// Una línea = un paso. Vocabulario fijo, en español
+// (excepto DOWN/UP, que se mantienen en inglés):
 //
 // ESPERAR 50
+// ESPERAR DETENER     (bloquea hasta la orden de detener)
 // DOWN A
 // UP A
 // LeftButton          (sin DOWN/UP = pulse)
@@ -291,6 +299,25 @@ fn emitir(input: InputId) {
 
 fn esperar(ms: u64) {
     thread::sleep(Duration::from_millis(ms));
+}
+
+// ======================================================
+// ⏸️ ESPERAR DETENER
+// ------------------------------------------------------
+// Bloquea el hilo de la instancia hasta que llegue la
+// orden de detener (detener(id)) — usado por Mantener y
+// Click Sostenido para no soltar la acción hasta que el
+// físico se suelte (Cache es quien manda el Detener en
+// ese momento). Sondea debe_detenerse() en vez de dormir
+// una sola vez porque no hay forma de despertar el hilo
+// desde afuera — el intervalo es corto para que la
+// liberación se sienta instantánea.
+// ======================================================
+
+fn esperar_detener(id: &str) {
+    while !debe_detenerse(id) {
+        thread::sleep(Duration::from_millis(15));
+    }
 }
 
 // ======================================================
@@ -446,7 +473,9 @@ fn ejecutar_linea(id: &str, linea: &str) {
         // ==============================================
         "ESPERAR" => {
             if let Some(valor) = partes.get(1) {
-                if let Ok(ms) = valor.parse::<u64>() {
+                if *valor == "DETENER" {
+                    esperar_detener(id);
+                } else if let Ok(ms) = valor.parse::<u64>() {
                     esperar(ms);
                 }
             }

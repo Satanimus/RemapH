@@ -83,8 +83,8 @@ pub fn obtener(extra: &ExtraCache) -> Vec<String> {
         // ==================================================
         ExtraCache::Turbo => vec![
             "[ACCION]".into(),
-            format!("WAIT {}", config::tiempo_repeticion()),
-            "LOOP".into(),
+            format!("ESPERAR {}", config::tiempo_repeticion()),
+            "REPETIR".into(),
         ],
 
         // ==================================================
@@ -92,7 +92,7 @@ pub fn obtener(extra: &ExtraCache) -> Vec<String> {
         // ==================================================
         ExtraCache::Mantener => vec![
             "[ACCION_DOWN]".into(),
-            "WAIT STOP".into(),
+            "ESPERAR DETENER".into(),
             "[ACCION_UP]".into(),
         ],
 
@@ -104,14 +104,14 @@ pub fn obtener(extra: &ExtraCache) -> Vec<String> {
         // ==================================================
         // 🖱️ DOBLE CLICK
         // ==================================================
-        ExtraCache::DobleClick => vec!["[ACCION]".into(), "WAIT 50".into(), "[ACCION]".into()],
+        ExtraCache::DobleClick => vec!["[ACCION]".into(), "ESPERAR 50".into(), "[ACCION]".into()],
 
         // ==================================================
         // 🖱️ CLICK SOSTENIDO
         // ==================================================
         ExtraCache::ClickSostenido => vec![
             "[ACCION_DOWN]".into(),
-            "WAIT STOP".into(),
+            "ESPERAR DETENER".into(),
             "[ACCION_UP]".into(),
         ],
 
