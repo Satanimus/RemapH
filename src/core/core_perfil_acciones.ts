@@ -4,7 +4,7 @@
 
 import { obtenerPerfilUi } from "./core_perfil_ui";
 
-import { clonarFila } from "./core_perfil";
+import { clonarFila, crearFila } from "./core_perfil";
 
 import type { FilaPerfil } from "./core_perfil";
 
@@ -26,6 +26,11 @@ export function clonarFilaPorId(id: string): void {
 
 // ======================================================
 // 🗑️ ELIMINAR FILA POR ID
+// ------------------------------------------------------
+// Si la fila eliminada era la única del perfil, se crea
+// automáticamente una fila nueva y vacía en su lugar, de
+// forma que la tabla nunca queda sin ninguna fila (solo
+// da la sensación de haberse "limpiado").
 // ======================================================
 
 export function eliminarFilaPorId(id: string): void {
@@ -42,6 +47,10 @@ export function eliminarFilaPorId(id: string): void {
 
     1,
   );
+
+  if (perfil.filas.length === 0) {
+    perfil.filas.push(crearFila());
+  }
 }
 
 // ======================================================

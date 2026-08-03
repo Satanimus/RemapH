@@ -18,6 +18,8 @@
 
 import type { Perfil, FilaPerfil } from "./core_perfil";
 
+import { crearFila } from "./core_perfil";
+
 import { crearEntrada } from "./core_entrada";
 
 import type { Entrada, TipoEntrada } from "./core_entrada";
@@ -87,13 +89,18 @@ interface InputJson {
 
 // ======================================================
 // 🔄 CONVERTIR PERFIL
+// ------------------------------------------------------
+// Si el perfil llega sin remapeos (perfil nuevo), se crea
+// una fila vacía para que la tabla nunca quede sin filas.
 // ======================================================
 
 export function convertirperfil_json(perfil_json: perfil_json): Perfil {
+  const filas = perfil_json.remapeos.map(convertirRemapeo);
+
   return {
     activo: true,
 
-    filas: perfil_json.remapeos.map(convertirRemapeo),
+    filas: filas.length > 0 ? filas : [crearFila()],
   };
 }
 

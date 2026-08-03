@@ -12,12 +12,7 @@ import { crearContenedorPopup } from "./componentes/comp_popup_contenedor";
 
 import { obtenerPerfilUi } from "../core/core_perfil_ui";
 
-import {
-  reconstruirTabla,
-  registrarActualizacionConflictos,
-} from "./ui_tabla_control";
-
-import { crearFila } from "../core/core_perfil";
+import { registrarActualizacionConflictos } from "./ui_tabla_control";
 
 // ======================================================
 // CREAR LAYOUT
@@ -30,19 +25,7 @@ export function crearLayout(alGuardar: () => Promise<void>): HTMLElement {
     actualizarStatusbar(obtenerPerfilUi().filas);
   });
 
-  const toolbar = crearToolbar(
-    () => {
-      const perfil = obtenerPerfilUi();
-
-      perfil.filas.push(crearFila());
-
-      reconstruirTabla();
-
-      marcarPerfilEditado(toolbar);
-    },
-
-    alGuardar,
-  );
+  const toolbar = crearToolbar(alGuardar);
 
   const tabla = crearTabla(() => {
     marcarPerfilEditado(toolbar);

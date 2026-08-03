@@ -8,9 +8,11 @@
 
 import type { ContextoFila } from "../../core/core_contexto_fila";
 import type { FilaPerfil } from "../../core/core_perfil";
+import { crearFila } from "../../core/core_perfil";
 import { crearBoton } from "./comp_boton";
 import { abrirPopupNumero } from "./comp_popup_abrir";
 import { moverFilaPorId } from "../../core/core_perfil_acciones";
+import { obtenerPerfilUi } from "../../core/core_perfil_ui";
 import { estaEnModoMover, reconstruirTabla } from "../ui_tabla_control";
 
 export function crearNumero(
@@ -24,6 +26,10 @@ export function crearNumero(
     return crearNumeroMover(contexto, numero, total, alModificar);
   }
 
+  const contenedor = document.createElement("div");
+
+  contenedor.className = "numero-celda";
+
   const boton = crearBoton({
     texto: `${numero} ▾`,
     titulo: "Opciones de fila",
@@ -33,7 +39,40 @@ export function crearNumero(
     abrirPopupNumero(evento, contexto, filaPerfil, alModificar);
   });
 
-  return boton;
+  contenedor.append(boton);
+
+  // ==================================================
+  // ➕ AGREGAR FILA (solo debajo de la última fila)
+  // ==================================================
+
+  if (numero === total) {
+    const botonAgregar = document.createElement("button");
+
+    botonAgregar.className = "btn-agregar-fila";
+    botonAgregar.type = "button";
+    botonAgregar.title = "Agregar fila";
+
+    const simbolo = document.createElement("span");
+
+    simbolo.textContent = "+";
+
+    botonAgregar.append(simbolo);
+
+    botonAgregar.addEventListener("click", (evento) => {
+      evento.stopPropagation();
+
+      const perfil = obtenerPerfilUi();
+
+      perfil.filas.push(crearFila());
+
+      alModificar();
+      reconstruirTabla();
+    });
+
+    contenedor.append(botonAgregar);
+  }
+
+  return contenedor;
 }
 
 // ======================================================

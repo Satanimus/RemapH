@@ -764,3 +764,94 @@
 
     background: rgba(216, 166, 40, .15);
 }
+
+/* ======================================================
+   🔢 NÚMERO — CELDA NORMAL
+   ------------------------------------------------------
+   Envuelve el botón "N ▾" y, solo en la última fila, el
+   botón circular "+" de agregar fila, posicionado justo
+   debajo del número.
+   ====================================================== */
+
+.numero-celda {
+
+    position: relative;
+
+    width: 100%;
+
+    height: 100%;
+
+    display: flex;
+
+    align-items: center;
+
+    justify-content: center;
+}
+
+/* ======================================================
+   ➕ AGREGAR FILA
+   ------------------------------------------------------
+   Círculo con "+" anclado debajo del número de la última
+   fila de la tabla.
+   ====================================================== */
+
+.btn-agregar-fila {
+
+    position: absolute;
+
+    top: 100%;
+
+    left: 50%;
+
+    transform: translate(-50%, var(--gap8));
+
+    width: 22px;
+
+    height: 22px;
+
+    display: flex;
+
+    align-items: center;
+
+    justify-content: center;
+
+    margin: 0;
+
+    padding: 0;
+
+    background: var(--button-bg);
+
+    color: var(--text-soft);
+
+    border: 1px solid var(--border-light);
+
+    border-radius: 50%;
+
+    font-family: var(--font);
+
+    font-size: var(--fs14);
+
+    line-height: 0;
+
+    cursor: pointer;
+
+    z-index: 1;
+
+    transition:
+        border-color .12s ease,
+        color .12s ease;
+}
+
+.btn-agregar-fila span {
+
+    display: block;
+
+    transform: translateY(-1px);
+}
+
+.btn-agregar-fila:hover {
+
+    border-color: var(--highlight);
+
+    color: var(--highlight);
+}

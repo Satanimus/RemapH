@@ -227,7 +227,6 @@
    🔘 BOTONES TOOLBAR
    ====================================================== */
 
-.btn-nueva-fila,
 .configuracion {
 
     height: 30px;
@@ -252,7 +251,6 @@
         border-color .12s ease;
 }
 
-.btn-nueva-fila:hover,
 .configuracion:hover {
 
     background: transparent;

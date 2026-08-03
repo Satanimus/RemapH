@@ -109,6 +109,13 @@
     border-right: 1px solid rgba(255, 255, 255, .025);
 }
 
+/* Permite que el botón "+" de agregar fila sobresalga
+   por debajo del número, sin quedar recortado. */
+.celda[data-columna="numero"] {
+
+    overflow: visible;
+}
+
 .celda:first-child {
 
     font-weight: bold;

@@ -39,7 +39,6 @@ import {
 // ======================================================
 
 export function crearToolbar(
-  alCrearFila: () => void,
   alGuardar: () => Promise<void>,
 ): HTMLElement {
   const toolbar = document.createElement("header");
@@ -77,13 +76,6 @@ export function crearToolbar(
         </div>
 
         <div class="toolbar-right">
-
-            <button
-                class="btn-nueva-fila"
-                type="button"
-            >
-                + Fila
-            </button>
 
             <button
                 class="configuracion"
@@ -147,16 +139,6 @@ export function crearToolbar(
     .catch((error) => {
       console.error("❌ No se pudo obtener el estado de la caché:", error);
     });
-
-  // ==================================================
-  // ➕ NUEVA FILA
-  // ==================================================
-
-  const botonNuevaFila = toolbar.querySelector(".btn-nueva-fila");
-
-  botonNuevaFila?.addEventListener("click", () => {
-    alCrearFila();
-  });
 
   // ==================================================
   // 🟢🔴 ESTADO PERFIL
