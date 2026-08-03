@@ -176,6 +176,21 @@
 // - Recién cuando ya no queda nada presionado Y el timer
 //   termina su ciclo sin que llegue nada nuevo, se envía a
 //   perfil_ui el resultado final, una sola vez.
+// - Implementación: en Captura, TODA la secuencia comparte un
+//   único grupo (a diferencia de Runtime, donde cada tecla sin
+//   relación abre su propio grupo) — así solo hay un timer
+//   vigente a la vez, y una tecla nueva cancela por generación
+//   el de la anterior (ver reenviar_down / iniciar_timer). El
+//   resultado resuelto pero con algo aún presionado se guarda
+//   en Grupo.pendiente (ver resolver_o_posponer) y se manda
+//   recién cuando el Up-handler detecta el grupo vacío. La
+//   condición de "grupo vacío" se revisa contra presionados,
+//   pero un grupo con presionados=[] puede seguir teniendo un
+//   timer async vivo (esperar_doble/esperar_mantenido de una
+//   tecla distinta a la que se acaba de soltar) — mientras ese
+//   timer no haya terminado, el grupo NO se borra, aunque esté
+//   vacío (ver el Up-handler: el borrado se decide mirando si
+//   queda timer, no si ESTE Up puntual arrancó uno).
 // - No existe la fase de reenvío de Ups post-Mantenido —
 //   eso es exclusivo de Runtime (ahí no hay instancia de
 //   Runtime que finalizar).
@@ -352,6 +367,13 @@ struct Grupo {
     presionados: Vec<InputId>,
     timer: Option<Timer>,
 
+    // Solo lo usa Captura (ver resolver_o_posponer): una condición ya
+    // resuelta (Simple/Doble/Mantenido) pero que todavía no se manda
+    // porque, en el instante de resolverse, seguía quedando algo
+    // físicamente presionado. Se manda recién cuando el Up-handler
+    // detecta que ya no queda nada (ver header, Reglas — Modo Captura).
+    pendiente: Option<CondicionTrigger>,
+
     // Solo lo usa la rueda (InputState::Pulse): cuántos pulsos lleva la
     // ráfaga actual. Nunca se toca para teclas/clics normales.
     pulsos: u64,
@@ -362,6 +384,7 @@ impl Grupo {
         Self {
             presionados: Vec::new(),
             timer: None,
+            pendiente: None,
             pulsos: 0,
         }
     }
@@ -406,6 +429,13 @@ impl AnalizadorTrigger {
                         grupo.presionados.push(evento.input.clone());
                     }
                     let _ = generacion;
+
+                    let a_enviar = Self::resolver_o_posponer(
+                        &mut grupos,
+                        &clave,
+                        self.modo,
+                        CondicionTrigger::Doble,
+                    );
                     drop(grupos);
 
                     // OJO: acá NO se reenvía este segundo Down (a
@@ -417,11 +447,30 @@ impl AnalizadorTrigger {
                     // en Captura (quedaba como "modificador + gatillo x2")
                     // y en Cache generaba una lista extra de la nada —
                     // ver el punto de índices inestables en cache.rs.
-                    Self::enviar_condicion(self.modo, CondicionTrigger::Doble);
+                    if let Some(condicion) = a_enviar {
+                        Self::enviar_condicion(self.modo, condicion);
+                    }
                     return Some(());
                 }
 
-                let clave = evento.input.clone();
+                // En Captura, TODA tecla de la secuencia comparte un único
+                // grupo (a diferencia de Runtime, donde cada tecla
+                // realmente nueva abre su propio grupo independiente) —
+                // así solo puede haber un timer vigente a la vez para
+                // toda la captura, y una tecla nueva cancela (por
+                // generación) el timer de la anterior, que pasa a quedar
+                // como modificador implícito. Sin esto, cada tecla
+                // resolvía su propio Simple/Doble/Mantenido en paralelo
+                // e independiente, cerrando la captura antes de tiempo.
+                let clave = if self.modo == ModoAnalizador::Captura {
+                    grupos
+                        .keys()
+                        .next()
+                        .cloned()
+                        .unwrap_or_else(|| evento.input.clone())
+                } else {
+                    evento.input.clone()
+                };
                 let grupo = grupos.entry(clave).or_insert_with(Grupo::nuevo);
                 grupo.presionados.push(evento.input.clone());
                 drop(grupos);
@@ -460,13 +509,6 @@ impl AnalizadorTrigger {
                     grupos = self.grupos.lock().unwrap();
                 }
 
-                // true mientras quede un timer async (Fase B) corriendo
-                // después de este Up — solo le importa al cleanup de
-                // abajo: si sigue pendiente, el grupo tiene que
-                // sobrevivir vacío, porque esperar_doble lo va a
-                // necesitar cuando despierte.
-                let mut queda_pendiente_async = false;
-
                 if let Some(necesita_doble) = timer_objetivo {
                     if necesita_doble {
                         // Se soltó antes de cumplirse tiempo_mantenido y SÍ
@@ -495,8 +537,6 @@ impl AnalizadorTrigger {
                         std::thread::spawn(move || {
                             Self::esperar_doble(grupos_arc, clave2, objetivo, generacion, modo);
                         });
-
-                        queda_pendiente_async = true;
                     } else {
                         // Ningún binding Doble es posible para esta entrada:
                         // esperar tiempo_doble acá no descarta nada real, es
@@ -526,7 +566,37 @@ impl AnalizadorTrigger {
                     .map(|g| g.presionados.is_empty())
                     .unwrap_or(false);
 
-                if vacio && !queda_pendiente_async {
+                // Si el grupo TODAVÍA tiene un timer vivo (puede ser el
+                // que se acaba de arrancar arriba, o uno de OTRA tecla
+                // del mismo grupo que sigue corriendo — ej: en Captura,
+                // Ctrl y A comparten grupo, y acá se está soltando Ctrl
+                // mientras el esperar_doble de A sigue en curso), el
+                // grupo no puede borrarse aunque quede vacío de
+                // presionados: ese hilo lo va a necesitar cuando
+                // despierte (ver vigente()). Si se borra antes, el hilo
+                // no encuentra su grupo, no manda nada, y la captura
+                // queda trabada en "esperando...".
+                let tiene_timer_vivo = grupos
+                    .get(&clave)
+                    .map(|g| g.timer.is_some())
+                    .unwrap_or(false);
+
+                // Captura: si ya no queda nada presionado, esta es la
+                // señal de que cualquier condición resuelta pero
+                // pospuesta (ver resolver_o_posponer) ya puede mandarse.
+                if vacio && self.modo == ModoAnalizador::Captura {
+                    let pendiente = grupos.get_mut(&clave).and_then(|g| g.pendiente.take());
+                    if let Some(condicion) = pendiente {
+                        if !tiene_timer_vivo {
+                            grupos.remove(&clave);
+                        }
+                        drop(grupos);
+                        Self::enviar_condicion(self.modo, condicion);
+                        return Some(());
+                    }
+                }
+
+                if vacio && !tiene_timer_vivo {
                     grupos.remove(&clave);
                 }
 
@@ -682,9 +752,14 @@ impl AnalizadorTrigger {
         if let Some(g) = grupos_g.get_mut(&clave) {
             g.timer = None;
         }
+
+        let a_enviar =
+            Self::resolver_o_posponer(&mut grupos_g, &clave, modo, CondicionTrigger::Mantenido);
         drop(grupos_g);
 
-        Self::enviar_condicion(modo, CondicionTrigger::Mantenido);
+        if let Some(condicion) = a_enviar {
+            Self::enviar_condicion(modo, condicion);
+        }
     }
 
     /// Fase B: si no llega un segundo Down antes de tiempo_doble -> Simple.
@@ -706,9 +781,14 @@ impl AnalizadorTrigger {
         if let Some(g) = grupos_g.get_mut(&clave) {
             g.timer = None;
         }
+
+        let a_enviar =
+            Self::resolver_o_posponer(&mut grupos_g, &clave, modo, CondicionTrigger::Simple);
         drop(grupos_g);
 
-        Self::enviar_condicion(modo, CondicionTrigger::Simple);
+        if let Some(condicion) = a_enviar {
+            Self::enviar_condicion(modo, condicion);
+        }
     }
 
     /// Cierre de una ráfaga de rueda (InputState::Pulse). Cada pulso
@@ -743,6 +823,34 @@ impl AnalizadorTrigger {
         };
 
         Self::enviar_condicion(modo, condicion);
+    }
+
+    /// En Captura, una condición recién resuelta solo se manda si además
+    /// ya no queda nada físicamente presionado en el grupo (ver header,
+    /// Reglas — Modo Captura). Si todavía hay algo presionado, se guarda
+    /// como `pendiente` y se manda más adelante, cuando el Up que suelta
+    /// lo último detecte que ya no queda nada (ver Up-handler). En
+    /// Runtime nunca se pospone: se manda siempre de inmediato.
+    fn resolver_o_posponer(
+        grupos_g: &mut HashMap<InputId, Grupo>,
+        clave: &InputId,
+        modo: ModoAnalizador,
+        condicion: CondicionTrigger,
+    ) -> Option<CondicionTrigger> {
+        if modo == ModoAnalizador::Captura {
+            let sigue_presionado = grupos_g
+                .get(clave)
+                .map(|g| !g.presionados.is_empty())
+                .unwrap_or(false);
+
+            if sigue_presionado {
+                if let Some(g) = grupos_g.get_mut(clave) {
+                    g.pendiente = Some(condicion);
+                }
+                return None;
+            }
+        }
+        Some(condicion)
     }
 
     fn enviar_condicion(modo: ModoAnalizador, condicion: CondicionTrigger) {
