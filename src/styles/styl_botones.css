@@ -354,6 +354,13 @@
     gap: 0;
 }
 
+.popup-perfil-acciones .ui-btn {
+
+    justify-content: flex-start;
+
+    text-align: left;
+}
+
 .popup-perfil-item {
 
     justify-content: flex-start;
@@ -478,6 +485,10 @@
 }
 
 .popup-lista .ui-btn {
+
+    justify-content: flex-start;
+
+    text-align: left;
 
     border-radius: var(--r4);
 

@@ -21,9 +21,7 @@
     display: grid;
 
     grid-template-rows:
-        var(--toolbar-height)
-        1fr
-        var(--status-height);
+        var(--toolbar-height) 1fr var(--status-height);
 }
 
 
@@ -36,9 +34,7 @@
     display: grid;
 
     grid-template-columns:
-        1fr
-        auto
-        1fr;
+        1fr auto 1fr;
 
     align-items: center;
 
@@ -304,7 +300,7 @@
     z-index: 9999;
 }
 
-.popup-capa > div {
+.popup-capa>div {
 
     width: max-content;
 
@@ -328,25 +324,6 @@
     flex-direction: column;
 
     gap: 0;
-}
-
-
-/* ======================================================
-   📋 LISTAS DE OPCIONES
-   ====================================================== */
-
-.popup-lista {
-
-    display: flex;
-
-    flex-direction: column;
-
-    gap: 0;
-}
-
-.popup-lista .ui-btn {
-
-    border-radius: var(--r4);
 }
 
 
@@ -438,8 +415,7 @@
     line-height: 1;
 }
 
-.popup-perfil-item:hover
-.popup-perfil-revertir-icono {
+.popup-perfil-item:hover .popup-perfil-revertir-icono {
 
     color: var(--highlight);
 }
