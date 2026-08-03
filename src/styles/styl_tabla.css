@@ -227,3 +227,70 @@
 
     white-space: nowrap;
 }
+
+.nota-contenedor {
+    position: relative;
+    width: 100%;
+}
+
+.nota-contenedor .nota {
+
+    flex: 1;
+
+}
+
+.btn-emoji {
+
+    position: absolute;
+
+    right: 6px;
+    top: 50%;
+
+    transform: translateY(-50%);
+
+    width: 22px;
+    height: 22px;
+
+    padding: 0;
+    margin: 0;
+
+    border: none;
+    background: none;
+    outline: none;
+
+    font-family: "Segoe UI Symbol", "Segoe UI", "Segoe UI Emoji", sans-serif;
+    font-size: 15px;
+    color: var(--text-disabled);
+    
+    line-height: 22px;
+
+    cursor: pointer;
+
+    opacity: 0;
+
+    pointer-events: none;
+
+    transition: opacity .12s;
+
+}
+
+.nota-contenedor:focus-within .btn-emoji {
+
+    opacity: 1;
+
+    pointer-events: auto;
+
+}
+
+.nota-contenedor:focus-within .nota {
+
+    padding-right: 26px;
+
+}
+
+.btn-emoji:hover {
+
+    color: var(--highlight);
+    /* o el cyan que ya uses */
+
+}

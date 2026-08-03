@@ -140,6 +140,8 @@ use base64::engine::general_purpose::STANDARD as BASE64;
 use base64::Engine as _;
 use serde::Serialize;
 
+use windows_sys::Win32::UI::Input::KeyboardAndMouse::*;
+
 // ======================================================
 // 🎹 COMANDOS PERFIL
 // ======================================================
@@ -304,4 +306,38 @@ pub fn obtener_icono_programa(nombre: String) -> Option<IconoJson> {
         .find(|proceso| proceso.nombre.eq_ignore_ascii_case(&nombre))?;
 
     back_app::extraer_icono(&proceso.ruta).map(convertir_icono)
+}
+
+// ======================================================
+// 😎 SELECTOR EMOJI
+// ======================================================
+#[tauri::command]
+pub fn abrir_selector_emoji() {
+    unsafe {
+        let mut inputs: [INPUT; 4] = std::mem::zeroed();
+
+        // Win down
+        inputs[0].r#type = INPUT_KEYBOARD;
+        inputs[0].Anonymous.ki.wVk = VK_LWIN;
+
+        // . down
+        inputs[1].r#type = INPUT_KEYBOARD;
+        inputs[1].Anonymous.ki.wVk = 0xBE;
+
+        // . up
+        inputs[2].r#type = INPUT_KEYBOARD;
+        inputs[2].Anonymous.ki.wVk = 0xBE;
+        inputs[2].Anonymous.ki.dwFlags = KEYEVENTF_KEYUP;
+
+        // Win up
+        inputs[3].r#type = INPUT_KEYBOARD;
+        inputs[3].Anonymous.ki.wVk = VK_LWIN;
+        inputs[3].Anonymous.ki.dwFlags = KEYEVENTF_KEYUP;
+
+        SendInput(
+            inputs.len() as u32,
+            inputs.as_ptr(),
+            std::mem::size_of::<INPUT>() as i32,
+        );
+    }
 }

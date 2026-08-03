@@ -121,22 +121,6 @@ export function crearTipo(
   });
 }
 
-export function crearNota(filaPerfil: FilaPerfil): HTMLInputElement {
-  const input = document.createElement("input");
-
-  input.className = "nota";
-
-  input.placeholder = "Nota...";
-
-  input.value = filaPerfil.nota;
-
-  input.addEventListener("input", () => {
-    filaPerfil.nota = input.value;
-  });
-
-  return input;
-}
-
 export function crearExtra(
   contexto: ContextoFila,
   filaPerfil: FilaPerfil,
@@ -291,4 +275,41 @@ export function crearColor(
   });
 
   return boton;
+}
+
+export function crearNota(filaPerfil: FilaPerfil): HTMLDivElement {
+  const contenedor = document.createElement("div");
+  contenedor.className = "nota-contenedor";
+
+  const input = document.createElement("input");
+  input.className = "nota";
+  input.placeholder = "Nota...";
+  input.value = filaPerfil.nota;
+
+  input.addEventListener("input", () => {
+    filaPerfil.nota = input.value;
+  });
+
+  const btnEmoji = document.createElement("button");
+
+  btnEmoji.className = "btn-emoji";
+
+  btnEmoji.type = "button";
+
+  btnEmoji.textContent = "\u263A"; // es la carita ☺
+
+  btnEmoji.title = "Insertar emoji";
+
+  btnEmoji.addEventListener("mousedown", async (e) => {
+    e.preventDefault();
+
+    await invoke("abrir_selector_emoji");
+
+    input.focus();
+  });
+
+  contenedor.appendChild(input);
+  contenedor.appendChild(btnEmoji);
+
+  return contenedor;
 }

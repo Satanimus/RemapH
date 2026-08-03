@@ -60,6 +60,7 @@ pub fn run() {
             comandos::obtener_icono_programa,
             comandos::obtener_tiempo_doble,
             comandos::establecer_tiempo_doble,
+            comandos::abrir_selector_emoji,
         ])
         .run(tauri::generate_context!())
         .expect("error al ejecutar Tauri");
