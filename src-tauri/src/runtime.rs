@@ -89,9 +89,20 @@
 //    llamó a ejecutar() — ese es el mismo hilo que escucha
 //    el teclado/mouse (viene encadenado desde entrada.rs);
 //    si algo bloqueara ahí, se congelaría la escucha entera
-//    mientras dura la espera/repetición. Una Acción simple
-//    sin Extra (Emitir/AbrirArchivo/Ui solos) no necesita
-//    nada de esto — se ejecuta directo, sin hilo.
+//    mientras dura la espera/repetición.
+//
+//    Emitir tampoco corre ahí — aunque no tiene ESPERAR ni
+//    REPETIR, un combo (Vec<InputId> de varios pasos DOWN/
+//    UP reales) sí toma un tiempo real de más de un send, y
+//    bloquear ahí retrasaba la lectura del próximo evento
+//    físico (goteo con triggers seguidos rápido — bug
+//    encontrado después de introducir combos en Emitir). Por
+//    eso Emitir va a COLA_SALIDA: un canal + un único hilo
+//    de salida de por vida, no uno por id — no hace falta
+//    Detener un Emitir a mitad de camino, así que no necesita
+//    la maquinaria de INSTANCIAS. Solo Ui/AbrirArchivo siguen
+//    sin hilo — son de verdad instantáneas, no producen
+//    eventos físicos encadenados.
 //
 // F) Estado compartido entre hilos: INSTANCIAS
 //    (Mutex<HashMap<id, bool>>, true = "debe detenerse").
@@ -105,7 +116,8 @@
 //    termina naturalmente si el script no tiene ninguno).
 //    "DETENER" como línea dentro de un script usa el mismo
 //    mecanismo (llama a la misma detener()) — no hay dos
-//    caminos distintos para lo mismo.
+//    caminos distintos para lo mismo. Emitir no usa esto —
+//    ver COLA_SALIDA en E).
 //
 // G) Backend de salida: emitir_evento() usa
 //    back_interception exclusivamente. Ya no existe el
@@ -119,9 +131,9 @@
 //     Detener → detener().
 // ejecutar_accion(id, accion, extra)
 //     Si hay extra, va por el camino con hilo
-//     (ejecutar_extra_en_hilo). Si no, ejecuta la Acción
-//     directo (Emitir/AbrirArchivo/Ui) o en hilo si es
-//     Macro de archivo.
+//     (ejecutar_extra_en_hilo). Si no: Emitir encola en
+//     COLA_SALIDA (no bloquea), AbrirArchivo/Ui corren
+//     directo, y Macro va a su propio hilo.
 // ejecutar_extra_en_hilo(id, extra, accion)
 //     Pide el molde a runt_extra, sustituye los
 //     placeholders, corre el resultado como macro en un
@@ -187,7 +199,9 @@
 // OrdenRuntime (Cache)
 //     ↓
 // ejecutar_accion()
-//     ├─ sin Extra, sin Macro → ejecución directa
+//     ├─ Emitir → COLA_SALIDA (encola, no bloquea) → hilo
+//     │           de salida dedicado → emitir_combo()
+//     ├─ AbrirArchivo / Ui → ejecución directa
 //     └─ con Extra o Macro de archivo → hilo propio (id)
 //               ↓
 //         ejecutar_lineas() [loop, revisa INSTANCIAS
@@ -215,6 +229,8 @@ use std::fs::File;
 
 use std::io::{BufRead, BufReader};
 
+use std::sync::mpsc::Sender;
+
 use std::sync::Mutex;
 
 use std::thread;
@@ -230,6 +246,64 @@ use std::time::Duration;
 
 static INSTANCIAS: std::sync::LazyLock<Mutex<HashMap<String, bool>>> =
     std::sync::LazyLock::new(|| Mutex::new(HashMap::new()));
+
+// ======================================================
+// 📤 COLA DE SALIDA (Emitir, sin Extra)
+// ------------------------------------------------------
+// Un Emitir (con o sin combo) YA no se ejecuta en el hilo
+// que llama a ejecutar() — ese hilo es, en la práctica,
+// siempre el mismo que lee el driver de captura
+// (back_interception::iniciar(), un loop estrictamente
+// serial: no vuelve a leer la próxima tecla física hasta
+// que ejecutar() vuelve). Antes de la Vec<InputId> de
+// combos esto no importaba (Emitir era un único pulse,
+// prácticamente instantáneo) — pero un combo de varias
+// teclas (varios DOWN/UP reales, uno por uno) sí toma un
+// tiempo real, y ejecutarlo ahí bloqueaba la lectura del
+// próximo evento físico: con teclas encadenadas rápido, la
+// salida se iba atrasando cada vez más (goteo), porque el
+// hilo de captura solo avanzaba al siguiente evento cuando
+// terminaba de mandar el combo completo del anterior.
+//
+// Solución: un canal FIFO + UN solo hilo de salida
+// dedicado. ejecutar_accion() ya no llama a emitir_combo()
+// directo — encola el Vec<InputId> (operación no bloqueante,
+// sobre un channel sin límite) y vuelve enseguida a leer
+// el próximo evento físico. El hilo de salida drena la cola
+// por su cuenta, en orden, a su propio ritmo — no necesita
+// que llegue un evento físico nuevo para seguir procesando
+// lo que ya tiene encolado.
+//
+// El orden de salida queda garantizado por el canal en sí:
+// hay un solo productor real (el hilo de captura, que es
+// intrínsecamente serial) y un solo consumidor (este hilo),
+// así que el orden de llegada es siempre el mismo orden en
+// que se dispararon los triggers. El Mutex de abajo no es
+// para eso — es porque mpsc::Sender<T> no es Sync (no se
+// puede compartir por referencia entre hilos, cada hilo
+// necesita su propio clone), y un `static` necesita que su
+// contenido sea Sync. Envolverlo en Mutex<Sender<..>> lo
+// resuelve sin agregar contención real: send() es rápido y,
+// hoy, el único que lo llama es el hilo de captura.
+//
+// No hace falta registrar esto en INSTANCIAS: un Emitir
+// nunca recibe Detener real (Cache lo manda con
+// Iniciar+Detener juntos, ver iniciar_y_finalizar en
+// cache.rs) — no hay nada que cancelar a mitad de camino.
+// ======================================================
+
+static COLA_SALIDA: std::sync::LazyLock<Mutex<Sender<Vec<InputId>>>> =
+    std::sync::LazyLock::new(|| {
+        let (tx, rx) = std::sync::mpsc::channel::<Vec<InputId>>();
+
+        thread::spawn(move || {
+            for inputs in rx {
+                emitir_combo(&inputs);
+            }
+        });
+
+        Mutex::new(tx)
+    });
 
 // ======================================================
 // 🚀 EJECUTAR ORDEN
@@ -260,7 +334,16 @@ fn ejecutar_accion(id: String, accion: AccionCache, extra: Option<ExtraCache>) {
 
     match accion {
         AccionCache::Emitir(inputs) => {
-            emitir_combo(&inputs);
+            // No se ejecuta acá — se encola para el hilo de salida
+            // dedicado (ver COLA_SALIDA). El lock es sobre el
+            // Sender, no sobre la cola en sí — send() es rápido,
+            // así que la contención es irrelevante en la práctica
+            // (además, hoy solo hay un llamador: el hilo de
+            // captura). Si el receiver ya no existiera (no debería
+            // pasar, el hilo es de por vida), se ignora en
+            // silencio: no hay nada más que hacer con un envío
+            // fallido acá.
+            let _ = COLA_SALIDA.lock().unwrap().send(inputs);
         }
 
         AccionCache::Macro(ruta) => {
