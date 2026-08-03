@@ -35,7 +35,7 @@ mod usuario;
 
 pub fn run() {
     std::thread::spawn(|| {
-        back_interception::iniciar(entrada::procesar_evento);
+        back_interception::iniciar(entrada::procesar_evento, analizador_trigger::captura_activa);
     });
     back_app::iniciar_monitor();
     tauri::Builder::default()

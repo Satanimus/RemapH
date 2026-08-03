@@ -16,17 +16,39 @@
 //
 // No decide qué hacer con un evento. No conoce Runtime,
 // Cache ni AnalizadorTrigger.
+//
+// EXCEPCIÓN puntual (fix bug "interfiere sin trigger en
+// caché" / tecla no soportada que se comía el input):
+// iniciar() recibe además un segundo callback,
+// debe_tragar_no_traducible, que le inyecta quien lo llama
+// (lib.rs, con analizador_trigger::captura_activa). Sigue sin
+// importar AnalizadorTrigger directamente — solo recibe un
+// predicado genérico Fn() -> bool — pero es la única función
+// de este archivo cuyo comportamiento depende de algo ajeno a
+// Interception/back_teclas. Motivo: antes, un Stroke que
+// back_teclas::convertir() no reconocía (ScanCode no listado
+// en pulsadores.tsv) se perdía en silencio — ni se procesaba
+// NI se reenviaba a Windows. Eso interfería con el sistema (la
+// tecla quedaba muda) incluso sin trigger activo ni caché
+// compilada. Ahora, si no se puede traducir, se reenvía el
+// Stroke crudo tal cual, salvo que haya una Captura en curso
+// (ahí sí se traga, para no ensuciar lo que se está grabando).
 // ------------------------------------------------------
 // 2. ¿Quién llama este archivo?
-// entrada.rs llama iniciar() una sola vez al arrancar.
+// lib.rs llama iniciar() una sola vez al arrancar, pasándole
+//     entrada::procesar_evento y
+//     analizador_trigger::captura_activa.
 // entrada.rs llama emitir_evento() para devolver un
 // evento sin consumir. Runtime (más adelante) llama
 // emitir_evento() para ejecutar una acción remapeada,
 // desde el hilo propio de cada instancia activa (por id).
 // ------------------------------------------------------
 // 3. ¿Qué información recibe?
-// iniciar(procesar): un callback FnMut(InputEvent),
-// llamado una vez por cada evento traducido.
+// iniciar(procesar, debe_tragar_no_traducible): un callback
+// FnMut(InputEvent) llamado una vez por cada evento traducido,
+// y un predicado Fn() -> bool que decide si un Stroke NO
+// traducible se traga (true) o se reenvía crudo a Windows
+// (false).
 // emitir_evento(evento): un InputEvent completo.
 // ------------------------------------------------------
 // 4. ¿Qué información entrega?
@@ -87,7 +109,10 @@
 //     Loop principal de ENTRADA. Arranca la sesión,
 //     registra el dispositivo primario de cada tipo la
 //     primera vez que aparece, y llama al callback con
-//     cada evento traducido.
+//     cada evento traducido. Si un Stroke NO se puede
+//     traducir, lo reenvía crudo a Windows tal cual —
+//     salvo que debe_tragar_no_traducible() diga true
+//     (captura en curso), en cuyo caso se traga.
 // con_sesion_salida()
 //     Da acceso a la sesión de Interception de SALIDA
 //     del hilo actual, creándola la primera vez que ese
@@ -255,7 +280,7 @@ fn traducir(stroke: &Stroke) -> Option<InputEvent> {
 // 🔁 INICIAR (loop de entrada)
 // ======================================================
 
-pub fn iniciar(mut procesar: impl FnMut(InputEvent)) {
+pub fn iniciar(mut procesar: impl FnMut(InputEvent), debe_tragar_no_traducible: impl Fn() -> bool) {
     let ict = crear();
 
     loop {
@@ -268,8 +293,21 @@ pub fn iniciar(mut procesar: impl FnMut(InputEvent)) {
             Stroke::Mouse { .. } => registrar_mouse(device),
         }
 
-        if let Some(evento) = traducir(&stroke) {
-            procesar(evento);
+        match traducir(&stroke) {
+            Some(evento) => procesar(evento),
+
+            // No reconocida por back_teclas/back_mouse (ScanCode fuera de
+            // pulsadores.tsv). Antes esto se perdía en silencio: ni se
+            // procesaba ni se reenviaba, y la tecla quedaba muda en
+            // Windows aunque no hubiera ningún trigger ni caché
+            // compilada — justo lo que este programa promete no hacer.
+            // Ahora se reenvía cruda, salvo que haya una Captura en
+            // curso (ahí se traga, para no ensuciar lo que se graba).
+            None => {
+                if !debe_tragar_no_traducible() {
+                    ict.send(device, &[stroke]);
+                }
+            }
         }
     }
 }

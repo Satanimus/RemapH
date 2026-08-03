@@ -361,7 +361,14 @@ pub fn recibir_down(input: InputId) {
     if posibles == exactas && exactas >= 1 {
         marcar_esperando_condicion(id);
         let gatillo = entrada_actual.last().cloned().unwrap();
-        analizador_trigger::iniciar_timer(gatillo);
+        // Solo hace falta la Fase B (esperar tiempo_doble) si entre las
+        // candidatas reales de esta entrada hay al menos un binding
+        // Doble — si no, esperar ese tiempo no descarta nada real, es
+        // demora pura (ver analizador_trigger::procesar, Up-handler).
+        let necesita_doble = candidatas
+            .iter()
+            .any(|c| c.trigger.condicion == CondicionTrigger::Doble);
+        analizador_trigger::iniciar_timer(gatillo, necesita_doble);
         entrada::retener();
         return;
     }

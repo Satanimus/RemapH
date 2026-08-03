@@ -178,6 +178,11 @@ const TABLA: &[(&str, ScanCode)] = &[
     ("Comma", ScanCode::Comma),
     ("Period", ScanCode::Period),
     ("Slash", ScanCode::Slash),
+    // Int1: tecla ISO extra (cerca del Shift izquierdo en teclados
+    // de 105 teclas / ISO, ej. layouts latinoamericanos y europeos).
+    // No comparte ScanCode con nada más, no es ambigua: va en TABLA,
+    // no en TABLA_EXTENDIDA.
+    ("Int1", ScanCode::Int1),
     // ------------------------------------------------
     // 🔒 BLOQUEO
     // ------------------------------------------------
@@ -231,6 +236,22 @@ const TABLA_EXTENDIDA: &[(&str, ScanCode)] = &[
     ("Delete", ScanCode::NumpadPeriod),
     ("RightControl", ScanCode::LeftControl),
     ("RightAlt", ScanCode::LeftAlt),
+    // Divide (numpad "/"): manda el mismo ScanCode crudo que el "/"
+    // normal (Slash) pero con el bit E0 puesto — mismo patrón que
+    // Home/Numpad7, Up/Numpad8, etc. de arriba. Sin esta entrada,
+    // nombre_interception() no la distinguía de la "/" normal y caía
+    // al nombre por defecto del ScanCode ("Slash"), pisando la fila
+    // "Divide" que pulsadores.tsv ya tenía preparada para esta tecla.
+    ("Divide", ScanCode::Slash),
+    // Oem2 (Win izquierda, VK_LWIN / nativo 0x5B): la tecla física manda
+    // el bit E0 (extendida). El nombre "Oem2" es el mismo que ya usa el
+    // fallback de nombre_interception() para la entrada (no hay un
+    // nombre inventado tipo "LeftMeta" — esa variante no existe en el
+    // crate `interception`), así que agregar esta entrada NO cambia
+    // nada del lado de la entrada; solo habilita la salida
+    // (convertir_salida) y fija correctamente es_extendida=true para
+    // cuando se emite.
+    ("Oem2", ScanCode::Oem2),
 ];
 
 // ======================================================

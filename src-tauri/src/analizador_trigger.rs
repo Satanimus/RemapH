@@ -58,8 +58,14 @@
 // ------------------------------------------------------
 // 3. ¿Qué información recibe?
 // procesar(evento: InputEvent) — cada Down/Up/Pulse real.
-// iniciar_timer() — orden de Cache (solo modo Runtime,
-//     solo cuando hay ambigüedad real).
+// iniciar_timer(objetivo, necesita_doble) — orden de Cache
+//     (solo modo Runtime, solo cuando hay ambigüedad real).
+//     necesita_doble lo decide Cache: true solo si, entre
+//     las candidatas de la entrada actual, hay al menos una
+//     con condición Doble. Si es false, el Up resuelve
+//     Simple en el acto — no tiene sentido esperar
+//     tiempo_doble para descartar un Doble que nunca fue
+//     una posibilidad real (ver Up-handler de procesar()).
 // obtener_presionados() — consulta puntual de Cache, para
 //     reiniciar su lista tras resolver.
 // limpiar() — orden de Cache: descarta timer en curso y
@@ -107,10 +113,14 @@
 //    de otra tecla → se envía "Mantenido". Se destruye el
 //    timer.
 // B) SIMPLE — llega el Up de esa tecla antes de cumplirse
-//    tiempo_mantenido → arranca la cuenta de tiempo_doble
-//    desde ese Up; si pasa tiempo_doble sin un nuevo Down
-//    de la misma tecla → se envía "Simple". Se destruye
-//    el timer.
+//    tiempo_mantenido. Si entre las candidatas de esta
+//    entrada hay algún Doble posible (necesita_doble=true),
+//    arranca la cuenta de tiempo_doble desde ese Up; si pasa
+//    tiempo_doble sin un nuevo Down de la misma tecla → se
+//    envía "Simple". Si NO hay ningún Doble posible
+//    (necesita_doble=false), no hace falta esperar nada — se
+//    envía "Simple" en el acto, apenas llega el Up. Se
+//    destruye el timer.
 // C) DOBLE — llega el Up y, antes de cumplirse
 //    tiempo_doble desde ese Up, un nuevo Down de la misma
 //    tecla → se envía "Doble" en el acto. Se destruye el
@@ -253,8 +263,8 @@ pub fn procesar_evento_runtime(evento: InputEvent) -> Option<()> {
     instancia_runtime().procesar(evento)
 }
 
-pub fn iniciar_timer(objetivo: InputId) {
-    instancia_runtime().iniciar_timer(objetivo)
+pub fn iniciar_timer(objetivo: InputId, necesita_doble: bool) {
+    instancia_runtime().iniciar_timer(objetivo, necesita_doble)
 }
 
 pub fn limpiar() {
@@ -325,6 +335,13 @@ pub enum ModoAnalizador {
 struct Timer {
     generacion: u64,
     objetivo: InputId,
+    // true si, para la entrada que originó este timer, existe al menos
+    // un binding configurado con condición Doble — o si estamos en modo
+    // Captura (ahí siempre hace falta detectar el gesto real). Cuando es
+    // false, la Fase B (esperar_doble) es pura demora sin propósito:
+    // nunca hubo un Doble posible que descartar, así que el Up resuelve
+    // Simple en el acto. Ver el Up-handler de procesar().
+    necesita_doble: bool,
 }
 
 struct Grupo {
@@ -419,11 +436,15 @@ impl AnalizadorTrigger {
                     .map(|g| g.reenviando_ups)
                     .unwrap_or(false);
 
-                let era_objetivo_mantenido_pendiente = grupos
+                // Si hay timer corriendo sobre ESTA tecla puntual, nos
+                // interesa además si pedía disambiguar Doble
+                // (necesita_doble) — de eso depende si hace falta la
+                // Fase B o se puede resolver Simple ya mismo.
+                let timer_objetivo = grupos
                     .get(&clave)
                     .and_then(|g| g.timer.as_ref())
-                    .map(|t| t.objetivo == evento.input)
-                    .unwrap_or(false);
+                    .filter(|t| t.objetivo == evento.input)
+                    .map(|t| t.necesita_doble);
 
                 if let Some(grupo) = grupos.get_mut(&clave) {
                     grupo.presionados.retain(|i| i != &evento.input);
@@ -442,30 +463,65 @@ impl AnalizadorTrigger {
                     grupos = self.grupos.lock().unwrap();
                 }
 
-                if era_objetivo_mantenido_pendiente {
-                    // Se soltó antes de cumplirse tiempo_mantenido.
-                    // Arranca la Fase B (esperar tiempo_doble) desde ahora.
-                    let generacion = grupos
-                        .get(&clave)
-                        .and_then(|g| g.timer.as_ref())
-                        .map(|t| t.generacion + 1)
-                        .unwrap_or(0);
+                // true mientras quede un timer async (Fase B) corriendo
+                // después de este Up — solo le importa al cleanup de
+                // abajo: si sigue pendiente, el grupo tiene que
+                // sobrevivir vacío, porque esperar_doble lo va a
+                // necesitar cuando despierte.
+                let mut queda_pendiente_async = false;
 
-                    if let Some(grupo) = grupos.get_mut(&clave) {
-                        grupo.timer = Some(Timer {
-                            generacion,
-                            objetivo: evento.input.clone(),
+                if let Some(necesita_doble) = timer_objetivo {
+                    if necesita_doble {
+                        // Se soltó antes de cumplirse tiempo_mantenido y SÍ
+                        // hay (al menos) un binding Doble en juego para esta
+                        // entrada: hace falta la Fase B (esperar
+                        // tiempo_doble) para no confundirlo con un doble-tap.
+                        let generacion = grupos
+                            .get(&clave)
+                            .and_then(|g| g.timer.as_ref())
+                            .map(|t| t.generacion + 1)
+                            .unwrap_or(0);
+
+                        if let Some(grupo) = grupos.get_mut(&clave) {
+                            grupo.timer = Some(Timer {
+                                generacion,
+                                objetivo: evento.input.clone(),
+                                necesita_doble: true,
+                            });
+                        }
+
+                        let grupos_arc = Arc::clone(&self.grupos);
+                        let modo = self.modo;
+                        let objetivo = evento.input.clone();
+                        let clave2 = clave.clone();
+
+                        std::thread::spawn(move || {
+                            Self::esperar_doble(grupos_arc, clave2, objetivo, generacion, modo);
                         });
+
+                        queda_pendiente_async = true;
+                    } else {
+                        // Ningún binding Doble es posible para esta entrada:
+                        // esperar tiempo_doble acá no descarta nada real, es
+                        // demora pura. Se resuelve Simple ya mismo, sin
+                        // pasar por ningún hilo ni sleep.
+                        if let Some(grupo) = grupos.get_mut(&clave) {
+                            grupo.timer = None;
+                        }
+
+                        let vacio_ahora = grupos
+                            .get(&clave)
+                            .map(|g| g.presionados.is_empty())
+                            .unwrap_or(false);
+                        if vacio_ahora {
+                            grupos.remove(&clave);
+                        }
+
+                        let modo = self.modo;
+                        drop(grupos);
+                        Self::enviar_condicion(modo, CondicionTrigger::Simple);
+                        return Some(());
                     }
-
-                    let grupos_arc = Arc::clone(&self.grupos);
-                    let modo = self.modo;
-                    let objetivo = evento.input.clone();
-                    let clave2 = clave.clone();
-
-                    std::thread::spawn(move || {
-                        Self::esperar_doble(grupos_arc, clave2, objetivo, generacion, modo);
-                    });
                 }
 
                 let vacio = grupos
@@ -473,7 +529,7 @@ impl AnalizadorTrigger {
                     .map(|g| g.presionados.is_empty())
                     .unwrap_or(false);
 
-                if vacio && !era_objetivo_mantenido_pendiente {
+                if vacio && !queda_pendiente_async {
                     grupos.remove(&clave);
                 }
 
@@ -493,6 +549,10 @@ impl AnalizadorTrigger {
                     grupo.timer = Some(Timer {
                         generacion,
                         objetivo: clave.clone(),
+                        // No lo usa cerrar_rueda (no pasa por
+                        // esperar_doble/esperar_mantenido); campo
+                        // presente solo porque el struct lo pide.
+                        necesita_doble: false,
                     });
 
                     generacion
@@ -554,13 +614,21 @@ impl AnalizadorTrigger {
         }
 
         if self.modo == ModoAnalizador::Captura {
-            self.iniciar_timer(input);
+            // Captura siempre corre las 3 fases completas: todavía no
+            // sabemos qué gesto va a terminar siendo (esto es
+            // justamente lo que el usuario está definiendo), así que
+            // necesita_doble siempre es true acá — a diferencia de
+            // Runtime, donde Cache ya sabe de antemano qué condiciones
+            // son candidatas reales.
+            self.iniciar_timer(input, true);
         }
     }
 
-    /// En Runtime, Cache lo pide explícitamente al detectar ambigüedad.
-    /// En Captura, se llama solo con cada Down nuevo.
-    pub fn iniciar_timer(&self, objetivo: InputId) {
+    /// En Runtime, Cache lo pide explícitamente al detectar ambigüedad,
+    /// pasando si hace falta o no disambiguar Doble para esta entrada
+    /// puntual (ver cache.rs::recibir_down). En Captura, se llama solo
+    /// con cada Down nuevo, siempre con necesita_doble=true.
+    pub fn iniciar_timer(&self, objetivo: InputId, necesita_doble: bool) {
         let mut grupos = self.grupos.lock().unwrap();
         let clave = match Self::clave_grupo(&grupos, &objetivo) {
             Some(c) => c,
@@ -577,6 +645,7 @@ impl AnalizadorTrigger {
             grupo.timer = Some(Timer {
                 generacion,
                 objetivo: objetivo.clone(),
+                necesita_doble,
             });
         }
         drop(grupos);

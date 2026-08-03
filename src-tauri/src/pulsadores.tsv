@@ -91,15 +91,15 @@ keyboard	0x6D	Subtract	NumpadMinus	-
 keyboard	0x6E	Decimal	NumpadPeriod	.
 keyboard	0x6F	Divide	Divide	/
 keyboard	0xD	Enter	Enter	Enter
-keyboard	0x1B	Escape	Esc	Escape
+keyboard	0x1B	Escape	Esc	Esc
 keyboard	0x8	Backspace	Backspace	Backspace
 keyboard	0x9	Tab	Tab	Tab
 keyboard	0x20	Space	Space	Espacio
 
-keyboard	0x25	Left	Left	Flecha izquierda
-keyboard	0x26	Up	Up	Flecha arriba
-keyboard	0x27	Right	Right	Flecha derecha
-keyboard	0x28	Down	Down	Flecha abajo
+keyboard	0x25	Left	Left	Izquierda
+keyboard	0x26	Up	Up	Arriba
+keyboard	0x27	Right	Right	Derecha
+keyboard	0x28	Down	Down	Abajo
 
 keyboard	0x24	Home	Home	Inicio
 keyboard	0x23	End	End	Fin
@@ -132,25 +132,39 @@ keyboard	0xA3	RightControl	RightControl	Ctrl derecho
 keyboard	0xA4	LeftAlt	LeftAlt	Alt izquierdo
 keyboard	0xA5	RightAlt	RightAlt	Alt derecho
 
-keyboard	0xBD	Minus	Minus	-
-keyboard	0xBB	Equals	Equals	=
-keyboard	0xDB	LeftBracket	LeftBracket	[
-keyboard	0xDD	RightBracket	RightBracket	]
-keyboard	0xDC	BackSlash	BackSlash	\
-keyboard	0xBA	SemiColon	SemiColon	;
-keyboard	0xDE	Apostrophe	Apostrophe	'
-keyboard	0xC0	Grave	Grave	`
+# ------------------------------------------------------
+# Símbolos: "interno" y "ui" reflejan lo que la tecla
+# realmente escribe con la distribución de teclado
+# "Español (Latinoamérica)" de Windows (KBDLA.DLL) — NO el
+# nombre en inglés de la posición física. "nativo" (VK_OEM_*)
+# e "interception" (ScanCode) sí se dejan igual: son
+# identificadores de POSICIÓN física, independientes del
+# layout activo — cambiarlos rompería la traducción en
+# back_teclas.rs sin necesidad, porque la posición no cambió,
+# sólo el símbolo que esa posición imprime.
+# ------------------------------------------------------
+keyboard	0xC0	Grado	Grave	°
+keyboard	0xBD	Apostrofo	Minus	'
+keyboard	0xBB	Interrogacion	Equals	¡
+
+keyboard	0xDB	AcentoAgudo	LeftBracket	'
+keyboard	0xDD	Mas	RightBracket	+
+
+keyboard	0xBA	Enie	SemiColon	ñ
+keyboard	0xDE	LlaveApertura	Apostrophe	´
+keyboard	0xDC	LlaveCierre	BackSlash	ç
+
 keyboard	0xBC	Comma	Comma	,
 keyboard	0xBE	Period	Period	.
-keyboard	0xBF	Slash	Slash	/
-keyboard	0x5B	LeftMeta	LeftMeta	Win
+keyboard	0xBF	Guion	Slash	-
+
+keyboard	0xE2	Int1	Int1	<
+keyboard	0x5B	LeftMeta	Oem2	Win
 
 mouse	0x0201	LeftButton	LeftButton	Click izquierdo
 mouse	0x0204	RightButton	RightButton	Click derecho
 mouse	0x0207	MiddleButton	MiddleButton	Click central
-mouse	0x020B	Button4	Button4	Botón lateral 4
-mouse	0x020C	Button5	Button5	Botón lateral 5
+mouse	0x020B	Button4	Button4	Botón 4
+mouse	0x020C	Button5	Button5	Botón 5
 mouse	0x020A_UP	WheelUp	WheelUp	Rueda arriba
 mouse	0x020A_DOWN	WheelDown	WheelDown	Rueda abajo
-
-
