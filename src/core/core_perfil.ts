@@ -7,6 +7,9 @@
 import type { Trigger } from "./core_trigger";
 import { crearTrigger } from "./core_trigger";
 
+import type { CoordenadaPerfil } from "./core_coordenada";
+import { crearCoordenada } from "./core_coordenada";
+
 // ======================================================
 // 👤 PERFIL
 // ======================================================
@@ -46,6 +49,8 @@ export interface FilaPerfil {
 
   extra: string;
 
+  coordenada: CoordenadaPerfil;
+
   app: AppPerfil;
 
   color: string;
@@ -72,6 +77,8 @@ export function crearFila(): FilaPerfil {
     condicion: "Normal",
 
     extra: "",
+
+    coordenada: crearCoordenada(),
 
     app: {
       programa: null,
@@ -120,5 +127,7 @@ export function clonarFila(fila: FilaPerfil): FilaPerfil {
           modificadores: [...fila.accion.modificadores],
         }
       : null,
+
+    coordenada: { ...fila.coordenada },
   };
 }

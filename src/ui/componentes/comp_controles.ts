@@ -19,6 +19,10 @@ import {
 
 import { abrirPopupApp } from "./comp_popup_app";
 
+import { abrirPopupCoordenada } from "./comp_popup_coordenada";
+
+import { textoCoordenada } from "../../core/core_coordenada";
+
 import { obtenerPerfilUi } from "../../core/core_perfil_ui";
 
 import { filaTieneConflicto } from "../../core/core_conflictos";
@@ -125,6 +129,18 @@ export function crearExtra(
   contexto: ContextoFila,
   filaPerfil: FilaPerfil,
 ): HTMLButtonElement {
+  // click_coordenada tiene su propio popup Extra (4 filas, queda
+  // abierto entre selecciones) — totalmente distinto del popup
+  // simple que usan los demás tipos.
+  if (filaPerfil.tipo === "click_coordenada") {
+    return crearPopup({
+      texto: textoCoordenada(filaPerfil.coordenada),
+      onClick: (evento) => {
+        abrirPopupCoordenada(evento, contexto, filaPerfil);
+      },
+    });
+  }
+
   return crearPopup({
     texto: extraATexto(filaPerfil.extra),
     onClick: (evento) => {

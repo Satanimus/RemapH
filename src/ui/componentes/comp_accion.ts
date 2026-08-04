@@ -10,7 +10,6 @@ import type { FilaPerfil } from "../../core/core_perfil";
 import {
   crearAccionMultimedia,
   crearAccionMacro,
-  crearAccionCoordenada,
   crearAccionPortapapeles,
 } from "./comp_accion_contenido";
 
@@ -32,12 +31,12 @@ export function crearAccion(
     case "macro":
       return crearAccionMacro();
 
-    case "click_coordenada":
-      return crearAccionCoordenada();
-
     case "portapapeles":
       return crearAccionPortapapeles();
 
+    // click_coordenada NO tiene un botón propio: reusa el mismo
+    // capturador de Tecla/Mouse (ver default) — lo capturado ahí es
+    // lo que se ejecuta en la coordenada calculada (ver popup Extra).
     default:
       return crearCapturador(contexto, filaPerfil, "Accion", alModificar);
   }

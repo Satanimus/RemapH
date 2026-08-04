@@ -28,6 +28,8 @@ import { crearTrigger } from "./core_trigger";
 
 import type { Trigger } from "./core_trigger";
 
+import type { CoordenadaPerfil } from "./core_coordenada";
+
 // ======================================================
 // 📦 MODELO JSON
 // ======================================================
@@ -67,6 +69,8 @@ interface RemapeoJson {
   accion_referencia: string | null;
 
   extra: string;
+
+  coordenada: CoordenadaPerfil;
 
   color: string;
 
@@ -131,6 +135,8 @@ function convertirRemapeo(remapeo: RemapeoJson): FilaPerfil {
     condicion: trigger.condicion,
 
     extra: remapeo.extra,
+
+    coordenada: remapeo.coordenada,
 
     color: remapeo.color,
 

@@ -25,13 +25,6 @@ export function crearAccionMacro(): HTMLButtonElement {
   });
 }
 
-export function crearAccionCoordenada(): HTMLButtonElement {
-  return crearBoton({
-    texto: "Coordenada",
-    clase: "capturador",
-  });
-}
-
 export function crearAccionPortapapeles(): HTMLButtonElement {
   return crearBoton({
     texto: "Portapapeles",

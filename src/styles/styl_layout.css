@@ -587,6 +587,50 @@
     width: 100%;
 }
 
+/* ======================================================
+   🖱️📌 POPUP COORDENADA (Click en coordenada)
+   ====================================================== */
+
+.coordenada-popup {
+    min-width: 260px;
+    max-width: 320px;
+    display: flex;
+    flex-direction: column;
+    gap: var(--gap8);
+}
+
+.coordenada-popup-fila {
+    display: flex;
+    flex-direction: column;
+    gap: var(--gap4);
+}
+
+.coordenada-popup-label {
+    font-size: var(--fs11);
+    color: var(--border-light);
+}
+
+.coordenada-popup-grupo {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--gap4);
+}
+
+.coordenada-popup-opcion[data-activo="true"] {
+    background: var(--blue);
+    border-color: var(--blue);
+    color: #FFF;
+}
+
+.coordenada-popup-sublista {
+    justify-content: space-between;
+    width: 100%;
+}
+
+.coordenada-popup-capturar {
+    width: 100%;
+}
+
 .app-icono {
     width: 18px;
     height: 18px;
