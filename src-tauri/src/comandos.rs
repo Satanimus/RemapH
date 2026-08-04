@@ -433,6 +433,7 @@ pub fn abrir_ventana_captura_coordenada(
     .always_on_top(true)
     .skip_taskbar(true)
     .focused(true)
+    .devtools(true)
     .build()
     .map_err(|error| error.to_string())?;
 

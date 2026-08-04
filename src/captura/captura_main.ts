@@ -79,17 +79,69 @@ card.append(header, cuerpo);
 raiz.append(card);
 
 // ======================================================
+// 🩺 DIAGNÓSTICO EN PANTALLA
+// ------------------------------------------------------
+// F12/devtools no siempre engancha en una ventana sin
+// decoraciones — en vez de depender de la consola, cualquier
+// error o timeout se escribe directo en el cuerpo de la
+// ventana para poder verlo sin herramientas externas.
+// TODO: sacar este bloque una vez confirmado que la ventana
+// funciona de punta a punta.
+// ======================================================
+
+function mostrarDiagnostico(texto: string): void {
+  const linea = document.createElement("div");
+  linea.className = "captura-linea";
+  linea.style.color = "#FF6B6B";
+  linea.style.wordBreak = "break-word";
+  linea.textContent = texto;
+  cuerpo.append(linea);
+}
+
+function conTimeout<T>(
+  promesa: Promise<T>,
+  ms: number,
+  etiqueta: string,
+): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      reject(
+        new Error(
+          `Timeout (${ms}ms) esperando "${etiqueta}" — el invoke nunca resolvió ni rechazó.`,
+        ),
+      );
+    }, ms);
+
+    promesa.then(
+      (valor) => {
+        clearTimeout(timer);
+        resolve(valor);
+      },
+      (error) => {
+        clearTimeout(timer);
+        reject(error);
+      },
+    );
+  });
+}
+
+// ======================================================
 // 🚪 CERRAR (sin guardar)
 // ======================================================
 
 botonCancelar.addEventListener("click", () => {
+  mostrarDiagnostico("Cancelar clickeado, invocando cierre...");
   cerrar();
 });
 
 function cerrar(): void {
   detenerPolling();
 
-  invoke("cerrar_ventana_captura_coordenada").catch(() => {});
+  invoke("cerrar_ventana_captura_coordenada")
+    .then(() =>
+      mostrarDiagnostico("cerrar_ventana_captura_coordenada resolvió OK."),
+    )
+    .catch((error) => mostrarDiagnostico(`Error al cerrar: ${String(error)}`));
 }
 
 // ======================================================
@@ -186,11 +238,26 @@ function guardarYcerrar(x: number, y: number): void {
 // ======================================================
 
 async function iniciar(): Promise<void> {
-  const configCruda = await invoke<{
+  mostrarDiagnostico("Iniciando — consultando config activa...");
+
+  let configCruda: {
     ubicacion: string;
     modo_ventana: string;
     punto_referencia: string;
-  } | null>("obtener_config_captura_activa");
+  } | null;
+
+  try {
+    configCruda = await conTimeout(
+      invoke("obtener_config_captura_activa"),
+      3000,
+      "obtener_config_captura_activa",
+    );
+  } catch (error) {
+    mostrarDiagnostico(`FALLÓ obtener_config_captura_activa: ${String(error)}`);
+    return;
+  }
+
+  mostrarDiagnostico(`Config recibida: ${JSON.stringify(configCruda)}`);
 
   // No debería pasar (comandos.rs fija la config antes de crear esta
   // ventana) — pero si pasa, no hay nada coherente que mostrar.
@@ -206,9 +273,19 @@ async function iniciar(): Promise<void> {
       configCruda.punto_referencia as ConfigCaptura["puntoReferencia"],
   };
 
-  const intervaloMs = await invoke<number>(
-    "obtener_intervalo_captura_coordenada",
-  ).catch(() => 100);
+  let intervaloMs = 100;
+
+  try {
+    intervaloMs = await conTimeout(
+      invoke<number>("obtener_intervalo_captura_coordenada"),
+      3000,
+      "obtener_intervalo_captura_coordenada",
+    );
+  } catch (error) {
+    mostrarDiagnostico(
+      `FALLÓ obtener_intervalo_captura_coordenada (uso 100ms): ${String(error)}`,
+    );
+  }
 
   intervaloId = setInterval(() => actualizar(config), intervaloMs);
   actualizar(config);
@@ -219,11 +296,25 @@ async function iniciar(): Promise<void> {
 // ======================================================
 
 async function actualizar(config: ConfigCaptura): Promise<void> {
-  const [cursor, ventana, guardar] = await Promise.all([
-    invoke<[number, number]>("obtener_cursor_captura"),
-    invoke<VentanaActiva | null>("obtener_ventana_activa_captura"),
-    invoke<boolean>("consultar_guardado_coordenada"),
-  ]).catch(() => [null, null, false] as const);
+  let cursor: [number, number] | null;
+  let ventana: VentanaActiva | null;
+  let guardar: boolean;
+
+  try {
+    [cursor, ventana, guardar] = await conTimeout(
+      Promise.all([
+        invoke<[number, number]>("obtener_cursor_captura"),
+        invoke<VentanaActiva | null>("obtener_ventana_activa_captura"),
+        invoke<boolean>("consultar_guardado_coordenada"),
+      ]),
+      3000,
+      "polling (cursor/ventana/guardado)",
+    );
+  } catch (error) {
+    detenerPolling();
+    mostrarDiagnostico(`FALLÓ el polling: ${String(error)}`);
+    return;
+  }
 
   if (!cursor) {
     return;
