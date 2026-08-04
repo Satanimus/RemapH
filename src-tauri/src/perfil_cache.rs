@@ -166,6 +166,8 @@ pub struct RemapeoCache {
     pub accion: AccionCache,
 
     pub extra: Option<ExtraCache>,
+
+    pub coordenada: Option<CoordenadaCache>,
 }
 
 // ======================================================
@@ -247,4 +249,62 @@ impl ExtraCache {
             ExtraCache::Turbo | ExtraCache::Mantener | ExtraCache::ClickSostenido
         )
     }
+}
+
+// ======================================================
+// 🖱️ COORDENADA CACHE
+// ------------------------------------------------------
+// Forma compilada de la columna Extra de "Click en
+// coordenada" — ya resuelta a números, lista para que
+// Runtime calcule el destino sin volver a interpretar
+// strings. La repetición (Normal/Mantener/Turbo) NO vive
+// acá: se resuelve al mismo ExtraCache de siempre (ver
+// compilador.rs), reutilizando el mecanismo existente.
+// ======================================================
+
+#[derive(Clone, Debug, PartialEq)]
+pub enum PuntoReferenciaCache {
+    SupIzq,
+    SupDer,
+    Centro,
+    InfIzq,
+    InfDer,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub enum UbicacionCache {
+    Absoluta {
+        x: f64,
+        y: f64,
+    },
+
+    RelativaCursor {
+        offset_x: f64,
+        offset_y: f64,
+    },
+
+    RelativaVentanaPorcentaje {
+        h: f64,
+        v: f64,
+    },
+
+    RelativaVentanaPixeles {
+        offset_x: f64,
+        offset_y: f64,
+        referencia: PuntoReferenciaCache,
+    },
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub enum PostAccionCache {
+    Inicial,
+
+    Final,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct CoordenadaCache {
+    pub ubicacion: UbicacionCache,
+
+    pub post_accion: PostAccionCache,
 }

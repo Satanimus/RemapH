@@ -73,6 +73,11 @@
 //     en vez de dejar el teclado/mouse trabado para siempre. Un log
 //     de advertencia avisa por consola cuando esto se activa, para
 //     poder distinguir "activó la red de seguridad" de "otra cosa".
+//
+// tecla_guardar_coordenada()
+// establecer_tecla_guardar_coordenada()
+//     Tecla que la ventana de captura de "Click en coordenada"
+//     escucha para guardar la posición actual ("F1" por defecto).
 // ------------------------------------------------------
 // Transformación:
 //
@@ -200,4 +205,30 @@ pub fn tiempo_maximo_retenido() -> u64 {
 
 pub fn establecer_tiempo_maximo_retenido(valor: u64) {
     TIEMPO_MAXIMO_RETENIDO.store(valor, Ordering::Relaxed);
+}
+
+// ======================================================
+// 📌 TECLA GUARDAR COORDENADA (ventana de captura)
+// ------------------------------------------------------
+// Código interno de tecla (mismo vocabulario que
+// pulsadores.tsv, ej. "F1") que la ventana de captura de
+// "Click en coordenada" escucha para guardar la posición
+// actual. Configurable, no fija — ver captura_coordenada.rs
+// (quien la usa) y comandos.rs (quien la expone a la UI).
+// ======================================================
+
+static TECLA_GUARDAR_COORDENADA: std::sync::Mutex<String> = std::sync::Mutex::new(String::new());
+
+pub fn tecla_guardar_coordenada() -> String {
+    let valor = TECLA_GUARDAR_COORDENADA.lock().unwrap();
+
+    if valor.is_empty() {
+        "F1".to_string()
+    } else {
+        valor.clone()
+    }
+}
+
+pub fn establecer_tecla_guardar_coordenada(valor: String) {
+    *TECLA_GUARDAR_COORDENADA.lock().unwrap() = valor;
 }

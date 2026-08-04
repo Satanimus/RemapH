@@ -131,6 +131,8 @@
 // ======================================================
 
 use crate::back_app;
+use crate::back_coordenada;
+use crate::captura_coordenada;
 use crate::config;
 use crate::perfil;
 use crate::perfil_json::perfil_json;
@@ -139,6 +141,8 @@ use crate::perfil_ui::{convertir_perfil, FilaUI, ResultadoPerfil, TriggerCaptura
 use base64::engine::general_purpose::STANDARD as BASE64;
 use base64::Engine as _;
 use serde::Serialize;
+
+use tauri::{Manager, WebviewUrl, WebviewWindowBuilder};
 
 use windows_sys::Win32::UI::Input::KeyboardAndMouse::*;
 
@@ -340,4 +344,124 @@ pub fn abrir_selector_emoji() {
             std::mem::size_of::<INPUT>() as i32,
         );
     }
+}
+
+// ======================================================
+// 🖱️📌 CLICK EN COORDENADA — VENTANA DE CAPTURA
+// ------------------------------------------------------
+// abrir_ventana_captura_coordenada() / cerrar_...()
+//     Crea/destruye la ventana overlay bajo demanda (no
+//     vive montada). Al abrir, activa el tap pasivo de
+//     captura_coordenada.rs; al cerrar (Cancelar, guardado,
+//     o cierre externo), lo desactiva.
+//
+// obtener_cursor_captura() / obtener_ventana_activa_captura()
+//     Polling en vivo desde la ventana de captura (posición
+//     del cursor y datos de la ventana activa).
+//
+// consultar_guardado_coordenada()
+//     Polling desde la ventana de captura: ¿se apretó la
+//     tecla de guardar desde la última consulta?
+//
+// guardar_resultado_coordenada() / obtener_resultado_coordenada()
+//     La ventana de captura entrega el resultado ya
+//     calculado; el popup de la fila del perfil lo retira.
+//
+// obtener_tecla_guardar_coordenada() / establecer_...()
+//     Config de la tecla de guardado (F1 por defecto).
+// ======================================================
+
+#[derive(Serialize)]
+pub struct VentanaActivaJson {
+    pub titulo: String,
+
+    pub x: i32,
+
+    pub y: i32,
+
+    pub ancho: i32,
+
+    pub alto: i32,
+}
+
+const VENTANA_CAPTURA_COORDENADA: &str = "captura_coordenada";
+
+#[tauri::command]
+pub fn abrir_ventana_captura_coordenada(app: tauri::AppHandle) -> Result<(), String> {
+    // Re-captura: si ya había una ventana abierta (el usuario volvió
+    // a hacer clic en 📌 Capturar sin cerrar la anterior), se cierra
+    // primero para no dejar dos overlays sueltos.
+    if let Some(existente) = app.get_webview_window(VENTANA_CAPTURA_COORDENADA) {
+        let _ = existente.close();
+    }
+
+    WebviewWindowBuilder::new(
+        &app,
+        VENTANA_CAPTURA_COORDENADA,
+        WebviewUrl::App("captura.html".into()),
+    )
+    .title("RemapH — Captura")
+    .inner_size(320.0, 120.0)
+    .resizable(false)
+    .decorations(false)
+    .transparent(true)
+    .always_on_top(true)
+    .skip_taskbar(true)
+    .focused(true)
+    .build()
+    .map_err(|error| error.to_string())?;
+
+    captura_coordenada::activar();
+
+    Ok(())
+}
+
+#[tauri::command]
+pub fn cerrar_ventana_captura_coordenada(app: tauri::AppHandle) {
+    if let Some(ventana) = app.get_webview_window(VENTANA_CAPTURA_COORDENADA) {
+        let _ = ventana.close();
+    }
+
+    captura_coordenada::desactivar();
+}
+
+#[tauri::command]
+pub fn obtener_cursor_captura() -> (i32, i32) {
+    back_coordenada::obtener_cursor()
+}
+
+#[tauri::command]
+pub fn obtener_ventana_activa_captura() -> Option<VentanaActivaJson> {
+    back_coordenada::obtener_ventana_activa().map(|ventana| VentanaActivaJson {
+        titulo: ventana.titulo,
+        x: ventana.x,
+        y: ventana.y,
+        ancho: ventana.ancho,
+        alto: ventana.alto,
+    })
+}
+
+#[tauri::command]
+pub fn consultar_guardado_coordenada() -> bool {
+    captura_coordenada::consultar_guardado()
+}
+
+#[tauri::command]
+pub fn guardar_resultado_coordenada(x: f64, y: f64) {
+    captura_coordenada::guardar_resultado(x, y);
+}
+
+#[tauri::command]
+pub fn obtener_resultado_coordenada() -> Option<(f64, f64)> {
+    captura_coordenada::obtener_resultado()
+}
+
+#[tauri::command]
+pub fn obtener_tecla_guardar_coordenada() -> String {
+    config::tecla_guardar_coordenada()
+}
+
+#[tauri::command]
+pub fn establecer_tecla_guardar_coordenada(valor: String) {
+    config::establecer_tecla_guardar_coordenada(valor)
 }

@@ -57,6 +57,12 @@
 // función, antes que cualquier otra cosa (incluido el corte
 // de cache vacía: con captura activa, da igual si hay algo
 // compilado o no).
+//
+// TAP PASIVO — captura_coordenada::observar_evento(): distinto
+// del Modo Captura de arriba. Se llama SIEMPRE, antes que
+// cualquier otra cosa (incluida la excepción de arriba), y
+// nunca cambia el flujo — solo mira si llegó la tecla de
+// guardar coordenada. Windows sigue recibiendo todo normal.
 // ------------------------------------------------------
 // 2. ¿Quién llama este archivo?
 // back_interception::iniciar() — le entrega cada
@@ -143,6 +149,7 @@
 use crate::analizador_trigger;
 use crate::back_interception;
 use crate::cache;
+use crate::captura_coordenada;
 use crate::config;
 use crate::eventos::{InputEvent, InputId, InputState};
 use std::cell::RefCell;
@@ -177,6 +184,15 @@ thread_local! {
 }
 
 pub fn procesar_evento(evento: InputEvent) {
+    // Tap pasivo para la ventana de captura de "Click en coordenada"
+    // (ver captura_coordenada.rs): nunca decide nada sobre el evento,
+    // solo observa. Va primero y no retorna nada — todo lo de abajo
+    // sigue exactamente igual, con o sin una captura de coordenada
+    // activa. A propósito NO es lo mismo que el "Modo Captura" de más
+    // abajo (ese sí consume todo); acá Windows sigue funcionando
+    // normal.
+    captura_coordenada::observar_evento(&evento);
+
     // EXCEPCIÓN — Modo Captura: se consume TODO, incondicionalmente, y
     // ni se mira RETENIDO/DEVOLVIENDO ni el estado de la cache. Esto va
     // primero que cualquier otra cosa (ver header, punto 5).

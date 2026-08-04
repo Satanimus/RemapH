@@ -130,6 +130,7 @@ pub struct RemapeoJson {
     pub accion_trigger: Option<TriggerJson>,
     pub accion_referencia: Option<String>,
     pub extra: String,
+    pub coordenada: CoordenadaJson,
     pub color: String,
     pub nota: String,
 }
@@ -169,4 +170,61 @@ pub struct AppJson {
 
     #[serde(rename = "segundoPlano")]
     pub segundo_plano: bool,
+}
+
+// ======================================================
+// 🖱️ COORDENADA JSON
+// ------------------------------------------------------
+// Datos de la columna Extra cuando tipo == "click_coordenada".
+// Independiente del campo `extra` (string) que usan los demás
+// tipos — acá el popup y la cantidad de datos son distintos.
+//
+// tipo_repeticion: "" | "turbo" | "mantener" — mismo
+//     vocabulario que `extra`, se interpreta con la misma
+//     convertir_extra() de compilador.rs.
+// ubicacion: "absoluta" | "relativa_cursor" | "relativa_ventana"
+// modo_ventana: "porcentaje" | "pixeles" — solo si ubicacion
+//     es "relativa_ventana".
+// punto_referencia: "sup_izq" | "sup_der" | "centro" |
+//     "inf_izq" | "inf_der" — solo si modo_ventana es "pixeles"
+//     (en "porcentaje" siempre es sup_izq, fijo).
+// post_accion: "inicial" | "final".
+// x / y: interpretación depende de ubicacion/modo_ventana —
+//     absoluta -> coordenada de pantalla.
+//     relativa_cursor -> offset (destino - origen).
+//     relativa_ventana + porcentaje -> %H, %V (0-100).
+//     relativa_ventana + pixeles -> offset desde punto_referencia.
+//     None mientras no se haya capturado todavía.
+// ======================================================
+
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CoordenadaJson {
+    pub tipo_repeticion: String,
+
+    pub ubicacion: String,
+
+    pub modo_ventana: String,
+
+    pub punto_referencia: String,
+
+    pub post_accion: String,
+
+    pub x: Option<f64>,
+
+    pub y: Option<f64>,
+}
+
+impl CoordenadaJson {
+    pub fn nueva() -> Self {
+        Self {
+            tipo_repeticion: String::new(),
+            ubicacion: "absoluta".to_string(),
+            modo_ventana: "pixeles".to_string(),
+            punto_referencia: "sup_izq".to_string(),
+            post_accion: "final".to_string(),
+            x: None,
+            y: None,
+        }
+    }
 }

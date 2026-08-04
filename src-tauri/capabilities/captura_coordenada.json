@@ -1,0 +1,9 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "captura-coordenada",
+  "description": "Capability for the coordinate-capture overlay window",
+  "windows": ["captura_coordenada"],
+  "permissions": [
+    "core:default"
+  ]
+}

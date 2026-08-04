@@ -171,7 +171,9 @@
 // ======================================================
 
 use crate::eventos::InputId;
-use crate::perfil_cache::{AccionCache, AppCache, CondicionTrigger, ExtraCache, RemapeoCache};
+use crate::perfil_cache::{
+    AccionCache, AppCache, CondicionTrigger, CoordenadaCache, ExtraCache, RemapeoCache,
+};
 use crate::{analizador_trigger, entrada, runtime};
 use std::sync::Mutex;
 
@@ -198,6 +200,7 @@ pub enum OrdenRuntime {
         id: String,
         accion: AccionCache,
         extra: Option<ExtraCache>,
+        coordenada: Option<CoordenadaCache>,
     },
     Detener {
         id: String,
@@ -494,6 +497,7 @@ fn iniciar_y_finalizar(remapeo: RemapeoCache) {
         id: remapeo.id.clone(),
         accion: remapeo.accion,
         extra: remapeo.extra,
+        coordenada: remapeo.coordenada,
     });
     runtime::ejecutar(runtime::OrdenRuntime::Detener { id: remapeo.id });
 }
@@ -507,6 +511,7 @@ fn iniciar_solamente(remapeo: RemapeoCache, entrada: Vec<InputId>) {
         id: remapeo.id,
         accion: remapeo.accion,
         extra: remapeo.extra,
+        coordenada: remapeo.coordenada,
     });
 }
 

@@ -118,7 +118,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::perfil_json::{perfil_json, AppJson, RemapeoJson, TriggerJson};
+use crate::perfil_json::{perfil_json, AppJson, CoordenadaJson, RemapeoJson, TriggerJson};
 
 // ======================================================
 // 🖥️ APP UI
@@ -151,6 +151,8 @@ pub struct FilaUI {
     pub accion: Option<TriggerUI>,
 
     pub extra: String,
+
+    pub coordenada: CoordenadaJson,
 
     pub color: String,
 
@@ -268,6 +270,8 @@ fn convertir_fila(fila: FilaUI) -> RemapeoJson {
         accion_referencia: None,
 
         extra: fila.extra,
+
+        coordenada: fila.coordenada,
 
         color: fila.color,
 

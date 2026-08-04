@@ -213,13 +213,15 @@
 //               ↓
 //         Dispositivo físico
 // ======================================================
+use crate::back_coordenada;
+
 use crate::back_interception;
 
 pub use crate::cache::OrdenRuntime;
 
 use crate::eventos::InputId;
 
-use crate::perfil_cache::{AccionCache, ExtraCache};
+use crate::perfil_cache::{AccionCache, CoordenadaCache, ExtraCache, PostAccionCache};
 
 use crate::runt_extra;
 
@@ -311,8 +313,13 @@ static COLA_SALIDA: std::sync::LazyLock<Mutex<Sender<Vec<InputId>>>> =
 
 pub fn ejecutar(orden: OrdenRuntime) {
     match orden {
-        OrdenRuntime::Iniciar { id, accion, extra } => {
-            ejecutar_accion(id, accion, extra);
+        OrdenRuntime::Iniciar {
+            id,
+            accion,
+            extra,
+            coordenada,
+        } => {
+            ejecutar_accion(id, accion, extra, coordenada);
         }
 
         OrdenRuntime::Detener { id } => {
@@ -325,7 +332,18 @@ pub fn ejecutar(orden: OrdenRuntime) {
 // ⚡ EJECUTAR ACCIÓN
 // ======================================================
 
-fn ejecutar_accion(id: String, accion: AccionCache, extra: Option<ExtraCache>) {
+fn ejecutar_accion(
+    id: String,
+    accion: AccionCache,
+    extra: Option<ExtraCache>,
+    coordenada: Option<CoordenadaCache>,
+) {
+    if let Some(coordenada) = coordenada {
+        ejecutar_click_coordenada(id, accion, extra, coordenada);
+
+        return;
+    }
+
     if let Some(extra) = extra {
         ejecutar_extra_en_hilo(id, extra, accion);
 
@@ -358,6 +376,59 @@ fn ejecutar_accion(id: String, accion: AccionCache, extra: Option<ExtraCache>) {
             mostrar_ui(valor);
         }
     }
+}
+
+// ======================================================
+// 🖱️ EJECUTAR CLICK EN COORDENADA
+// ------------------------------------------------------
+// El destino se calcula UNA sola vez acá, antes de arrancar
+// — nunca se recalcula durante Turbo/Mantener (ver
+// perfil_cache.rs, CoordenadaCache). Corre siempre en su
+// propio hilo (igual que Extra/Macro): mover el cursor +
+// ejecutar un combo ya es más de un pulse instantáneo, así
+// que no debe bloquear el hilo que lee el input físico.
+//
+// Post-acción "Inicial": se guarda la posición real del
+// cursor ANTES de moverlo, y se restaura recién cuando la
+// ejecución completa termina — para Mantener/Turbo, eso es
+// cuando ejecutar_lineas() vuelve (o sea, cuando llegó el
+// Detener real). Post-acción "Final": no se guarda nada, el
+// cursor queda donde el click lo dejó.
+// ======================================================
+
+fn ejecutar_click_coordenada(
+    id: String,
+    accion: AccionCache,
+    extra: Option<ExtraCache>,
+    coordenada: CoordenadaCache,
+) {
+    thread::spawn(move || {
+        let origen = match coordenada.post_accion {
+            PostAccionCache::Inicial => Some(back_coordenada::obtener_cursor()),
+            PostAccionCache::Final => None,
+        };
+
+        let destino = back_coordenada::calcular_destino(&coordenada.ubicacion);
+        back_coordenada::mover_cursor(destino.0, destino.1);
+
+        match extra {
+            Some(extra) => {
+                let lineas = runt_extra::obtener(&extra);
+                let lineas = sustituir_accion(lineas, &accion);
+                ejecutar_lineas(id, lineas);
+            }
+
+            None => {
+                if let AccionCache::Emitir(inputs) = &accion {
+                    emitir_combo(inputs);
+                }
+            }
+        }
+
+        if let Some((x, y)) = origen {
+            back_coordenada::mover_cursor(x, y);
+        }
+    });
 }
 
 // ======================================================

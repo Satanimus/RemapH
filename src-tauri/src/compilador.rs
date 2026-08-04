@@ -114,15 +114,24 @@
 //     (ej: tecla_mouse sin gatillo capturado todavía) — en
 //     los dos casos la fila se descarta de la cache, nunca
 //     se panickea por datos incompletos.
+//
+// convertir_coordenada()
+//     Solo para tipo == "click_coordenada": resuelve
+//     CoordenadaJson (strings de UI) → Option<CoordenadaCache>
+//     (ubicación ya resuelta a números). None si todavía no
+//     se capturó — mismo criterio de descarte silencioso.
 // ------------------------------------------------------
 
 use crate::cache;
 
 use crate::eventos::InputId;
 
-use crate::perfil_cache::{AccionCache, AppCache, ExtraCache, RemapeoCache, TriggerCache};
+use crate::perfil_cache::{
+    AccionCache, AppCache, CoordenadaCache, ExtraCache, PostAccionCache, PuntoReferenciaCache,
+    RemapeoCache, TriggerCache, UbicacionCache,
+};
 
-use crate::perfil_json::{perfil_json, AppJson, RemapeoJson};
+use crate::perfil_json::{perfil_json, AppJson, CoordenadaJson, RemapeoJson};
 
 // ======================================================
 // ⚙️ COMPILAR
@@ -160,6 +169,27 @@ fn compilar_remapeo(remapeo: &RemapeoJson) -> Option<RemapeoCache> {
 
     let accion = convertir_accion(remapeo)?;
 
+    // "Click en coordenada" tiene su propia repetición (dentro de
+    // CoordenadaJson, independiente del `extra` genérico de los demás
+    // tipos) pero usa el mismo vocabulario ("", "turbo", "mantener") y
+    // el mismo convertir_extra() — no es un mecanismo nuevo, solo se
+    // alimenta desde otro campo.
+    let extra = if remapeo.tipo == "click_coordenada" {
+        convertir_extra(&remapeo.coordenada.tipo_repeticion)
+    } else {
+        convertir_extra(&remapeo.extra)
+    };
+
+    // Igual que con la Acción: si el tipo es click_coordenada pero
+    // todavía no se capturó la coordenada (x/y en None), la fila se
+    // descarta en silencio (mismo criterio que un tecla_mouse sin
+    // gatillo capturado todavía).
+    let coordenada = if remapeo.tipo == "click_coordenada" {
+        Some(convertir_coordenada(&remapeo.coordenada)?)
+    } else {
+        None
+    };
+
     Some(RemapeoCache {
         id: remapeo.id.clone(),
 
@@ -173,7 +203,9 @@ fn compilar_remapeo(remapeo: &RemapeoJson) -> Option<RemapeoCache> {
 
         accion,
 
-        extra: convertir_extra(&remapeo.extra),
+        extra,
+
+        coordenada,
     })
 }
 
@@ -244,7 +276,11 @@ fn convertir_entrada(trigger: &crate::perfil_json::TriggerJson) -> Vec<InputId> 
 
 fn convertir_accion(remapeo: &RemapeoJson) -> Option<AccionCache> {
     match remapeo.tipo.as_str() {
-        "tecla_mouse" => {
+        // click_coordenada reusa exactamente el mismo capturador de
+        // Tecla/Mouse para su Acción (ver comp_accion.ts) — lo único
+        // que cambia es DÓNDE se ejecuta (ver convertir_coordenada),
+        // nunca QUÉ se ejecuta.
+        "tecla_mouse" | "click_coordenada" => {
             let trigger = remapeo.accion_trigger.as_ref()?;
 
             let gatillo = trigger.gatillo.as_ref()?;
@@ -265,9 +301,9 @@ fn convertir_accion(remapeo: &RemapeoJson) -> Option<AccionCache> {
 
         "ui" => Some(AccionCache::Ui(referencia(remapeo)?)),
 
-        // Tipos todavía decorativos en la UI (Multimedia, Click
-        // coordenada, Portapapeles, etc.): no producen ninguna acción
-        // real todavía. La fila entera se descarta al compilar (ver
+        // Tipos todavía decorativos en la UI (Multimedia,
+        // Portapapeles, etc.): no producen ninguna acción real
+        // todavía. La fila entera se descarta al compilar (ver
         // compilar_remapeo), igual que una fila en OFF.
         _ => None,
     }
@@ -299,5 +335,62 @@ fn convertir_extra(extra: &str) -> Option<ExtraCache> {
         "toggle" => Some(ExtraCache::Toggle),
 
         _ => None,
+    }
+}
+
+// ======================================================
+// 🖱️ CONVERTIR COORDENADA
+// ------------------------------------------------------
+// None si todavía no se capturó (x/y en None) — la fila se
+// descarta en compilar_remapeo, mismo criterio que una
+// Acción sin capturar.
+// ======================================================
+
+fn convertir_coordenada(coordenada: &CoordenadaJson) -> Option<CoordenadaCache> {
+    let x = coordenada.x?;
+    let y = coordenada.y?;
+
+    let ubicacion = match coordenada.ubicacion.as_str() {
+        "relativa_cursor" => UbicacionCache::RelativaCursor {
+            offset_x: x,
+            offset_y: y,
+        },
+
+        "relativa_ventana" => match coordenada.modo_ventana.as_str() {
+            "porcentaje" => UbicacionCache::RelativaVentanaPorcentaje { h: x, v: y },
+
+            _ => UbicacionCache::RelativaVentanaPixeles {
+                offset_x: x,
+                offset_y: y,
+                referencia: convertir_punto_referencia(&coordenada.punto_referencia),
+            },
+        },
+
+        _ => UbicacionCache::Absoluta { x, y },
+    };
+
+    let post_accion = match coordenada.post_accion.as_str() {
+        "inicial" => PostAccionCache::Inicial,
+
+        _ => PostAccionCache::Final,
+    };
+
+    Some(CoordenadaCache {
+        ubicacion,
+        post_accion,
+    })
+}
+
+fn convertir_punto_referencia(valor: &str) -> PuntoReferenciaCache {
+    match valor {
+        "sup_der" => PuntoReferenciaCache::SupDer,
+
+        "centro" => PuntoReferenciaCache::Centro,
+
+        "inf_izq" => PuntoReferenciaCache::InfIzq,
+
+        "inf_der" => PuntoReferenciaCache::InfDer,
+
+        _ => PuntoReferenciaCache::SupIzq,
     }
 }
