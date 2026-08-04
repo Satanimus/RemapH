@@ -367,9 +367,25 @@ pub fn abrir_selector_emoji() {
 //     La ventana de captura entrega el resultado ya
 //     calculado; el popup de la fila del perfil lo retira.
 //
+// obtener_config_captura_activa()
+//     La ventana de captura la consulta una sola vez al cargar
+//     (ubicación/modo/punto de referencia de la fila que la abrió).
+//
 // obtener_tecla_guardar_coordenada() / establecer_...()
 //     Config de la tecla de guardado (F1 por defecto).
+//
+// obtener_intervalo_captura_coordenada()
+//     Cada cuántos ms debe sondear captura.html (config.rs).
 // ======================================================
+
+#[derive(Serialize)]
+pub struct ConfigCapturaJson {
+    pub ubicacion: String,
+
+    pub modo_ventana: String,
+
+    pub punto_referencia: String,
+}
 
 #[derive(Serialize)]
 pub struct VentanaActivaJson {
@@ -387,13 +403,22 @@ pub struct VentanaActivaJson {
 const VENTANA_CAPTURA_COORDENADA: &str = "captura_coordenada";
 
 #[tauri::command]
-pub fn abrir_ventana_captura_coordenada(app: tauri::AppHandle) -> Result<(), String> {
+pub fn abrir_ventana_captura_coordenada(
+    app: tauri::AppHandle,
+    ubicacion: String,
+    modo_ventana: String,
+    punto_referencia: String,
+) -> Result<(), String> {
     // Re-captura: si ya había una ventana abierta (el usuario volvió
     // a hacer clic en 📌 Capturar sin cerrar la anterior), se cierra
     // primero para no dejar dos overlays sueltos.
     if let Some(existente) = app.get_webview_window(VENTANA_CAPTURA_COORDENADA) {
         let _ = existente.close();
     }
+
+    // Se fija la config ANTES de crear la ventana: captura.html puede
+    // consultarla apenas termina de cargar, sin carrera posible.
+    captura_coordenada::activar(ubicacion, modo_ventana, punto_referencia);
 
     WebviewWindowBuilder::new(
         &app,
@@ -410,8 +435,6 @@ pub fn abrir_ventana_captura_coordenada(app: tauri::AppHandle) -> Result<(), Str
     .focused(true)
     .build()
     .map_err(|error| error.to_string())?;
-
-    captura_coordenada::activar();
 
     Ok(())
 }
@@ -442,6 +465,15 @@ pub fn obtener_ventana_activa_captura() -> Option<VentanaActivaJson> {
 }
 
 #[tauri::command]
+pub fn obtener_config_captura_activa() -> Option<ConfigCapturaJson> {
+    captura_coordenada::obtener_config_activa().map(|config| ConfigCapturaJson {
+        ubicacion: config.ubicacion,
+        modo_ventana: config.modo_ventana,
+        punto_referencia: config.punto_referencia,
+    })
+}
+
+#[tauri::command]
 pub fn consultar_guardado_coordenada() -> bool {
     captura_coordenada::consultar_guardado()
 }
@@ -464,4 +496,9 @@ pub fn obtener_tecla_guardar_coordenada() -> String {
 #[tauri::command]
 pub fn establecer_tecla_guardar_coordenada(valor: String) {
     config::establecer_tecla_guardar_coordenada(valor)
+}
+
+#[tauri::command]
+pub fn obtener_intervalo_captura_coordenada() -> u64 {
+    config::intervalo_captura_coordenada()
 }

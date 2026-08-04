@@ -1,15 +1,29 @@
 import { defineConfig } from "vite";
 
+import { fileURLToPath, URL } from "node:url";
+
 // @ts-expect-error process is a nodejs global
 const host = process.env.TAURI_DEV_HOST;
 
 // https://vite.dev/config/
 export default defineConfig(async () => ({
-
   // Vite options tailored for Tauri development and only applied in `tauri dev` or `tauri build`
   //
   // 1. prevent Vite from obscuring rust errors
   clearScreen: false,
+
+  // Segunda página independiente: la ventana overlay de captura de
+  // coordenada (WebviewUrl::App("captura.html")) — sin esto Vite
+  // solo compila index.html y esa ventana carga en blanco (404).
+  build: {
+    rollupOptions: {
+      input: {
+        main: fileURLToPath(new URL("./index.html", import.meta.url)),
+        captura: fileURLToPath(new URL("./captura.html", import.meta.url)),
+      },
+    },
+  },
+
   // 2. tauri expects a fixed port, fail if that port is not available
   server: {
     port: 1420,

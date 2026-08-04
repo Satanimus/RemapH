@@ -43,8 +43,14 @@
 // ------------------------------------------------------
 // 5. Funciones del archivo
 //
-// activar() / desactivar()
-//     Se llaman al abrir/cerrar la ventana de captura.
+// activar(ubicacion, modo_ventana, punto_referencia) / desactivar()
+//     Se llaman al abrir/cerrar la ventana de captura. activar()
+//     recibe también la configuración activa de la fila que abrió
+//     la ventana (mismo vocabulario que core_coordenada.ts:
+//     "absoluta"/"relativa_cursor"/"relativa_ventana",
+//     "porcentaje"/"pixeles", "sup_izq"/etc.) — se guarda tal cual,
+//     sin interpretarla acá, para que captura.html la lea una sola
+//     vez al abrir vía obtener_config_activa().
 // observar_evento(evento)
 //     Tap pasivo: si está activo y el evento es Down de la
 //     tecla configurada, marca "se pidió guardar". Nunca
@@ -65,22 +71,47 @@
 use crate::config;
 use crate::eventos::{InputEvent, InputId, InputState};
 
+/// Config de la fila que abrió la ventana — mismo vocabulario de
+/// strings que core_coordenada.ts, sin interpretar acá.
+#[derive(Clone)]
+pub struct ConfigCaptura {
+    pub ubicacion: String,
+
+    pub modo_ventana: String,
+
+    pub punto_referencia: String,
+}
+
 static ACTIVA: std::sync::Mutex<bool> = std::sync::Mutex::new(false);
 static GUARDADO_SOLICITADO: std::sync::Mutex<bool> = std::sync::Mutex::new(false);
 static RESULTADO: std::sync::Mutex<Option<(f64, f64)>> = std::sync::Mutex::new(None);
+static CONFIG_ACTIVA: std::sync::Mutex<Option<ConfigCaptura>> = std::sync::Mutex::new(None);
 
-/// Llamada al abrir la ventana de captura.
-pub fn activar() {
+/// Llamada al abrir la ventana de captura, con la config de la fila
+/// que la abrió.
+pub fn activar(ubicacion: String, modo_ventana: String, punto_referencia: String) {
     *ACTIVA.lock().unwrap() = true;
     *GUARDADO_SOLICITADO.lock().unwrap() = false;
     *RESULTADO.lock().unwrap() = None;
+    *CONFIG_ACTIVA.lock().unwrap() = Some(ConfigCaptura {
+        ubicacion,
+        modo_ventana,
+        punto_referencia,
+    });
 }
 
 /// Llamada al cerrar la ventana de captura (Cancelar, guardado, o
-/// cierre externo) — deja todo limpio para la próxima apertura.
+/// cierre externo/auto-cancelación por cambio de opción) — deja todo
+/// limpio para la próxima apertura.
 pub fn desactivar() {
     *ACTIVA.lock().unwrap() = false;
     *GUARDADO_SOLICITADO.lock().unwrap() = false;
+    *CONFIG_ACTIVA.lock().unwrap() = None;
+}
+
+/// Consultada una sola vez por captura.html al cargar.
+pub fn obtener_config_activa() -> Option<ConfigCaptura> {
+    CONFIG_ACTIVA.lock().unwrap().clone()
 }
 
 /// Tap pasivo llamado por entrada.rs en CADA evento físico, antes de

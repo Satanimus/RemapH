@@ -67,11 +67,13 @@ pub fn run() {
             comandos::cerrar_ventana_captura_coordenada,
             comandos::obtener_cursor_captura,
             comandos::obtener_ventana_activa_captura,
+            comandos::obtener_config_captura_activa,
             comandos::consultar_guardado_coordenada,
             comandos::guardar_resultado_coordenada,
             comandos::obtener_resultado_coordenada,
             comandos::obtener_tecla_guardar_coordenada,
             comandos::establecer_tecla_guardar_coordenada,
+            comandos::obtener_intervalo_captura_coordenada,
         ])
         .run(tauri::generate_context!())
         .expect("error al ejecutar Tauri");

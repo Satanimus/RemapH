@@ -19,7 +19,10 @@ import {
 
 import { abrirPopupApp } from "./comp_popup_app";
 
-import { abrirPopupCoordenada } from "./comp_popup_coordenada";
+import {
+  abrirPopupCoordenada,
+  cerrarVentanaCapturaCoordenada,
+} from "./comp_popup_coordenada";
 
 import { textoCoordenada } from "../../core/core_coordenada";
 
@@ -115,6 +118,17 @@ export function crearTipo(
       abrirPopupTipo(
         evento,
         (valor) => {
+          // Si esta fila era click_coordenada y tenía la ventana de
+          // captura abierta, deja de tener sentido apenas cambia el
+          // tipo — no puede quedar calculando para una fila que ya
+          // no es click en coordenada.
+          if (
+            filaPerfil.tipo === "click_coordenada" &&
+            valor !== "click_coordenada"
+          ) {
+            cerrarVentanaCapturaCoordenada();
+          }
+
           filaPerfil.tipo = valor;
 
           reconstruirFila(contexto.id);

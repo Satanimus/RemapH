@@ -78,6 +78,13 @@
 // establecer_tecla_guardar_coordenada()
 //     Tecla que la ventana de captura de "Click en coordenada"
 //     escucha para guardar la posición actual ("F1" por defecto).
+//
+// intervalo_captura_coordenada()
+// establecer_intervalo_captura_coordenada()
+//     Cada cuántos ms la ventana de captura de "Click en coordenada"
+//     vuelve a leer cursor/ventana activa y a chequear si se pidió
+//     guardar (100ms por defecto — solo feedback visual, no necesita
+//     ser más fino).
 // ------------------------------------------------------
 // Transformación:
 //
@@ -231,4 +238,18 @@ pub fn tecla_guardar_coordenada() -> String {
 
 pub fn establecer_tecla_guardar_coordenada(valor: String) {
     *TECLA_GUARDAR_COORDENADA.lock().unwrap() = valor;
+}
+
+// ======================================================
+// ⏱️ INTERVALO CAPTURA COORDENADA (polling ventana overlay)
+// ======================================================
+
+static INTERVALO_CAPTURA_COORDENADA: AtomicU64 = AtomicU64::new(100);
+
+pub fn intervalo_captura_coordenada() -> u64 {
+    INTERVALO_CAPTURA_COORDENADA.load(Ordering::Relaxed)
+}
+
+pub fn establecer_intervalo_captura_coordenada(valor: u64) {
+    INTERVALO_CAPTURA_COORDENADA.store(valor, Ordering::Relaxed);
 }

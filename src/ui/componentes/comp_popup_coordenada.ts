@@ -42,6 +42,23 @@ import type {
 import { textoCoordenada } from "../../core/core_coordenada";
 
 // ======================================================
+// 🚪 CERRAR VENTANA DE CAPTURA (auto-cancelación)
+// ------------------------------------------------------
+// Si la ventana overlay está abierta y el usuario cambia
+// cualquier opción que la deja incoherente (ubicación, modo
+// de ventana, punto de referencia, o el tipo de la fila deja
+// de ser click_coordenada), se cierra sola — no puede quedar
+// una ventana de captura en el aire sin saber para qué
+// ubicación está calculando. Si no había ninguna abierta,
+// cerrar_ventana_captura_coordenada no hace nada (comandos.rs
+// ya maneja el caso "no existe la ventana").
+// ======================================================
+
+export function cerrarVentanaCapturaCoordenada(): void {
+  invoke("cerrar_ventana_captura_coordenada").catch(() => {});
+}
+
+// ======================================================
 // 🔘 GRUPO DE OPCIONES (fila de botones tipo radio)
 // ======================================================
 
@@ -140,6 +157,7 @@ function abrirSubPopupVentana(
         coordenada.x = null;
         coordenada.y = null;
 
+        cerrarVentanaCapturaCoordenada();
         reconstruirFila(contexto.id);
         redibujar();
       }),
@@ -169,6 +187,7 @@ function abrirSubPopupVentana(
             coordenada.x = null;
             coordenada.y = null;
 
+            cerrarVentanaCapturaCoordenada();
             reconstruirFila(contexto.id);
             redibujar();
           },
@@ -183,11 +202,15 @@ function abrirSubPopupVentana(
 // ======================================================
 // 📌 INICIAR CAPTURA
 // ------------------------------------------------------
-// Abre la ventana overlay (Etapa 3 — hoy el comando ya
-// existe del lado Rust, pero captura.html todavía no) y
-// sondea el resultado. TODO Etapa 3: si el usuario cierra
-// la ventana con Cancelar, este intervalo debe limpiarse
-// también (hoy solo se limpia al recibir un resultado).
+// Abre la ventana overlay pasándole la ubicación/modo/punto
+// de referencia activos de la fila (comandos.rs los fija en
+// captura_coordenada.rs ANTES de crear la ventana, así que
+// captura.html los lee sin condición de carrera) y sondea el
+// resultado. Si el usuario la cierra con Cancelar sin
+// guardar, obtener_resultado_coordenada nunca deja de
+// devolver null — este polling queda huérfano hasta que se
+// abra una fila/página nueva. Es aceptable: no hace nada,
+// solo un invoke liviano cada 200ms.
 // ======================================================
 
 function iniciarCaptura(
@@ -195,7 +218,13 @@ function iniciarCaptura(
   filaPerfil: FilaPerfil,
   evento: MouseEvent,
 ): void {
-  invoke("abrir_ventana_captura_coordenada").catch(() => {});
+  const coordenada = filaPerfil.coordenada;
+
+  invoke("abrir_ventana_captura_coordenada", {
+    ubicacion: coordenada.ubicacion,
+    modoVentana: coordenada.modoVentana,
+    puntoReferencia: coordenada.puntoReferencia,
+  }).catch(() => {});
 
   const intervalo = setInterval(() => {
     invoke<[number, number] | null>("obtener_resultado_coordenada")
@@ -285,6 +314,7 @@ export function abrirPopupCoordenada(
         coordenada.x = null;
         coordenada.y = null;
 
+        cerrarVentanaCapturaCoordenada();
         reconstruirFila(contexto.id);
         redibujar();
       }),
