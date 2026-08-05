@@ -102,11 +102,15 @@ pub fn convertir(state: MouseFilter, rolling: i16) -> Option<InputEvent> {
     // ----------------------------------------------
 
     if rolling > 0 {
-        return construir("WheelUp", |input| InputEvent::pulse(input, ahora()));
+        return construir("WheelUp", |input| {
+            InputEvent::pulse_con_magnitud(input, ahora(), rolling)
+        });
     }
 
     if rolling < 0 {
-        return construir("WheelDown", |input| InputEvent::pulse(input, ahora()));
+        return construir("WheelDown", |input| {
+            InputEvent::pulse_con_magnitud(input, ahora(), rolling)
+        });
     }
 
     // ----------------------------------------------

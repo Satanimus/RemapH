@@ -250,9 +250,11 @@ fn convertir_entrada(trigger: &crate::perfil_json::TriggerJson) -> Vec<InputId> 
 // en un solo Vec<InputId> con convertir_input (misma
 // convención que convertir_entrada del lado trigger:
 // modificadores primero, gatillo al final). La condición
-// del accion_trigger no se usa — Emitir no tiene condición
-// propia. Para macro/archivo/ui se usa accion_referencia
-// tal cual.
+// del accion_trigger (Simple/Doble/Mantenido) SÍ se usa —
+// viaja junto en Emitir(inputs, condicion) para que Runtime
+// sepa si tiene que repetir el combo (Doble) o dejarlo
+// abajo un rato (Mantenido). Para macro/archivo/ui se usa
+// accion_referencia tal cual.
 // Cualquier otro tipo (decorativo, sin implementar todavía
 // en Rust) hace que la fila se descarte al compilar.
 //
@@ -279,7 +281,7 @@ fn convertir_accion(remapeo: &RemapeoJson) -> Option<AccionCache> {
                 .chain(std::iter::once(convertir_input(gatillo)))
                 .collect();
 
-            Some(AccionCache::Emitir(inputs))
+            Some(AccionCache::Emitir(inputs, trigger.condicion.clone()))
         }
 
         "macro" => Some(AccionCache::Macro(referencia(remapeo)?)),

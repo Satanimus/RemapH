@@ -400,7 +400,16 @@ fn emitir_mouse(evento: &InputEvent) {
     };
 
     con_sesion_salida(|ict| match salida {
-        MouseOutput::Wheel(cantidad) => enviar_rueda(ict, device, cantidad),
+        // Si el evento trae magnitud real (rueda física, ver
+        // back_mouse::convertir/InputEvent::pulse_con_magnitud),
+        // se reenvía tal cual entró — así un giro de varias
+        // muescas no se aplana a una sola cuando no hay trigger
+        // que lo intercepte. Si no trae magnitud (evento
+        // sintético de una Acción remapeada), se usa el valor
+        // fijo de siempre (120/-120).
+        MouseOutput::Wheel(cantidad) => {
+            enviar_rueda(ict, device, evento.magnitud.unwrap_or(cantidad))
+        }
 
         MouseOutput::Button { down, up } => match evento.state {
             InputState::Down => enviar_boton(ict, device, down),

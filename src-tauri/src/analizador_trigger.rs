@@ -605,6 +605,26 @@ impl AnalizadorTrigger {
 
             InputState::Pulse => {
                 let clave = evento.input.clone();
+
+                // Si ningún candidato posible espera esta rueda como
+                // próximo paso AHORA MISMO (ni sola, ni como
+                // continuación de modificadores ya presionados),
+                // agruparla en ráfagas no sirve para nada (no hay
+                // condición Simple/Mantenido que resolver) y solo logra
+                // tragarse pulsos físicos que deberían volver tal cual a
+                // Windows. En ese caso cada pulso se trata como un
+                // evento suelto e independiente — mismo camino que ya
+                // usa el teclado para un input sin ningún candidato
+                // (ver cache::recibir_down → posibles == 0 → pasar()).
+                // Solo aplica a Runtime: Captura sigue necesitando ver
+                // cada pulso agrupado para poder armar el trigger nuevo
+                // que se está grabando.
+                if self.modo == ModoAnalizador::Runtime && !cache::hay_candidata_para(&clave) {
+                    drop(grupos);
+                    cache::recibir_down(clave);
+                    return Some(());
+                }
+
                 let es_primero = !grupos.contains_key(&clave);
 
                 let generacion = {

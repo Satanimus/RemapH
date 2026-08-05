@@ -85,6 +85,16 @@
 //     vuelve a leer cursor/ventana activa y a chequear si se pidió
 //     guardar (100ms por defecto — solo feedback visual, no necesita
 //     ser más fino).
+//
+// delay_entre_salida_doble()
+// establecer_delay_entre_salida_doble()
+//     Pausa entre el 1º y 2º combo cuando la Acción capturada
+//     (accion_trigger, tipo tecla_mouse) tiene condición Doble.
+//
+// tiempo_salida_mantenido()
+// establecer_tiempo_salida_mantenido()
+//     Cuánto queda abajo la tecla/botón de salida cuando la Acción
+//     capturada tiene condición Mantenido, antes de soltarse sola.
 // ------------------------------------------------------
 // Transformación:
 //
@@ -252,4 +262,32 @@ pub fn intervalo_captura_coordenada() -> u64 {
 
 pub fn establecer_intervalo_captura_coordenada(valor: u64) {
     INTERVALO_CAPTURA_COORDENADA.store(valor, Ordering::Relaxed);
+}
+
+// ======================================================
+// ⏱️ DELAY ENTRE SALIDA DOBLE (Acción con condición Doble)
+// ======================================================
+
+static DELAY_ENTRE_SALIDA_DOBLE: AtomicU64 = AtomicU64::new(30);
+
+pub fn delay_entre_salida_doble() -> u64 {
+    DELAY_ENTRE_SALIDA_DOBLE.load(Ordering::Relaxed)
+}
+
+pub fn establecer_delay_entre_salida_doble(valor: u64) {
+    DELAY_ENTRE_SALIDA_DOBLE.store(valor, Ordering::Relaxed);
+}
+
+// ======================================================
+// ⏳ TIEMPO SALIDA MANTENIDO (Acción con condición Mantenido)
+// ======================================================
+
+static TIEMPO_SALIDA_MANTENIDO: AtomicU64 = AtomicU64::new(300);
+
+pub fn tiempo_salida_mantenido() -> u64 {
+    TIEMPO_SALIDA_MANTENIDO.load(Ordering::Relaxed)
+}
+
+pub fn establecer_tiempo_salida_mantenido(valor: u64) {
+    TIEMPO_SALIDA_MANTENIDO.store(valor, Ordering::Relaxed);
 }

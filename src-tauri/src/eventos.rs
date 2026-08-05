@@ -48,7 +48,12 @@
 //InputEvent::up()
 //    Da formato a un evento físico Up.
 //InputEvent::pulse()
-//    Da formato a un evento Pulse.
+//    Da formato a un evento Pulse (sin magnitud real).
+//InputEvent::pulse_con_magnitud()
+//    Da formato a un evento Pulse que además carga la
+//    magnitud física real (hoy solo la usa la rueda del
+//    mouse — ver back_mouse.rs). None en el resto de los
+//    casos.
 // ------------------------------------------------------
 // Transformación que realiza
 // Windows
@@ -142,6 +147,14 @@ pub struct InputEvent {
     pub state: InputState,
 
     pub instante: Instante,
+
+    // Magnitud física real del evento (hoy solo la rueda del
+    // mouse la usa — cuántas "muescas" trae un Stroke). None
+    // para cualquier evento que no la necesite (teclado,
+    // botones, o eventos sintéticos generados por una Acción
+    // remapeada). Ver back_mouse.rs / back_interception.rs.
+    #[serde(default)]
+    pub magnitud: Option<i16>,
 }
 
 // ======================================================
@@ -161,6 +174,8 @@ impl InputEvent {
             state: InputState::Down,
 
             instante,
+
+            magnitud: None,
         }
     }
 
@@ -176,6 +191,8 @@ impl InputEvent {
             state: InputState::Up,
 
             instante,
+
+            magnitud: None,
         }
     }
 
@@ -191,6 +208,25 @@ impl InputEvent {
             state: InputState::Pulse,
 
             instante,
+
+            magnitud: None,
+        }
+    }
+
+    // ==================================================
+    // ⚡ PULSE CON MAGNITUD
+    // ==================================================
+
+    #[inline]
+    pub fn pulse_con_magnitud(input: InputId, instante: Instante, magnitud: i16) -> Self {
+        Self {
+            input,
+
+            state: InputState::Pulse,
+
+            instante,
+
+            magnitud: Some(magnitud),
         }
     }
 }

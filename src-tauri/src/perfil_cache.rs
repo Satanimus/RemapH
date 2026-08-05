@@ -1,5 +1,5 @@
 // ======================================================
-// 📦 perfil_cache  
+// 📦 perfil_cache
 // ======================================================
 // ETAPA 4 DEL FLUJO
 // ------------------------------------------------------
@@ -194,7 +194,18 @@ pub enum AccionCache {
     // gatillo, los anteriores son modificadores que van DOWN antes
     // y UP después (en orden inverso). Nunca vacío: convertir_accion
     // garantiza al menos el gatillo.
-    Emitir(Vec<InputId>),
+    //
+    // El segundo campo es la condición capturada para esta Acción
+    // (Simple/Doble/Mantenido) — antes se descartaba al compilar y
+    // toda Acción se ejecutaba como si fuera Simple. Runtime decide
+    // con esto cómo ejecutar el combo (ver ejecutar_emitir() en
+    // runtime.rs):
+    // • Simple    → un solo down+up.
+    // • Doble     → dos down+up, separados por
+    //               config::delay_entre_salida_doble().
+    // • Mantenido → down, espera config::tiempo_salida_mantenido(),
+    //               up.
+    Emitir(Vec<InputId>, CondicionTrigger),
 
     Macro(String),
 

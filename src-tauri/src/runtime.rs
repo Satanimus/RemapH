@@ -1,5 +1,5 @@
 // ======================================================
-// ⚙️ Runtime  
+// ⚙️ Runtime
 // ======================================================
 // 1. ¿Qué hace este archivo?
 //
@@ -143,8 +143,16 @@
 //     DOWN/UP reales del combo (mods + gatillo), solo si
 //     accion es Emitir. Una línea con placeholder puede
 //     convertirse en varias líneas.
-// emitir_combo(inputs)
-//     Ejecuta un Emitir directo (sin Extra): DOWN de los
+// ejecutar_emitir(inputs, condicion)
+//     Despacha un Emitir directo (sin Extra) según su
+//     condición: Simple → emitir_combo() una vez. Doble →
+//     emitir_combo() dos veces, separadas por
+//     config::delay_entre_salida_doble(). Mantenido →
+//     emitir_combo_abajo(), espera
+//     config::tiempo_salida_mantenido(), emitir_combo_arriba().
+// emitir_combo(inputs) / emitir_combo_abajo(inputs) /
+// emitir_combo_arriba(inputs)
+//     Ejecuta (o solo la mitad de) un combo: DOWN de los
 //     mods en orden, DOWN+UP del gatillo, UP de los mods en
 //     orden inverso.
 // ejecutar_macro_en_hilo(id, ruta)
@@ -219,9 +227,13 @@ use crate::back_interception;
 
 pub use crate::cache::OrdenRuntime;
 
+use crate::config;
+
 use crate::eventos::InputId;
 
-use crate::perfil_cache::{AccionCache, CoordenadaCache, ExtraCache, PostAccionCache};
+use crate::perfil_cache::{
+    AccionCache, CondicionTrigger, CoordenadaCache, ExtraCache, PostAccionCache,
+};
 
 use crate::runt_extra;
 
@@ -294,13 +306,13 @@ static INSTANCIAS: std::sync::LazyLock<Mutex<HashMap<String, bool>>> =
 // cache.rs) — no hay nada que cancelar a mitad de camino.
 // ======================================================
 
-static COLA_SALIDA: std::sync::LazyLock<Mutex<Sender<Vec<InputId>>>> =
+static COLA_SALIDA: std::sync::LazyLock<Mutex<Sender<(Vec<InputId>, CondicionTrigger)>>> =
     std::sync::LazyLock::new(|| {
-        let (tx, rx) = std::sync::mpsc::channel::<Vec<InputId>>();
+        let (tx, rx) = std::sync::mpsc::channel::<(Vec<InputId>, CondicionTrigger)>();
 
         thread::spawn(move || {
-            for inputs in rx {
-                emitir_combo(&inputs);
+            for (inputs, condicion) in rx {
+                ejecutar_emitir(&inputs, &condicion);
             }
         });
 
@@ -351,7 +363,7 @@ fn ejecutar_accion(
     }
 
     match accion {
-        AccionCache::Emitir(inputs) => {
+        AccionCache::Emitir(inputs, condicion) => {
             // No se ejecuta acá — se encola para el hilo de salida
             // dedicado (ver COLA_SALIDA). El lock es sobre el
             // Sender, no sobre la cola en sí — send() es rápido,
@@ -361,7 +373,7 @@ fn ejecutar_accion(
             // pasar, el hilo es de por vida), se ignora en
             // silencio: no hay nada más que hacer con un envío
             // fallido acá.
-            let _ = COLA_SALIDA.lock().unwrap().send(inputs);
+            let _ = COLA_SALIDA.lock().unwrap().send((inputs, condicion));
         }
 
         AccionCache::Macro(ruta) => {
@@ -419,8 +431,8 @@ fn ejecutar_click_coordenada(
             }
 
             None => {
-                if let AccionCache::Emitir(inputs) = &accion {
-                    emitir_combo(inputs);
+                if let AccionCache::Emitir(inputs, condicion) = &accion {
+                    ejecutar_emitir(inputs, condicion);
                 }
             }
         }
@@ -466,6 +478,46 @@ fn emitir(input: InputId) {
 }
 
 // ======================================================
+// ⚡ EJECUTAR EMITIR (según condición: Simple/Doble/Mantenido)
+// ------------------------------------------------------
+// Único lugar que decide, para un Emitir sin Extra, cómo
+// ejecutar el combo según la condición capturada en la
+// Acción (ver perfil_cache.rs / compilador.rs — antes esto
+// se descartaba y todo se ejecutaba como Simple):
+// • Simple    → un combo completo (down+up).
+// • Doble     → un combo completo, espera
+//               config::delay_entre_salida_doble(), y
+//               repite el combo completo.
+// • Mantenido → solo el DOWN del combo, espera
+//               config::tiempo_salida_mantenido(), y recién
+//               ahí manda el UP.
+// Llamado tanto desde el hilo de salida dedicado
+// (COLA_SALIDA) como desde Click en coordenada sin Extra.
+// ======================================================
+
+fn ejecutar_emitir(inputs: &[InputId], condicion: &CondicionTrigger) {
+    match condicion {
+        CondicionTrigger::Simple => emitir_combo(inputs),
+
+        CondicionTrigger::Doble => {
+            emitir_combo(inputs);
+
+            thread::sleep(Duration::from_millis(config::delay_entre_salida_doble()));
+
+            emitir_combo(inputs);
+        }
+
+        CondicionTrigger::Mantenido => {
+            emitir_combo_abajo(inputs);
+
+            thread::sleep(Duration::from_millis(config::tiempo_salida_mantenido()));
+
+            emitir_combo_arriba(inputs);
+        }
+    }
+}
+
+// ======================================================
 // 📤 EMITIR COMBO (Emitir directo, sin Extra)
 // ------------------------------------------------------
 // inputs = [mod1, mod2, ..., gatillo] (último = gatillo,
@@ -475,6 +527,19 @@ fn emitir(input: InputId) {
 // ======================================================
 
 fn emitir_combo(inputs: &[InputId]) {
+    emitir_combo_abajo(inputs);
+    emitir_combo_arriba(inputs);
+}
+
+// ======================================================
+// ⬇️ EMITIR COMBO ABAJO (solo la mitad DOWN)
+// ------------------------------------------------------
+// DOWN de los mods en orden → DOWN del gatillo. Usado solo
+// (sin la mitad de arriba) por Mantenido, para dejar la
+// tecla de salida apretada hasta el UP.
+// ======================================================
+
+fn emitir_combo_abajo(inputs: &[InputId]) {
     let Some((gatillo, mods)) = inputs.split_last() else {
         return;
     };
@@ -484,6 +549,19 @@ fn emitir_combo(inputs: &[InputId]) {
     }
 
     emitir_down_input(gatillo.clone());
+}
+
+// ======================================================
+// ⬆️ EMITIR COMBO ARRIBA (solo la mitad UP)
+// ------------------------------------------------------
+// UP del gatillo → UP de los mods en orden inverso.
+// ======================================================
+
+fn emitir_combo_arriba(inputs: &[InputId]) {
+    let Some((gatillo, mods)) = inputs.split_last() else {
+        return;
+    };
+
     emitir_up_input(gatillo.clone());
 
     for modificador in mods.iter().rev() {
@@ -573,7 +651,11 @@ fn ejecutar_extra_en_hilo(id: String, extra: ExtraCache, accion: AccionCache) {
 // ======================================================
 
 fn sustituir_accion(lineas: Vec<String>, accion: &AccionCache) -> Vec<String> {
-    let AccionCache::Emitir(inputs) = accion else {
+    // La condición (Simple/Doble/Mantenido) de la Acción no aplica
+    // acá — un Extra (Turbo/Mantener/Toggle) ya define su propio
+    // ritmo de repetición/sostenido, así que el placeholder siempre
+    // se expande a un combo simple down/up.
+    let AccionCache::Emitir(inputs, _condicion) = accion else {
         return lineas;
     };
 

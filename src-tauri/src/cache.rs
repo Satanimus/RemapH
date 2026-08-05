@@ -154,6 +154,12 @@
 //     true si no quedó ningún remapeo compilado (perfil
 //     vacío o todo OFF). La consulta perfil.rs para
 //     informar cache_activo a la UI.
+// hay_candidata_para()
+//     true si un InputId podría continuar ahora mismo algún
+//     trigger posible (de solo lectura, no toca LISTAS). La
+//     consulta AnalizadorTrigger para la rueda del mouse:
+//     solo agrupa sus pulsos en ráfagas cuando hace falta
+//     resolver Simple/Mantenido para un candidato real.
 // actualizar_estado_app() / app_habilitada()
 //     Igual que antes, sin cambios de diseño.
 // ------------------------------------------------------
@@ -251,6 +257,34 @@ pub fn esta_vacia() -> bool {
 
 pub fn borrar_fila(id: &str) {
     CACHE.lock().unwrap().retain(|r| r.id != id);
+}
+
+/// true si `input` podría continuar AHORA MISMO algún trigger posible
+/// — considerando las listas en curso (modificadores ya presionados en
+/// una secuencia sin resolver todavía) igual que recibir_down(), pero
+/// de solo lectura: no crea ni modifica ninguna lista, no llama a
+/// entrada.rs. Lo usa AnalizadorTrigger para la rueda del mouse (ver
+/// analizador_trigger.rs, procesar() rama Pulse): solo agrupa la rueda
+/// en ráfagas (para poder resolver Simple/Mantenido) cuando existe un
+/// candidato real cuyo PRÓXIMO input sea esta rueda — no simplemente
+/// porque la rueda aparezca en algún remapeo sin relación con lo que
+/// está pasando ahora.
+pub fn hay_candidata_para(input: &InputId) -> bool {
+    let listas = LISTAS.lock().unwrap();
+
+    for lista in listas.iter() {
+        let mut probable = lista.entrada.clone();
+        probable.push(input.clone());
+        let (posibles, _, _) = contar(&probable);
+        if posibles > 0 {
+            return true;
+        }
+    }
+
+    drop(listas);
+
+    let (posibles, _, _) = contar(std::slice::from_ref(input));
+    posibles > 0
 }
 
 pub fn actualizar_estado_app(app: AppCache, activa: bool) {
