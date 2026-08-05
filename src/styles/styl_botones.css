@@ -387,6 +387,31 @@
 }
 
 /* ======================================================
+    📌 BOTÓN PRINCIPAL — Capturar Coordenada
+    ------------------------------------------------------
+    Único botón "cyan oscuro" del popup Extra: es la acción
+    principal, tiene que destacar sobre el resto (que son
+    transparentes por la regla de arriba).
+    ====================================================== */
+
+.popup-capa .popup-extra-capturar {
+
+    background: var(--cyan-dark);
+
+    border-color: var(--cyan-dark);
+
+    color: #FFF;
+
+}
+
+.popup-capa .popup-extra-capturar:hover {
+
+    background: var(--tag-cyan);
+
+    border-color: var(--tag-cyan);
+}
+
+/* ======================================================
    📋 LISTAS POPUP
    ====================================================== */
 

@@ -616,6 +616,17 @@
     gap: var(--gap4);
 }
 
+/* ======================================================
+   Modificador: fuerza 3 columnas parejas, para grupos que
+   necesitan un orden de grilla fijo (ej. Punto de Referencia:
+   3 arriba, 2 abajo) en vez del wrap natural del flex.
+   ====================================================== */
+
+.popup-grupo.popup-grupo-grid3 {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+}
+
 .popup-opcion {
     display: inline-flex;
     align-items: center;
@@ -631,19 +642,79 @@
     background: var(--tag-cyan);
 }
 
-.popup-indicador-personalizado {
-    display: inline-flex;
-    line-height: 1;
-}
+/* ======================================================
+   🔀 INTERRUPTOR (switch deslizante — Coordenada)
+   ------------------------------------------------------
+   Pista + bolita, tipo iOS/Android. Apagado: pista y
+   bolita en gris oscuro (bolita visible, marcando que es
+   una elección no usada, no una ausencia). Prendido: pista
+   cyan tenue, bolita cyan sólida, desplazada al costado
+   derecho.
+   ====================================================== */
 
-.popup-toggle {
+.popup-switch {
     width: 100%;
     justify-content: flex-start;
+    gap: var(--gap8);
+}
+
+.popup-switch-pista {
+    position: relative;
+    width: 32px;
+    height: 18px;
+    min-width: 32px;
+    border-radius: 9px;
+    background: var(--button-bg);
+    border: 1px solid var(--border-light);
+    transition: background var(--speed), border-color var(--speed);
+}
+
+.popup-switch-bolita {
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: var(--text-disabled);
+    transition: transform var(--speed), background var(--speed);
+}
+
+.popup-switch[data-activo="true"] .popup-switch-pista {
+    background: rgba(3, 169, 244, .18);
+    border-color: var(--tag-cyan);
+}
+
+.popup-switch[data-activo="true"] .popup-switch-bolita {
+    background: var(--tag-cyan);
+    transform: translateX(14px);
+}
+
+.popup-switch[data-activo="false"] {
+    color: var(--text-soft);
+}
+
+/* ======================================================
+   🧱 CAJA INTERNA (otro nivel dentro del mismo popup)
+   ------------------------------------------------------
+   Mismo tono de borde que el popup, fondo un poco más
+   oscuro que el panel — deja claro que agrupa un nivel de
+   opciones subordinado (hoy: Relativa a Ventana).
+   ====================================================== */
+
+.popup-caja-interna {
+    display: flex;
+    flex-direction: column;
+    gap: var(--gap8);
+    padding: var(--gap8);
+    background: var(--bg);
+    border: 1px solid var(--border-light);
+    border-radius: var(--r4);
 }
 
 /* ======================================================
    🖱️📌 POPUP EXTRA (Tecla/Mouse: Simple/Mantenido/Turbo +
-   toggle Coordenada expandible)
+   interruptor Coordenada expandible)
    ====================================================== */
 
 .popup-extra {
@@ -654,13 +725,9 @@
     gap: var(--gap8);
 }
 
-.popup-extra-sublista {
-    justify-content: space-between;
-    width: 100%;
-}
-
 .popup-extra-capturar {
     width: 100%;
+    font-weight: 600;
 }
 
 .app-icono {

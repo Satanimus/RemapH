@@ -74,16 +74,19 @@ export function crearCoordenada(): CoordenadaPerfil {
 }
 
 // ======================================================
-// 📝 TEXTO DEL BOTÓN "📌 CAPTURAR"
+// 📝 TEXTO DEL BOTÓN "CAPTURAR"
 // ------------------------------------------------------
 // Refleja el estado del botón de la fila 3 del popup: sin
 // capturar todavía, o la coordenada/offset/porcentaje ya
-// guardado, con el formato que corresponda a cada modo.
+// guardado, con el formato que corresponda a cada modo. NO
+// incluye el pin 📌 — el llamador (comp_popup_coordenada.ts)
+// lo antepone siempre, así el ícono queda a la izquierda en
+// los dos estados por igual.
 // ======================================================
 
 export function textoCoordenada(coordenada: CoordenadaPerfil): string {
   if (coordenada.x === null || coordenada.y === null) {
-    return "📌 Capturar";
+    return "Capturar Coordenada";
   }
 
   switch (coordenada.ubicacion) {

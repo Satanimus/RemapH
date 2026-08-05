@@ -3,13 +3,12 @@
 // ------------------------------------------------------
 // Piezas compartidas para popups persistentes (los que se
 // redibujan sin cerrarse, ver comp_popup_coordenada.ts):
-// grupo de opciones tipo-radio, fila con etiqueta, botón
-// toggle independiente, y el indicador cyan que marca cuál
-// opción está activa (o es la default sin tocar) en
-// cualquiera de los dos. Antes esto vivía duplicado dentro
-// de comp_popup_coordenada.ts; se extrae acá para que
-// cualquier popup nuevo con este mismo patrón lo reuse en
-// vez de reimplementarlo.
+// grupo de opciones tipo-radio, fila con etiqueta, interruptor
+// deslizante independiente, y el indicador cyan que marca cuál
+// opción está activa (o es la default sin tocar) en el grupo.
+// Antes esto vivía duplicado dentro de comp_popup_coordenada.ts;
+// se extrae acá para que cualquier popup nuevo con este mismo
+// patrón lo reuse en vez de reimplementarlo.
 // ======================================================
 
 // ======================================================
@@ -32,10 +31,11 @@ export function crearGrupoOpciones<T extends string>(
   opciones: { texto: string; valor: T }[],
   valorActual: T,
   onSeleccionar: (valor: T) => void,
+  claseExtra?: string,
 ): HTMLElement {
   const grupo = document.createElement("div");
 
-  grupo.className = "popup-grupo";
+  grupo.className = claseExtra ? `popup-grupo ${claseExtra}` : "popup-grupo";
 
   opciones.forEach((opcion) => {
     const boton = document.createElement("button");
@@ -63,41 +63,38 @@ export function crearGrupoOpciones<T extends string>(
 }
 
 // ======================================================
-// 🔘 BOTÓN TOGGLE (independiente, no forma parte de un grupo)
+// 🔀 INTERRUPTOR (switch deslizante, independiente de grupo)
 // ------------------------------------------------------
-// Para casos como Coordenada: un único botón que se prende o
-// apaga por sí mismo, sin excluir otras opciones. Usa el
-// mismo indicador que el grupo, para que la identidad visual
-// sea consistente en todo el popup.
+// Para casos como Coordenada: una opción que se prende o
+// apaga por sí misma, sin excluir otras. Se ve como un
+// switch tipo iOS/Android — pista + bolita que se desliza —
+// en vez del botón con indicador cyan usado en los grupos
+// tipo-radio, para que quede claro a simple vista que es un
+// ON/OFF y no una elección entre varias.
 // ======================================================
 
-export function crearBotonToggle(
+export function crearInterruptor(
   texto: string,
   activo: boolean,
   onClick: () => void,
-  indicadorPersonalizado?: string,
 ): HTMLButtonElement {
   const boton = document.createElement("button");
 
-  boton.className = "ui-btn popup-opcion popup-toggle";
+  boton.className = "ui-btn popup-switch";
 
   boton.dataset.activo = activo ? "true" : "false";
 
-  if (activo) {
-    if (indicadorPersonalizado) {
-      const indicador = document.createElement("span");
+  const pista = document.createElement("span");
 
-      indicador.className = "popup-indicador-personalizado";
+  pista.className = "popup-switch-pista";
 
-      indicador.textContent = indicadorPersonalizado;
+  const bolita = document.createElement("span");
 
-      boton.append(indicador);
-    } else {
-      boton.append(crearIndicadorActivo());
-    }
-  }
+  bolita.className = "popup-switch-bolita";
 
-  boton.append(document.createTextNode(texto));
+  pista.append(bolita);
+
+  boton.append(pista, document.createTextNode(texto));
 
   boton.addEventListener("click", onClick);
 

@@ -61,10 +61,12 @@ header.setAttribute("data-tauri-drag-region", "");
 const icono = document.createElement("span");
 icono.className = "captura-header-icono";
 icono.textContent = "⠿";
+icono.setAttribute("data-tauri-drag-region", "");
 
 const titulo = document.createElement("span");
 titulo.className = "captura-header-titulo";
 titulo.textContent = "MODO CAPTURA";
+titulo.setAttribute("data-tauri-drag-region", "");
 
 const botonCancelar = document.createElement("button");
 botonCancelar.className = "captura-cancelar";
@@ -213,6 +215,12 @@ function detenerPolling(): void {
 let pasoRelativaCursor: 1 | 2 = 1;
 let origenRelativaCursor: { x: number; y: number } | null = null;
 
+// Tecla de guardado configurada (config.rs — "F1" por defecto). Se
+// consulta una sola vez al cargar, igual que el resto de la config
+// activa — se usa en los textos de instrucción en vez del genérico
+// "la tecla configurada".
+let teclaGuardar = "F1";
+
 // ======================================================
 // 💾 GUARDAR RESULTADO Y CERRAR
 // ======================================================
@@ -287,6 +295,18 @@ async function iniciar(): Promise<void> {
     );
   }
 
+  try {
+    teclaGuardar = await conTimeout(
+      invoke<string>("obtener_tecla_guardar_coordenada"),
+      3000,
+      "obtener_tecla_guardar_coordenada",
+    );
+  } catch (error) {
+    mostrarDiagnostico(
+      `FALLÓ obtener_tecla_guardar_coordenada (uso F1): ${String(error)}`,
+    );
+  }
+
   intervaloId = setInterval(() => actualizar(config), intervaloMs);
   actualizar(config);
 }
@@ -326,7 +346,7 @@ async function actualizar(config: ConfigCaptura): Promise<void> {
 
   switch (config.ubicacion) {
     case "absoluta": {
-      dibujarLinea("Presione la tecla configurada para guardar posición");
+      dibujarLinea(`Presione ${teclaGuardar} para guardar posición`);
       dibujarLinea(`X: ${cursorX}  Y: ${cursorY}`, true);
 
       if (guardar) {
@@ -338,7 +358,7 @@ async function actualizar(config: ConfigCaptura): Promise<void> {
 
     case "relativa_cursor": {
       if (pasoRelativaCursor === 1) {
-        dibujarLinea("Origen: presione la tecla para marcar origen");
+        dibujarLinea(`Origen: presione ${teclaGuardar} para marcar origen`);
         dibujarLinea(`X: ${cursorX}  Y: ${cursorY}`, true);
 
         if (guardar) {
@@ -350,7 +370,7 @@ async function actualizar(config: ConfigCaptura): Promise<void> {
         const offsetX = cursorX - origen.x;
         const offsetY = cursorY - origen.y;
 
-        dibujarLinea("Destino: presione la tecla para marcar destino");
+        dibujarLinea(`Destino: presione ${teclaGuardar} para marcar destino`);
         dibujarLinea(
           `X: ${offsetX >= 0 ? "+" : ""}${offsetX}  Y: ${offsetY >= 0 ? "+" : ""}${offsetY}`,
           true,
@@ -367,7 +387,7 @@ async function actualizar(config: ConfigCaptura): Promise<void> {
     case "relativa_ventana": {
       if (!ventana) {
         dibujarLinea("Ventana activa: [fuera de ventana]");
-        dibujarLinea("Presione la tecla configurada para guardar posición");
+        dibujarLinea(`Presione ${teclaGuardar} para guardar posición`);
 
         break;
       }

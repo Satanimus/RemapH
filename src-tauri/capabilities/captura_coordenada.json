@@ -4,6 +4,7 @@
   "description": "Capability for the coordinate-capture overlay window",
   "windows": ["captura_coordenada"],
   "permissions": [
-    "core:default"
+    "core:default",
+    "core:window:allow-start-dragging"
   ]
 }

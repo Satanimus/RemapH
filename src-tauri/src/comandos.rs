@@ -455,6 +455,7 @@ pub async fn abrir_ventana_captura_coordenada(
     .resizable(false)
     .decorations(false)
     .transparent(true)
+    .shadow(false)
     .always_on_top(true)
     .skip_taskbar(true)
     .focused(true)

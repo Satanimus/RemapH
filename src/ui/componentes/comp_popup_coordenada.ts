@@ -5,27 +5,30 @@
 // "tecla_mouse"). Popup persistente: al elegir una opción se
 // actualiza el estado y se vuelve a dibujar el mismo popup en
 // el lugar (mostrarPopup reemplaza el contenido sin cerrar la
-// capa), en vez de cerrarlo.
+// capa), en vez de cerrarlo. Todo vive en UN solo popup que
+// se extiende hacia abajo — no hay sub-popups laterales.
 //
-// FILA 1 — Simple / Mantenido / Turbo (sobre filaPerfil.extra,
+// NIVEL 1 — Simple / Mantenido / Turbo (sobre filaPerfil.extra,
 //          mismo vocabulario "" | "mantener" | "turbo" que usa
 //          compilador.rs vía convertir_extra())
-// TOGGLE  — Coordenada (sobre filaPerfil.coordenada.activa).
-//          No excluyente con la fila de arriba: se puede
+// INTERRUPTOR — Coordenada (sobre filaPerfil.coordenada.activa).
+//          No excluyente con el nivel de arriba: se puede
 //          combinar cualquier repetición con Coordenada. Al
 //          activarse, expande debajo:
-//   FILA 2 — Ubicación (Absoluta/Relativa a cursor/Relativa a
-//            ventana) + sub-popup lateral si es Relativa a
-//            ventana (modo Porcentaje/Píxeles + punto de
-//            referencia, este último solo en Píxeles)
-//   FILA 3 — 📌 Capturar (abre la ventana de captura — ver
-//            comandos.rs; conecta el polling del resultado)
-//   FILA 4 — Post-acción (Posición inicial/Posición final)
+//   NIVEL 2 — Ubicación (Absoluta/Relativa a cursor/Relativa a
+//            ventana). Si es Relativa a ventana, se agrega una
+//            caja interna (otro nivel visual, mismo popup) con
+//            Método de medición (Porcentaje/Píxeles) y, solo
+//            en Píxeles, Punto de referencia.
+//   BOTÓN   — 📌 Capturar Coordenada (abre la ventana de
+//            captura — ver comandos.rs; conecta el polling
+//            del resultado). Botón principal, cyan oscuro.
+//   NIVEL 3 — Post-acción (Posición inicial/Posición final)
 //
-// El pin 📌 es el indicador propio de Coordenada (en vez del
-// círculo cyan genérico) — aparece en el toggle cuando está
-// activo, y en el texto del botón Extra de la tabla (ver
-// textoExtraTeclaMouse).
+// El pin 📌 solo queda como emoji del texto del botón de
+// captura y del texto del botón Extra de la tabla (ver
+// textoExtraTeclaMouse) — el toggle de Coordenada usa el
+// interruptor deslizante genérico (crearInterruptor).
 // ======================================================
 
 import { invoke } from "@tauri-apps/api/core";
@@ -50,7 +53,7 @@ import { textoCoordenada } from "../../core/core_coordenada";
 import {
   crearGrupoOpciones,
   crearFilaPopup,
-  crearBotonToggle,
+  crearInterruptor,
 } from "./comp_popup_grupo";
 
 // ======================================================
@@ -114,30 +117,34 @@ function crearSeparador(): HTMLElement {
 }
 
 // ======================================================
-// 🪟 SUB-POPUP LATERAL: RELATIVA A VENTANA
+// 🧱 CAJA INTERNA: RELATIVA A VENTANA
+// ------------------------------------------------------
+// Ya no es un sub-popup lateral aparte: es un bloque más,
+// dentro del mismo popup, visualmente marcado como "otro
+// nivel" (borde + fondo más oscuro que el panel — clase
+// popup-caja-interna). Contiene Método de medición y, solo
+// en Píxeles, Punto de referencia.
 // ======================================================
 
-function abrirSubPopupVentana(
-  evento: MouseEvent,
+function crearCajaVentana(
   contexto: ContextoFila,
   filaPerfil: FilaPerfil,
-): void {
+  redibujar: () => void,
+): HTMLElement {
   const coordenada = filaPerfil.coordenada;
 
-  const popup = document.createElement("div");
+  const caja = document.createElement("div");
 
-  popup.className = "popup-extra";
-
-  const redibujar = () => abrirSubPopupVentana(evento, contexto, filaPerfil);
+  caja.className = "popup-caja-interna";
 
   const modoOpciones: { texto: string; valor: ModoVentanaCoordenada }[] = [
-    { texto: "Porcentaje", valor: "porcentaje" },
     { texto: "Píxeles", valor: "pixeles" },
+    { texto: "Porcentaje", valor: "porcentaje" },
   ];
 
-  popup.append(
+  caja.append(
     crearFilaPopup(
-      "Modo de medición",
+      "Método de Medición",
       crearGrupoOpciones(modoOpciones, coordenada.modoVentana, (valor) => {
         coordenada.modoVentana = valor;
 
@@ -167,9 +174,9 @@ function abrirSubPopupVentana(
         { texto: "Inf-Der", valor: "inf_der" },
       ];
 
-    popup.append(
+    caja.append(
       crearFilaPopup(
-        "Punto de referencia",
+        "Punto de Referencia",
         crearGrupoOpciones(
           puntoOpciones,
           coordenada.puntoReferencia,
@@ -182,12 +189,13 @@ function abrirSubPopupVentana(
             reconstruirFila(contexto.id);
             redibujar();
           },
+          "popup-grupo-grid3",
         ),
       ),
     );
   }
 
-  mostrarPopup(popup, evento.clientX + 240, evento.clientY);
+  return caja;
 }
 
 // ======================================================
@@ -262,7 +270,7 @@ export function abrirPopupExtraTeclaMouse(
     abrirPopupExtraTeclaMouse(evento, contexto, filaPerfil);
 
   // ----------------------------------
-  // FILA 1 — Simple / Mantenido / Turbo
+  // NIVEL 1 — Simple / Mantenido / Turbo
   // ----------------------------------
 
   popup.append(
@@ -281,25 +289,20 @@ export function abrirPopupExtraTeclaMouse(
   popup.append(crearSeparador());
 
   // ----------------------------------
-  // TOGGLE — Coordenada
+  // INTERRUPTOR — Coordenada
   // ----------------------------------
 
   popup.append(
-    crearBotonToggle(
-      "Coordenada",
-      coordenada.activa,
-      () => {
-        coordenada.activa = !coordenada.activa;
+    crearInterruptor("Coordenada", coordenada.activa, () => {
+      coordenada.activa = !coordenada.activa;
 
-        if (!coordenada.activa) {
-          cerrarVentanaCapturaCoordenada();
-        }
+      if (!coordenada.activa) {
+        cerrarVentanaCapturaCoordenada();
+      }
 
-        reconstruirFila(contexto.id);
-        redibujar();
-      },
-      "📌",
-    ),
+      reconstruirFila(contexto.id);
+      redibujar();
+    }),
   );
 
   if (!coordenada.activa) {
@@ -308,19 +311,21 @@ export function abrirPopupExtraTeclaMouse(
     return;
   }
 
+  popup.append(crearSeparador());
+
   // ----------------------------------
-  // FILA 2 — Ubicación (solo si Coordenada está activa)
+  // NIVEL 2 — Ubicación (solo si Coordenada está activa)
   // ----------------------------------
 
   const ubicacionOpciones: { texto: string; valor: UbicacionCoordenada }[] = [
     { texto: "Absoluta", valor: "absoluta" },
-    { texto: "Relativa a cursor", valor: "relativa_cursor" },
-    { texto: "Relativa a ventana", valor: "relativa_ventana" },
+    { texto: "Cursor", valor: "relativa_cursor" },
+    { texto: "Ventana", valor: "relativa_ventana" },
   ];
 
   popup.append(
     crearFilaPopup(
-      "Ubicación",
+      "Ubicación relativa a:",
       crearGrupoOpciones(ubicacionOpciones, coordenada.ubicacion, (valor) => {
         coordenada.ubicacion = valor;
 
@@ -336,55 +341,24 @@ export function abrirPopupExtraTeclaMouse(
     ),
   );
 
+  // Caja interna (mismo popup, otro nivel visual) — solo si la
+  // ubicación es Relativa a Ventana.
   if (coordenada.ubicacion === "relativa_ventana") {
-    const modoTexto =
-      coordenada.modoVentana === "porcentaje" ? "Porcentaje" : "Píxeles";
-
-    const botonVentana = document.createElement("button");
-
-    botonVentana.className = "ui-btn popup-extra-sublista";
-
-    botonVentana.textContent = `Configurar ventana (${modoTexto})  ▸`;
-
-    botonVentana.addEventListener("click", () => {
-      abrirSubPopupVentana(evento, contexto, filaPerfil);
-    });
-
-    popup.append(botonVentana);
+    popup.append(crearCajaVentana(contexto, filaPerfil, redibujar));
   }
 
-  popup.append(crearSeparador());
-
   // ----------------------------------
-  // FILA 3 — Capturar
-  // ----------------------------------
-
-  const botonCapturar = document.createElement("button");
-
-  botonCapturar.className = "ui-btn popup-extra-capturar";
-
-  botonCapturar.textContent = textoCoordenada(coordenada);
-
-  botonCapturar.addEventListener("click", () => {
-    iniciarCaptura(contexto, filaPerfil, evento);
-  });
-
-  popup.append(botonCapturar);
-
-  popup.append(crearSeparador());
-
-  // ----------------------------------
-  // FILA 4 — Post-acción
+  // NIVEL 3 — Post-acción
   // ----------------------------------
 
   const postAccionOpciones: { texto: string; valor: PostAccionCoordenada }[] = [
-    { texto: "Posición inicial", valor: "inicial" },
-    { texto: "Posición final", valor: "final" },
+    { texto: "Posición Inicial", valor: "inicial" },
+    { texto: "Posición Final", valor: "final" },
   ];
 
   popup.append(
     crearFilaPopup(
-      "Al finalizar ir a",
+      "Al finalizar ir a:",
       crearGrupoOpciones(postAccionOpciones, coordenada.postAccion, (valor) => {
         coordenada.postAccion = valor;
 
@@ -393,6 +367,24 @@ export function abrirPopupExtraTeclaMouse(
       }),
     ),
   );
+
+  popup.append(crearSeparador());
+
+  // ----------------------------------
+  // BOTÓN — Capturar Coordenada
+  // ----------------------------------
+
+  const botonCapturar = document.createElement("button");
+
+  botonCapturar.className = "ui-btn popup-extra-capturar";
+
+  botonCapturar.textContent = `📌 ${textoCoordenada(coordenada)}`;
+
+  botonCapturar.addEventListener("click", () => {
+    iniciarCaptura(contexto, filaPerfil, evento);
+  });
+
+  popup.append(botonCapturar);
 
   mostrarPopup(popup, evento.clientX, evento.clientY);
 }
