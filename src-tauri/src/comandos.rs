@@ -403,24 +403,49 @@ pub struct VentanaActivaJson {
 const VENTANA_CAPTURA_COORDENADA: &str = "captura_coordenada";
 
 #[tauri::command]
-pub fn abrir_ventana_captura_coordenada(
+pub async fn abrir_ventana_captura_coordenada(
     app: tauri::AppHandle,
     ubicacion: String,
     modo_ventana: String,
     punto_referencia: String,
 ) -> Result<(), String> {
+    // ⚠️ IMPORTANTE: este comando tiene que ser `async fn`. En Windows,
+    // WebviewWindowBuilder::build() hace DEADLOCK si se lo llama desde
+    // un comando síncrono (`fn` normal) — es un problema documentado
+    // de Tauri/WebView2, no algo nuestro:
+    // https://docs.rs/tauri/latest/tauri/webview/struct.WebviewWindowBuilder.html
+    // Síntoma exacto que daba antes de este cambio: la ventana nativa
+    // se creaba (con barra, arrastrable, minimizable) pero quedaba en
+    // blanco, sin webview adjunto (sin clic derecho, sin F12) y sin
+    // poder cerrarse — clásico deadlock.
+
     // Re-captura: si ya había una ventana abierta (el usuario volvió
     // a hacer clic en 📌 Capturar sin cerrar la anterior), se cierra
     // primero para no dejar dos overlays sueltos.
+    //
+    // close() es ASINCRÓNICO: solo pide el cierre, no lo espera. Si
+    // se sigue de largo y se crea de inmediato una ventana nueva con
+    // el mismo label ("captura_coordenada"), puede que la vieja
+    // todavía no se haya destruido del todo — WebviewWindowBuilder
+    // falla (o queda en estado inconsistente) si el label sigue
+    // ocupado. Por eso se espera, con un tope de 1s, a que
+    // get_webview_window() confirme que ya no existe antes de seguir.
     if let Some(existente) = app.get_webview_window(VENTANA_CAPTURA_COORDENADA) {
         let _ = existente.close();
+
+        for _ in 0..50 {
+            if app.get_webview_window(VENTANA_CAPTURA_COORDENADA).is_none() {
+                break;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(20));
+        }
     }
 
     // Se fija la config ANTES de crear la ventana: captura.html puede
     // consultarla apenas termina de cargar, sin carrera posible.
     captura_coordenada::activar(ubicacion, modo_ventana, punto_referencia);
 
-    WebviewWindowBuilder::new(
+    let ventana = WebviewWindowBuilder::new(
         &app,
         VENTANA_CAPTURA_COORDENADA,
         WebviewUrl::App("captura.html".into()),
@@ -436,6 +461,13 @@ pub fn abrir_ventana_captura_coordenada(
     .devtools(true)
     .build()
     .map_err(|error| error.to_string())?;
+
+    // Abre las devtools de ESTA ventana automáticamente en debug — ya
+    // cumplió su propósito de diagnóstico (confirmó el deadlock de
+    // WebviewWindowBuilder en comando síncrono). Comentado por ahora;
+    // descomentar si hace falta diagnosticar algo de nuevo.
+    // #[cfg(debug_assertions)]
+    // ventana.open_devtools();
 
     Ok(())
 }

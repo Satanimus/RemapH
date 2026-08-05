@@ -224,7 +224,12 @@ function iniciarCaptura(
     ubicacion: coordenada.ubicacion,
     modoVentana: coordenada.modoVentana,
     puntoReferencia: coordenada.puntoReferencia,
-  }).catch(() => {});
+  }).catch((error) => {
+    // Antes esto se tragaba en silencio — si .build() falla del lado
+    // de Rust (comandos.rs), era invisible. Ahora queda en la consola
+    // de devtools de ESTA ventana (F12 en la ventana principal).
+    console.error("abrir_ventana_captura_coordenada FALLÓ:", error);
+  });
 
   const intervalo = setInterval(() => {
     invoke<[number, number] | null>("obtener_resultado_coordenada")
