@@ -562,20 +562,6 @@
     font-size: var(--fs16);
 }
 
-.app-popup-segundo-plano {
-    display: flex;
-    align-items: center;
-    gap: var(--gap8);
-    height: 28px;
-    padding: 0 var(--gap8);
-    cursor: pointer;
-}
-
-.app-popup-segundo-plano input {
-    margin: 0;
-    accent-color: var(--green);
-}
-
 .app-popup-separador {
     height: 1px;
     background: var(--border);
@@ -585,6 +571,27 @@
 .app-popup-otros {
     justify-content: flex-start;
     width: 100%;
+}
+
+/* ======================================================
+   📂 LISTADO DE PROGRAMAS — subtítulo + toggle Principales/Otros
+   ------------------------------------------------------
+   Mismo patrón visual que popup-fila-label / popup-grupo,
+   pero con texto oscuro (var(--text)) en vez del tenue
+   (var(--border-light)) porque acá funciona como encabezado
+   de sección, no como etiqueta secundaria de un control.
+   ====================================================== */
+
+.app-popup-lista-titulo {
+    font-size: var(--fs11);
+    color: var(--border-light);
+}
+
+.app-popup-lista-caja {
+    background: var(--bg);
+    border: 1px solid var(--border-light);
+    border-radius: var(--r4);
+    padding: var(--gap4);
 }
 
 /* ======================================================
@@ -778,14 +785,6 @@
    ====================================================== */
 
 .app-popup .ui-btn {
-
-    justify-content: flex-start;
-
-    text-align: left;
-
-}
-
-.app-popup-segundo-plano {
 
     justify-content: flex-start;
 

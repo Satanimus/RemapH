@@ -1,14 +1,19 @@
 // ======================================================
 // 🖥️ comp_Popup_App
 // ------------------------------------------------------
-// Popup de selección de programa.
+// Popup de selección de programa. Estilo alineado con el
+// popup Extra de Tecla/Mouse (comp_popup_coordenada.ts):
+// popup persistente que se redibuja en el lugar en vez de
+// cerrarse en cada interacción, interruptor deslizante y
+// caja oscura para el listado.
 //
 // Uso global
-// Segundo plano
+// Segundo plano (interruptor — no cierra el popup)
 // ───────────
-// Programas con ícono
-// ───────────
-// Otros programas
+// Listado de programas:  [Principales] [Otros]
+// ┌ caja oscura ─────────────┐
+// │ Programas (según filtro) │
+// └───────────────────────────┘
 // ======================================================
 
 import { invoke } from "@tauri-apps/api/core";
@@ -20,6 +25,8 @@ import { reconstruirFila } from "../ui_tabla_control";
 import type { ContextoFila } from "../../core/core_contexto_fila";
 
 import type { FilaPerfil } from "../../core/core_perfil";
+
+import { crearInterruptor, crearGrupoOpciones } from "./comp_popup_grupo";
 
 // ======================================================
 // 📦 MODELOS BACKEND
@@ -189,46 +196,34 @@ function crearBotonGlobal(
 
 // ======================================================
 // 🟢 SEGUNDO PLANO
+// ------------------------------------------------------
+// Mismo interruptor deslizante que usa Coordenada en el
+// popup Extra (comp_popup_grupo.ts): gris oscuro apagado,
+// bolita en vez de checkbox. Togglear NO cierra el popup —
+// solo reconstruye la fila y redibuja el mismo popup en el
+// lugar, igual que el resto de los controles persistentes.
 // ======================================================
 
 function crearSegundoPlano(
   filaPerfil: FilaPerfil,
 
   contexto: ContextoFila,
+
+  redibujar: () => void,
 ): HTMLElement {
-  const fila = document.createElement("label");
+  return crearInterruptor(
+    "Segundo plano :",
 
-  fila.className = "app-popup-segundo-plano";
-
-  const check = document.createElement("input");
-
-  check.type = "checkbox";
-
-  check.checked = filaPerfil.app.segundoPlano;
-
-  const texto = document.createElement("span");
-
-  texto.textContent = "Segundo plano :";
-
-  fila.append(
-    check,
-
-    texto,
-  );
-
-  check.addEventListener(
-    "change",
+    filaPerfil.app.segundoPlano,
 
     () => {
-      filaPerfil.app.segundoPlano = check.checked;
+      filaPerfil.app.segundoPlano = !filaPerfil.app.segundoPlano;
 
       reconstruirFila(contexto.id);
 
-      ocultarPopup();
+      redibujar();
     },
   );
-
-  return fila;
 }
 
 // ======================================================
@@ -244,21 +239,59 @@ function crearSeparador(): HTMLElement {
 }
 
 // ======================================================
-// 📂 OTROS PROGRAMAS
+// 📋 LISTADO DE PROGRAMAS (subtítulo + Principales/Otros + caja)
+// ------------------------------------------------------
+// Mismo patrón que el popup Extra de Tecla/Mouse: subtítulo
+// con el mismo estilo que "Ubicación relativa a:" (clase
+// popup-fila-label, vía app-popup-lista-titulo) + grupo de
+// opciones tipo-radio (Principales/Otros) que decide qué
+// lista se muestra, todo dentro de una caja oscura
+// (popup-caja-interna) tomada del popup de Coordenada. Elegir
+// Principales/Otros o un programa NO cierra el popup — salvo
+// elegir un programa puntual, que sí selecciona y cierra
+// (mismo comportamiento que antes tenían los botones de
+// programa).
 // ======================================================
 
-function abrirOtrosProgramas(
+type FiltroListado = "principales" | "otros";
+
+const LISTADO_OPCIONES: { texto: string; valor: FiltroListado }[] = [
+  { texto: "Principales", valor: "principales" },
+  { texto: "Otros", valor: "otros" },
+];
+
+function crearListadoProgramas(
   procesos: ProcesoIconoJson[],
 
   contexto: ContextoFila,
 
   filaPerfil: FilaPerfil,
 
-  evento: MouseEvent,
-): void {
-  const popup = document.createElement("div");
+  filtro: FiltroListado,
 
-  popup.className = "app-popup";
+  onCambiarFiltro: (filtro: FiltroListado) => void,
+): HTMLElement {
+  const contenedor = document.createElement("div");
+
+  contenedor.className = "popup-fila";
+
+  const titulo = document.createElement("span");
+
+  titulo.className = "app-popup-lista-titulo";
+
+  titulo.textContent = "Listado de programas:";
+
+  contenedor.append(titulo);
+
+  contenedor.append(
+    crearGrupoOpciones(LISTADO_OPCIONES, filtro, (valor) => {
+      onCambiarFiltro(valor);
+    }),
+  );
+
+  const caja = document.createElement("div");
+
+  caja.className = "popup-caja-interna app-popup-lista-caja";
 
   const lista = document.createElement("div");
 
@@ -266,7 +299,9 @@ function abrirOtrosProgramas(
 
   procesos
 
-    .filter((proceso) => !proceso.icono)
+    .filter((proceso) =>
+      filtro === "principales" ? proceso.icono !== null : !proceso.icono,
+    )
 
     .forEach((proceso) => {
       lista.append(
@@ -282,15 +317,11 @@ function abrirOtrosProgramas(
       );
     });
 
-  popup.append(lista);
+  caja.append(lista);
 
-  mostrarPopup(
-    popup,
+  contenedor.append(caja);
 
-    evento.clientX,
-
-    evento.clientY,
-  );
+  return contenedor;
 }
 
 // ======================================================
@@ -303,6 +334,8 @@ export async function abrirPopupApp(
   contexto: ContextoFila,
 
   filaPerfil: FilaPerfil,
+
+  filtroInicial: FiltroListado = "principales",
 ): Promise<void> {
   const procesos = await invoke<ProcesoIconoJson[]>("listar_procesos_ventana");
 
@@ -310,63 +343,30 @@ export async function abrirPopupApp(
 
   popup.className = "app-popup";
 
+  const redibujar = (filtro: FiltroListado) =>
+    abrirPopupApp(evento, contexto, filaPerfil, filtro);
+
   popup.append(
     crearBotonGlobal(filaPerfil, contexto),
 
-    crearSegundoPlano(filaPerfil, contexto),
+    crearSegundoPlano(filaPerfil, contexto, () => redibujar(filtroInicial)),
 
     crearSeparador(),
   );
 
-  const lista = document.createElement("div");
+  popup.append(
+    crearListadoProgramas(
+      procesos,
 
-  lista.className = "app-popup-lista";
+      contexto,
 
-  procesos
+      filaPerfil,
 
-    .filter((proceso) => proceso.icono !== null)
+      filtroInicial,
 
-    .forEach((proceso) => {
-      lista.append(
-        crearBotonProceso(
-          proceso,
-
-          () => {
-            filaPerfil.app.programa = proceso.nombre;
-
-            reconstruirFila(contexto.id);
-          },
-        ),
-      );
-    });
-
-  popup.append(lista);
-
-  popup.append(crearSeparador());
-
-  const otros = document.createElement("button");
-
-  otros.className = "ui-btn app-popup-otros";
-
-  otros.textContent = "Otros programas  ▸";
-
-  otros.addEventListener(
-    "click",
-
-    () => {
-      abrirOtrosProgramas(
-        procesos,
-
-        contexto,
-
-        filaPerfil,
-
-        evento,
-      );
-    },
+      (filtro) => redibujar(filtro),
+    ),
   );
-
-  popup.append(otros);
 
   mostrarPopup(
     popup,
