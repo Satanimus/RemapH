@@ -23,6 +23,10 @@ interception = "0.1.2"
 
 base64 = "0.22"
 
+# Control de volumen por sesión de audio (alcance "En App" de la
+# Acción Multimedia) — ver back_multimedia.rs.
+winmix = "0.1"
+
 windows-sys = {
     version = ">=0.59, <=0.61",
     features = [

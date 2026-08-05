@@ -1,5 +1,5 @@
 // ======================================================
-// 🖥️ Perfil UI  
+// 🖥️ Perfil UI
 // ======================================================
 //
 // Modelos de comunicación entre:
@@ -150,13 +150,32 @@ pub struct FilaUI {
 
     pub accion: Option<TriggerUI>,
 
+    // Referencia de Acción para tipos que no son tecla_mouse (hoy:
+    // Multimedia — el comando elegido: "volumen_subir", etc.). Sigue
+    // siendo None para el resto de los tipos (macro/archivo/ui
+    // todavía no conectados desde la UI).
+    #[serde(rename = "accionReferencia", default)]
+    pub accion_referencia: Option<String>,
+
     pub extra: String,
+
+    // Alcance de la Acción Multimedia ("global" | "en_app"). Ver
+    // nota en perfil_json.rs — campo propio, no reusa `extra`.
+    #[serde(rename = "extraMultimedia", default = "extra_multimedia_default")]
+    pub extra_multimedia: String,
 
     pub coordenada: CoordenadaJson,
 
     pub color: String,
 
     pub nota: String,
+}
+
+// Default de `extra_multimedia` cuando el JSON entrante no lo trae
+// (perfiles viejos, o filas que no son multimedia todavía) — mismo
+// significado que "Global".
+fn extra_multimedia_default() -> String {
+    "global".to_string()
 }
 
 // ======================================================
@@ -261,15 +280,16 @@ fn convertir_fila(fila: FilaUI) -> RemapeoJson {
 
         tipo: fila.tipo,
 
-        // FilaUI todavía no tiene un campo para la referencia
-        // (macro/archivo/ui) — la UI hoy solo arma accion como
-        // TriggerUI (teclado/mouse). Queda en None hasta que se
-        // conecte esa parte de la UI.
         accion_trigger: fila.accion.map(convertir_trigger),
 
-        accion_referencia: None,
+        // macro/archivo/ui todavía no están conectados desde la UI
+        // (siguen sin poder mandar accion_referencia) — Multimedia sí,
+        // ya viaja tal cual desde FilaUI.
+        accion_referencia: fila.accion_referencia,
 
         extra: fila.extra,
+
+        extra_multimedia: fila.extra_multimedia,
 
         coordenada: fila.coordenada,
 

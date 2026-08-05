@@ -15,6 +15,8 @@ import {
 
 import { crearCapturador } from "./comp_capturador";
 
+import { abrirPopupAccionMultimedia } from "./comp_popup_multimedia";
+
 // ======================================================
 // CREAR ACCIÓN
 // ======================================================
@@ -25,8 +27,17 @@ export function crearAccion(
   alModificar: () => void,
 ): HTMLButtonElement {
   switch (filaPerfil.tipo) {
-    case "multimedia":
-      return crearAccionMultimedia();
+    case "multimedia": {
+      const boton = crearAccionMultimedia(filaPerfil);
+
+      boton.addEventListener("click", (evento) => {
+        abrirPopupAccionMultimedia(evento, contexto, filaPerfil);
+
+        alModificar();
+      });
+
+      return boton;
+    }
 
     case "macro":
       return crearAccionMacro();

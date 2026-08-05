@@ -73,16 +73,16 @@ keyboard	0x37	Num7	Num7	7
 keyboard	0x38	Num8	Num8	8
 keyboard	0x39	Num9	Num9	9
 
-keyboard	0x60	NumPad0	Numpad0	NumPad 0
-keyboard	0x61	NumPad1	Numpad1	NumPad 1
-keyboard	0x62	NumPad2	Numpad2	NumPad 2
-keyboard	0x63	NumPad3	Numpad3	NumPad 3
-keyboard	0x64	NumPad4	Numpad4	NumPad 4
-keyboard	0x65	NumPad5	Numpad5	NumPad 5
-keyboard	0x66	NumPad6	Numpad6	NumPad 6
-keyboard	0x67	NumPad7	Numpad7	NumPad 7
-keyboard	0x68	NumPad8	Numpad8	NumPad 8
-keyboard	0x69	NumPad9	Numpad9	NumPad 9
+keyboard	0x60	NumPad0	Numpad0	Num 0
+keyboard	0x61	NumPad1	Numpad1	Num 1
+keyboard	0x62	NumPad2	Numpad2	Num 2
+keyboard	0x63	NumPad3	Numpad3	Num 3
+keyboard	0x64	NumPad4	Numpad4	Num 4
+keyboard	0x65	NumPad5	Numpad5	Num 5
+keyboard	0x66	NumPad6	Numpad6	Num 6
+keyboard	0x67	NumPad7	Numpad7	Num 7
+keyboard	0x68	NumPad8	Numpad8	Num 8
+keyboard	0x69	NumPad9	Numpad9	Num 9
 
 
 keyboard	0x6A	Multiply	NumpadMultiply	*
@@ -125,12 +125,12 @@ keyboard	0x79	F10	F10	F10
 keyboard	0x7A	F11	F11	F11
 keyboard	0x7B	F12	F12	F12
 
-keyboard	0xA0	LeftShift	LeftShift	Shift izquierdo
-keyboard	0xA1	RightShift	RightShift	Shift derecho
-keyboard	0xA2	LeftControl	LeftControl	Ctrl izquierdo
-keyboard	0xA3	RightControl	RightControl	Ctrl derecho
-keyboard	0xA4	LeftAlt	LeftAlt	Alt izquierdo
-keyboard	0xA5	RightAlt	RightAlt	Alt derecho
+keyboard	0xA0	LeftShift	LeftShift	Shift izq
+keyboard	0xA1	RightShift	RightShift	Shift der
+keyboard	0xA2	LeftControl	LeftControl	Ctrl izq
+keyboard	0xA3	RightControl	RightControl	Ctrl der
+keyboard	0xA4	LeftAlt	LeftAlt	Alt izq
+keyboard	0xA5	RightAlt	RightAlt	Alt der
 
 # ------------------------------------------------------
 # Símbolos: "interno" y "ui" reflejan lo que la tecla
@@ -161,9 +161,9 @@ keyboard	0xBF	Guion	Slash	-
 keyboard	0xE2	Int1	Int1	<
 keyboard	0x5B	LeftMeta	Oem2	Win
 
-mouse	0x0201	LeftButton	LeftButton	Click izquierdo
-mouse	0x0204	RightButton	RightButton	Click derecho
-mouse	0x0207	MiddleButton	MiddleButton	Click central
+mouse	0x0201	LeftButton	LeftButton	Click izq
+mouse	0x0204	RightButton	RightButton	Click der
+mouse	0x0207	MiddleButton	MiddleButton	Click rueda
 mouse	0x020B	Button4	Button4	Botón 4
 mouse	0x020C	Button5	Button5	Botón 5
 mouse	0x020A_UP	WheelUp	WheelUp	Rueda arriba

@@ -4,6 +4,10 @@
 
 import { crearBoton } from "./comp_boton";
 
+import type { FilaPerfil } from "../../core/core_perfil";
+
+import { textoAccionMultimedia } from "../../core/core_multimedia";
+
 export function crearAccionTeclado(): HTMLButtonElement {
   return crearBoton({
     texto: "Capturar",
@@ -11,9 +15,11 @@ export function crearAccionTeclado(): HTMLButtonElement {
   });
 }
 
-export function crearAccionMultimedia(): HTMLButtonElement {
+export function crearAccionMultimedia(
+  filaPerfil: FilaPerfil,
+): HTMLButtonElement {
   return crearBoton({
-    texto: "Multimedia",
+    texto: textoAccionMultimedia(filaPerfil.accionReferencia),
     clase: "capturador",
   });
 }

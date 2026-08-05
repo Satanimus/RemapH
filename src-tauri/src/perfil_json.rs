@@ -130,6 +130,15 @@ pub struct RemapeoJson {
     pub accion_trigger: Option<TriggerJson>,
     pub accion_referencia: Option<String>,
     pub extra: String,
+    // Alcance de la Acción Multimedia: "global" | "en_app". Solo
+    // tiene sentido cuando tipo == "multimedia" — para el resto de
+    // los tipos queda en "global" sin usarse. Campo separado de
+    // `extra` a propósito (decisión del usuario): `extra` es
+    // vocabulario propio de Tecla/Mouse (Simple/Mantenido/Turbo),
+    // mezclarlo acá sería confuso. Snake_case a propósito, mismo
+    // criterio que accion_trigger/accion_referencia: el nombre viaja
+    // igual en el JSON sin traducción adicional.
+    pub extra_multimedia: String,
     pub coordenada: CoordenadaJson,
     pub color: String,
     pub nota: String,

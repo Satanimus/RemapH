@@ -387,6 +387,10 @@ fn ejecutar_accion(
         AccionCache::Ui(valor) => {
             mostrar_ui(valor);
         }
+
+        AccionCache::Multimedia(comando, alcance) => {
+            crate::back_multimedia::ejecutar(&comando, &alcance);
+        }
     }
 }
 

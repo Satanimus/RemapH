@@ -11,6 +11,7 @@ mod back_app;
 mod back_coordenada;
 mod back_interception;
 mod back_mouse;
+mod back_multimedia;
 mod back_teclas;
 mod cache;
 mod captura_coordenada;

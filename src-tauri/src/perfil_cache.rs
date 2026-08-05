@@ -212,6 +212,58 @@ pub enum AccionCache {
     AbrirArchivo(String),
 
     Ui(String),
+
+    // Acción tipo Multimedia. No es un Emitir (no pasa por
+    // Interception/back_interception): se ejecuta con
+    // SendInput/keybd_event de Windows directo (alcance Global) o
+    // leyendo/escribiendo la sesión de audio de un proceso vía
+    // winmix (alcance En App) — ver back_multimedia.rs.
+    Multimedia(ComandoMultimedia, AlcanceMultimedia),
+}
+
+// ======================================================
+// 🎚️ COMANDO MULTIMEDIA
+// ======================================================
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum ComandoMultimedia {
+    VolumenSubir,
+    VolumenBajar,
+    Silenciar,
+    PlayPausa,
+    Detener,
+    Siguiente,
+    Anterior,
+}
+
+impl ComandoMultimedia {
+    /// true para los 3 comandos de Volumen — son los únicos que
+    /// admiten alcance En App (ver AlcanceMultimedia). Los de
+    /// Reproducción solo existen como Global.
+    pub fn es_de_volumen(&self) -> bool {
+        matches!(
+            self,
+            ComandoMultimedia::VolumenSubir
+                | ComandoMultimedia::VolumenBajar
+                | ComandoMultimedia::Silenciar
+        )
+    }
+}
+
+// ======================================================
+// 🌐 ALCANCE MULTIMEDIA
+// ------------------------------------------------------
+// EnApp ya trae el nombre del programa resuelto en tiempo de
+// compilación (compilador.rs lo saca de remapeo.app.programa) — así
+// runtime.rs/back_multimedia.rs no necesitan volver a mirar
+// TriggerCache/AppCache para ejecutar.
+// ======================================================
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum AlcanceMultimedia {
+    Global,
+
+    EnApp { programa: String },
 }
 
 // ======================================================

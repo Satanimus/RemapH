@@ -127,8 +127,8 @@ use crate::cache;
 use crate::eventos::InputId;
 
 use crate::perfil_cache::{
-    AccionCache, AppCache, CoordenadaCache, ExtraCache, PostAccionCache, PuntoReferenciaCache,
-    RemapeoCache, TriggerCache, UbicacionCache,
+    AccionCache, AlcanceMultimedia, AppCache, ComandoMultimedia, CoordenadaCache, ExtraCache,
+    PostAccionCache, PuntoReferenciaCache, RemapeoCache, TriggerCache, UbicacionCache,
 };
 
 use crate::perfil_json::{perfil_json, AppJson, CoordenadaJson, RemapeoJson};
@@ -290,11 +290,67 @@ fn convertir_accion(remapeo: &RemapeoJson) -> Option<AccionCache> {
 
         "ui" => Some(AccionCache::Ui(referencia(remapeo)?)),
 
-        // Tipos todavía decorativos en la UI (Multimedia,
-        // Portapapeles, etc.): no producen ninguna acción real
-        // todavía. La fila entera se descarta al compilar (ver
-        // compilar_remapeo), igual que una fila en OFF.
+        "multimedia" => {
+            let comando = convertir_comando_multimedia(remapeo.accion_referencia.as_deref()?)?;
+
+            let alcance = convertir_alcance_multimedia(remapeo, &comando);
+
+            Some(AccionCache::Multimedia(comando, alcance))
+        }
+
+        // Tipos todavía decorativos en la UI (Portapapeles, etc.): no
+        // producen ninguna acción real todavía. La fila entera se
+        // descarta al compilar (ver compilar_remapeo), igual que una
+        // fila en OFF.
         _ => None,
+    }
+}
+
+// ======================================================
+// 🎚️ CONVERTIR COMANDO MULTIMEDIA
+// ------------------------------------------------------
+// None si accion_referencia todavía no se eligió, o trae un valor
+// desconocido — mismo criterio de descarte silencioso que el resto
+// de convertir_accion (nunca panic por un dato incompleto).
+// ======================================================
+
+fn convertir_comando_multimedia(valor: &str) -> Option<ComandoMultimedia> {
+    match valor {
+        "volumen_subir" => Some(ComandoMultimedia::VolumenSubir),
+        "volumen_bajar" => Some(ComandoMultimedia::VolumenBajar),
+        "silenciar" => Some(ComandoMultimedia::Silenciar),
+        "play_pausa" => Some(ComandoMultimedia::PlayPausa),
+        "detener" => Some(ComandoMultimedia::Detener),
+        "siguiente" => Some(ComandoMultimedia::Siguiente),
+        "anterior" => Some(ComandoMultimedia::Anterior),
+        _ => None,
+    }
+}
+
+// ======================================================
+// 🌐 CONVERTIR ALCANCE MULTIMEDIA
+// ------------------------------------------------------
+// "en_app" solo es válido para comandos de Volumen y solo si hay un
+// programa elegido en la columna App — cualquier otro caso (mal
+// dato guardado, condición cambió después) cae a Global en vez de
+// descartar la fila entera; la UI ya impone estas reglas al elegir,
+// esto es solo la red de seguridad del lado Rust.
+// ======================================================
+
+fn convertir_alcance_multimedia(
+    remapeo: &RemapeoJson,
+    comando: &ComandoMultimedia,
+) -> AlcanceMultimedia {
+    if remapeo.extra_multimedia != "en_app" || !comando.es_de_volumen() {
+        return AlcanceMultimedia::Global;
+    }
+
+    match &remapeo.app.programa {
+        Some(programa) => AlcanceMultimedia::EnApp {
+            programa: programa.clone(),
+        },
+
+        None => AlcanceMultimedia::Global,
     }
 }
 

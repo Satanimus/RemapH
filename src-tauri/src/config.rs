@@ -291,3 +291,23 @@ pub fn tiempo_salida_mantenido() -> u64 {
 pub fn establecer_tiempo_salida_mantenido(valor: u64) {
     TIEMPO_SALIDA_MANTENIDO.store(valor, Ordering::Relaxed);
 }
+
+// ======================================================
+// 🔊 DELTA DE VOLUMEN (Acción Multimedia, alcance En App)
+// ------------------------------------------------------
+// Cuánto sube/baja el volumen de la sesión de audio de un programa
+// por cada pulsación de Subir/Bajar en alcance "En App"
+// (back_multimedia.rs, vía winmix). El alcance Global no usa este
+// valor — VK_VOLUME_UP/DOWN los maneja Windows con su propio paso
+// nativo, no aceptan un delta custom.
+// ======================================================
+
+static DELTA_VOLUMEN: AtomicU64 = AtomicU64::new(10);
+
+pub fn delta_volumen() -> u64 {
+    DELTA_VOLUMEN.load(Ordering::Relaxed)
+}
+
+pub fn establecer_delta_volumen(valor: u64) {
+    DELTA_VOLUMEN.store(valor, Ordering::Relaxed);
+}

@@ -70,6 +70,8 @@ interface RemapeoJson {
 
   extra: string;
 
+  extra_multimedia: string;
+
   coordenada: CoordenadaPerfil;
 
   color: string;
@@ -135,6 +137,11 @@ function convertirRemapeo(remapeo: RemapeoJson): FilaPerfil {
     condicion: trigger.condicion,
 
     extra: remapeo.extra,
+
+    accionReferencia: remapeo.accion_referencia,
+
+    extraMultimedia:
+      remapeo.extra_multimedia === "en_app" ? "en_app" : "global",
 
     coordenada: remapeo.coordenada,
 

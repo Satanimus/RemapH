@@ -49,6 +49,16 @@ export interface FilaPerfil {
 
   extra: string;
 
+  // Solo relevantes cuando tipo === "multimedia". accionReferencia
+  // es el comando elegido ("volumen_subir" | "volumen_bajar" |
+  // "silenciar" | "play_pausa" | "detener" | "siguiente" |
+  // "anterior"), null hasta que se elige uno. extraMultimedia es el
+  // alcance de ejecución — campo propio, no reusa `extra` (ese es
+  // vocabulario de Tecla/Mouse).
+  accionReferencia: string | null;
+
+  extraMultimedia: "global" | "en_app";
+
   coordenada: CoordenadaPerfil;
 
   app: AppPerfil;
@@ -77,6 +87,10 @@ export function crearFila(): FilaPerfil {
     condicion: "Normal",
 
     extra: "",
+
+    accionReferencia: null,
+
+    extraMultimedia: "global",
 
     coordenada: crearCoordenada(),
 
