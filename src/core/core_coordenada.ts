@@ -1,17 +1,16 @@
 // ======================================================
 // 🖱️ core_Coordenada
 // ------------------------------------------------------
-// Modelo de la columna Extra cuando FilaPerfil.tipo es
-// "click_coordenada". Independiente del campo `extra`
-// (string) que usan los demás tipos — el popup y la
-// cantidad de datos acá son distintos.
+// Modelo del extra "Coordenada" dentro del popup Extra de
+// Tecla/Mouse (filaPerfil.tipo === "tecla_mouse"). Ya no es
+// un Tipo aparte: es un toggle independiente del grupo
+// Simple/Mantenido/Turbo (ver `activa`), que comparte fila
+// con filaPerfil.extra en vez de tener su propia repetición.
 //
 // Espejo exacto de CoordenadaJson en perfil_json.rs (mismos
 // nombres de campo, camelCase) — viaja tal cual hacia Rust
 // en compilar_perfil, sin traducción adicional.
 // ======================================================
-
-export type TipoRepeticionCoordenada = "" | "turbo" | "mantener";
 
 export type UbicacionCoordenada =
   | "absoluta"
@@ -30,7 +29,10 @@ export type PuntoReferenciaCoordenada =
 export type PostAccionCoordenada = "inicial" | "final";
 
 export interface CoordenadaPerfil {
-  tipoRepeticion: TipoRepeticionCoordenada;
+  // Toggle independiente del grupo Simple/Mantenido/Turbo
+  // (filaPerfil.extra). No excluyente: al activarse, el
+  // popup se expande mostrando el resto de estos campos.
+  activa: boolean;
 
   ubicacion: UbicacionCoordenada;
 
@@ -55,7 +57,7 @@ export interface CoordenadaPerfil {
 
 export function crearCoordenada(): CoordenadaPerfil {
   return {
-    tipoRepeticion: "",
+    activa: false,
 
     ubicacion: "absoluta",
 

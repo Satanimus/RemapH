@@ -34,9 +34,9 @@ export function crearAccion(
     case "portapapeles":
       return crearAccionPortapapeles();
 
-    // click_coordenada NO tiene un botón propio: reusa el mismo
-    // capturador de Tecla/Mouse (ver default) — lo capturado ahí es
-    // lo que se ejecuta en la coordenada calculada (ver popup Extra).
+    // El extra Coordenada (dentro de Tecla/Mouse) no tiene un botón
+    // propio: reusa este mismo capturador — lo capturado es lo que se
+    // ejecuta en la coordenada calculada (ver popup Extra).
     default:
       return crearCapturador(contexto, filaPerfil, "Accion", alModificar);
   }

@@ -1,24 +1,31 @@
 // ======================================================
 // 🖱️📌 comp_Popup_Coordenada
 // ------------------------------------------------------
-// Popup Extra cuando filaPerfil.tipo es "click_coordenada".
-// Distinto del popup Extra simple (comp_popup_abrir.ts) que
-// usan los demás tipos — acá el popup queda abierto entre
-// selecciones (cada fila es un grupo de opciones, no un
-// selector de una sola vez): al elegir una opción se
-// actualiza el estado y se vuelve a dibujar el mismo popup
-// en el lugar (mostrarPopup reemplaza el contenido sin
-// cerrar la capa), en vez de cerrarlo.
+// Popup Extra completo de Tecla/Mouse (filaPerfil.tipo ===
+// "tecla_mouse"). Popup persistente: al elegir una opción se
+// actualiza el estado y se vuelve a dibujar el mismo popup en
+// el lugar (mostrarPopup reemplaza el contenido sin cerrar la
+// capa), en vez de cerrarlo.
 //
-// FILA 1 — Tipo de repetición (Normal/Mantener/Turbo)
-// FILA 2 — Ubicación (Absoluta/Relativa a cursor/Relativa a
-//          ventana) + sub-popup lateral si es Relativa a
-//          ventana (modo Porcentaje/Píxeles + punto de
-//          referencia, este último solo en Píxeles)
-// FILA 3 — 📌 Capturar (abre la ventana de captura — ver
-//          comandos.rs; la ventana en sí es la Etapa 3, acá
-//          ya queda conectado el polling del resultado)
-// FILA 4 — Post-acción (Posición inicial/Posición final)
+// FILA 1 — Simple / Mantenido / Turbo (sobre filaPerfil.extra,
+//          mismo vocabulario "" | "mantener" | "turbo" que usa
+//          compilador.rs vía convertir_extra())
+// TOGGLE  — Coordenada (sobre filaPerfil.coordenada.activa).
+//          No excluyente con la fila de arriba: se puede
+//          combinar cualquier repetición con Coordenada. Al
+//          activarse, expande debajo:
+//   FILA 2 — Ubicación (Absoluta/Relativa a cursor/Relativa a
+//            ventana) + sub-popup lateral si es Relativa a
+//            ventana (modo Porcentaje/Píxeles + punto de
+//            referencia, este último solo en Píxeles)
+//   FILA 3 — 📌 Capturar (abre la ventana de captura — ver
+//            comandos.rs; conecta el polling del resultado)
+//   FILA 4 — Post-acción (Posición inicial/Posición final)
+//
+// El pin 📌 es el indicador propio de Coordenada (en vez del
+// círculo cyan genérico) — aparece en el toggle cuando está
+// activo, y en el texto del botón Extra de la tabla (ver
+// textoExtraTeclaMouse).
 // ======================================================
 
 import { invoke } from "@tauri-apps/api/core";
@@ -32,7 +39,6 @@ import type { ContextoFila } from "../../core/core_contexto_fila";
 import type { FilaPerfil } from "../../core/core_perfil";
 
 import type {
-  TipoRepeticionCoordenada,
   UbicacionCoordenada,
   ModoVentanaCoordenada,
   PuntoReferenciaCoordenada,
@@ -41,73 +47,58 @@ import type {
 
 import { textoCoordenada } from "../../core/core_coordenada";
 
+import {
+  crearGrupoOpciones,
+  crearFilaPopup,
+  crearBotonToggle,
+} from "./comp_popup_grupo";
+
+// ======================================================
+// 🧭 VOCABULARIO Simple / Mantenido / Turbo
+// ------------------------------------------------------
+// Mismos valores que EXTRA_OPCIONES de comp_popup_abrir.ts
+// (comparten filaPerfil.extra y convertir_extra() del lado
+// Rust) — solo cambian los textos mostrados acá, específicos
+// del popup de Tecla/Mouse.
+// ======================================================
+
+const EXTRA_TECLA_MOUSE_OPCIONES: { texto: string; valor: string }[] = [
+  { texto: "Simple", valor: "" },
+  { texto: "Mantenido", valor: "mantener" },
+  { texto: "Turbo", valor: "turbo" },
+];
+
+// ======================================================
+// 📝 TEXTO DEL BOTÓN EXTRA (columna de la tabla)
+// ------------------------------------------------------
+// Repetición + pin 📌 si Coordenada está activa.
+// ======================================================
+
+export function textoExtraTeclaMouse(filaPerfil: FilaPerfil): string {
+  const base =
+    EXTRA_TECLA_MOUSE_OPCIONES.find(
+      (opcion) => opcion.valor === filaPerfil.extra,
+    )?.texto ?? filaPerfil.extra;
+
+  return filaPerfil.coordenada.activa ? `📌 ${base}` : base;
+}
+
 // ======================================================
 // 🚪 CERRAR VENTANA DE CAPTURA (auto-cancelación)
 // ------------------------------------------------------
 // Si la ventana overlay está abierta y el usuario cambia
 // cualquier opción que la deja incoherente (ubicación, modo
-// de ventana, punto de referencia, o el tipo de la fila deja
-// de ser click_coordenada), se cierra sola — no puede quedar
-// una ventana de captura en el aire sin saber para qué
-// ubicación está calculando. Si no había ninguna abierta,
-// cerrar_ventana_captura_coordenada no hace nada (comandos.rs
-// ya maneja el caso "no existe la ventana").
+// de ventana, punto de referencia, se apaga el toggle
+// Coordenada, o el tipo de la fila deja de ser tecla_mouse),
+// se cierra sola — no puede quedar una ventana de captura en
+// el aire sin saber para qué ubicación está calculando. Si no
+// había ninguna abierta, cerrar_ventana_captura_coordenada no
+// hace nada (comandos.rs ya maneja el caso "no existe la
+// ventana").
 // ======================================================
 
 export function cerrarVentanaCapturaCoordenada(): void {
   invoke("cerrar_ventana_captura_coordenada").catch(() => {});
-}
-
-// ======================================================
-// 🔘 GRUPO DE OPCIONES (fila de botones tipo radio)
-// ======================================================
-
-function crearGrupoOpciones<T extends string>(
-  opciones: { texto: string; valor: T }[],
-  valorActual: T,
-  onSeleccionar: (valor: T) => void,
-): HTMLElement {
-  const grupo = document.createElement("div");
-
-  grupo.className = "coordenada-popup-grupo";
-
-  opciones.forEach((opcion) => {
-    const boton = document.createElement("button");
-
-    boton.className = "ui-btn coordenada-popup-opcion";
-
-    boton.textContent = opcion.texto;
-
-    boton.dataset.activo = opcion.valor === valorActual ? "true" : "false";
-
-    boton.addEventListener("click", () => {
-      onSeleccionar(opcion.valor);
-    });
-
-    grupo.append(boton);
-  });
-
-  return grupo;
-}
-
-// ======================================================
-// 🏷️ FILA CON ETIQUETA
-// ======================================================
-
-function crearFilaPopup(etiqueta: string, contenido: HTMLElement): HTMLElement {
-  const fila = document.createElement("div");
-
-  fila.className = "coordenada-popup-fila";
-
-  const label = document.createElement("span");
-
-  label.className = "coordenada-popup-label";
-
-  label.textContent = etiqueta;
-
-  fila.append(label, contenido);
-
-  return fila;
 }
 
 // ======================================================
@@ -135,7 +126,7 @@ function abrirSubPopupVentana(
 
   const popup = document.createElement("div");
 
-  popup.className = "coordenada-popup";
+  popup.className = "popup-extra";
 
   const redibujar = () => abrirSubPopupVentana(evento, contexto, filaPerfil);
 
@@ -244,7 +235,7 @@ function iniciarCaptura(
         filaPerfil.coordenada.y = resultado[1];
 
         reconstruirFila(contexto.id);
-        abrirPopupCoordenada(evento, contexto, filaPerfil);
+        abrirPopupExtraTeclaMouse(evento, contexto, filaPerfil);
       })
       .catch(() => {
         clearInterval(intervalo);
@@ -253,10 +244,10 @@ function iniciarCaptura(
 }
 
 // ======================================================
-// 🖱️📌 ABRIR POPUP COORDENADA
+// 🖱️📌 ABRIR POPUP EXTRA (Tecla/Mouse)
 // ======================================================
 
-export function abrirPopupCoordenada(
+export function abrirPopupExtraTeclaMouse(
   evento: MouseEvent,
   contexto: ContextoFila,
   filaPerfil: FilaPerfil,
@@ -265,41 +256,60 @@ export function abrirPopupCoordenada(
 
   const popup = document.createElement("div");
 
-  popup.className = "coordenada-popup";
+  popup.className = "popup-extra";
 
-  const redibujar = () => abrirPopupCoordenada(evento, contexto, filaPerfil);
+  const redibujar = () =>
+    abrirPopupExtraTeclaMouse(evento, contexto, filaPerfil);
 
   // ----------------------------------
-  // FILA 1 — Tipo de repetición
+  // FILA 1 — Simple / Mantenido / Turbo
   // ----------------------------------
-
-  const repeticionOpciones: {
-    texto: string;
-    valor: TipoRepeticionCoordenada;
-  }[] = [
-    { texto: "Normal", valor: "" },
-    { texto: "Mantener", valor: "mantener" },
-    { texto: "Turbo", valor: "turbo" },
-  ];
 
   popup.append(
-    crearFilaPopup(
-      "Tipo de repetición",
-      crearGrupoOpciones(
-        repeticionOpciones,
-        coordenada.tipoRepeticion,
-        (valor) => {
-          coordenada.tipoRepeticion = valor;
+    crearGrupoOpciones(
+      EXTRA_TECLA_MOUSE_OPCIONES,
+      filaPerfil.extra,
+      (valor) => {
+        filaPerfil.extra = valor;
 
-          reconstruirFila(contexto.id);
-          redibujar();
-        },
-      ),
+        reconstruirFila(contexto.id);
+        redibujar();
+      },
     ),
   );
 
+  popup.append(crearSeparador());
+
   // ----------------------------------
-  // FILA 2 — Ubicación
+  // TOGGLE — Coordenada
+  // ----------------------------------
+
+  popup.append(
+    crearBotonToggle(
+      "Coordenada",
+      coordenada.activa,
+      () => {
+        coordenada.activa = !coordenada.activa;
+
+        if (!coordenada.activa) {
+          cerrarVentanaCapturaCoordenada();
+        }
+
+        reconstruirFila(contexto.id);
+        redibujar();
+      },
+      "📌",
+    ),
+  );
+
+  if (!coordenada.activa) {
+    mostrarPopup(popup, evento.clientX, evento.clientY);
+
+    return;
+  }
+
+  // ----------------------------------
+  // FILA 2 — Ubicación (solo si Coordenada está activa)
   // ----------------------------------
 
   const ubicacionOpciones: { texto: string; valor: UbicacionCoordenada }[] = [
@@ -332,7 +342,7 @@ export function abrirPopupCoordenada(
 
     const botonVentana = document.createElement("button");
 
-    botonVentana.className = "ui-btn coordenada-popup-sublista";
+    botonVentana.className = "ui-btn popup-extra-sublista";
 
     botonVentana.textContent = `Configurar ventana (${modoTexto})  ▸`;
 
@@ -351,7 +361,7 @@ export function abrirPopupCoordenada(
 
   const botonCapturar = document.createElement("button");
 
-  botonCapturar.className = "ui-btn coordenada-popup-capturar";
+  botonCapturar.className = "ui-btn popup-extra-capturar";
 
   botonCapturar.textContent = textoCoordenada(coordenada);
 

@@ -588,10 +588,65 @@
 }
 
 /* ======================================================
-   🖱️📌 POPUP COORDENADA (Click en coordenada)
+   🔘 GRUPO DE OPCIONES COMPARTIDO (comp_popup_grupo.ts)
+   ------------------------------------------------------
+   Usado por cualquier popup persistente con filas de
+   opciones tipo-radio o botones toggle (hoy: popup de
+   Coordenada/Extra). El indicador cyan (círculo a la
+   izquierda del texto) es la identidad visual estándar
+   para "esta opción está activa o es la default sin
+   tocar" en todo el programa — reemplaza el fondo azul
+   sólido que antes no se distinguía bien.
    ====================================================== */
 
-.coordenada-popup {
+.popup-fila {
+    display: flex;
+    flex-direction: column;
+    gap: var(--gap4);
+}
+
+.popup-fila-label {
+    font-size: var(--fs11);
+    color: var(--border-light);
+}
+
+.popup-grupo {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--gap4);
+}
+
+.popup-opcion {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--gap4);
+}
+
+.popup-indicador-activo {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    min-width: 8px;
+    border-radius: 50%;
+    background: var(--tag-cyan);
+}
+
+.popup-indicador-personalizado {
+    display: inline-flex;
+    line-height: 1;
+}
+
+.popup-toggle {
+    width: 100%;
+    justify-content: flex-start;
+}
+
+/* ======================================================
+   🖱️📌 POPUP EXTRA (Tecla/Mouse: Simple/Mantenido/Turbo +
+   toggle Coordenada expandible)
+   ====================================================== */
+
+.popup-extra {
     min-width: 260px;
     max-width: 320px;
     display: flex;
@@ -599,35 +654,12 @@
     gap: var(--gap8);
 }
 
-.coordenada-popup-fila {
-    display: flex;
-    flex-direction: column;
-    gap: var(--gap4);
-}
-
-.coordenada-popup-label {
-    font-size: var(--fs11);
-    color: var(--border-light);
-}
-
-.coordenada-popup-grupo {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--gap4);
-}
-
-.coordenada-popup-opcion[data-activo="true"] {
-    background: var(--blue);
-    border-color: var(--blue);
-    color: #FFF;
-}
-
-.coordenada-popup-sublista {
+.popup-extra-sublista {
     justify-content: space-between;
     width: 100%;
 }
 
-.coordenada-popup-capturar {
+.popup-extra-capturar {
     width: 100%;
 }
 

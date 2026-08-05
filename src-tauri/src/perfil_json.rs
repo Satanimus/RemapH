@@ -1,5 +1,5 @@
 // ======================================================
-// 👤 perfil_json  
+// 👤 perfil_json
 // ======================================================
 // 1. ¿Qué hace este archivo?
 // Modelo persistente del perfil de usuario.
@@ -175,13 +175,15 @@ pub struct AppJson {
 // ======================================================
 // 🖱️ COORDENADA JSON
 // ------------------------------------------------------
-// Datos de la columna Extra cuando tipo == "click_coordenada".
-// Independiente del campo `extra` (string) que usan los demás
-// tipos — acá el popup y la cantidad de datos son distintos.
+// Datos del extra "Coordenada" dentro del popup Extra de
+// tecla_mouse. Ya no depende de tipo == "click_coordenada"
+// (ese tipo dejó de existir) — activa es un toggle
+// independiente del `extra` genérico de la fila.
 //
-// tipo_repeticion: "" | "turbo" | "mantener" — mismo
-//     vocabulario que `extra`, se interpreta con la misma
-//     convertir_extra() de compilador.rs.
+// activa: si está prendido, se calcula y mueve el cursor
+//     antes de ejecutar la acción de la fila (ver
+//     compilador.rs); la repetición (Simple/Mantenido/Turbo)
+//     ahora la da `extra`, no un campo propio acá.
 // ubicacion: "absoluta" | "relativa_cursor" | "relativa_ventana"
 // modo_ventana: "porcentaje" | "pixeles" — solo si ubicacion
 //     es "relativa_ventana".
@@ -200,7 +202,7 @@ pub struct AppJson {
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CoordenadaJson {
-    pub tipo_repeticion: String,
+    pub activa: bool,
 
     pub ubicacion: String,
 
@@ -218,7 +220,7 @@ pub struct CoordenadaJson {
 impl CoordenadaJson {
     pub fn nueva() -> Self {
         Self {
-            tipo_repeticion: String::new(),
+            activa: false,
             ubicacion: "absoluta".to_string(),
             modo_ventana: "pixeles".to_string(),
             punto_referencia: "sup_izq".to_string(),

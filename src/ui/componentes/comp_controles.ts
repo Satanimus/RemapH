@@ -20,11 +20,10 @@ import {
 import { abrirPopupApp } from "./comp_popup_app";
 
 import {
-  abrirPopupCoordenada,
+  abrirPopupExtraTeclaMouse,
   cerrarVentanaCapturaCoordenada,
+  textoExtraTeclaMouse,
 } from "./comp_popup_coordenada";
-
-import { textoCoordenada } from "../../core/core_coordenada";
 
 import { obtenerPerfilUi } from "../../core/core_perfil_ui";
 
@@ -118,14 +117,11 @@ export function crearTipo(
       abrirPopupTipo(
         evento,
         (valor) => {
-          // Si esta fila era click_coordenada y tenía la ventana de
-          // captura abierta, deja de tener sentido apenas cambia el
-          // tipo — no puede quedar calculando para una fila que ya
-          // no es click en coordenada.
-          if (
-            filaPerfil.tipo === "click_coordenada" &&
-            valor !== "click_coordenada"
-          ) {
+          // Si esta fila tenía Coordenada activa y deja de ser
+          // tecla_mouse, ya no tiene sentido — no puede quedar una
+          // ventana de captura calculando para una fila que ya no
+          // puede usar ese extra.
+          if (filaPerfil.coordenada.activa && valor !== "tecla_mouse") {
             cerrarVentanaCapturaCoordenada();
           }
 
@@ -143,14 +139,14 @@ export function crearExtra(
   contexto: ContextoFila,
   filaPerfil: FilaPerfil,
 ): HTMLButtonElement {
-  // click_coordenada tiene su propio popup Extra (4 filas, queda
-  // abierto entre selecciones) — totalmente distinto del popup
-  // simple que usan los demás tipos.
-  if (filaPerfil.tipo === "click_coordenada") {
+  // tecla_mouse tiene su propio popup Extra (Simple/Mantenido/Turbo +
+  // toggle Coordenada expandible, queda abierto entre selecciones) —
+  // totalmente distinto del popup simple que usan los demás tipos.
+  if (filaPerfil.tipo === "tecla_mouse") {
     return crearPopup({
-      texto: textoCoordenada(filaPerfil.coordenada),
+      texto: textoExtraTeclaMouse(filaPerfil),
       onClick: (evento) => {
-        abrirPopupCoordenada(evento, contexto, filaPerfil);
+        abrirPopupExtraTeclaMouse(evento, contexto, filaPerfil);
       },
     });
   }

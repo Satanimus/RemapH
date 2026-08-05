@@ -116,10 +116,10 @@
 //     se panickea por datos incompletos.
 //
 // convertir_coordenada()
-//     Solo para tipo == "click_coordenada": resuelve
-//     CoordenadaJson (strings de UI) → Option<CoordenadaCache>
-//     (ubicación ya resuelta a números). None si todavía no
-//     se capturó — mismo criterio de descarte silencioso.
+//     Resuelve CoordenadaJson (strings de UI) → Option<CoordenadaCache>
+//     (ubicación ya resuelta a números), cuando coordenada.activa es
+//     true. None si todavía no se capturó — mismo criterio de
+//     descarte silencioso.
 // ------------------------------------------------------
 
 use crate::cache;
@@ -169,22 +169,13 @@ fn compilar_remapeo(remapeo: &RemapeoJson) -> Option<RemapeoCache> {
 
     let accion = convertir_accion(remapeo)?;
 
-    // "Click en coordenada" tiene su propia repetición (dentro de
-    // CoordenadaJson, independiente del `extra` genérico de los demás
-    // tipos) pero usa el mismo vocabulario ("", "turbo", "mantener") y
-    // el mismo convertir_extra() — no es un mecanismo nuevo, solo se
-    // alimenta desde otro campo.
-    let extra = if remapeo.tipo == "click_coordenada" {
-        convertir_extra(&remapeo.coordenada.tipo_repeticion)
-    } else {
-        convertir_extra(&remapeo.extra)
-    };
+    let extra = convertir_extra(&remapeo.extra);
 
-    // Igual que con la Acción: si el tipo es click_coordenada pero
-    // todavía no se capturó la coordenada (x/y en None), la fila se
-    // descarta en silencio (mismo criterio que un tecla_mouse sin
-    // gatillo capturado todavía).
-    let coordenada = if remapeo.tipo == "click_coordenada" {
+    // Coordenada ya no depende de un tipo aparte: es un extra
+    // independiente de tecla_mouse. Si está activa pero todavía no se
+    // capturó (x/y en None), la fila se descarta en silencio (mismo
+    // criterio que una Acción sin capturar).
+    let coordenada = if remapeo.coordenada.activa {
         Some(convertir_coordenada(&remapeo.coordenada)?)
     } else {
         None
@@ -276,11 +267,7 @@ fn convertir_entrada(trigger: &crate::perfil_json::TriggerJson) -> Vec<InputId> 
 
 fn convertir_accion(remapeo: &RemapeoJson) -> Option<AccionCache> {
     match remapeo.tipo.as_str() {
-        // click_coordenada reusa exactamente el mismo capturador de
-        // Tecla/Mouse para su Acción (ver comp_accion.ts) — lo único
-        // que cambia es DÓNDE se ejecuta (ver convertir_coordenada),
-        // nunca QUÉ se ejecuta.
-        "tecla_mouse" | "click_coordenada" => {
+        "tecla_mouse" => {
             let trigger = remapeo.accion_trigger.as_ref()?;
 
             let gatillo = trigger.gatillo.as_ref()?;
