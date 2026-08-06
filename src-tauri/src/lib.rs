@@ -10,6 +10,7 @@ mod analizador_trigger;
 mod back_app;
 mod back_coordenada;
 mod back_interception;
+mod back_menu_express;
 mod back_mouse;
 mod back_multimedia;
 mod back_teclas;
@@ -43,6 +44,17 @@ pub fn run() {
     back_app::iniciar_monitor();
     tauri::Builder::default()
         .device_event_filter(tauri::DeviceEventFilter::Always)
+        .setup(|app| {
+            // AppHandle global para back_menu_express.rs — el trigger
+            // que abre una ventana MenuExpress llega desde el hilo de
+            // entrada física (ver runtime.rs), no desde un comando
+            // Tauri, así que no hay forma de recibirlo como parámetro
+            // en ese momento. Se fija acá, una única vez, apenas Tauri
+            // termina de inicializar.
+            back_menu_express::inicializar(app.handle().clone());
+
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![
             comandos::compilar_perfil,
             comandos::activar_perfil,
@@ -75,6 +87,8 @@ pub fn run() {
             comandos::obtener_tecla_guardar_coordenada,
             comandos::establecer_tecla_guardar_coordenada,
             comandos::obtener_intervalo_captura_coordenada,
+            comandos::obtener_datos_menu_express,
+            comandos::cerrar_menu_express,
         ])
         .run(tauri::generate_context!())
         .expect("error al ejecutar Tauri");

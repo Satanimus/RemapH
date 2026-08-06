@@ -240,6 +240,14 @@ pub enum AccionCache {
         ubicacion: UbicacionMenu,
         tamano_boton: TamanoMenu,
         tamano_texto: TamanoMenu,
+        // Color de la FILA MenuExpress (mismo vocabulario que la
+        // paleta de color de fila — "cyan"/"green"/etc., ver
+        // styl_variables.css --tag-<color>). Único campo "decorativo"
+        // que sí viaja hasta acá pese a la regla general de
+        // perfil_cache (ver header del archivo) — acá tiene un uso
+        // funcional real: back_menu_express.rs lo usa como color base
+        // del fondo semitransparente de la ventana (ver spec).
+        color: String,
     },
 }
 
@@ -270,10 +278,31 @@ pub enum FormaMenu {
     Cuadricula,
 }
 
+impl FormaMenu {
+    /// Inverso de compilador.rs::convertir_forma_menu — usado por
+    /// back_menu_express.rs para mandarle el dato a la ventana (TS
+    /// trabaja con el mismo vocabulario string que core_menu_express.ts).
+    pub fn como_str(&self) -> &'static str {
+        match self {
+            FormaMenu::Radial => "radial",
+            FormaMenu::Cuadricula => "cuadricula",
+        }
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum ComportamientoMenu {
     Toggle,
     Efimero,
+}
+
+impl ComportamientoMenu {
+    pub fn como_str(&self) -> &'static str {
+        match self {
+            ComportamientoMenu::Toggle => "toggle",
+            ComportamientoMenu::Efimero => "efimero",
+        }
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -282,11 +311,30 @@ pub enum UbicacionMenu {
     Cursor,
 }
 
+impl UbicacionMenu {
+    pub fn como_str(&self) -> &'static str {
+        match self {
+            UbicacionMenu::Persistente => "persistente",
+            UbicacionMenu::Cursor => "cursor",
+        }
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum TamanoMenu {
     Pequeno,
     Mediano,
     Grande,
+}
+
+impl TamanoMenu {
+    pub fn como_str(&self) -> &'static str {
+        match self {
+            TamanoMenu::Pequeno => "pequeno",
+            TamanoMenu::Mediano => "mediano",
+            TamanoMenu::Grande => "grande",
+        }
+    }
 }
 
 // ======================================================

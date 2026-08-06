@@ -225,6 +225,8 @@ use crate::back_coordenada;
 
 use crate::back_interception;
 
+use crate::back_menu_express;
+
 pub use crate::cache::OrdenRuntime;
 
 use crate::config;
@@ -392,11 +394,11 @@ fn ejecutar_accion(
             crate::back_multimedia::ejecutar(&comando, &alcance);
         }
 
-        // TODO(etapa 5): reemplazar por back_menu_express::abrir(),
-        // que arma la ventana flotante real a partir de este mismo
-        // paquete. Por ahora solo confirma que Compilador arma
-        // AccionCache::MenuExpress completo y que Runtime lo recibe
-        // entero al disparar el trigger de la fila.
+        // Alternar la ventana flotante del menú (etapa 5) — abrir_o_
+        // alternar() decide sola si toca crear la ventana o cerrar la
+        // que ya estaba abierta para este id (mismo trigger = toggle,
+        // ver back_menu_express.rs). El id de la ORDEN (no de la
+        // Acción) es el mismo RemapeoJson::id de la fila MenuExpress.
         AccionCache::MenuExpress {
             nombre,
             botones,
@@ -407,19 +409,22 @@ fn ejecutar_accion(
             ubicacion,
             tamano_boton,
             tamano_texto,
+            color,
         } => {
-            println!(
-                "[MenuExpress] id={} nombre={:?} botones={:?} forma={:?} columnas={} filas={} comportamiento={:?} ubicacion={:?} tamano_boton={:?} tamano_texto={:?}",
+            back_menu_express::abrir_o_alternar(
                 id,
-                nombre,
-                botones,
-                forma,
-                columnas,
-                filas,
-                comportamiento,
-                ubicacion,
-                tamano_boton,
-                tamano_texto
+                back_menu_express::MenuExpressPaquete {
+                    nombre,
+                    botones,
+                    forma,
+                    columnas,
+                    filas,
+                    comportamiento,
+                    ubicacion,
+                    tamano_boton,
+                    tamano_texto,
+                    color,
+                },
             );
         }
     }

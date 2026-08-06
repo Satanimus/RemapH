@@ -1,0 +1,169 @@
+/* ======================================================
+   ⚡🪟 menu_express.css
+   ------------------------------------------------------
+   Estilos propios de la ventana flotante de MenuExpress. NO
+   importa styl_general.css (fondo sólido, rompería la
+   transparencia — mismo motivo que captura.css). Reutiliza
+   solo las variables centralizadas en styl_variables.css,
+   incluidas las --tag-<color> de la paleta de filas: el fondo
+   de la tarjeta se tiñe con el color de la fila que generó
+   este menú (ver back_menu_express.rs / spec).
+
+   Layout: lista vertical simple (etapa 5). Radial/Cuadrícula
+   llegan en la etapa 6 — esta hoja solo tiene el modo lista,
+   .menu-express-cuerpo ya queda listo para que esa etapa
+   agregue variantes (.forma-radial / .forma-cuadricula) sin
+   tocar esto.
+   ====================================================== */
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+html,
+body {
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background: transparent;
+    font-family: var(--font);
+    font-size: var(--fs13);
+    color: #ffffff;
+    user-select: none;
+}
+
+.menu-express-card {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    /* --menu-color la fija menu_express_main.ts por fila, con
+       color-mix para la transparencia — fallback sólido acá por si
+       el navegador no soporta color-mix. */
+    background: var(--menu-color, rgba(20, 20, 30, 0.85));
+    border: 1px solid var(--border-light);
+    border-radius: 8px;
+    overflow: hidden;
+    cursor: move;
+}
+
+.menu-express-header {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 8px;
+    background: rgba(255, 255, 255, 0.08);
+    flex-shrink: 0;
+}
+
+.menu-express-titulo {
+    flex: 1;
+    font-size: var(--fs11);
+    letter-spacing: 0.03em;
+    opacity: 0.9;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.menu-express-cerrar {
+    width: 20px;
+    height: 20px;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    border: 1px solid var(--border-light);
+    border-radius: 4px;
+    color: #ffffff;
+    font-size: var(--fs12);
+    line-height: 1;
+    cursor: pointer;
+    /* Este botón NO debe arrastrar la ventana — sin
+       data-tauri-drag-region, a diferencia del resto de la
+       tarjeta (ver spec: "toda la ventana excepto botones"). */
+}
+
+.menu-express-cerrar:hover {
+    border-color: var(--highlight-red);
+    color: var(--highlight-red);
+}
+
+.menu-express-cuerpo {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 6px;
+    overflow: auto;
+}
+
+.menu-express-vacio {
+    margin: auto;
+    font-size: var(--fs12);
+    opacity: 0.7;
+    text-align: center;
+    padding: 12px;
+}
+
+.menu-express-boton {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 10px;
+    background: rgba(0, 0, 0, 0.25);
+    border: 1px solid rgba(255, 255, 255, 0.35);
+    border-radius: 6px;
+    color: #ffffff;
+    cursor: pointer;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    transition: background-color 0.1s ease;
+}
+
+.menu-express-boton:hover {
+    background: rgba(255, 255, 255, 0.15);
+}
+
+.menu-express-boton:active {
+    background: rgba(255, 255, 255, 0.28);
+}
+
+/* ==========================
+   Tamaños de botón (menu_extra.tamanoBoton) — valores base;
+   config.rs (etapa 8) los hará configurables de verdad. Por
+   ahora fijos acá, mismo criterio que captura.css con sus
+   propias medidas.
+   ========================== */
+
+.menu-express-boton.tam-pequeno {
+    height: 30px;
+}
+
+.menu-express-boton.tam-mediano {
+    height: 40px;
+}
+
+.menu-express-boton.tam-grande {
+    height: 50px;
+}
+
+/* ==========================
+   Tamaños de texto (menu_extra.tamanoTexto)
+   ========================== */
+
+.menu-express-boton.txt-pequeno {
+    font-size: 10px;
+}
+
+.menu-express-boton.txt-mediano {
+    font-size: 13px;
+}
+
+.menu-express-boton.txt-grande {
+    font-size: 16px;
+}

@@ -153,6 +153,12 @@ pub fn compilar(perfil: &perfil_json) {
     cache::escribir_cache(remapeos);
 
     crate::back_app::revisar_apps();
+
+    // Cualquier ventana MenuExpress abierta puede estar mostrando
+    // botones que ya no existen (fila borrada/editada) — se cierran
+    // todas al recompilar en vez de intentar sincronizarlas en
+    // caliente (decisión del usuario, ver back_menu_express.rs).
+    crate::back_menu_express::cerrar_todas();
 }
 
 // ======================================================
@@ -373,6 +379,7 @@ fn convertir_menu_express(remapeo: &RemapeoJson, perfil: &perfil_json) -> Option
         ubicacion: convertir_ubicacion_menu(&remapeo.menu_extra.ubicacion),
         tamano_boton: convertir_tamano_menu(&remapeo.menu_extra.tamano_boton),
         tamano_texto: convertir_tamano_menu(&remapeo.menu_extra.tamano_texto),
+        color: remapeo.color.clone(),
     })
 }
 

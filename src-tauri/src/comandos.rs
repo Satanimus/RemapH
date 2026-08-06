@@ -536,3 +536,25 @@ pub fn establecer_tecla_guardar_coordenada(valor: String) {
 pub fn obtener_intervalo_captura_coordenada() -> u64 {
     config::intervalo_captura_coordenada()
 }
+
+// ======================================================
+// ⚡🪟 MENU EXPRESS — VENTANA FLOTANTE
+// ------------------------------------------------------
+// abrir_o_alternar() NO es un comando Tauri — runtime.rs la
+// llama directo (el trigger llega desde el hilo de entrada
+// física, no desde JS). Acá solo lo que la propia ventana
+// necesita invocar: leer sus datos una vez al cargar, y
+// pedir su propio cierre (botón [x]).
+// ======================================================
+
+#[tauri::command]
+pub fn obtener_datos_menu_express(
+    id: String,
+) -> Option<crate::back_menu_express::MenuExpressDatosUI> {
+    crate::back_menu_express::obtener_datos(&id)
+}
+
+#[tauri::command]
+pub fn cerrar_menu_express(id: String) {
+    crate::back_menu_express::cerrar(&id);
+}
