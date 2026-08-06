@@ -230,6 +230,70 @@ pub fn establecer_tiempo_doble(valor: u64) {
 }
 
 // ======================================================
+// ⚡🪟 MENU EXPRESS — TAMAÑOS CONFIGURABLES
+// ------------------------------------------------------
+// Un solo comando de lectura combinada (no uno por valor, como
+// tiempo_doble/etc.): la ventana de MenuExpress necesita los 9
+// valores juntos al cargar (ver menu_express_main.ts), no de a
+// uno. Los setters individuales sí siguen el patrón par
+// obtener/establecer del resto del archivo — quedan listos para
+// un futuro panel de configuración, aunque hoy ningún popup de
+// la UI los expone todavía (fuera del alcance de MenuExpress).
+// ======================================================
+
+#[derive(Serialize)]
+pub struct MenuExpressTamanosJson {
+    pub boton_pequeno: (u64, u64),
+    pub boton_mediano: (u64, u64),
+    pub boton_grande: (u64, u64),
+    pub texto_pequeno: u64,
+    pub texto_mediano: u64,
+    pub texto_grande: u64,
+}
+
+#[tauri::command]
+pub fn obtener_tamanos_menu_express() -> MenuExpressTamanosJson {
+    MenuExpressTamanosJson {
+        boton_pequeno: config::menu_boton_pequeno(),
+        boton_mediano: config::menu_boton_mediano(),
+        boton_grande: config::menu_boton_grande(),
+        texto_pequeno: config::menu_texto_pequeno(),
+        texto_mediano: config::menu_texto_mediano(),
+        texto_grande: config::menu_texto_grande(),
+    }
+}
+
+#[tauri::command]
+pub fn establecer_menu_boton_pequeno(ancho: u64, alto: u64) {
+    config::establecer_menu_boton_pequeno(ancho, alto)
+}
+
+#[tauri::command]
+pub fn establecer_menu_boton_mediano(ancho: u64, alto: u64) {
+    config::establecer_menu_boton_mediano(ancho, alto)
+}
+
+#[tauri::command]
+pub fn establecer_menu_boton_grande(ancho: u64, alto: u64) {
+    config::establecer_menu_boton_grande(ancho, alto)
+}
+
+#[tauri::command]
+pub fn establecer_menu_texto_pequeno(valor: u64) {
+    config::establecer_menu_texto_pequeno(valor)
+}
+
+#[tauri::command]
+pub fn establecer_menu_texto_mediano(valor: u64) {
+    config::establecer_menu_texto_mediano(valor)
+}
+
+#[tauri::command]
+pub fn establecer_menu_texto_grande(valor: u64) {
+    config::establecer_menu_texto_grande(valor)
+}
+
+// ======================================================
 // 🎹 CAPTURA
 // ======================================================
 

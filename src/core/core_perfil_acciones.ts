@@ -92,9 +92,21 @@ export function moverFilaPorId(
 
 // ======================================================
 // 🔍 ¿LA FILA TIENE ALGO EN ACCIÓN?
+// ------------------------------------------------------
+// tecla_mouse/coordenada: hay algo capturado en Acción
+// (accion.gatillo). menu_express es distinto — nunca usa ese
+// campo (usa menuAccion.botones en cambio, ver core_perfil.ts) —
+// así que sin este caso especial, un MenuExpress con botones ya
+// agregados aparentaba "vacío" y se podía eliminar sin la
+// confirmación extra que sí exige cualquier otra fila con algo
+// configurado (ver uso en comp_popup_abrir.ts).
 // ======================================================
 
 export function filaTieneAccion(filaPerfil: FilaPerfil): boolean {
+  if (filaPerfil.tipo === "menu_express") {
+    return filaPerfil.menuAccion.botones.length > 0;
+  }
+
   return !!filaPerfil.accion?.gatillo;
 }
 

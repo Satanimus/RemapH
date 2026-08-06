@@ -293,6 +293,35 @@ fn label_de(id: &str) -> String {
 }
 
 // ======================================================
+// 📍 ÚLTIMA POSICIÓN (ubicacion = Persistente) — ETAPA 8
+// ------------------------------------------------------
+// id de la fila -> última posición (x, y) en la que se cerró esa
+// ventana. Solo en memoria (vive y muere con el proceso, como el
+// resto de config.rs) — "recordar la última posición" no implica
+// sobrevivir a un reinicio de la app, solo a abrir/cerrar el
+// menú varias veces en la misma sesión. Se escribe en
+// on_window_event (CloseRequested, ver crear_ventana) y se lee
+// acá en abrir_o_alternar() para el próximo open.
+// ======================================================
+
+static ULTIMA_POSICION: Mutex<Option<HashMap<String, (i32, i32)>>> = Mutex::new(None);
+
+fn recordar_posicion(id: &str, x: i32, y: i32) {
+    let mut guardia = ULTIMA_POSICION.lock().unwrap();
+    guardia
+        .get_or_insert_with(HashMap::new)
+        .insert(id.to_string(), (x, y));
+}
+
+fn ultima_posicion(id: &str) -> Option<(i32, i32)> {
+    ULTIMA_POSICION
+        .lock()
+        .unwrap()
+        .as_ref()
+        .and_then(|mapa| mapa.get(id).copied())
+}
+
+// ======================================================
 // ⚡🪟 ABRIR O ALTERNAR
 // ------------------------------------------------------
 // Único punto de entrada llamado desde runtime.rs. Alternar es
@@ -329,25 +358,26 @@ pub fn abrir_o_alternar(id: String, paquete: MenuExpressPaquete) {
 // 📐 TAMAÑO DE VENTANA SEGÚN FORMA
 // ------------------------------------------------------
 // Mismo criterio geométrico que menu_express_main.ts
-// (TAMANOS_BOTON_PX / renderizarRadial / calcularGrid) — si uno
-// cambia, cambiar el otro. Acá solo hace falta el tamaño final
-// de VENTANA (para que la ventana nativa entre justo, sin
+// (leerTamanosMenuExpress / renderizarRadial / calcularGrid) —
+// si uno cambia, cambiar el otro. Acá solo hace falta el tamaño
+// final de VENTANA (para que la ventana nativa entre justo, sin
 // scroll ni recorte); el posicionamiento de cada botón adentro
 // lo resuelve el TS con ese mismo espacio disponible.
+//
+// Etapa 8: los px de cada tamaño ya no están fijos acá — se leen
+// de config.rs (única fuente de verdad real, configurable), lo
+// mismo que hace menu_express_main.ts vía el comando
+// obtener_tamanos_menu_express (ver comandos.rs).
 // ======================================================
 
-const TAMANOS_BOTON_PX: [(TamanoMenu, f64, f64); 3] = [
-    (TamanoMenu::Pequeno, 60.0, 30.0),
-    (TamanoMenu::Mediano, 80.0, 40.0),
-    (TamanoMenu::Grande, 100.0, 50.0),
-];
-
 fn tamano_boton_px(tamano: &TamanoMenu) -> (f64, f64) {
-    TAMANOS_BOTON_PX
-        .iter()
-        .find(|(t, _, _)| t == tamano)
-        .map(|(_, ancho, alto)| (*ancho, *alto))
-        .unwrap_or((80.0, 40.0))
+    let (ancho, alto) = match tamano {
+        TamanoMenu::Pequeno => crate::config::menu_boton_pequeno(),
+        TamanoMenu::Mediano => crate::config::menu_boton_mediano(),
+        TamanoMenu::Grande => crate::config::menu_boton_grande(),
+    };
+
+    (ancho as f64, alto as f64)
 }
 
 // Alto fijo del header (título + [x], ver menu_express.css) más

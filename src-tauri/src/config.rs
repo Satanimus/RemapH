@@ -95,6 +95,23 @@
 // establecer_tiempo_salida_mantenido()
 //     Cuánto queda abajo la tecla/botón de salida cuando la Acción
 //     capturada tiene condición Mantenido, antes de soltarse sola.
+//
+// delta_volumen()
+// establecer_delta_volumen()
+//     Cuánto sube/baja el volumen por pulsación (Acción Multimedia,
+//     alcance En App).
+//
+// menu_boton_pequeno() / menu_boton_mediano() / menu_boton_grande()
+// establecer_menu_boton_pequeno() / _mediano() / _grande()
+//     Ancho/alto en px de los 3 tamaños de botón de MenuExpress
+//     (menu_extra.tamanoBoton). Única fuente de verdad — antes
+//     hardcodeados por triplicado (CSS + TS + Rust), ver
+//     comentario en la sección de abajo.
+//
+// menu_texto_pequeno() / menu_texto_mediano() / menu_texto_grande()
+// establecer_menu_texto_pequeno() / _mediano() / _grande()
+//     Tamaño de fuente en px de los 3 tamaños de texto de
+//     MenuExpress (menu_extra.tamanoTexto). Mismo criterio.
 // ------------------------------------------------------
 // Transformación:
 //
@@ -310,4 +327,99 @@ pub fn delta_volumen() -> u64 {
 
 pub fn establecer_delta_volumen(valor: u64) {
     DELTA_VOLUMEN.store(valor, Ordering::Relaxed);
+}
+
+// ======================================================
+// ⚡🪟 MENU EXPRESS — TAMAÑOS DE BOTÓN
+// ------------------------------------------------------
+// Ancho/alto en px para cada uno de los 3 tamaños de botón
+// (menu_extra.tamanoBoton). Antes vivían hardcodeados en
+// menu_express.css / TAMANOS_BOTON_PX (menu_express_main.ts) /
+// TAMANOS_BOTON_PX (back_menu_express.rs) — desde acá pasan a
+// ser la única fuente de verdad real y configurable; los otros
+// dos lugares los LEEN por comando/consulta en vez de tener su
+// propia copia fija (ver obtener_tamanos_menu_express en
+// comandos.rs y calcular_tamano_ventana en back_menu_express.rs).
+// Valores por defecto: los mismos que ya venían de la etapa 5/6.
+// ======================================================
+
+static MENU_BOTON_PEQUENO_ANCHO: AtomicU64 = AtomicU64::new(60);
+static MENU_BOTON_PEQUENO_ALTO: AtomicU64 = AtomicU64::new(30);
+
+static MENU_BOTON_MEDIANO_ANCHO: AtomicU64 = AtomicU64::new(80);
+static MENU_BOTON_MEDIANO_ALTO: AtomicU64 = AtomicU64::new(40);
+
+static MENU_BOTON_GRANDE_ANCHO: AtomicU64 = AtomicU64::new(100);
+static MENU_BOTON_GRANDE_ALTO: AtomicU64 = AtomicU64::new(50);
+
+pub fn menu_boton_pequeno() -> (u64, u64) {
+    (
+        MENU_BOTON_PEQUENO_ANCHO.load(Ordering::Relaxed),
+        MENU_BOTON_PEQUENO_ALTO.load(Ordering::Relaxed),
+    )
+}
+
+pub fn establecer_menu_boton_pequeno(ancho: u64, alto: u64) {
+    MENU_BOTON_PEQUENO_ANCHO.store(ancho, Ordering::Relaxed);
+    MENU_BOTON_PEQUENO_ALTO.store(alto, Ordering::Relaxed);
+}
+
+pub fn menu_boton_mediano() -> (u64, u64) {
+    (
+        MENU_BOTON_MEDIANO_ANCHO.load(Ordering::Relaxed),
+        MENU_BOTON_MEDIANO_ALTO.load(Ordering::Relaxed),
+    )
+}
+
+pub fn establecer_menu_boton_mediano(ancho: u64, alto: u64) {
+    MENU_BOTON_MEDIANO_ANCHO.store(ancho, Ordering::Relaxed);
+    MENU_BOTON_MEDIANO_ALTO.store(alto, Ordering::Relaxed);
+}
+
+pub fn menu_boton_grande() -> (u64, u64) {
+    (
+        MENU_BOTON_GRANDE_ANCHO.load(Ordering::Relaxed),
+        MENU_BOTON_GRANDE_ALTO.load(Ordering::Relaxed),
+    )
+}
+
+pub fn establecer_menu_boton_grande(ancho: u64, alto: u64) {
+    MENU_BOTON_GRANDE_ANCHO.store(ancho, Ordering::Relaxed);
+    MENU_BOTON_GRANDE_ALTO.store(alto, Ordering::Relaxed);
+}
+
+// ======================================================
+// ⚡🔤 MENU EXPRESS — TAMAÑOS DE TEXTO
+// ------------------------------------------------------
+// Tamaño de fuente en px para cada uno de los 3 tamaños de texto
+// (menu_extra.tamanoTexto). Mismo criterio que los de botón — ver
+// comentario arriba.
+// ======================================================
+
+static MENU_TEXTO_PEQUENO: AtomicU64 = AtomicU64::new(10);
+static MENU_TEXTO_MEDIANO: AtomicU64 = AtomicU64::new(13);
+static MENU_TEXTO_GRANDE: AtomicU64 = AtomicU64::new(16);
+
+pub fn menu_texto_pequeno() -> u64 {
+    MENU_TEXTO_PEQUENO.load(Ordering::Relaxed)
+}
+
+pub fn establecer_menu_texto_pequeno(valor: u64) {
+    MENU_TEXTO_PEQUENO.store(valor, Ordering::Relaxed);
+}
+
+pub fn menu_texto_mediano() -> u64 {
+    MENU_TEXTO_MEDIANO.load(Ordering::Relaxed)
+}
+
+pub fn establecer_menu_texto_mediano(valor: u64) {
+    MENU_TEXTO_MEDIANO.store(valor, Ordering::Relaxed);
+}
+
+pub fn menu_texto_grande() -> u64 {
+    MENU_TEXTO_GRANDE.load(Ordering::Relaxed)
+}
+
+pub fn establecer_menu_texto_grande(valor: u64) {
+    MENU_TEXTO_GRANDE.store(valor, Ordering::Relaxed);
 }

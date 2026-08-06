@@ -91,6 +91,13 @@ pub fn run() {
             comandos::cerrar_menu_express,
             comandos::menu_express_boton_down,
             comandos::menu_express_boton_up,
+            comandos::obtener_tamanos_menu_express,
+            comandos::establecer_menu_boton_pequeno,
+            comandos::establecer_menu_boton_mediano,
+            comandos::establecer_menu_boton_grande,
+            comandos::establecer_menu_texto_pequeno,
+            comandos::establecer_menu_texto_mediano,
+            comandos::establecer_menu_texto_grande,
         ])
         .run(tauri::generate_context!())
         .expect("error al ejecutar Tauri");

@@ -17,9 +17,7 @@
 // ETAPA 6: layout real según datos.forma — Radial (círculo,
 // ángulo uniforme 360°/N, radio adaptativo) y Cuadrícula (CSS
 // Grid, columnas/filas con la regla "0 = auto": se rellena
-// primero la dimensión fija, la otra crece). Tamaños de botón/
-// texto en TAMANOS_PX más abajo — mismo valor que menu_express.css
-// (config.rs los hará configurables de verdad en la etapa 8).
+// primero la dimensión fija, la otra crece).
 //
 // ETAPA 7: ejecución real de los botones — mousedown manda el down
 // real (menu_express_boton_down), mouseup el up real
@@ -28,6 +26,12 @@
 // el tiempo real entre down y up (mientras el botón del mouse siga
 // presionado) es exactamente lo que runtime.rs ya sabe interpretar
 // (mismo motor que un trigger físico sostenido, ver back_menu_express.rs).
+//
+// ETAPA 8: tamaños de botón/texto ya no están hardcodeados — se leen
+// de config.rs vía obtener_tamanos_menu_express (ver
+// leerTamanosMenuExpress más abajo), única fuente de verdad real.
+// ubicacion "Persistente" ahora recuerda la última posición real
+// (ver back_menu_express.rs) en vez de un punto fijo.
 // ======================================================
 
 import { invoke } from "@tauri-apps/api/core";
@@ -139,23 +143,83 @@ function aplicarColorFondo(color: string): void {
 }
 
 // ======================================================
-// 📐 TAMAÑOS EN PX
+// 📐 TAMAÑOS EN PX (config.rs — etapa 8)
 // ------------------------------------------------------
-// Mismo valor que menu_express.css (.tam-*/.txt-*) — acá en TS
-// porque el cálculo geométrico (radio del círculo, tamaño de
-// grid) necesita el número real, no solo la clase CSS. Única
-// fuente de verdad hasta que config.rs los exponga (etapa 8);
-// si cambian acá, cambiarlos también en el CSS.
+// Se leen una sola vez al iniciar, vía obtener_tamanos_menu_express
+// (ver config.rs / comandos.rs) — config.rs es la única fuente de
+// verdad real y configurable; las clases .tam-*/.txt-* en
+// menu_express.css quedan solo como valor de respaldo (por si el
+// comando fallara) — el valor real efectivo siempre se aplica
+// inline (style.width/height/fontSize), que gana sobre la clase.
 // ======================================================
 
-const TAMANOS_BOTON_PX: Record<
-  MenuExpressDatos["tamanoBoton"],
-  { ancho: number; alto: number }
-> = {
-  pequeno: { ancho: 60, alto: 30 },
-  mediano: { ancho: 80, alto: 40 },
-  grande: { ancho: 100, alto: 50 },
+interface MenuExpressTamanos {
+  botonPequeno: { ancho: number; alto: number };
+  botonMediano: { ancho: number; alto: number };
+  botonGrande: { ancho: number; alto: number };
+  textoPequeno: number;
+  textoMediano: number;
+  textoGrande: number;
+}
+
+// Respaldo (mismo valor que .tam-*/.txt-* en menu_express.css) —
+// solo se usa si obtener_tamanos_menu_express llegara a fallar.
+let TAMANOS: MenuExpressTamanos = {
+  botonPequeno: { ancho: 60, alto: 30 },
+  botonMediano: { ancho: 80, alto: 40 },
+  botonGrande: { ancho: 100, alto: 50 },
+  textoPequeno: 10,
+  textoMediano: 13,
+  textoGrande: 16,
 };
+
+function tamanoBotonPx(tamano: MenuExpressDatos["tamanoBoton"]): {
+  ancho: number;
+  alto: number;
+} {
+  if (tamano === "pequeno") return TAMANOS.botonPequeno;
+  if (tamano === "grande") return TAMANOS.botonGrande;
+  return TAMANOS.botonMediano;
+}
+
+function tamanoTextoPx(tamano: MenuExpressDatos["tamanoTexto"]): number {
+  if (tamano === "pequeno") return TAMANOS.textoPequeno;
+  if (tamano === "grande") return TAMANOS.textoGrande;
+  return TAMANOS.textoMediano;
+}
+
+async function leerTamanosMenuExpress(): Promise<void> {
+  try {
+    const resultado = await invoke<{
+      botonPequeno: [number, number];
+      botonMediano: [number, number];
+      botonGrande: [number, number];
+      textoPequeno: number;
+      textoMediano: number;
+      textoGrande: number;
+    }>("obtener_tamanos_menu_express");
+
+    TAMANOS = {
+      botonPequeno: {
+        ancho: resultado.botonPequeno[0],
+        alto: resultado.botonPequeno[1],
+      },
+      botonMediano: {
+        ancho: resultado.botonMediano[0],
+        alto: resultado.botonMediano[1],
+      },
+      botonGrande: {
+        ancho: resultado.botonGrande[0],
+        alto: resultado.botonGrande[1],
+      },
+      textoPequeno: resultado.textoPequeno,
+      textoMediano: resultado.textoMediano,
+      textoGrande: resultado.textoGrande,
+    };
+  } catch {
+    // Se queda con el respaldo de arriba.
+  }
+}
 
 // ======================================================
 // 🔘 CREAR UN BOTÓN
@@ -188,6 +252,17 @@ function crearBoton(
   elemento.className = `menu-express-boton tam-${datos.tamanoBoton} txt-${datos.tamanoTexto}`;
   elemento.textContent = boton.renombrar || "(sin nombre)";
   elemento.title = boton.renombrar;
+
+  // Valor real efectivo (config.rs) aplicado inline — gana sobre
+  // la clase .tam-*/.txt-* de respaldo. En modo lista/cuadrícula
+  // el ancho lo pisa el propio layout (100%/celda de grid), pero
+  // fijarlo igual acá no hace daño — ver menu_express.css.
+  const { ancho, alto } = tamanoBotonPx(datos.tamanoBoton);
+  elemento.style.height = `${alto}px`;
+  elemento.style.fontSize = `${tamanoTextoPx(datos.tamanoTexto)}px`;
+  if (datos.forma === "radial") {
+    elemento.style.width = `${ancho}px`;
+  }
 
   elemento.addEventListener("mousedown", (evento) => {
     // Solo botón izquierdo — clic derecho/medio no ejecuta nada
@@ -247,7 +322,7 @@ function crearBoton(
 
 function renderizarRadial(datos: MenuExpressDatos): void {
   const n = datos.botones.length;
-  const { ancho, alto } = TAMANOS_BOTON_PX[datos.tamanoBoton];
+  const { ancho, alto } = tamanoBotonPx(datos.tamanoBoton);
   const radioBoton = Math.max(ancho, alto) / 2;
 
   // Mismo cálculo que calcular_tamano_ventana() en
@@ -387,6 +462,8 @@ function renderizarBotones(datos: MenuExpressDatos): void {
 // ======================================================
 
 async function iniciar(): Promise<void> {
+  await leerTamanosMenuExpress();
+
   if (!id) {
     titulo.textContent = "Menú";
     cuerpo.innerHTML = "";
