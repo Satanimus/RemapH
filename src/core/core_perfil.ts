@@ -10,6 +10,12 @@ import { crearTrigger } from "./core_trigger";
 import type { CoordenadaPerfil } from "./core_coordenada";
 import { crearCoordenada } from "./core_coordenada";
 
+import type {
+  MenuAccionPerfil,
+  MenuExpressExtraPerfil,
+} from "./core_menu_express";
+import { crearMenuAccion, crearMenuExtra } from "./core_menu_express";
+
 // ======================================================
 // 👤 PERFIL
 // ======================================================
@@ -61,6 +67,15 @@ export interface FilaPerfil {
 
   coordenada: CoordenadaPerfil;
 
+  // Solo relevantes cuando tipo === "menu_express". El id de la
+  // propia fila ES el id del menú (no hay id aparte). menuAccion es
+  // la columna Acción (nombre del menú + botones que contiene);
+  // menuExtra es la columna Extra (forma/comportamiento/ubicación/
+  // tamaños). Ver core_menu_express.ts.
+  menuAccion: MenuAccionPerfil;
+
+  menuExtra: MenuExpressExtraPerfil;
+
   app: AppPerfil;
 
   color: string;
@@ -93,6 +108,10 @@ export function crearFila(): FilaPerfil {
     extraMultimedia: "global",
 
     coordenada: crearCoordenada(),
+
+    menuAccion: crearMenuAccion(),
+
+    menuExtra: crearMenuExtra(),
 
     app: {
       programa: null,
@@ -143,5 +162,18 @@ export function clonarFila(fila: FilaPerfil): FilaPerfil {
       : null,
 
     coordenada: { ...fila.coordenada },
+
+    // La fila clonada es una fila nueva con su propio id — si el
+    // original era un MenuExpress, el menú NO se duplica de verdad
+    // (dos filas con el mismo botones/nombre pero cada una es "su
+    // propio menú" al tener id distinto). Los botones sí se clonan
+    // para que editar uno no afecte al otro.
+    menuAccion: {
+      ...fila.menuAccion,
+
+      botones: fila.menuAccion.botones.map((boton) => ({ ...boton })),
+    },
+
+    menuExtra: { ...fila.menuExtra },
   };
 }

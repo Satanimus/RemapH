@@ -30,6 +30,11 @@ import type { Trigger } from "./core_trigger";
 
 import type { CoordenadaPerfil } from "./core_coordenada";
 
+import type {
+  MenuAccionPerfil,
+  MenuExpressExtraPerfil,
+} from "./core_menu_express";
+
 // ======================================================
 // 📦 MODELO JSON
 // ======================================================
@@ -73,6 +78,13 @@ interface RemapeoJson {
   extra_multimedia: string;
 
   coordenada: CoordenadaPerfil;
+
+  // Snake_case a propósito, mismo criterio que accion_trigger/
+  // accion_referencia: el nombre viaja igual en el JSON sin
+  // traducción adicional. Ver core_menu_express.ts.
+  menu_accion: MenuAccionPerfil;
+
+  menu_extra: MenuExpressExtraPerfil;
 
   color: string;
 
@@ -144,6 +156,10 @@ function convertirRemapeo(remapeo: RemapeoJson): FilaPerfil {
       remapeo.extra_multimedia === "en_app" ? "en_app" : "global",
 
     coordenada: remapeo.coordenada,
+
+    menuAccion: remapeo.menu_accion,
+
+    menuExtra: remapeo.menu_extra,
 
     color: remapeo.color,
 

@@ -140,6 +140,17 @@ pub struct RemapeoJson {
     // igual en el JSON sin traducción adicional.
     pub extra_multimedia: String,
     pub coordenada: CoordenadaJson,
+    // Solo relevantes cuando tipo == "menu_express". El id de esta
+    // misma fila (RemapeoJson::id) ES el id del menú — no hay id
+    // aparte. menu_accion es la columna Acción (nombre del menú +
+    // botones que contiene); menu_extra es la columna Extra (forma/
+    // comportamiento/ubicación/tamaños). #[serde(default)] para que
+    // perfiles guardados antes de esta feature sigan cargando sin
+    // romper. Ver MenuAccionJson / MenuExpressExtraJson más abajo.
+    #[serde(default)]
+    pub menu_accion: MenuAccionJson,
+    #[serde(default)]
+    pub menu_extra: MenuExpressExtraJson,
     pub color: String,
     pub nota: String,
 }
@@ -236,6 +247,85 @@ impl CoordenadaJson {
             post_accion: "final".to_string(),
             x: None,
             y: None,
+        }
+    }
+}
+
+// ======================================================
+// ⚡ MENU EXPRESS — ACCIÓN / EXTRA
+// ------------------------------------------------------
+// Datos del tipo "menu_express". El id del menú es el mismo
+// RemapeoJson::id de la fila (no hay id propio acá). Se guardan
+// como dos objetos siempre presentes en la fila (mismo criterio que
+// CoordenadaJson) — solo tienen efecto cuando RemapeoJson::tipo ==
+// "menu_express".
+//
+// MenuBotonJson: un botón del menú.
+//   fila_id: id INTERNO de la fila referenciada (no su número de
+//     orden en la tabla).
+//   renombrar: texto que Menú muestra sobre ese botón.
+//
+// MenuAccionJson (columna Acción):
+//   nombre: nombre del menú, mostrado en el botón de la columna
+//     Acción ("⚡ Multimedia") y en el editor.
+//   botones: lista de MenuBotonJson, en el orden en que se
+//     guardaron — compilador.rs los reordena por número de fila al
+//     compilar (no se guarda el orden de ejecución, ver spec).
+//
+// MenuExpressExtraJson (columna Extra):
+//   forma: "radial" | "cuadricula"
+//   columnas / filas: 0 = Auto (se acomoda al número de atajos).
+//     Solo uno de los dos puede ser distinto de 0 — la UI impone
+//     esa regla; acá se guarda tal cual se recibe.
+//   comportamiento: "toggle" | "efimero"
+//   ubicacion: "persistente" | "cursor"
+//   tamano_boton / tamano_texto: "pequeno" | "mediano" | "grande"
+// ======================================================
+
+#[derive(Clone, Debug, Default, PartialEq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MenuBotonJson {
+    pub fila_id: String,
+
+    pub renombrar: String,
+}
+
+#[derive(Clone, Debug, Default, PartialEq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MenuAccionJson {
+    pub nombre: String,
+
+    pub botones: Vec<MenuBotonJson>,
+}
+
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MenuExpressExtraJson {
+    pub forma: String,
+
+    pub columnas: u32,
+
+    pub filas: u32,
+
+    pub comportamiento: String,
+
+    pub ubicacion: String,
+
+    pub tamano_boton: String,
+
+    pub tamano_texto: String,
+}
+
+impl Default for MenuExpressExtraJson {
+    fn default() -> Self {
+        Self {
+            forma: "radial".to_string(),
+            columnas: 0,
+            filas: 2,
+            comportamiento: "toggle".to_string(),
+            ubicacion: "persistente".to_string(),
+            tamano_boton: "mediano".to_string(),
+            tamano_texto: "mediano".to_string(),
         }
     }
 }

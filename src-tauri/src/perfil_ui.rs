@@ -118,7 +118,10 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::perfil_json::{perfil_json, AppJson, CoordenadaJson, RemapeoJson, TriggerJson};
+use crate::perfil_json::{
+    perfil_json, AppJson, CoordenadaJson, MenuAccionJson, MenuExpressExtraJson, RemapeoJson,
+    TriggerJson,
+};
 
 // ======================================================
 // 🖥️ APP UI
@@ -165,6 +168,18 @@ pub struct FilaUI {
     pub extra_multimedia: String,
 
     pub coordenada: CoordenadaJson,
+
+    // Solo relevantes cuando tipo == "menu_express". El id de esta
+    // misma fila ES el id del menú. Ver MenuAccionJson /
+    // MenuExpressExtraJson en perfil_json.rs. #[serde(default)] para
+    // filas creadas antes de esta feature (no debería pasar desde la
+    // UI, que siempre los manda, pero es la misma red de seguridad
+    // que ya usa extra_multimedia).
+    #[serde(rename = "menuAccion", default)]
+    pub menu_accion: MenuAccionJson,
+
+    #[serde(rename = "menuExtra", default)]
+    pub menu_extra: MenuExpressExtraJson,
 
     pub color: String,
 
@@ -292,6 +307,10 @@ fn convertir_fila(fila: FilaUI) -> RemapeoJson {
         extra_multimedia: fila.extra_multimedia,
 
         coordenada: fila.coordenada,
+
+        menu_accion: fila.menu_accion,
+
+        menu_extra: fila.menu_extra,
 
         color: fila.color,
 
