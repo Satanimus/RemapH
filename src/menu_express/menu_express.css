@@ -9,11 +9,13 @@
    de la tarjeta se tiñe con el color de la fila que generó
    este menú (ver back_menu_express.rs / spec).
 
-   Layout: lista vertical simple (etapa 5). Radial/Cuadrícula
-   llegan en la etapa 6 — esta hoja solo tiene el modo lista,
-   .menu-express-cuerpo ya queda listo para que esa etapa
-   agregue variantes (.forma-radial / .forma-cuadricula) sin
-   tocar esto.
+   Layout (etapa 6): tres modos en .menu-express-cuerpo, elegidos
+   por clase desde menu_express_main.ts según datos.forma —
+   .forma-radial (círculo, posicionamiento absoluto por JS) y
+   .forma-cuadricula (CSS Grid, columnas/filas por JS). El cálculo
+   geométrico (ángulos, radio, cuántas columnas/filas según la
+   regla "0 = auto") vive 100% en TS — acá solo el contenedor y el
+   position:absolute que el layout radial necesita.
    ====================================================== */
 
 * {
@@ -101,6 +103,59 @@ body {
     overflow: auto;
 }
 
+/* ==========================
+   Forma: Cuadrícula — CSS Grid. grid-template-columns/rows los
+   fija menu_express_main.ts (estilo inline), calculados según
+   columnas/filas de menuExtra y la regla "0 = auto" (ver spec:
+   se rellenan filas primero). Sin scroll: el alto de ventana ya
+   viene calculado en back_menu_express.rs para que todo entre.
+   ========================== */
+
+.menu-express-cuerpo.forma-cuadricula {
+    display: grid;
+    grid-auto-flow: row;
+    overflow: visible;
+}
+
+.menu-express-cuerpo.forma-cuadricula .menu-express-boton {
+    width: 100%;
+    height: 100%;
+}
+
+/* ==========================
+   Forma: Radial — cada botón se posiciona con position:absolute
+   (left/top en % calculados en TS, transform para centrar el
+   botón en su punto). El centro queda libre (o con el nombre del
+   menú, ver menu_express_main.ts). Sin límite de botones: se
+   dibujan todos los que quepan en el círculo (spec).
+   ========================== */
+
+.menu-express-cuerpo.forma-radial {
+    position: relative;
+    overflow: visible;
+    padding: 0;
+}
+
+.menu-express-cuerpo.forma-radial .menu-express-boton {
+    position: absolute;
+    transform: translate(-50%, -50%);
+}
+
+.menu-express-radial-centro {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    max-width: 70%;
+    text-align: center;
+    font-size: var(--fs12);
+    opacity: 0.75;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    pointer-events: none;
+}
+
 .menu-express-vacio {
     margin: auto;
     font-size: var(--fs12);
@@ -138,6 +193,12 @@ body {
    config.rs (etapa 8) los hará configurables de verdad. Por
    ahora fijos acá, mismo criterio que captura.css con sus
    propias medidas.
+
+   Alto siempre fijo. Ancho SOLO se fija en modo Radial (acá
+   abajo, con selector .forma-radial) — en modo lista
+   flex-direction:column estira al 100% (etapa 5, sin cambios), y
+   en modo Cuadrícula la celda del grid manda (width:100% arriba,
+   ver .forma-cuadricula .menu-express-boton).
    ========================== */
 
 .menu-express-boton.tam-pequeno {
@@ -150,6 +211,22 @@ body {
 
 .menu-express-boton.tam-grande {
     height: 50px;
+}
+
+/* Espejo exacto de TAMANOS_BOTON_PX en menu_express_main.ts /
+   TAMANOS_BOTON_PX en back_menu_express.rs — si uno cambia,
+   cambiar los tres. */
+
+.menu-express-cuerpo.forma-radial .menu-express-boton.tam-pequeno {
+    width: 60px;
+}
+
+.menu-express-cuerpo.forma-radial .menu-express-boton.tam-mediano {
+    width: 80px;
+}
+
+.menu-express-cuerpo.forma-radial .menu-express-boton.tam-grande {
+    width: 100px;
 }
 
 /* ==========================

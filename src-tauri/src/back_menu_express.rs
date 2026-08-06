@@ -1,7 +1,7 @@
 // ======================================================
 // ⚡🪟 Back_Menu_Express
 // ======================================================
-// ETAPA 5 DEL FLUJO MenuExpress
+// ETAPAS 5 y 6 DEL FLUJO MenuExpress
 // ------------------------------------------------------
 // 1. ¿Qué hace este archivo?
 //
@@ -14,13 +14,17 @@
 // independiente (confirmado por el usuario, ver plan por
 // etapas).
 //
-// Este archivo NO decide layout (radial/cuadrícula — eso es
-// 100% TS en la ventana, etapa 6) ni ejecuta los botones
-// (eso es runtime::ejecutar vía comandos nuevos, etapa 7).
-// Su responsabilidad es solo el ciclo de vida de la ventana
-// nativa: abrir, cerrar, alternar, y entregarle sus datos
-// (nombre/botones/forma/etc.) una sola vez al cargar — mismo
-// patrón que captura_coordenada.rs + comandos.rs::
+// Este archivo NO dibuja el layout en sí (radial/cuadrícula es
+// 100% TS dentro de la ventana, ver menu_express_main.ts) ni
+// ejecuta los botones (eso es runtime::ejecutar vía comandos
+// nuevos, etapa 7). Sí calcula el TAMAÑO de ventana según forma/
+// cantidad de botones/tamaño de botón (calcular_tamano_ventana,
+// etapa 6) — con el mismo criterio geométrico que el TS usa para
+// posicionar cada botón adentro, para que la ventana entre justo
+// sin recorte ni scroll. El resto es ciclo de vida: abrir,
+// cerrar, alternar, y entregarle sus datos (nombre/botones/
+// forma/etc.) una sola vez al cargar — mismo patrón que
+// captura_coordenada.rs + comandos.rs::
 // abrir_ventana_captura_coordenada.
 // ------------------------------------------------------
 // 2. ¿Quién llama este archivo?
@@ -278,6 +282,91 @@ pub fn abrir_o_alternar(id: String, paquete: MenuExpressPaquete) {
 }
 
 // ======================================================
+// 📐 TAMAÑO DE VENTANA SEGÚN FORMA
+// ------------------------------------------------------
+// Mismo criterio geométrico que menu_express_main.ts
+// (TAMANOS_BOTON_PX / renderizarRadial / calcularGrid) — si uno
+// cambia, cambiar el otro. Acá solo hace falta el tamaño final
+// de VENTANA (para que la ventana nativa entre justo, sin
+// scroll ni recorte); el posicionamiento de cada botón adentro
+// lo resuelve el TS con ese mismo espacio disponible.
+// ======================================================
+
+const TAMANOS_BOTON_PX: [(TamanoMenu, f64, f64); 3] = [
+    (TamanoMenu::Pequeno, 60.0, 30.0),
+    (TamanoMenu::Mediano, 80.0, 40.0),
+    (TamanoMenu::Grande, 100.0, 50.0),
+];
+
+fn tamano_boton_px(tamano: &TamanoMenu) -> (f64, f64) {
+    TAMANOS_BOTON_PX
+        .iter()
+        .find(|(t, _, _)| t == tamano)
+        .map(|(_, ancho, alto)| (*ancho, *alto))
+        .unwrap_or((80.0, 40.0))
+}
+
+// Alto fijo del header (título + [x], ver menu_express.css) más
+// el padding del cuerpo — se suma al alto de contenido para el
+// alto total de ventana en los tres modos.
+const ALTO_HEADER: f64 = 32.0;
+const PADDING_CUERPO: f64 = 12.0;
+
+fn calcular_tamano_ventana(paquete: &MenuExpressPaquete) -> (f64, f64) {
+    let n = paquete.botones.len().max(1);
+    let (ancho_boton, alto_boton) = tamano_boton_px(&paquete.tamano_boton);
+
+    match paquete.forma {
+        FormaMenu::Radial => {
+            let radio_boton = ancho_boton.max(alto_boton) / 2.0;
+
+            // Mismo cálculo que renderizarRadial() en
+            // menu_express_main.ts.
+            let radio = (70.0f64)
+                .max((radio_boton + 12.0) / (std::f64::consts::PI / (n.max(2) as f64)).sin());
+
+            let diametro = radio * 2.0 + radio_boton * 2.0 + 24.0;
+
+            (diametro.max(180.0), diametro.max(180.0) + ALTO_HEADER)
+        }
+
+        FormaMenu::Cuadricula => {
+            let (columnas, filas) = calcular_grid_cuadricula(n, paquete.columnas, paquete.filas);
+
+            let ancho = columnas as f64 * ancho_boton
+                + (columnas as f64 - 1.0).max(0.0) * 4.0
+                + PADDING_CUERPO;
+
+            let alto_cuerpo =
+                filas as f64 * alto_boton + (filas as f64 - 1.0).max(0.0) * 4.0 + PADDING_CUERPO;
+
+            (
+                ancho.clamp(140.0, 900.0),
+                (alto_cuerpo + ALTO_HEADER).clamp(90.0, 700.0),
+            )
+        }
+    }
+}
+
+// Espejo de calcularGrid() en menu_express_main.ts — misma regla
+// "0 = auto, se rellenan filas/columnas fijas primero, valor no
+// válido cae a 1" (ver spec).
+fn calcular_grid_cuadricula(n: usize, columnas: u32, filas: u32) -> (u32, u32) {
+    if filas > 0 {
+        return ((n as f64 / filas as f64).ceil().max(1.0) as u32, filas);
+    }
+
+    if columnas > 0 {
+        return (
+            columnas,
+            (n as f64 / columnas as f64).ceil().max(1.0) as u32,
+        );
+    }
+
+    (1, n.max(1) as u32)
+}
+
+// ======================================================
 // 🏗️ CREAR VENTANA
 // ------------------------------------------------------
 // Corre en el hilo principal (run_on_main_thread) — este
@@ -291,10 +380,7 @@ pub fn abrir_o_alternar(id: String, paquete: MenuExpressPaquete) {
 fn crear_ventana(app: AppHandle, id: String, paquete: MenuExpressPaquete) {
     let label = label_de(&id);
 
-    // Cantidad de botones define un alto aproximado para la lista
-    // simple de esta etapa — el cálculo geométrico real
-    // (radial/cuadrícula) llega en la etapa 6, en TS.
-    let alto_estimado = (60.0 + paquete.botones.len() as f64 * 36.0).clamp(90.0, 480.0);
+    let (ancho, alto) = calcular_tamano_ventana(&paquete);
 
     let posicion = match paquete.ubicacion {
         UbicacionMenu::Cursor => Some(crate::back_coordenada::obtener_cursor()),
@@ -310,14 +396,21 @@ fn crear_ventana(app: AppHandle, id: String, paquete: MenuExpressPaquete) {
     let id_interno = id.clone();
     let label_interno = label.clone();
 
+    // AppHandle propio para el closure: run_on_main_thread ya toma
+    // `app` prestado para la llamada en sí (&self), así que el
+    // closure `move` no puede mover ese mismo `app` adentro — se
+    // clona acá afuera (AppHandle::clone() es barato, es un Arc por
+    // dentro) y se mueve la copia.
+    let app_interno = app.clone();
+
     let resultado = app.run_on_main_thread(move || {
         let mut builder = WebviewWindowBuilder::new(
-            &app,
+            &app_interno,
             &label_interno,
             WebviewUrl::App(format!("menu_express.html?id={id_interno}").into()),
         )
         .title("RemapH — Menú")
-        .inner_size(220.0, alto_estimado)
+        .inner_size(ancho, alto)
         .resizable(false)
         .decorations(false)
         .transparent(true)

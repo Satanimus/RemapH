@@ -14,10 +14,16 @@
 // (back_menu_express::abrir_o_alternar registra antes de
 // llamar a crear_ventana), sin carrera posible.
 //
-// ETAPA 5: layout lista vertical simple, sin radial/cuadrícula
-// (llega en la etapa 6) y sin ejecución real de los botones al
-// hacer clic (llega en la etapa 7, junto con Mantenido/Turbo
-// emulados y el cierre real Toggle/Efímero tras el up).
+// ETAPA 6: layout real según datos.forma — Radial (círculo,
+// ángulo uniforme 360°/N, radio adaptativo) y Cuadrícula (CSS
+// Grid, columnas/filas con la regla "0 = auto": se rellena
+// primero la dimensión fija, la otra crece). Tamaños de botón/
+// texto en TAMANOS_PX más abajo — mismo valor que menu_express.css
+// (config.rs los hará configurables de verdad en la etapa 8).
+//
+// Todavía sin ejecución real de los botones al hacer clic (llega
+// en la etapa 7, junto con Mantenido/Turbo emulados y el cierre
+// real Toggle/Efímero tras el up).
 // ======================================================
 
 import { invoke } from "@tauri-apps/api/core";
@@ -129,16 +135,180 @@ function aplicarColorFondo(color: string): void {
 }
 
 // ======================================================
-// 🔘 RENDERIZAR BOTONES (lista simple — etapa 5)
+// 📐 TAMAÑOS EN PX
 // ------------------------------------------------------
-// Radial/Cuadrícula (según datos.forma) llegan en la etapa 6.
-// Acá siempre se dibuja como lista vertical, sin importar la
-// forma elegida — es una simplificación deliberada de esta
-// etapa, no el comportamiento final.
+// Mismo valor que menu_express.css (.tam-*/.txt-*) — acá en TS
+// porque el cálculo geométrico (radio del círculo, tamaño de
+// grid) necesita el número real, no solo la clase CSS. Única
+// fuente de verdad hasta que config.rs los exponga (etapa 8);
+// si cambian acá, cambiarlos también en el CSS.
+// ======================================================
+
+const TAMANOS_BOTON_PX: Record<
+  MenuExpressDatos["tamanoBoton"],
+  { ancho: number; alto: number }
+> = {
+  pequeno: { ancho: 60, alto: 30 },
+  mediano: { ancho: 80, alto: 40 },
+  grande: { ancho: 100, alto: 50 },
+};
+
+// ======================================================
+// 🔘 CREAR UN BOTÓN
+// ------------------------------------------------------
+// Común a los tres layouts — solo cambia cómo se posiciona
+// después de creado (grid vs radial vs lista).
+// ======================================================
+
+function crearBoton(
+  boton: MenuBotonDatos,
+  datos: MenuExpressDatos,
+): HTMLButtonElement {
+  const elemento = document.createElement("button");
+
+  elemento.className = `menu-express-boton tam-${datos.tamanoBoton} txt-${datos.tamanoTexto}`;
+  elemento.textContent = boton.renombrar || "(sin nombre)";
+  elemento.title = boton.renombrar;
+
+  // Placeholder de esta etapa: la ejecución real (buscar la fila
+  // en la caché compilada y llamar a runtime::ejecutar vía
+  // menu_express_boton_down/up) llega en la etapa 7. Por ahora
+  // solo confirma que el dato de cada botón (filaId) llegó bien
+  // hasta acá.
+  elemento.addEventListener("click", () => {
+    console.log(
+      `[MenuExpress] clic en botón (placeholder, sin ejecutar) filaId=${boton.filaId}`,
+    );
+  });
+
+  return elemento;
+}
+
+// ======================================================
+// ⭕ LAYOUT RADIAL
+// ------------------------------------------------------
+// Ángulo uniforme (360°/N), primer botón arriba (-90°) y
+// sentido horario. Radio adaptativo: crece con la cantidad de
+// botones para que no se encimen, pero nunca baja de un mínimo
+// cómodo. Sin límite de botones (spec) — el radio absorbe la
+// cantidad, y back_menu_express.rs ya calculó un tamaño de
+// ventana acorde (ver calcular_tamano_ventana(), mismo criterio
+// espejado en Rust — si uno cambia, cambiar el otro).
+// ======================================================
+
+function renderizarRadial(datos: MenuExpressDatos): void {
+  const n = datos.botones.length;
+  const { ancho, alto } = TAMANOS_BOTON_PX[datos.tamanoBoton];
+  const radioBoton = Math.max(ancho, alto) / 2;
+
+  // Mismo cálculo que calcular_tamano_ventana() en
+  // back_menu_express.rs — si uno cambia, cambiar el otro.
+  const radio = Math.max(
+    70,
+    (radioBoton + 12) / Math.sin(Math.PI / Math.max(n, 2)),
+  );
+
+  if (datos.nombre) {
+    const centro = document.createElement("div");
+    centro.className = "menu-express-radial-centro";
+    centro.textContent = datos.nombre;
+    cuerpo.append(centro);
+  }
+
+  datos.botones.forEach((boton, indice) => {
+    const elemento = crearBoton(boton, datos);
+
+    const anguloGrados = -90 + (360 / n) * indice;
+    const anguloRad = (anguloGrados * Math.PI) / 180;
+
+    // Posición en px relativa al centro del contenedor — el
+    // contenedor mismo mide (radio*2 + margen) de lado, calculado
+    // en calcularDiametroRadial (espejado en back_menu_express.rs),
+    // así que "50% + N px" siempre cae dentro.
+    const x = radio * Math.cos(anguloRad);
+    const y = radio * Math.sin(anguloRad);
+
+    elemento.style.left = `calc(50% + ${x}px)`;
+    elemento.style.top = `calc(50% + ${y}px)`;
+
+    cuerpo.append(elemento);
+  });
+}
+
+// ======================================================
+// ▦ LAYOUT CUADRÍCULA
+// ------------------------------------------------------
+// Regla (spec): solo una de columnas/filas puede limitar a la
+// vez — la que vale 0 es la flexible y se acomoda al número de
+// botones. Se rellena primero la dimensión fija (ej. 5 filas con
+// 10 botones → 2 columnas). Si ambas son 0 (no debería pasar,
+// crearMenuExtra() siempre deja una fija — pero por si acaso) o
+// algún valor no es válido, se toma como 1 (spec).
+// ======================================================
+
+function calcularGrid(
+  n: number,
+  columnas: number,
+  filas: number,
+): { columnas: number; filas: number } {
+  const col =
+    Number.isFinite(columnas) && columnas > 0 ? Math.floor(columnas) : 0;
+  const fil = Number.isFinite(filas) && filas > 0 ? Math.floor(filas) : 0;
+
+  if (fil > 0) {
+    // Filas fijas → columnas se acomoda (rellena filas primero).
+    return { columnas: Math.max(1, Math.ceil(n / fil)), filas: fil };
+  }
+
+  if (col > 0) {
+    // Columnas fijas → filas se acomoda.
+    return { columnas: col, filas: Math.max(1, Math.ceil(n / col)) };
+  }
+
+  // Ninguna de las dos es válida: ambas "1" (spec: valor no
+  // válido → 1), lo que en la práctica cae a una columna vertical.
+  return { columnas: 1, filas: Math.max(1, n) };
+}
+
+function renderizarCuadricula(datos: MenuExpressDatos): void {
+  const n = datos.botones.length;
+  const { columnas, filas } = calcularGrid(n, datos.columnas, datos.filas);
+
+  cuerpo.style.gridTemplateColumns = `repeat(${columnas}, 1fr)`;
+  cuerpo.style.gridTemplateRows = `repeat(${filas}, 1fr)`;
+
+  datos.botones.forEach((boton) => {
+    cuerpo.append(crearBoton(boton, datos));
+  });
+}
+
+// ======================================================
+// 📋 LAYOUT LISTA (fallback)
+// ------------------------------------------------------
+// No debería alcanzarse — datos.forma siempre es "radial" o
+// "cuadricula" (ver core_menu_express.ts) — pero queda como
+// respaldo defensivo si llegara un valor inesperado.
+// ======================================================
+
+function renderizarLista(datos: MenuExpressDatos): void {
+  datos.botones.forEach((boton) => {
+    cuerpo.append(crearBoton(boton, datos));
+  });
+}
+
+// ======================================================
+// 🔘 RENDERIZAR BOTONES
+// ------------------------------------------------------
+// Despacha según datos.forma. La clase forma-* en .cuerpo activa
+// el CSS correspondiente (grid / posicionamiento absoluto) —
+// ver menu_express.css.
 // ======================================================
 
 function renderizarBotones(datos: MenuExpressDatos): void {
   cuerpo.innerHTML = "";
+  cuerpo.style.gridTemplateColumns = "";
+  cuerpo.style.gridTemplateRows = "";
+  cuerpo.classList.remove("forma-radial", "forma-cuadricula");
 
   if (datos.botones.length === 0) {
     const vacio = document.createElement("div");
@@ -148,26 +318,19 @@ function renderizarBotones(datos: MenuExpressDatos): void {
     return;
   }
 
-  datos.botones.forEach((boton) => {
-    const elemento = document.createElement("button");
+  if (datos.forma === "radial") {
+    cuerpo.classList.add("forma-radial");
+    renderizarRadial(datos);
+    return;
+  }
 
-    elemento.className = `menu-express-boton tam-${datos.tamanoBoton} txt-${datos.tamanoTexto}`;
-    elemento.textContent = boton.renombrar || "(sin nombre)";
-    elemento.title = boton.renombrar;
+  if (datos.forma === "cuadricula") {
+    cuerpo.classList.add("forma-cuadricula");
+    renderizarCuadricula(datos);
+    return;
+  }
 
-    // Placeholder de esta etapa: la ejecución real (buscar la fila
-    // en la caché compilada y llamar a runtime::ejecutar vía
-    // menu_express_boton_down/up) llega en la etapa 7. Por ahora
-    // solo confirma que el dato de cada botón (filaId) llegó bien
-    // hasta acá.
-    elemento.addEventListener("click", () => {
-      console.log(
-        `[MenuExpress] clic en botón (placeholder, sin ejecutar) filaId=${boton.filaId}`,
-      );
-    });
-
-    cuerpo.append(elemento);
-  });
+  renderizarLista(datos);
 }
 
 // ======================================================
