@@ -17,6 +17,8 @@
 
     justify-content: center;
 
+    text-align: center;
+
     height: 28px;
 
     min-width: 28px;
@@ -35,14 +37,21 @@
 
     overflow: hidden;
 
-    text-overflow: ellipsis;
-
     cursor: pointer;
 
     transition:
         border-color var(--speed),
         color var(--speed),
         background var(--speed);
+}
+
+/* Texto que no entra: se pasa a alineado a la izquierda, así el
+   overflow:hidden del botón recorta solo el extremo derecho
+   (nunca el izquierdo, nunca con "..."). Clase agregada por
+   util_texto_boton.ts. */
+.ui-btn--desborda {
+    justify-content: flex-start;
+    text-align: left;
 }
 
 /* ======================================================

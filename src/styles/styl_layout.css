@@ -510,11 +510,18 @@
     border-radius: var(--r4);
 }
 
+/* Ítem 4: Botones Disponibles siempre completo, sin scrollbar
+   (a diferencia de Seleccionados, que sí puede comprimirse). */
+.popup-menu-editor-lista--completa {
+    max-height: none;
+    overflow-y: visible;
+}
+
 .popup-menu-editor-item {
     display: flex;
     align-items: center;
     gap: var(--gap8);
-    padding: 4px 2px;
+    padding: 0 2px;
 }
 
 .popup-menu-editor-numero {
@@ -538,34 +545,52 @@
 .popup-menu-editor-renombrar {
     flex: 1;
     min-width: 0;
+    background: transparent;
+    border: 1px solid transparent;
+}
+
+.popup-menu-editor-renombrar:hover {
+    border-color: var(--highlight);
+}
+
+.popup-input.popup-menu-editor-renombrar:focus {
+    background: var(--panel2);
+    border-color: var(--border);
+    outline: none;
 }
 
 .popup-menu-editor-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    appearance: none;
+    -webkit-appearance: none;
     width: 22px;
     height: 22px;
     min-width: 22px;
     padding: 0;
     border-radius: 50%;
     font-weight: 700;
-    line-height: 1;
+    font-size: var(--fs14);
+    line-height: 22px;
 }
 
-.popup-menu-editor-agregar {
+.popup-menu-editor-toggle.popup-menu-editor-agregar {
     color: var(--tag-green);
     border-color: var(--tag-green);
 }
 
-.popup-menu-editor-agregar:hover {
+.popup-menu-editor-toggle.popup-menu-editor-agregar:hover {
     background: var(--tag-green);
     color: #FFF;
 }
 
-.popup-menu-editor-quitar {
+.popup-menu-editor-toggle.popup-menu-editor-quitar {
     color: var(--highlight-red);
     border-color: var(--highlight-red);
 }
 
-.popup-menu-editor-quitar:hover {
+.popup-menu-editor-toggle.popup-menu-editor-quitar:hover {
     background: var(--highlight-red);
     color: #FFF;
 }

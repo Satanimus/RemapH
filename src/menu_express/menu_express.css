@@ -65,8 +65,8 @@ body {
 .menu-express-header {
     display: flex;
     align-items: center;
-    gap: 6px;
-    padding: 6px 8px;
+    gap: 4px;
+    padding: 2px 4px;
     background: rgba(255, 255, 255, 0.08);
     flex-shrink: 0;
 }
@@ -82,18 +82,19 @@ body {
 }
 
 .menu-express-cerrar {
-    width: 20px;
-    height: 20px;
+    width: 15px;
+    height: 15px;
     flex-shrink: 0;
     display: flex;
     align-items: center;
     justify-content: center;
     background: transparent;
     border: 1px solid var(--border-light);
-    border-radius: 4px;
+    border-radius: 3px;
     color: #ffffff;
-    font-size: var(--fs12);
+    font-size: var(--fs11);
     line-height: 1;
+    padding: 0;
     cursor: pointer;
     /* Este botón NO debe arrastrar la ventana — sin
        data-tauri-drag-region, a diferencia del resto de la
@@ -179,6 +180,7 @@ body {
     display: flex;
     align-items: center;
     justify-content: center;
+    text-align: center;
     padding: 0 10px;
     background: rgba(0, 0, 0, 0.25);
     border: 1px solid rgba(255, 255, 255, 0.35);
@@ -187,8 +189,14 @@ body {
     cursor: pointer;
     white-space: nowrap;
     overflow: hidden;
-    text-overflow: ellipsis;
     transition: background-color 0.1s ease;
+}
+
+/* Mismo criterio que .ui-btn--desborda: si el texto no entra, se
+   pasa a la izquierda para que el recorte sea solo a la derecha. */
+.menu-express-boton.ui-btn--desborda {
+    justify-content: flex-start;
+    text-align: left;
 }
 
 .menu-express-boton:hover {

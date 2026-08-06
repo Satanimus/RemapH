@@ -14,6 +14,8 @@ import { convertirperfil_json } from "./core/core_perfil_json";
 
 import type { perfil_json } from "./core/core_perfil_json";
 
+import { iniciarAjusteTextoBotones } from "./ui/util/util_texto_boton";
+
 // ======================================================
 // 💾 GUARDAR Y ACTIVAR PERFIL
 // ======================================================
@@ -44,6 +46,8 @@ async function iniciarApp(): Promise<void> {
   establecerPerfilUi(perfil);
 
   document.body.replaceChildren(crearApp(guardarPerfil));
+
+  iniciarAjusteTextoBotones();
 }
 
 // ======================================================

@@ -41,6 +41,8 @@ import { invoke } from "@tauri-apps/api/core";
 import "../styles/styl_variables.css";
 import "./menu_express.css";
 
+import { iniciarAjusteTextoBotones } from "../ui/util/util_texto_boton";
+
 // ======================================================
 // 🧭 TIPOS
 // ------------------------------------------------------
@@ -523,4 +525,5 @@ async function iniciar(): Promise<void> {
   renderizarBotones(datos);
 }
 
+iniciarAjusteTextoBotones();
 iniciar();

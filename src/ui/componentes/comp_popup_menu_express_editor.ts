@@ -210,13 +210,15 @@ export function abrirEditorMenuExpress(
   const tituloSeleccionados = document.createElement("span");
 
   tituloSeleccionados.className = "popup-fila-label";
-  tituloSeleccionados.textContent = "Botones Seleccionados";
+  tituloSeleccionados.textContent =
+    "Botones Seleccionado - Nombre Personalizado";
 
   popup.append(tituloSeleccionados);
 
   const listaSeleccionados = document.createElement("div");
 
-  listaSeleccionados.className = "popup-menu-editor-lista";
+  listaSeleccionados.className =
+    "popup-menu-editor-lista popup-menu-editor-lista--completa";
 
   const seleccionados = menuAccion.botones
     .map((boton) => ({
