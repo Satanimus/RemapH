@@ -49,6 +49,17 @@ body {
     border-radius: 8px;
     overflow: hidden;
     cursor: move;
+    /* Etapa 8: cierre suave de Comportamiento Efímero — la duración
+       tiene que calzar con DURACION_FADE_MS en menu_express_main.ts
+       (cerrarConFade), que espera este tiempo antes de invocar el
+       cierre real de la ventana nativa. */
+    opacity: 1;
+    transition: opacity 0.18s ease;
+}
+
+.menu-express-card.cerrando {
+    opacity: 0;
+    pointer-events: none;
 }
 
 .menu-express-header {

@@ -74,11 +74,11 @@
 //     convertido a vocabulario string (mismo que
 //     core_menu_express.ts) para que la ventana no tenga que
 //     conocer los enums de Rust.
-// boton_up(...) -> bool: true si el propio comportamiento del
-//     menú (Efímero) cerró la ventana como consecuencia de este
-//     clic — la ventana ya no existe, así que el TS no debe
-//     tocar el DOM después de recibir true (ver
-//     menu_express_main.ts).
+// boton_up(...) -> bool: true si el Comportamiento de este menú
+//     es Efímero (debe cerrarse tras este clic). La ventana NO
+//     se cierra sola acá — es responsabilidad del TS reproducir
+//     el fade-out y recién ahí invocar cerrar_menu_express (ver
+//     menu_express_main.ts, etapa 8).
 // ------------------------------------------------------
 // 5. Funciones del archivo
 //
@@ -118,10 +118,14 @@
 //     si acaso), no hace nada.
 // boton_up(id_menu, fila_id)
 //     Manda OrdenRuntime::Detener (mismo up físico) y después
-//     resuelve Comportamiento: si el menú es Efímero, cierra la
-//     ventana (cerrar(id_menu)). Si es Toggle, no hace nada más
-//     — el menú se queda abierto hasta el [x] o el mismo trigger
-//     de nuevo (ver abrir_o_alternar). Devuelve true si cerró.
+//     resuelve Comportamiento: si el menú es Efímero, devuelve
+//     true para que la propia ventana (menu_express_main.ts)
+//     juegue su animación de fade-out y recién después invoque
+//     cerrar_menu_express (etapa 8 — el cierre real NO ocurre
+//     acá, para darle tiempo a la animación antes de que la
+//     ventana se destruya). Si es Toggle, no hace nada más — el
+//     menú se queda abierto hasta el [x] o el mismo trigger de
+//     nuevo (ver abrir_o_alternar).
 // label_de(id)
 //     "menu_express_<id>" — único lugar que arma el label,
 //     para no repetir el formato en cada función.
@@ -132,10 +136,11 @@
 // • Cursor      → posición actual del cursor
 //   (back_coordenada::obtener_cursor()), igual que "Relativa a
 //   cursor" en Click en coordenada.
-// • Persistente → por ahora (etapa 5) usa un punto por
-//   defecto fijo; recordar la ÚLTIMA posición real en memoria
-//   (por id) es una mejora de etapa 8 (pulido) — no bloquea
-//   que el menú funcione mientras tanto.
+// • Persistente → última posición real en memoria para ese id
+//   (ULTIMA_POSICION, etapa 8), guardada al cerrar la ventana
+//   anterior (CloseRequested, ver crear_ventana). Si nunca se
+//   cerró una en esta sesión, no hay "última" — se deja sin
+//   posición explícita y Tauri usa su default.
 //
 // boton_down/boton_up SIEMPRE mandan Iniciar+Detener por
 // separado (nunca iniciar_y_finalizar de cache.rs) — eso es
@@ -458,9 +463,11 @@ fn crear_ventana(app: AppHandle, id: String, paquete: MenuExpressPaquete) {
 
     let posicion = match paquete.ubicacion {
         UbicacionMenu::Cursor => Some(crate::back_coordenada::obtener_cursor()),
-        // TODO(etapa 8): recordar la última posición real en memoria
-        // por id en vez de este punto fijo.
-        UbicacionMenu::Persistente => None,
+        // Etapa 8: recordar la última posición real en memoria (por id,
+        // ver ULTIMA_POSICION arriba). Primera vez que se abre este id
+        // en la sesión → None, y se deja que Tauri elija la posición
+        // por defecto (no hay "última" todavía).
+        UbicacionMenu::Persistente => ultima_posicion(&id),
     };
 
     // Copias para el closure movido a run_on_main_thread — se
@@ -502,12 +509,28 @@ fn crear_ventana(app: AppHandle, id: String, paquete: MenuExpressPaquete) {
             Ok(ventana) => {
                 let id_cierre = id_interno.clone();
 
+                // Clon aparte para leer la posición desde dentro del
+                // closure de eventos (on_window_event no entrega la
+                // ventana como argumento) — WebviewWindow::clone() es
+                // barato (wrapper sobre Arc), mismo criterio que
+                // AppHandle::clone() más arriba.
+                let ventana_para_evento = ventana.clone();
+
                 // Si la ventana se cierra por cualquier otra vía (Alt+F4,
                 // cerrar_todas, el propio botón [x] ya invocó el comando
                 // pero por si el usuario la cierra "a lo nativo") — se
                 // limpia el registro para que abrir_o_alternar() la trate
-                // como cerrada la próxima vez.
+                // como cerrada la próxima vez. En CloseRequested (la
+                // ventana todavía existe) también se guarda su posición
+                // actual, para que la próxima apertura con ubicacion =
+                // Persistente reaparezca ahí (etapa 8).
                 ventana.on_window_event(move |evento| {
+                    if let tauri::WindowEvent::CloseRequested { .. } = evento {
+                        if let Ok(posicion) = ventana_para_evento.outer_position() {
+                            recordar_posicion(&id_cierre, posicion.x, posicion.y);
+                        }
+                    }
+
                     if let tauri::WindowEvent::CloseRequested { .. }
                     | tauri::WindowEvent::Destroyed = evento
                     {
@@ -621,9 +644,13 @@ pub fn boton_down(fila_id: &str) {
 // antes, un Efímero cerraría la ventana ANTES de que Turbo/
 // Mantenido llegaran a soltar de verdad.
 //
-// Devuelve true si el menú se cerró como consecuencia (Efímero)
-// — la ventana ya no existe, así que el TS no debe seguir
-// tocando el DOM después de este resultado.
+// Devuelve true si el menú es Efímero (debe cerrarse tras este
+// clic) — a propósito NO cierra la ventana acá (etapa 8): eso
+// dejaría cero tiempo para la animación de fade-out, porque la
+// ventana se destruiría antes de que el TS pudiera reproducirla.
+// El cierre real queda en manos del TS (ver menu_express_main.ts,
+// cerrarConFade), que anima y recién ahí invoca
+// cerrar_menu_express — mismo comando que usa el botón [x].
 // ======================================================
 
 pub fn boton_up(id_menu: &str, fila_id: &str) -> bool {
@@ -631,15 +658,9 @@ pub fn boton_up(id_menu: &str, fila_id: &str) -> bool {
         id: fila_id.to_string(),
     });
 
-    let comportamiento_efimero = con_registro(|mapa| {
+    con_registro(|mapa| {
         mapa.get(id_menu)
             .map(|datos| datos.comportamiento == "efimero")
-    });
-
-    if comportamiento_efimero == Some(true) {
-        cerrar(id_menu);
-        return true;
-    }
-
-    false
+    })
+    .unwrap_or(false)
 }

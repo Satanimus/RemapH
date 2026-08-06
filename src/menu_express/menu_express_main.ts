@@ -31,7 +31,9 @@
 // de config.rs vía obtener_tamanos_menu_express (ver
 // leerTamanosMenuExpress más abajo), única fuente de verdad real.
 // ubicacion "Persistente" ahora recuerda la última posición real
-// (ver back_menu_express.rs) en vez de un punto fijo.
+// (ver back_menu_express.rs) en vez de un punto fijo. Comportamiento
+// Efímero ahora cierra con fade-out (ver cerrarConFade más abajo) en
+// vez de destruirse en seco.
 // ======================================================
 
 import { invoke } from "@tauri-apps/api/core";
@@ -123,6 +125,25 @@ function cerrar(): void {
 }
 
 botonCerrar.addEventListener("click", cerrar);
+
+// ======================================================
+// 🌫️ CIERRE SUAVE (Comportamiento Efímero) — ETAPA 8
+// ------------------------------------------------------
+// back_menu_express.rs::boton_up ya NO cierra la ventana: solo
+// avisa (true) que este menú es Efímero y debe cerrarse tras el
+// clic. Acá se juega la animación (clase "cerrando", ver
+// menu_express.css) y recién cuando termina se invoca el cierre
+// real — mismo comando que usa el botón [x]. DURACION_FADE_MS
+// tiene que calzar con la transición CSS de .menu-express-card
+// (0.18s) para no cortar la animación a mitad de camino.
+// ======================================================
+
+const DURACION_FADE_MS = 180;
+
+function cerrarConFade(): void {
+  card.classList.add("cerrando");
+  window.setTimeout(cerrar, DURACION_FADE_MS);
+}
 
 // ======================================================
 // 🎨 FONDO TEÑIDO CON EL COLOR DE LA FILA
@@ -284,22 +305,21 @@ function crearBoton(
 
       if (!id) return;
 
-      let cerrado = false;
+      let esEfimero = false;
 
       try {
-        cerrado = await invoke<boolean>("menu_express_boton_up", {
+        esEfimero = await invoke<boolean>("menu_express_boton_up", {
           idMenu: id,
           filaId: boton.filaId,
         });
       } catch {
-        cerrado = false;
+        esEfimero = false;
       }
 
-      // Efímero: back_menu_express.rs ya cerró la ventana nativa —
-      // acá solo evita seguir tocando un DOM que está a punto de
-      // desaparecer con ella (no hay nada más que hacer del lado
-      // TS, la ventana entera se destruye).
-      if (cerrado) return;
+      // Efímero: la ventana sigue existiendo (Rust ya no la cierra
+      // sola, ver back_menu_express.rs) — se juega el fade-out acá
+      // y recién al terminar se invoca el cierre real.
+      if (esEfimero) cerrarConFade();
     };
 
     document.addEventListener("mouseup", soltar);
