@@ -106,3 +106,31 @@ export function crearMenuExtra(): MenuExpressExtraPerfil {
     tamanoTexto: "mediano",
   };
 }
+
+// ======================================================
+// 📝 TEXTO ACCIÓN (columna Acción de la tabla)
+// ------------------------------------------------------
+// Default "⚡ Editar MenuExpress" hasta que el menú tenga
+// nombre — a partir de ahí, rayo + nombre (ver spec).
+// ======================================================
+
+export function textoMenuAccion(menuAccion: MenuAccionPerfil): string {
+  return menuAccion.nombre
+    ? `⚡ ${menuAccion.nombre}`
+    : "⚡ Editar MenuExpress";
+}
+
+// ======================================================
+// 📝 TEXTO EXTRA (columna Extra de la tabla)
+// ------------------------------------------------------
+// Resumen corto: Forma elegida, + 🔁/⚡ según Comportamiento
+// (Toggle/Efímero) para que se distinga sin abrir el popup.
+// ======================================================
+
+export function textoMenuExtra(menuExtra: MenuExpressExtraPerfil): string {
+  const forma = menuExtra.forma === "cuadricula" ? "Cuadrícula" : "Radial";
+
+  const comportamiento = menuExtra.comportamiento === "efimero" ? "⚡" : "🔁";
+
+  return `${forma} ${comportamiento}`;
+}

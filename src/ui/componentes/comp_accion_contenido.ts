@@ -8,6 +8,8 @@ import type { FilaPerfil } from "../../core/core_perfil";
 
 import { textoAccionMultimedia } from "../../core/core_multimedia";
 
+import { textoMenuAccion } from "../../core/core_menu_express";
+
 export function crearAccionTeclado(): HTMLButtonElement {
   return crearBoton({
     texto: "Capturar",
@@ -20,6 +22,18 @@ export function crearAccionMultimedia(
 ): HTMLButtonElement {
   return crearBoton({
     texto: textoAccionMultimedia(filaPerfil.accionReferencia),
+    clase: "capturador",
+  });
+}
+
+// El editor propio (seleccionados/disponibles) se conecta recién en
+// la Etapa 3 — por ahora el botón solo muestra el nombre del menú
+// (o el default), sin abrir nada al hacer clic (ver comp_accion.ts).
+export function crearAccionMenuExpress(
+  filaPerfil: FilaPerfil,
+): HTMLButtonElement {
+  return crearBoton({
+    texto: textoMenuAccion(filaPerfil.menuAccion),
     clase: "capturador",
   });
 }

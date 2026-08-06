@@ -9,6 +9,7 @@ import type { FilaPerfil } from "../../core/core_perfil";
 
 import {
   crearAccionMultimedia,
+  crearAccionMenuExpress,
   crearAccionMacro,
   crearAccionPortapapeles,
 } from "./comp_accion_contenido";
@@ -16,6 +17,8 @@ import {
 import { crearCapturador } from "./comp_capturador";
 
 import { abrirPopupAccionMultimedia } from "./comp_popup_multimedia";
+
+import { abrirEditorMenuExpress } from "./comp_popup_menu_express_editor";
 
 // ======================================================
 // CREAR ACCIÓN
@@ -32,6 +35,20 @@ export function crearAccion(
 
       boton.addEventListener("click", (evento) => {
         abrirPopupAccionMultimedia(evento, contexto, filaPerfil);
+
+        alModificar();
+      });
+
+      return boton;
+    }
+
+    // El clic abre el editor (seleccionados/disponibles) — ver
+    // comp_popup_menu_express_editor.ts.
+    case "menu_express": {
+      const boton = crearAccionMenuExpress(filaPerfil);
+
+      boton.addEventListener("click", (evento) => {
+        abrirEditorMenuExpress(evento, contexto, filaPerfil);
 
         alModificar();
       });

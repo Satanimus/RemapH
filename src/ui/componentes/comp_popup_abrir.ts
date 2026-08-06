@@ -120,6 +120,7 @@ function abrirListaConValor(
 const TIPO_OPCIONES: { texto: string; valor: string }[] = [
   { texto: "Tecla/Mouse", valor: "tecla_mouse" },
   { texto: "Multimedia", valor: "multimedia" },
+  { texto: "MenuExpress", valor: "menu_express" },
   { texto: "Macro", valor: "macro" },
   { texto: "Portapapeles", valor: "portapapeles" },
 ];

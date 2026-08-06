@@ -469,6 +469,107 @@
     border-color: var(--highlight);
 }
 
+/* ======================================================
+   🔢 CAMPO NUMÉRICO CHICO (MenuExpress: Limitar Cuadrícula)
+   ====================================================== */
+
+.popup-numero-campo {
+    display: flex;
+    align-items: center;
+    gap: var(--gap4);
+    font-size: var(--fs13);
+}
+
+.popup-input-numero {
+    width: 56px;
+    text-align: center;
+}
+
+/* ======================================================
+   ⚡📝 EDITOR DE MENUEXPRESS (seleccionados/disponibles)
+   ====================================================== */
+
+.popup-menu-editor {
+    min-width: 320px;
+    max-width: 380px;
+}
+
+.popup-menu-editor-nombre {
+    width: 100%;
+}
+
+.popup-menu-editor-lista {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    max-height: 180px;
+    overflow-y: auto;
+    padding: var(--gap4);
+    background: var(--bg);
+    border: 1px solid var(--border-light);
+    border-radius: var(--r4);
+}
+
+.popup-menu-editor-item {
+    display: flex;
+    align-items: center;
+    gap: var(--gap8);
+    padding: 4px 2px;
+}
+
+.popup-menu-editor-numero {
+    font-size: var(--fs11);
+    color: var(--text-soft);
+    min-width: 26px;
+}
+
+.popup-menu-editor-texto {
+    flex: 1;
+    color: var(--text-disabled);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.popup-menu-editor-item[data-seccion="seleccionado"] .popup-menu-editor-numero {
+    color: var(--text);
+}
+
+.popup-menu-editor-renombrar {
+    flex: 1;
+    min-width: 0;
+}
+
+.popup-menu-editor-toggle {
+    width: 22px;
+    height: 22px;
+    min-width: 22px;
+    padding: 0;
+    border-radius: 50%;
+    font-weight: 700;
+    line-height: 1;
+}
+
+.popup-menu-editor-agregar {
+    color: var(--tag-green);
+    border-color: var(--tag-green);
+}
+
+.popup-menu-editor-agregar:hover {
+    background: var(--tag-green);
+    color: #FFF;
+}
+
+.popup-menu-editor-quitar {
+    color: var(--highlight-red);
+    border-color: var(--highlight-red);
+}
+
+.popup-menu-editor-quitar:hover {
+    background: var(--highlight-red);
+    color: #FFF;
+}
+
 
 /* ======================================================
    ❓ CONFIRMAR

@@ -29,6 +29,10 @@ import { abrirPopupExtraMultimedia } from "./comp_popup_multimedia_extra";
 
 import { textoExtraMultimedia } from "../../core/core_multimedia";
 
+import { abrirPopupExtraMenuExpress } from "./comp_popup_menu_express_extra";
+
+import { textoMenuExtra } from "../../core/core_menu_express";
+
 import { obtenerPerfilUi } from "../../core/core_perfil_ui";
 
 import { filaTieneConflicto } from "../../core/core_conflictos";
@@ -162,6 +166,18 @@ export function crearExtra(
       texto: textoExtraMultimedia(filaPerfil.extraMultimedia),
       onClick: (evento) => {
         abrirPopupExtraMultimedia(evento, contexto, filaPerfil);
+      },
+    });
+  }
+
+  // menu_express tiene su propio popup Extra (Forma/Limitar
+  // cuadrícula/Comportamiento/Ubicación/Tamaños) — igual de
+  // persistente que los anteriores.
+  if (filaPerfil.tipo === "menu_express") {
+    return crearPopup({
+      texto: textoMenuExtra(filaPerfil.menuExtra),
+      onClick: (evento) => {
+        abrirPopupExtraMenuExpress(evento, contexto, filaPerfil);
       },
     });
   }

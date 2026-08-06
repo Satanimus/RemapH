@@ -8,6 +8,12 @@ import { clonarFila, crearFila } from "./core_perfil";
 
 import type { FilaPerfil } from "./core_perfil";
 
+import { triggerATexto } from "./core_trigger";
+
+import { textoAccionMultimedia } from "./core_multimedia";
+
+import { textoMenuAccion } from "./core_menu_express";
+
 // ======================================================
 // 📋 CLONAR FILA POR ID
 // ======================================================
@@ -90,4 +96,35 @@ export function moverFilaPorId(
 
 export function filaTieneAccion(filaPerfil: FilaPerfil): boolean {
   return !!filaPerfil.accion?.gatillo;
+}
+
+// ======================================================
+// 📝 TEXTO DE LA COLUMNA ACCIÓN (cualquier tipo de fila)
+// ------------------------------------------------------
+// Usado por el editor de MenuExpress (comp_popup_menu_express_editor.ts)
+// para mostrar, en las listas de disponibles/seleccionados, el mismo
+// texto que ya se ve en la columna Acción de la tabla principal — sin
+// tener que reconstruir el botón real (que además dispararía sus
+// propios listeners de clic).
+// ======================================================
+
+export function textoAccionFila(filaPerfil: FilaPerfil): string {
+  switch (filaPerfil.tipo) {
+    case "multimedia":
+      return textoAccionMultimedia(filaPerfil.accionReferencia);
+
+    case "menu_express":
+      return textoMenuAccion(filaPerfil.menuAccion);
+
+    case "macro":
+      return "Macro";
+
+    case "portapapeles":
+      return "Portapapeles";
+
+    default:
+      return filaPerfil.accion?.gatillo
+        ? triggerATexto(filaPerfil.accion)
+        : "Capturar";
+  }
 }
