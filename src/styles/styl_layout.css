@@ -650,6 +650,18 @@
 }
 
 /* ======================================================
+   Opción inhabilitada dentro de un popup-grupo (ej. "En App"
+   en el popup Extra de Multimedia mientras no hay programa
+   elegido, o el comando activo es de Reproducción).
+   ====================================================== */
+
+.popup-opcion:disabled {
+    color: var(--text-disabled);
+    cursor: not-allowed;
+    opacity: 0.6;
+}
+
+/* ======================================================
    🔀 INTERRUPTOR (switch deslizante — Coordenada)
    ------------------------------------------------------
    Pista + bolita, tipo iOS/Android. Apagado: pista y

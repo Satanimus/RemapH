@@ -28,7 +28,17 @@ export function crearIndicadorActivo(): HTMLSpanElement {
 // ======================================================
 
 export function crearGrupoOpciones<T extends string>(
-  opciones: { texto: string; valor: T }[],
+  opciones: {
+    texto: string;
+    valor: T;
+    // Opcionales — para grupos donde alguna opción puede quedar
+    // inhabilitada según el estado de la fila (ej. "En App" en el
+    // popup Extra de Multimedia, ver comp_popup_multimedia_extra.ts).
+    // `titulo` es el tooltip que explica el porqué mientras está
+    // deshabilitada.
+    deshabilitado?: boolean;
+    titulo?: string;
+  }[],
   valorActual: T,
   onSeleccionar: (valor: T) => void,
   claseExtra?: string,
@@ -52,9 +62,17 @@ export function crearGrupoOpciones<T extends string>(
 
     boton.append(document.createTextNode(opcion.texto));
 
-    boton.addEventListener("click", () => {
-      onSeleccionar(opcion.valor);
-    });
+    if (opcion.deshabilitado) {
+      boton.disabled = true;
+
+      if (opcion.titulo) {
+        boton.title = opcion.titulo;
+      }
+    } else {
+      boton.addEventListener("click", () => {
+        onSeleccionar(opcion.valor);
+      });
+    }
 
     grupo.append(boton);
   });

@@ -91,3 +91,16 @@ export function textoAccionMultimedia(comando: string | null): string {
 
   return `${opcion.icono} ${opcion.texto}`;
 }
+
+// ======================================================
+// 📝 TEXTO DEL BOTÓN EXTRA (columna de la tabla)
+// ------------------------------------------------------
+// Alcance de ejecución (filaPerfil.extraMultimedia) — usado por
+// comp_controles.ts::crearExtra() cuando tipo === "multimedia".
+// Mismo criterio visual que textoExtraTeclaMouse en
+// comp_popup_coordenada.ts.
+// ======================================================
+
+export function textoExtraMultimedia(alcance: "global" | "en_app"): string {
+  return alcance === "en_app" ? "🎯 En App" : "🌐 Global";
+}

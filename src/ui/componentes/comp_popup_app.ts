@@ -185,6 +185,14 @@ function crearBotonGlobal(
     () => {
       filaPerfil.app.programa = null;
 
+      // Si esta fila era Multimedia con alcance "En App", vaciar la
+      // columna App le quita el programa al que apuntaba — se
+      // resetea sola a "global" (regla acordada, ver
+      // comp_popup_multimedia_extra.ts).
+      if (filaPerfil.extraMultimedia === "en_app") {
+        filaPerfil.extraMultimedia = "global";
+      }
+
       reconstruirFila(contexto.id);
 
       ocultarPopup();

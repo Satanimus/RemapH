@@ -102,7 +102,7 @@ function analizarRueda(bufferEventos: EventoBuffer[]): Trigger {
   trigger.gatillo = entradaRueda.entrada;
 
   trigger.condicion =
-    ruedas.length >= CONFIG_CAPTURA.sensibilidadRueda ? "Mantenido" : "Simple";
+    ruedas.length >= CONFIG_CAPTURA.sensibilidadRueda ? "mantenido" : "simple";
 
   trigger.modificadores = obtenerModificadoresRueda(bufferEventos);
 
@@ -179,7 +179,7 @@ function analizarCondicion(trigger: Trigger, bloque: EventoBuffer[]): void {
   const ups = bloque.filter((evento) => evento.evento === "Up");
 
   if (ups.length >= 2) {
-    trigger.condicion = "Doble";
+    trigger.condicion = "doble";
 
     return;
   }
@@ -197,7 +197,7 @@ function analizarCondicion(trigger: Trigger, bloque: EventoBuffer[]): void {
   const duracion = ups[0].tiempo - primerDown.tiempo;
 
   trigger.condicion =
-    duracion >= CONFIG_CAPTURA.tiempoMantenido ? "Mantenido" : "Simple";
+    duracion >= CONFIG_CAPTURA.tiempoMantenido ? "mantenido" : "simple";
 }
 
 // ======================================================
@@ -259,7 +259,7 @@ function normalizarAltGr(trigger: Trigger): void {
 function esClickIzquierdoSolo(trigger: Trigger): boolean {
   return (
     trigger.gatillo?.codigo === "LeftButton" &&
-    trigger.condicion === "Simple" &&
+    trigger.condicion === "simple" &&
     trigger.modificadores.length === 0
   );
 }

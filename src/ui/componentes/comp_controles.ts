@@ -25,6 +25,10 @@ import {
   textoExtraTeclaMouse,
 } from "./comp_popup_coordenada";
 
+import { abrirPopupExtraMultimedia } from "./comp_popup_multimedia_extra";
+
+import { textoExtraMultimedia } from "../../core/core_multimedia";
+
 import { obtenerPerfilUi } from "../../core/core_perfil_ui";
 
 import { filaTieneConflicto } from "../../core/core_conflictos";
@@ -147,6 +151,17 @@ export function crearExtra(
       texto: textoExtraTeclaMouse(filaPerfil),
       onClick: (evento) => {
         abrirPopupExtraTeclaMouse(evento, contexto, filaPerfil);
+      },
+    });
+  }
+
+  // multimedia tiene su propio popup Extra (Global/En App) — igual
+  // de persistente que el de Tecla/Mouse, pero mucho más chico.
+  if (filaPerfil.tipo === "multimedia") {
+    return crearPopup({
+      texto: textoExtraMultimedia(filaPerfil.extraMultimedia),
+      onClick: (evento) => {
+        abrirPopupExtraMultimedia(evento, contexto, filaPerfil);
       },
     });
   }
