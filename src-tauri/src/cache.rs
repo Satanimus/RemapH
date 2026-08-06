@@ -150,6 +150,11 @@
 // escribir_cache() / escribir_fila() / borrar_cache() /
 // borrar_fila()
 //     Igual que antes, sin cambios de diseño.
+// obtener_remapeo(id) -> Option<RemapeoCache>
+//     Busca una fila ya compilada por id (clon, de solo
+//     lectura). Etapa 7 de MenuExpress: back_menu_express.rs
+//     la usa para resolver qué Acción/Extra ejecutar cuando
+//     se hace clic en un botón de un menú.
 // esta_vacia()
 //     true si no quedó ningún remapeo compilado (perfil
 //     vacío o todo OFF). La consulta perfil.rs para
@@ -257,6 +262,17 @@ pub fn esta_vacia() -> bool {
 
 pub fn borrar_fila(id: &str) {
     CACHE.lock().unwrap().retain(|r| r.id != id);
+}
+
+/// Busca una fila ya compilada por su id — usado por
+/// back_menu_express.rs (etapa 7) para resolver qué Acción/Extra
+/// ejecutar cuando se hace clic en un botón DE ADENTRO de un menú
+/// (el fila_id guardado en cada MenuBotonCache, ver perfil_cache.rs).
+/// Clone porque OrdenRuntime::Iniciar necesita quedarse con su propia
+/// copia de accion/extra/coordenada — el lock no puede quedar tomado
+/// mientras Runtime hace su trabajo.
+pub fn obtener_remapeo(id: &str) -> Option<RemapeoCache> {
+    CACHE.lock().unwrap().iter().find(|r| r.id == id).cloned()
 }
 
 /// true si `input` podría continuar AHORA MISMO algún trigger posible

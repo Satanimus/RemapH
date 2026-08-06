@@ -543,8 +543,13 @@ pub fn obtener_intervalo_captura_coordenada() -> u64 {
 // abrir_o_alternar() NO es un comando Tauri — runtime.rs la
 // llama directo (el trigger llega desde el hilo de entrada
 // física, no desde JS). Acá solo lo que la propia ventana
-// necesita invocar: leer sus datos una vez al cargar, y
-// pedir su propio cierre (botón [x]).
+// necesita invocar: leer sus datos una vez al cargar, pedir su
+// propio cierre (botón [x]), y ejecutar/detener un botón de
+// adentro en cada mousedown/mouseup (etapa 7) — la lógica real
+// de esto último vive en back_menu_express.rs (incluida la
+// llamada a runtime::ejecutar), nunca acá, para no romper la
+// regla de este archivo (ver header: "Comandos NO: ejecuta
+// Runtime").
 // ======================================================
 
 #[tauri::command]
@@ -557,4 +562,14 @@ pub fn obtener_datos_menu_express(
 #[tauri::command]
 pub fn cerrar_menu_express(id: String) {
     crate::back_menu_express::cerrar(&id);
+}
+
+#[tauri::command]
+pub fn menu_express_boton_down(fila_id: String) {
+    crate::back_menu_express::boton_down(&fila_id);
+}
+
+#[tauri::command]
+pub fn menu_express_boton_up(id_menu: String, fila_id: String) -> bool {
+    crate::back_menu_express::boton_up(&id_menu, &fila_id)
 }

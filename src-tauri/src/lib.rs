@@ -89,6 +89,8 @@ pub fn run() {
             comandos::obtener_intervalo_captura_coordenada,
             comandos::obtener_datos_menu_express,
             comandos::cerrar_menu_express,
+            comandos::menu_express_boton_down,
+            comandos::menu_express_boton_up,
         ])
         .run(tauri::generate_context!())
         .expect("error al ejecutar Tauri");

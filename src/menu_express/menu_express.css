@@ -184,7 +184,8 @@ body {
     background: rgba(255, 255, 255, 0.15);
 }
 
-.menu-express-boton:active {
+.menu-express-boton:active,
+.menu-express-boton.presionado {
     background: rgba(255, 255, 255, 0.28);
 }
 

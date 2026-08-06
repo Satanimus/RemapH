@@ -21,9 +21,13 @@
 // texto en TAMANOS_PX más abajo — mismo valor que menu_express.css
 // (config.rs los hará configurables de verdad en la etapa 8).
 //
-// Todavía sin ejecución real de los botones al hacer clic (llega
-// en la etapa 7, junto con Mantenido/Turbo emulados y el cierre
-// real Toggle/Efímero tras el up).
+// ETAPA 7: ejecución real de los botones — mousedown manda el down
+// real (menu_express_boton_down), mouseup el up real
+// (menu_express_boton_up), y éste último resuelve Comportamiento
+// (Toggle/Efímero) del lado de Rust. Mantenido/Turbo se emulan solos:
+// el tiempo real entre down y up (mientras el botón del mouse siga
+// presionado) es exactamente lo que runtime.rs ya sabe interpretar
+// (mismo motor que un trigger físico sostenido, ver back_menu_express.rs).
 // ======================================================
 
 import { invoke } from "@tauri-apps/api/core";
@@ -158,6 +162,21 @@ const TAMANOS_BOTON_PX: Record<
 // ------------------------------------------------------
 // Común a los tres layouts — solo cambia cómo se posiciona
 // después de creado (grid vs radial vs lista).
+//
+// mousedown/mouseup (NO click): un click dispara recién al
+// soltar, pero acá el down y el up son eventos DISTINTOS que
+// Runtime necesita por separado — el tiempo real entre uno y
+// otro es lo que define cuánto dura un Mantenido o cuántas
+// vueltas alcanza a dar un Turbo (ver back_menu_express.rs,
+// boton_down/boton_up).
+//
+// El mouseup se escucha en `document`, no en el propio botón:
+// si el usuario suelta el botón del mouse afuera del elemento
+// (arrastró el cursor antes de soltar), igual tiene que llegar
+// el up real — soltar "en cualquier lado" es análogo a soltar
+// una tecla física, no depende de seguir con el cursor encima.
+// Se limpia el listener después de cada uso (una sola vez por
+// down) para no ir acumulando listeners de botones ya sueltos.
 // ======================================================
 
 function crearBoton(
@@ -170,15 +189,45 @@ function crearBoton(
   elemento.textContent = boton.renombrar || "(sin nombre)";
   elemento.title = boton.renombrar;
 
-  // Placeholder de esta etapa: la ejecución real (buscar la fila
-  // en la caché compilada y llamar a runtime::ejecutar vía
-  // menu_express_boton_down/up) llega en la etapa 7. Por ahora
-  // solo confirma que el dato de cada botón (filaId) llegó bien
-  // hasta acá.
-  elemento.addEventListener("click", () => {
-    console.log(
-      `[MenuExpress] clic en botón (placeholder, sin ejecutar) filaId=${boton.filaId}`,
-    );
+  elemento.addEventListener("mousedown", (evento) => {
+    // Solo botón izquierdo — clic derecho/medio no ejecuta nada
+    // (mismo criterio que "Click izquierdo solo" bloqueado como
+    // trigger de MenuExpress, ver spec etapa 8).
+    if (evento.button !== 0) return;
+
+    evento.preventDefault();
+
+    elemento.classList.add("presionado");
+
+    invoke("menu_express_boton_down", { filaId: boton.filaId }).catch(() => {});
+
+    const soltar = async (subida: MouseEvent): Promise<void> => {
+      if (subida.button !== 0) return;
+
+      document.removeEventListener("mouseup", soltar);
+      elemento.classList.remove("presionado");
+
+      if (!id) return;
+
+      let cerrado = false;
+
+      try {
+        cerrado = await invoke<boolean>("menu_express_boton_up", {
+          idMenu: id,
+          filaId: boton.filaId,
+        });
+      } catch {
+        cerrado = false;
+      }
+
+      // Efímero: back_menu_express.rs ya cerró la ventana nativa —
+      // acá solo evita seguir tocando un DOM que está a punto de
+      // desaparecer con ella (no hay nada más que hacer del lado
+      // TS, la ventana entera se destruye).
+      if (cerrado) return;
+    };
+
+    document.addEventListener("mouseup", soltar);
   });
 
   return elemento;

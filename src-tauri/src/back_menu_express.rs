@@ -1,7 +1,7 @@
 // ======================================================
 // ⚡🪟 Back_Menu_Express
 // ======================================================
-// ETAPAS 5 y 6 DEL FLUJO MenuExpress
+// ETAPAS 5, 6 y 7 DEL FLUJO MenuExpress
 // ------------------------------------------------------
 // 1. ¿Qué hace este archivo?
 //
@@ -15,15 +15,21 @@
 // etapas).
 //
 // Este archivo NO dibuja el layout en sí (radial/cuadrícula es
-// 100% TS dentro de la ventana, ver menu_express_main.ts) ni
-// ejecuta los botones (eso es runtime::ejecutar vía comandos
-// nuevos, etapa 7). Sí calcula el TAMAÑO de ventana según forma/
-// cantidad de botones/tamaño de botón (calcular_tamano_ventana,
-// etapa 6) — con el mismo criterio geométrico que el TS usa para
-// posicionar cada botón adentro, para que la ventana entre justo
-// sin recorte ni scroll. El resto es ciclo de vida: abrir,
-// cerrar, alternar, y entregarle sus datos (nombre/botones/
-// forma/etc.) una sola vez al cargar — mismo patrón que
+// 100% TS dentro de la ventana, ver menu_express_main.ts). Sí
+// calcula el TAMAÑO de ventana según forma/cantidad de botones/
+// tamaño de botón (calcular_tamano_ventana, etapa 6) — con el
+// mismo criterio geométrico que el TS usa para posicionar cada
+// botón adentro, para que la ventana entre justo sin recorte ni
+// scroll. También resuelve la EJECUCIÓN de un botón de adentro
+// (etapa 7: boton_down/boton_up) — busca la fila referenciada
+// en la caché ya compilada (cache::obtener_remapeo) y llama a
+// runtime::ejecutar directo, EXACTAMENTE la misma función que ya
+// usa cache.rs (iniciar_solamente/iniciar_y_finalizar) para un
+// trigger físico normal — el motor de Mantenido/Turbo/etc. ya
+// estabilizado queda intacto, esto solo lo dispara desde un
+// clic de UI en vez de un Down/Up físico. El resto es ciclo de
+// vida: abrir, cerrar, alternar, y entregarle sus datos (nombre/
+// botones/forma/etc.) una sola vez al cargar — mismo patrón que
 // captura_coordenada.rs + comandos.rs::
 // abrir_ventana_captura_coordenada.
 // ------------------------------------------------------
@@ -36,10 +42,13 @@
 //     no desde una invocación JS. Por eso necesita el
 //     AppHandle global (inicializar(), fijado en setup() de
 //     Tauri) en vez de recibirlo como parámetro de comando.
-// comandos.rs — expone cerrar_menu_express() y
-//     obtener_datos_menu_express() como comandos Tauri finos
-//     que delegan acá (mismo criterio que el resto del
-//     archivo: comandos.rs nunca tiene lógica propia).
+// comandos.rs — expone cerrar_menu_express(),
+//     obtener_datos_menu_express(), menu_express_boton_down() y
+//     menu_express_boton_up() como comandos Tauri finos que
+//     delegan acá (mismo criterio que el resto del archivo:
+//     comandos.rs nunca tiene lógica propia — acá vive la
+//     lógica real, incluida la llamada a runtime::ejecutar, para
+//     no romper esa regla en comandos.rs).
 // compilador.rs (compilar()) — llama cerrar_todas() en cada
 //     recompilación, para nunca dejar una ventana abierta con
 //     botones que referencian filas que ya no existen (ver
@@ -55,6 +64,9 @@
 // cerrar_todas() — cierre masivo (recompilación).
 // obtener_datos(id) — la propia ventana, una sola vez al
 //     cargar (ver menu_express_main.ts).
+// boton_down(fila_id) / boton_up(id_menu, fila_id) — la propia
+//     ventana, en cada mousedown/mouseup sobre un botón de
+//     adentro (ver menu_express_main.ts, etapa 7).
 // ------------------------------------------------------
 // 4. ¿Qué información entrega?
 //
@@ -62,6 +74,11 @@
 //     convertido a vocabulario string (mismo que
 //     core_menu_express.ts) para que la ventana no tenga que
 //     conocer los enums de Rust.
+// boton_up(...) -> bool: true si el propio comportamiento del
+//     menú (Efímero) cerró la ventana como consecuencia de este
+//     clic — la ventana ya no existe, así que el TS no debe
+//     tocar el DOM después de recibir true (ver
+//     menu_express_main.ts).
 // ------------------------------------------------------
 // 5. Funciones del archivo
 //
@@ -74,8 +91,8 @@
 //     Si ya hay una ventana abierta para ese id → la cierra
 //     (toggle a NIVEL DE TRIGGER: volver a presionar el mismo
 //     trigger cierra su menú, sea Toggle o Efímero — eso solo
-//     define qué pasa al hacer clic en un botón DE ADENTRO,
-//     ver runtime.rs/comandos.rs etapa 7). Si no, la crea.
+//     define qué pasa al hacer clic en un botón DE ADENTRO, ver
+//     boton_up() más abajo). Si no, la crea.
 // crear_ventana(app, id, paquete)
 //     Arma y muestra la ventana nueva. Corre en el hilo
 //     principal vía AppHandle::run_on_main_thread — este
@@ -92,6 +109,19 @@
 //     cerrar() de cada id actualmente registrado.
 // obtener_datos(id)
 //     Consulta de sólo lectura del registro — no lo modifica.
+// boton_down(fila_id)
+//     Busca fila_id en la caché compilada (cache::
+//     obtener_remapeo) y manda OrdenRuntime::Iniciar — mismo
+//     down que un trigger físico. Si la fila ya no existe
+//     (referenciaba algo borrado — no debería pasar, compilar()
+//     ya cierra el menú entero, ver cerrar_todas() — pero por
+//     si acaso), no hace nada.
+// boton_up(id_menu, fila_id)
+//     Manda OrdenRuntime::Detener (mismo up físico) y después
+//     resuelve Comportamiento: si el menú es Efímero, cierra la
+//     ventana (cerrar(id_menu)). Si es Toggle, no hace nada más
+//     — el menú se queda abierto hasta el [x] o el mismo trigger
+//     de nuevo (ver abrir_o_alternar). Devuelve true si cerró.
 // label_de(id)
 //     "menu_express_<id>" — único lugar que arma el label,
 //     para no repetir el formato en cada función.
@@ -106,11 +136,25 @@
 //   defecto fijo; recordar la ÚLTIMA posición real en memoria
 //   (por id) es una mejora de etapa 8 (pulido) — no bloquea
 //   que el menú funcione mientras tanto.
+//
+// boton_down/boton_up SIEMPRE mandan Iniciar+Detener por
+// separado (nunca iniciar_y_finalizar de cache.rs) — eso es
+// justamente lo que necesita Mantenido/Turbo: el down real
+// ocurre al mousedown, el up real (el que decide cuánto duró el
+// Mantenido, o si hubo tiempo para otra vuelta de Turbo) ocurre
+// al mouseup, exactamente como con un trigger físico sostenido.
+// Runtime ya sabe distinguir solo: si el Extra de esa fila no
+// pide down/up diferido (requiere_up_real() == false — ej. un
+// Emitir Simple sin Extra), el Detener no tiene nada que hacer
+// porque la ejecución ya terminó sola con el Iniciar — no hace
+// falta que boton_down/boton_up lo verifiquen ellos mismos.
 // ======================================================
 
 use crate::perfil_cache::{
     ComportamientoMenu, FormaMenu, MenuBotonCache, TamanoMenu, UbicacionMenu,
 };
+
+use crate::runtime::OrdenRuntime;
 
 use serde::Serialize;
 
@@ -506,4 +550,66 @@ pub fn cerrar_todas() {
 
 pub fn obtener_datos(id: &str) -> Option<MenuExpressDatosUI> {
     con_registro(|mapa| mapa.get(id).cloned())
+}
+
+// ======================================================
+// ⬇️ BOTÓN — DOWN
+// ------------------------------------------------------
+// La propia ventana lo llama en cada mousedown sobre un botón
+// de adentro (ver menu_express_main.ts). Busca fila_id en la
+// caché ya compilada (misma caché que usa el motor físico
+// normal, ver cache.rs) y manda el mismo Iniciar que mandaría
+// cache.rs para un trigger real — Runtime no distingue si vino
+// de acá o de un Down físico (ver header, decisión de diseño).
+// Si la fila ya no existe (no debería pasar, ver cerrar_todas
+// en compilador.rs), no hace nada — no hay nada que iniciar.
+// ======================================================
+
+pub fn boton_down(fila_id: &str) {
+    let Some(remapeo) = crate::cache::obtener_remapeo(fila_id) else {
+        return;
+    };
+
+    crate::runtime::ejecutar(OrdenRuntime::Iniciar {
+        id: remapeo.id,
+        accion: remapeo.accion,
+        extra: remapeo.extra,
+        coordenada: remapeo.coordenada,
+    });
+}
+
+// ======================================================
+// ⬆️ BOTÓN — UP
+// ------------------------------------------------------
+// La propia ventana lo llama en cada mouseup sobre un botón de
+// adentro — SIEMPRE, incluso si el mouse ya no está sobre el
+// botón al soltar (mismo criterio que un Up físico: el up de
+// Mantenido/Turbo no depende de seguir con el cursor encima).
+// Manda el Detener real (mismo que un Up físico) y, recién
+// después, resuelve Comportamiento (Toggle/Efímero) — la spec
+// aclara que eso se decide "tras el up", nunca antes: si fuera
+// antes, un Efímero cerraría la ventana ANTES de que Turbo/
+// Mantenido llegaran a soltar de verdad.
+//
+// Devuelve true si el menú se cerró como consecuencia (Efímero)
+// — la ventana ya no existe, así que el TS no debe seguir
+// tocando el DOM después de este resultado.
+// ======================================================
+
+pub fn boton_up(id_menu: &str, fila_id: &str) -> bool {
+    crate::runtime::ejecutar(OrdenRuntime::Detener {
+        id: fila_id.to_string(),
+    });
+
+    let comportamiento_efimero = con_registro(|mapa| {
+        mapa.get(id_menu)
+            .map(|datos| datos.comportamiento == "efimero")
+    });
+
+    if comportamiento_efimero == Some(true) {
+        cerrar(id_menu);
+        return true;
+    }
+
+    false
 }
