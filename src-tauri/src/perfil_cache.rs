@@ -219,6 +219,74 @@ pub enum AccionCache {
     // leyendo/escribiendo la sesión de audio de un proceso vía
     // winmix (alcance En App) — ver back_multimedia.rs.
     Multimedia(ComandoMultimedia, AlcanceMultimedia),
+
+    // Acción tipo MenuExpress. nombre/botones vienen de la columna
+    // Acción de la fila (menu_accion); forma/columnas/filas/
+    // comportamiento/ubicacion/tamaños vienen de la columna Extra
+    // (menu_extra) — compilador.rs los empaqueta juntos acá porque
+    // Runtime recibe un solo AccionCache (no hay ExtraCache aparte
+    // para este tipo, ver perfil_json.rs). botones ya viene filtrado
+    // (fila_id que ya no existe en el perfil se descarta en
+    // silencio) y ordenado por posición de la fila referenciada en
+    // la tabla — nunca vacío: convertir_menu_express (compilador.rs)
+    // descarta la fila entera (None) si queda en 0 botones.
+    MenuExpress {
+        nombre: String,
+        botones: Vec<MenuBotonCache>,
+        forma: FormaMenu,
+        columnas: u32,
+        filas: u32,
+        comportamiento: ComportamientoMenu,
+        ubicacion: UbicacionMenu,
+        tamano_boton: TamanoMenu,
+        tamano_texto: TamanoMenu,
+    },
+}
+
+// ======================================================
+// ⚡ MENU EXPRESS CACHE
+// ------------------------------------------------------
+// Piezas compiladas del tipo "menu_express" — ver AccionCache::
+// MenuExpress más arriba. Espejo de FormaMenu/ComportamientoMenu/
+// UbicacionMenu/TamanoMenu (TS, core_menu_express.ts) y de forma/
+// comportamiento/ubicacion/tamano_boton/tamano_texto (Rust,
+// perfil_json.rs::MenuExpressExtraJson), ya resueltos a enum en vez
+// de viajar como String hasta Runtime.
+// ======================================================
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct MenuBotonCache {
+    // Id interno de la fila referenciada (no su número de orden en
+    // la tabla) — con esto Runtime/back_menu_express.rs buscan la
+    // fila en la caché ya compilada al ejecutar el botón (etapa 7).
+    pub fila_id: String,
+
+    pub renombrar: String,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum FormaMenu {
+    Radial,
+    Cuadricula,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum ComportamientoMenu {
+    Toggle,
+    Efimero,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum UbicacionMenu {
+    Persistente,
+    Cursor,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum TamanoMenu {
+    Pequeno,
+    Mediano,
+    Grande,
 }
 
 // ======================================================

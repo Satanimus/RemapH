@@ -391,6 +391,37 @@ fn ejecutar_accion(
         AccionCache::Multimedia(comando, alcance) => {
             crate::back_multimedia::ejecutar(&comando, &alcance);
         }
+
+        // TODO(etapa 5): reemplazar por back_menu_express::abrir(),
+        // que arma la ventana flotante real a partir de este mismo
+        // paquete. Por ahora solo confirma que Compilador arma
+        // AccionCache::MenuExpress completo y que Runtime lo recibe
+        // entero al disparar el trigger de la fila.
+        AccionCache::MenuExpress {
+            nombre,
+            botones,
+            forma,
+            columnas,
+            filas,
+            comportamiento,
+            ubicacion,
+            tamano_boton,
+            tamano_texto,
+        } => {
+            println!(
+                "[MenuExpress] id={} nombre={:?} botones={:?} forma={:?} columnas={} filas={} comportamiento={:?} ubicacion={:?} tamano_boton={:?} tamano_texto={:?}",
+                id,
+                nombre,
+                botones,
+                forma,
+                columnas,
+                filas,
+                comportamiento,
+                ubicacion,
+                tamano_boton,
+                tamano_texto
+            );
+        }
     }
 }
 

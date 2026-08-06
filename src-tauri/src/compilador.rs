@@ -120,6 +120,14 @@
 //     (ubicación ya resuelta a números), cuando coordenada.activa es
 //     true. None si todavía no se capturó — mismo criterio de
 //     descarte silencioso.
+//
+// convertir_menu_express()
+//     Resuelve tipo == "menu_express" → Option<AccionCache::
+//     MenuExpress>. Empaqueta menu_accion + menu_extra en un solo
+//     AccionCache (no hay ExtraCache aparte para este tipo). Filtra
+//     en silencio los botones cuyo fila_id ya no exista en el
+//     perfil, y los reordena por posición de la fila referenciada
+//     en la tabla. None si el menú queda sin botones.
 // ------------------------------------------------------
 
 use crate::cache;
@@ -127,8 +135,9 @@ use crate::cache;
 use crate::eventos::InputId;
 
 use crate::perfil_cache::{
-    AccionCache, AlcanceMultimedia, AppCache, ComandoMultimedia, CoordenadaCache, ExtraCache,
-    PostAccionCache, PuntoReferenciaCache, RemapeoCache, TriggerCache, UbicacionCache,
+    AccionCache, AlcanceMultimedia, AppCache, ComandoMultimedia, ComportamientoMenu,
+    CoordenadaCache, ExtraCache, FormaMenu, MenuBotonCache, PostAccionCache, PuntoReferenciaCache,
+    RemapeoCache, TamanoMenu, TriggerCache, UbicacionCache, UbicacionMenu,
 };
 
 use crate::perfil_json::{perfil_json, AppJson, CoordenadaJson, RemapeoJson};
@@ -154,7 +163,7 @@ pub fn compilar_perfil(perfil: &perfil_json) -> Vec<RemapeoCache> {
     perfil
         .remapeos
         .iter()
-        .filter_map(compilar_remapeo)
+        .filter_map(|remapeo| compilar_remapeo(remapeo, perfil))
         .collect()
 }
 
@@ -162,12 +171,12 @@ pub fn compilar_perfil(perfil: &perfil_json) -> Vec<RemapeoCache> {
 // 🧩 COMPILAR REMAPEO
 // ======================================================
 
-fn compilar_remapeo(remapeo: &RemapeoJson) -> Option<RemapeoCache> {
+fn compilar_remapeo(remapeo: &RemapeoJson, perfil: &perfil_json) -> Option<RemapeoCache> {
     if remapeo.estado != "ON" {
         return None;
     }
 
-    let accion = convertir_accion(remapeo)?;
+    let accion = convertir_accion(remapeo, perfil)?;
 
     let extra = convertir_extra(&remapeo.extra);
 
@@ -267,7 +276,7 @@ fn convertir_entrada(trigger: &crate::perfil_json::TriggerJson) -> Vec<InputId> 
 // cualquier perfil que tuviera una fila así guardada.
 // ======================================================
 
-fn convertir_accion(remapeo: &RemapeoJson) -> Option<AccionCache> {
+fn convertir_accion(remapeo: &RemapeoJson, perfil: &perfil_json) -> Option<AccionCache> {
     match remapeo.tipo.as_str() {
         "tecla_mouse" => {
             let trigger = remapeo.accion_trigger.as_ref()?;
@@ -298,11 +307,101 @@ fn convertir_accion(remapeo: &RemapeoJson) -> Option<AccionCache> {
             Some(AccionCache::Multimedia(comando, alcance))
         }
 
+        "menu_express" => convertir_menu_express(remapeo, perfil),
+
         // Tipos todavía decorativos en la UI (Portapapeles, etc.): no
         // producen ninguna acción real todavía. La fila entera se
         // descarta al compilar (ver compilar_remapeo), igual que una
         // fila en OFF.
         _ => None,
+    }
+}
+
+// ======================================================
+// ⚡ CONVERTIR MENU EXPRESS
+// ------------------------------------------------------
+// botones: se descarta en silencio cualquier fila_id que ya no
+// exista en el perfil actual (fila borrada mientras tanto — mismo
+// criterio de descarte silencioso que el resto del compilador, ver
+// nota de convertir_accion más arriba). El orden final es por
+// posición de la fila referenciada dentro de perfil.remapeos (el
+// "número de fila" que ve el usuario en la columna Número), no el
+// orden en que se fueron agregando los botones (ver spec / nota en
+// perfil_json.rs::MenuAccionJson).
+//
+// Si no queda ningún botón (todos referenciaban filas ya borradas,
+// o el menú nunca tuvo ninguno agregado), la fila entera se
+// descarta — un MenuExpress vacío no se puede abrir (ver spec).
+// ======================================================
+
+fn convertir_menu_express(remapeo: &RemapeoJson, perfil: &perfil_json) -> Option<AccionCache> {
+    let mut botones: Vec<(usize, MenuBotonCache)> = remapeo
+        .menu_accion
+        .botones
+        .iter()
+        .filter_map(|boton| {
+            let posicion = perfil
+                .remapeos
+                .iter()
+                .position(|fila| fila.id == boton.fila_id)?;
+
+            Some((
+                posicion,
+                MenuBotonCache {
+                    fila_id: boton.fila_id.clone(),
+                    renombrar: boton.renombrar.clone(),
+                },
+            ))
+        })
+        .collect();
+
+    if botones.is_empty() {
+        return None;
+    }
+
+    botones.sort_by_key(|(posicion, _)| *posicion);
+
+    let botones = botones.into_iter().map(|(_, boton)| boton).collect();
+
+    Some(AccionCache::MenuExpress {
+        nombre: remapeo.menu_accion.nombre.clone(),
+        botones,
+        forma: convertir_forma_menu(&remapeo.menu_extra.forma),
+        columnas: remapeo.menu_extra.columnas,
+        filas: remapeo.menu_extra.filas,
+        comportamiento: convertir_comportamiento_menu(&remapeo.menu_extra.comportamiento),
+        ubicacion: convertir_ubicacion_menu(&remapeo.menu_extra.ubicacion),
+        tamano_boton: convertir_tamano_menu(&remapeo.menu_extra.tamano_boton),
+        tamano_texto: convertir_tamano_menu(&remapeo.menu_extra.tamano_texto),
+    })
+}
+
+fn convertir_forma_menu(valor: &str) -> FormaMenu {
+    match valor {
+        "cuadricula" => FormaMenu::Cuadricula,
+        _ => FormaMenu::Radial,
+    }
+}
+
+fn convertir_comportamiento_menu(valor: &str) -> ComportamientoMenu {
+    match valor {
+        "efimero" => ComportamientoMenu::Efimero,
+        _ => ComportamientoMenu::Toggle,
+    }
+}
+
+fn convertir_ubicacion_menu(valor: &str) -> UbicacionMenu {
+    match valor {
+        "cursor" => UbicacionMenu::Cursor,
+        _ => UbicacionMenu::Persistente,
+    }
+}
+
+fn convertir_tamano_menu(valor: &str) -> TamanoMenu {
+    match valor {
+        "pequeno" => TamanoMenu::Pequeno,
+        "grande" => TamanoMenu::Grande,
+        _ => TamanoMenu::Mediano,
     }
 }
 
