@@ -397,16 +397,18 @@ fn calcular_tamano_ventana(paquete: &MenuExpressPaquete) -> (f64, f64) {
 
     match paquete.forma {
         FormaMenu::Radial => {
-            let radio_boton = ancho_boton.max(alto_boton) / 2.0;
+            // Espejo exacto de calcularRadiosRadial() en
+            // menu_express_main.ts — si uno cambia, cambiar el otro.
+            // Etapa 9: anillo continuo de gajos, sin header (Radial ya
+            // no lo tiene). El radio NO depende de `n`: los gajos
+            // cubren el anillo completo y nunca se solapan entre sí,
+            // más botones solo angostan cada gajo.
+            let grosor = alto_boton;
+            let hueco_radio = (alto_boton * 1.3).round();
+            let radio_exterior = hueco_radio + grosor;
+            let diametro = radio_exterior * 2.0 + 16.0;
 
-            // Mismo cálculo que renderizarRadial() en
-            // menu_express_main.ts.
-            let radio = (70.0f64)
-                .max((radio_boton + 12.0) / (std::f64::consts::PI / (n.max(2) as f64)).sin());
-
-            let diametro = radio * 2.0 + radio_boton * 2.0 + 24.0;
-
-            (diametro.max(180.0), diametro.max(180.0) + ALTO_HEADER)
+            (diametro, diametro)
         }
 
         FormaMenu::Cuadricula => {

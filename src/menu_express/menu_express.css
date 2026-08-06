@@ -6,16 +6,16 @@
    transparencia — mismo motivo que captura.css). Reutiliza
    solo las variables centralizadas en styl_variables.css,
    incluidas las --tag-<color> de la paleta de filas: el fondo
-   de la tarjeta se tiñe con el color de la fila que generó
-   este menú (ver back_menu_express.rs / spec).
+   de la tarjeta (Cuadrícula) o de cada gajo (Radial) se tiñe con
+   el color de la fila que generó este menú (ver
+   back_menu_express.rs / spec).
 
-   Layout (etapa 6): tres modos en .menu-express-cuerpo, elegidos
-   por clase desde menu_express_main.ts según datos.forma —
-   .forma-radial (círculo, posicionamiento absoluto por JS) y
-   .forma-cuadricula (CSS Grid, columnas/filas por JS). El cálculo
-   geométrico (ángulos, radio, cuántas columnas/filas según la
-   regla "0 = auto") vive 100% en TS — acá solo el contenedor y el
-   position:absolute que el layout radial necesita.
+   Layout: dos estructuras de tarjeta completamente distintas,
+   elegidas en menu_express_main.ts según datos.forma —
+   .menu-express-card--radial (sin header, anillo de gajos +
+   círculo central) y la tarjeta "clásica" con header (Cuadrícula).
+   El cálculo geométrico del anillo (ángulos, radios, el path de
+   cada gajo) vive 100% en TS — acá solo los estilos de superficie.
    ====================================================== */
 
 * {
@@ -36,6 +36,18 @@ body {
     user-select: none;
 }
 
+/* #menu-express (el <main> de menu_express.html) es el padre
+   directo de .menu-express-card, que se apoya en height:100%
+   para llenar la ventana. Sin esta regla, #menu-express queda con
+   altura auto (shrink-to-fit) y ese 100% no tiene de qué agarrarse
+   — la tarjeta colapsa a la altura de su contenido, y como en modo
+   Radial todos los botones son position:absolute (no aportan
+   altura natural), el cuerpo terminaba en ~0px de alto. */
+#menu-express {
+    width: 100%;
+    height: 100%;
+}
+
 .menu-express-card {
     width: 100%;
     height: 100%;
@@ -44,11 +56,10 @@ body {
     /* --menu-color la fija menu_express_main.ts por fila, con
        color-mix para la transparencia — fallback sólido acá por si
        el navegador no soporta color-mix. */
-    background: var(--menu-color, rgba(20, 20, 30, 0.85));
+    background: var(--menu-color, rgba(20, 20, 30, 0.6));
     border: 1px solid var(--border-light);
     border-radius: 8px;
     overflow: hidden;
-    cursor: move;
     /* Etapa 8: cierre suave de Comportamiento Efímero — la duración
        tiene que calzar con DURACION_FADE_MS en menu_express_main.ts
        (cerrarConFade), que espera este tiempo antes de invocar el
@@ -62,6 +73,25 @@ body {
     pointer-events: none;
 }
 
+/* ==========================
+   Tarjeta Radial (etapa 9) — sin header, sin fondo rectangular:
+   solo se ve el anillo de gajos + el círculo central, dibujados
+   por .menu-express-cuerpo/.menu-express-radial-centro. overflow
+   visible porque el anillo (con su margen de 16px, ver
+   calcularRadiosRadial) ya viene del tamaño exacto de ventana
+   calculado en back_menu_express.rs — no hay nada que recortar.
+   ========================== */
+
+.menu-express-card--radial {
+    background: transparent;
+    border: none;
+    border-radius: 0;
+    align-items: center;
+    justify-content: center;
+    overflow: visible;
+    cursor: default;
+}
+
 .menu-express-header {
     display: flex;
     align-items: center;
@@ -69,6 +99,7 @@ body {
     padding: 2px 4px;
     background: rgba(255, 255, 255, 0.08);
     flex-shrink: 0;
+    cursor: move;
 }
 
 .menu-express-titulo {
@@ -98,7 +129,7 @@ body {
     cursor: pointer;
     /* Este botón NO debe arrastrar la ventana — sin
        data-tauri-drag-region, a diferencia del resto de la
-       tarjeta (ver spec: "toda la ventana excepto botones"). */
+       tarjeta (header en Cuadrícula, círculo central en Radial). */
 }
 
 .menu-express-cerrar:hover {
@@ -113,6 +144,7 @@ body {
     gap: 4px;
     padding: 6px;
     overflow: auto;
+    cursor: move;
 }
 
 /* ==========================
@@ -135,37 +167,90 @@ body {
 }
 
 /* ==========================
-   Forma: Radial — cada botón se posiciona con position:absolute
-   (left/top en % calculados en TS, transform para centrar el
-   botón en su punto). El centro queda libre (o con el nombre del
-   menú, ver menu_express_main.ts). Sin límite de botones: se
-   dibujan todos los que quepan en el círculo (spec).
+   Forma: Radial (etapa 9) — anillo continuo de gajos. El
+   contenedor mide diametro x diametro (fijado por JS,
+   calcularRadiosRadial), centrado dentro de la tarjeta por el
+   flex del padre (.menu-express-card--radial). No arrastra la
+   ventana (a diferencia de antes) — el arrastre en Radial vive
+   solo en .menu-express-radial-centro (spec: "solo desde el
+   centro").
    ========================== */
 
 .menu-express-cuerpo.forma-radial {
     position: relative;
+    flex: none;
     overflow: visible;
     padding: 0;
+    gap: 0;
+    cursor: default;
 }
 
-.menu-express-cuerpo.forma-radial .menu-express-boton {
+.menu-express-boton--gajo {
+    position: absolute;
+    top: 0;
+    left: 0;
+    padding: 0;
+    border: none;
+    border-radius: 0;
+    background: rgba(0, 0, 0, 0.32);
+}
+
+.menu-express-boton--gajo:hover {
+    background: rgba(255, 255, 255, 0.16);
+}
+
+.menu-express-boton--gajo:active,
+.menu-express-boton--gajo.presionado {
+    background: rgba(255, 255, 255, 0.3);
+}
+
+.menu-express-boton-etiqueta {
     position: absolute;
     transform: translate(-50%, -50%);
+    text-align: center;
+    line-height: 1.15;
+    white-space: normal;
+    overflow: hidden;
+    pointer-events: none;
 }
 
+/* Círculo central — reemplaza al header en modo Radial: nombre del
+   menú + botón de cerrar. Único lugar arrastrable en Radial (ver
+   data-tauri-drag-region en menu_express_main.ts). z-index por
+   encima de los gajos (que se insertan antes en el DOM, pero por
+   las dudas si algún gajo llegara a solaparlo geométricamente). */
 .menu-express-radial-centro {
     position: absolute;
     left: 50%;
     top: 50%;
     transform: translate(-50%, -50%);
-    max-width: 70%;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    border-radius: 50%;
+    background: rgba(15, 15, 22, 0.75);
+    border: 1px solid var(--border-light);
+    padding: 6px;
+    cursor: move;
+}
+
+.menu-express-radial-centro-titulo {
+    max-width: 100%;
     text-align: center;
     font-size: var(--fs12);
-    opacity: 0.75;
-    white-space: nowrap;
+    opacity: 0.85;
     overflow: hidden;
     text-overflow: ellipsis;
-    pointer-events: none;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+}
+
+.menu-express-radial-cerrar {
+    cursor: pointer;
 }
 
 .menu-express-vacio {
@@ -174,6 +259,16 @@ body {
     opacity: 0.7;
     text-align: center;
     padding: 12px;
+}
+
+.menu-express-vacio--radial {
+    position: absolute;
+    left: 50%;
+    top: 100%;
+    transform: translateX(-50%);
+    margin-top: 8px;
+    width: max-content;
+    max-width: 160px;
 }
 
 .menu-express-boton {
@@ -212,13 +307,8 @@ body {
    Tamaños de botón (menu_extra.tamanoBoton) — valores base;
    config.rs (etapa 8) los hará configurables de verdad. Por
    ahora fijos acá, mismo criterio que captura.css con sus
-   propias medidas.
-
-   Alto siempre fijo. Ancho SOLO se fija en modo Radial (acá
-   abajo, con selector .forma-radial) — en modo lista
-   flex-direction:column estira al 100% (etapa 5, sin cambios), y
-   en modo Cuadrícula la celda del grid manda (width:100% arriba,
-   ver .forma-cuadricula .menu-express-boton).
+   propias medidas. Solo aplica a lista/Cuadrícula — Radial
+   calcula su propio tamaño de anillo en TS (calcularRadiosRadial).
    ========================== */
 
 .menu-express-boton.tam-pequeno {
@@ -231,22 +321,6 @@ body {
 
 .menu-express-boton.tam-grande {
     height: 50px;
-}
-
-/* Espejo exacto de TAMANOS_BOTON_PX en menu_express_main.ts /
-   TAMANOS_BOTON_PX en back_menu_express.rs — si uno cambia,
-   cambiar los tres. */
-
-.menu-express-cuerpo.forma-radial .menu-express-boton.tam-pequeno {
-    width: 60px;
-}
-
-.menu-express-cuerpo.forma-radial .menu-express-boton.tam-mediano {
-    width: 80px;
-}
-
-.menu-express-cuerpo.forma-radial .menu-express-boton.tam-grande {
-    width: 100px;
 }
 
 /* ==========================
