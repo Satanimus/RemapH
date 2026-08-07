@@ -241,7 +241,8 @@ body {
    data-tauri-drag-region en menu_express_main.ts). z-index por
    encima de los gajos (que se insertan antes en el DOM, pero por
    las dudas si algún gajo llegara a solaparlo geométricamente). */
-.menu-express-radial-centro {
+
+   .menu-express-radial-centro {
     position: absolute;
     left: 50%;
     top: 50%;
@@ -253,7 +254,7 @@ body {
     justify-content: center;
     gap: 6px;
     border-radius: 50%;
-    background: rgba(15, 15, 22, 0.75);
+    background: var(--menu-color, rgba(15, 15, 22, 0.75));
     border: 1px solid var(--border-light);
     padding: 6px;
     cursor: move;
@@ -328,7 +329,6 @@ body {
 .menu-express-boton--color-propio {
     border-color: var(--boton-color-borde);
 }
-
 
 /* ==========================
    Tamaños de botón (menu_extra.tamanoBoton) — valores base;
