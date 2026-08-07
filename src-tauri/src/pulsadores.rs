@@ -1,5 +1,5 @@
 // ======================================================
-// 🎛️ Pulsadores  
+// 🎛️ Pulsadores
 // ======================================================
 // ETAPA 0 DEL FLUJO
 // ------------------------------------------------------
@@ -276,4 +276,71 @@ pub fn ui_desde_interno(nombre: &str) -> String {
     por_interno(nombre)
         .map(|p| p.ui.to_string())
         .unwrap_or_else(|| nombre.to_string())
+}
+
+// ======================================================
+// 🌐 TRADUCCIÓN GENÉRICA POR COLUMNA
+// ------------------------------------------------------
+// Único punto de entrada para traducir entre columnas del
+// diccionario desde afuera (comandos.rs → UI). Pensado para
+// que la UI nunca tenga que conocer la estructura de
+// pulsadores.tsv, solo pedir "de esta columna a esta otra".
+//
+// La columna "usuario" (nombre personalizado del usuario)
+// todavía no existe como campo propio de Pulsador — hasta
+// que se agregue, tanto para leerla como para escribirla
+// esta función cae en "ui" como mejor aproximación
+// disponible. El día que se agregue la columna real, solo
+// hay que sumar el campo a Pulsador/cargar() y estos dos
+// brazos empiezan a usarlo — nada de afuera de este archivo
+// tiene que cambiar.
+// ======================================================
+
+pub fn traducir(valor: &str, origen: &str, destino: &str) -> Option<String> {
+    let pulsador = match origen {
+        "nativo" => por_nativo(valor),
+        "interno" => por_interno(valor),
+        "interception" => por_interception(valor),
+        "ui" => por_ui(valor),
+        "usuario" => por_interno(valor),
+        _ => None,
+    }?;
+
+    let campo = match destino {
+        "nativo" => &pulsador.nativo,
+        "interno" => &pulsador.interno,
+        "interception" => &pulsador.interception,
+        "ui" => &pulsador.ui,
+        "usuario" => &pulsador.ui,
+        _ => return None,
+    };
+
+    Some(campo.clone())
+}
+
+// ======================================================
+// 🌐 TRADUCCIÓN EN LOTE
+// ------------------------------------------------------
+// Misma traducción que traducir(), pero para varios valores
+// en una sola pasada — evita que la UI tenga que hacer un
+// round-trip a Tauri por cada tecla al reconstruir un perfil
+// completo. Los valores que no matchean ningún pulsador
+// simplemente no aparecen en el mapa devuelto (quien llama
+// decide el fallback, típicamente el propio valor original).
+// ======================================================
+
+pub fn traducir_lote(
+    valores: &[String],
+    origen: &str,
+    destino: &str,
+) -> std::collections::HashMap<String, String> {
+    let mut mapa = std::collections::HashMap::new();
+
+    for valor in valores {
+        if let Some(traducido) = traducir(valor, origen, destino) {
+            mapa.insert(valor.clone(), traducido);
+        }
+    }
+
+    mapa
 }

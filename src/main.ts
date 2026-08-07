@@ -41,7 +41,7 @@ async function guardarPerfil(): Promise<void> {
 async function iniciarApp(): Promise<void> {
   const perfil_json = await invoke<perfil_json>("obtener_perfil_actual");
 
-  const perfil = convertirperfil_json(perfil_json);
+  const perfil = await convertirperfil_json(perfil_json);
 
   establecerPerfilUi(perfil);
 

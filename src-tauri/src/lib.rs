@@ -63,6 +63,8 @@ pub fn run() {
             comandos::obtener_captura,
             comandos::obtener_perfil_actual,
             comandos::obtener_perfiles,
+            comandos::traducir_pulsador,
+            comandos::traducir_pulsador_lote,
             comandos::obtener_nombre_perfil_actual,
             comandos::obtener_estado_cache,
             comandos::restaurar_perfil_actual,

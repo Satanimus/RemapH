@@ -253,6 +253,26 @@ const TABLA_EXTENDIDA: &[(&str, ScanCode)] = &[
     // (convertir_salida) y fija correctamente es_extendida=true para
     // cuando se emite.
     ("Oem2", ScanCode::Oem2),
+    // Impr Pant (sin Alt): la tecla física manda DOS strokes — un
+    // "fake shift" (E0+LeftShift) seguido del real (E0+NumpadMultiply).
+    // Sin esta entrada, el segundo stroke caía al nombre por defecto
+    // del ScanCode ignorando el E0 ("NumpadMultiply" normal), y al
+    // reemitirse perdía el bit E0 → Windows lo leía como el "*" del
+    // numpad.
+    ("PrintScreen", ScanCode::NumpadMultiply),
+    // Fake-shift de Impr Pant (E0+LeftShift): OJO, este nombre
+    // "PrintScreenFakeShift" es a propósito uno que NO existe en
+    // pulsadores.tsv. Si se dejara caer al nombre por defecto
+    // ("LeftShift"), colisiona con la fila real de LeftShift del tsv
+    // y el stroke se reconoce como si fuera un Shift físico genuino
+    // — se cuela en captura/triggers como "modificador LeftShift"
+    // (bug ya visto). Al no matchear ningún interno en el tsv, cae en
+    // la rama "no traducible" de back_interception, que lo descarta
+    // sin reenviarlo (ver iniciar(), caso especial
+    // es_fake_shift_impr_pant) — back_interception::emitir_teclado()
+    // lo reconstruye por su cuenta, pegado al stroke real, cada vez
+    // que se emite "PrintScreen".
+    ("PrintScreenFakeShift", ScanCode::LeftShift),
 ];
 
 // ======================================================

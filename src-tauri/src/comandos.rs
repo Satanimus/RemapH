@@ -137,6 +137,7 @@ use crate::config;
 use crate::perfil;
 use crate::perfil_json::perfil_json;
 use crate::perfil_ui::{convertir_perfil, FilaUI, ResultadoPerfil, TriggerCapturaUI};
+use crate::pulsadores;
 
 use base64::engine::general_purpose::STANDARD as BASE64;
 use base64::Engine as _;
@@ -173,6 +174,28 @@ pub fn obtener_perfiles() -> Result<Vec<String>, String> {
 #[tauri::command]
 pub fn obtener_nombre_perfil_actual() -> Result<String, String> {
     perfil::obtener_nombre_actual()
+}
+
+// ======================================================
+// 🌐 COMANDOS TRADUCTOR (pulsadores.tsv)
+// ------------------------------------------------------
+// Puente entre columnas del diccionario para la UI (ver
+// core_traductor.ts). La UI nunca lee pulsadores.tsv
+// directamente — pide traducciones puntuales acá.
+// ======================================================
+
+#[tauri::command]
+pub fn traducir_pulsador(valor: String, origen: String, destino: String) -> Option<String> {
+    pulsadores::traducir(&valor, &origen, &destino)
+}
+
+#[tauri::command]
+pub fn traducir_pulsador_lote(
+    valores: Vec<String>,
+    origen: String,
+    destino: String,
+) -> std::collections::HashMap<String, String> {
+    pulsadores::traducir_lote(&valores, &origen, &destino)
 }
 
 #[tauri::command]

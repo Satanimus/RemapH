@@ -200,7 +200,7 @@ export function crearToolbar(alGuardar: () => Promise<void>): HTMLElement {
       alGuardar,
 
       (resultado) => {
-        aplicarResultadoPerfil(toolbar, nombrePerfil, cacheDot, resultado);
+        void aplicarResultadoPerfil(toolbar, nombrePerfil, cacheDot, resultado);
       },
     );
   });
@@ -212,13 +212,13 @@ export function crearToolbar(alGuardar: () => Promise<void>): HTMLElement {
 // APLICAR RESULTADO PERFIL
 // ======================================================
 
-function aplicarResultadoPerfil(
+async function aplicarResultadoPerfil(
   toolbar: HTMLElement,
   nombrePerfil: HTMLElement,
   cacheDot: HTMLElement,
   resultado: ResultadoPerfil,
-): void {
-  const perfil = convertirperfil_json(resultado.perfil);
+): Promise<void> {
+  const perfil = await convertirperfil_json(resultado.perfil);
 
   establecerPerfilUi(perfil);
 

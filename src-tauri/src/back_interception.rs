@@ -147,7 +147,9 @@
 use crate::back_mouse::{self, MouseOutput};
 use crate::back_teclas;
 use crate::eventos::{InputEvent, InputState};
-use interception::{Device, Filter, Interception, KeyFilter, KeyState, MouseFilter, Stroke};
+use interception::{
+    Device, Filter, Interception, KeyFilter, KeyState, MouseFilter, ScanCode, Stroke,
+};
 use std::cell::RefCell;
 use std::sync::{Mutex, OnceLock};
 
@@ -303,8 +305,24 @@ pub fn iniciar(mut procesar: impl FnMut(InputEvent), debe_tragar_no_traducible: 
             // compilada — justo lo que este programa promete no hacer.
             // Ahora se reenvía cruda, salvo que haya una Captura en
             // curso (ahí se traga, para no ensuciar lo que se graba).
+            //
+            // EXCEPCIÓN — fake-shift de Impr Pant (E0+LeftShift): este
+            // stroke puntual NO se reenvía nunca acá, ni siquiera
+            // crudo. emitir_teclado() lo reconstruye por su cuenta,
+            // pegado al stroke real de PrintScreen, cada vez que ese
+            // evento se emite (ver back_teclas.rs, TABLA_EXTENDIDA).
+            // Si además lo dejáramos pasar acá, Windows vería un
+            // Shift-down duplicado (el crudo inmediato + el
+            // reconstruido después) y deja de reconocer la
+            // combinación — es justo el bug que esto corrige.
             None => {
-                if !debe_tragar_no_traducible() {
+                let es_fake_shift_impr_pant = matches!(
+                    stroke,
+                    Stroke::Keyboard { code: ScanCode::LeftShift, state, .. }
+                        if state.contains(KeyState::E0)
+                );
+
+                if !es_fake_shift_impr_pant && !debe_tragar_no_traducible() {
                     ict.send(device, &[stroke]);
                 }
             }
@@ -345,11 +363,33 @@ pub fn emitir_evento(evento: InputEvent) {
 }
 
 fn emitir_teclado(evento: &InputEvent) {
-    let Some((code, es_extendida)) = back_teclas::convertir_salida(&evento.input) else {
+    let Some(device) = teclado_primario() else {
         return;
     };
 
-    let Some(device) = teclado_primario() else {
+    // Impr Pant es un caso especial: la tecla física manda un PAR de
+    // strokes pegados (fake-shift E0+2A seguido del real E0+37) y
+    // Windows solo lo reconoce como Impr Pant si le llegan juntos, en
+    // el orden correcto, desde el mismo envío. Si se emitiera como un
+    // stroke suelto (como cualquier otra tecla, vía back_teclas::
+    // convertir_salida + enviar_tecla), Windows lo traduce a nada (ni
+    // "*" ni captura) — ver nota en back_teclas.rs, TABLA_EXTENDIDA.
+    // Por eso NO pasa por el camino genérico: se arma acá el par
+    // completo, replicando byte a byte la secuencia física real.
+    if evento.input.control() == Some("PrintScreen") {
+        con_sesion_salida(|ict| match evento.state {
+            InputState::Down => enviar_impr_pant(ict, device, true),
+            InputState::Up => enviar_impr_pant(ict, device, false),
+            InputState::Pulse => {
+                enviar_impr_pant(ict, device, true);
+                enviar_impr_pant(ict, device, false);
+            }
+        });
+
+        return;
+    }
+
+    let Some((code, es_extendida)) = back_teclas::convertir_salida(&evento.input) else {
         return;
     };
 
@@ -363,6 +403,24 @@ fn emitir_teclado(evento: &InputEvent) {
             enviar_tecla(ict, device, code, KeyState::UP, es_extendida);
         }
     });
+}
+
+// ======================================================
+// 🖨️ IMPR PANT (par fake-shift + tecla real)
+// ------------------------------------------------------
+// Secuencia física real (Set 1, ambas extendidas E0):
+// Press:   E0 2A (shift) luego E0 37 (tecla)
+// Release: E0 B7 (tecla) luego E0 AA (shift) — orden inverso
+// ======================================================
+
+fn enviar_impr_pant(ict: &Interception, device: Device, presionar: bool) {
+    if presionar {
+        enviar_tecla(ict, device, ScanCode::LeftShift, KeyState::DOWN, true);
+        enviar_tecla(ict, device, ScanCode::NumpadMultiply, KeyState::DOWN, true);
+    } else {
+        enviar_tecla(ict, device, ScanCode::NumpadMultiply, KeyState::UP, true);
+        enviar_tecla(ict, device, ScanCode::LeftShift, KeyState::UP, true);
+    }
 }
 
 fn enviar_tecla(

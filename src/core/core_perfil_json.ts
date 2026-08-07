@@ -35,6 +35,8 @@ import type {
   MenuExpressExtraPerfil,
 } from "./core_menu_express";
 
+import { traducirLote } from "./core_traductor";
+
 // ======================================================
 // 📦 MODELO JSON
 // ======================================================
@@ -110,10 +112,34 @@ interface InputJson {
 // ------------------------------------------------------
 // Si el perfil llega sin remapeos (perfil nuevo), se crea
 // una fila vacía para que la tabla nunca quede sin filas.
+//
+// El JSON que manda Rust solo trae el nombre INTERNO de
+// cada tecla (fuente de verdad, ver pulsadores.tsv) — nunca
+// el nombre visible. Traducir ese nombre a UI es
+// responsabilidad de la UI (acá), no de Rust: el día que
+// exista una columna "usuario" con nombres personalizados
+// por archivo de config, este es el único lugar que hay que
+// tocar para empezar a usarla (ver core_traductor.ts).
+//
+// Para no hacer un round-trip a Tauri por cada tecla del
+// perfil, se junta primero cada `control` único que aparece
+// en todo el perfil y se traduce todo en un solo lote.
 // ======================================================
 
-export function convertirperfil_json(perfil_json: perfil_json): Perfil {
-  const filas = perfil_json.remapeos.map(convertirRemapeo);
+export async function convertirperfil_json(
+  perfil_json: perfil_json,
+): Promise<Perfil> {
+  const mapaNombres = await traducirLote(
+    recolectarControles(perfil_json.remapeos),
+
+    "interno",
+
+    "ui",
+  );
+
+  const filas = perfil_json.remapeos.map((remapeo) =>
+    convertirRemapeo(remapeo, mapaNombres),
+  );
 
   return {
     activo: true,
@@ -123,11 +149,43 @@ export function convertirperfil_json(perfil_json: perfil_json): Perfil {
 }
 
 // ======================================================
+// 📋 RECOLECTAR CONTROLES
+// ------------------------------------------------------
+// Todos los `control` (nombre interno) que aparecen en
+// modificadores/gatillo, tanto del trigger de disparo como
+// del trigger de acción, sin duplicados.
+// ======================================================
+
+function recolectarControles(remapeos: RemapeoJson[]): string[] {
+  const controles = new Set<string>();
+
+  const agregarTrigger = (trigger: TriggerJson | null) => {
+    if (!trigger) return;
+
+    trigger.modificadores.forEach((input) => controles.add(input.control));
+
+    if (trigger.gatillo) controles.add(trigger.gatillo.control);
+  };
+
+  remapeos.forEach((remapeo) => {
+    agregarTrigger(remapeo.trigger);
+
+    agregarTrigger(remapeo.accion_trigger);
+  });
+
+  return Array.from(controles);
+}
+
+// ======================================================
 // 🧩 CONVERTIR REMAPEO
 // ======================================================
 
-function convertirRemapeo(remapeo: RemapeoJson): FilaPerfil {
-  const trigger = convertirTrigger(remapeo.trigger);
+function convertirRemapeo(
+  remapeo: RemapeoJson,
+
+  mapaNombres: Record<string, string>,
+): FilaPerfil {
+  const trigger = convertirTrigger(remapeo.trigger, mapaNombres);
 
   return {
     id: remapeo.id,
@@ -141,7 +199,7 @@ function convertirRemapeo(remapeo: RemapeoJson): FilaPerfil {
     tipo: remapeo.tipo,
 
     accion: remapeo.accion_trigger
-      ? convertirTrigger(remapeo.accion_trigger)
+      ? convertirTrigger(remapeo.accion_trigger, mapaNombres)
       : null,
 
     // Vestigial (duplica trigger.condicion) — nada la lee hoy,
@@ -171,13 +229,19 @@ function convertirRemapeo(remapeo: RemapeoJson): FilaPerfil {
 // 🎯 CONVERTIR TRIGGER
 // ======================================================
 
-function convertirTrigger(triggerJson: TriggerJson): Trigger {
+function convertirTrigger(
+  triggerJson: TriggerJson,
+
+  mapaNombres: Record<string, string>,
+): Trigger {
   const trigger = crearTrigger();
 
-  trigger.modificadores = triggerJson.modificadores.map(convertirEntrada);
+  trigger.modificadores = triggerJson.modificadores.map((input) =>
+    convertirEntrada(input, mapaNombres),
+  );
 
   trigger.gatillo = triggerJson.gatillo
-    ? convertirEntrada(triggerJson.gatillo)
+    ? convertirEntrada(triggerJson.gatillo, mapaNombres)
     : null;
 
   trigger.condicion = convertirCondicion(triggerJson.condicion);
@@ -187,15 +251,24 @@ function convertirTrigger(triggerJson: TriggerJson): Trigger {
 
 // ======================================================
 // 🆔 CONVERTIR ENTRADA
+// ------------------------------------------------------
+// Si el control no aparece en el mapa (no matcheó ningún
+// pulsador conocido), se usa el nombre interno tal cual
+// como último recurso — mejor mostrar el nombre crudo que
+// dejar la celda vacía.
 // ======================================================
 
-function convertirEntrada(input: InputJson): Entrada {
+function convertirEntrada(
+  input: InputJson,
+
+  mapaNombres: Record<string, string>,
+): Entrada {
   return crearEntrada(
     convertirTipo(input.fuente),
 
     input.control,
 
-    input.control,
+    mapaNombres[input.control] ?? input.control,
   );
 }
 
