@@ -54,7 +54,7 @@ body {
     justify-content: center;
     text-align: center;
     padding: 0 10px;
-    background: rgba(0, 0, 0, 0.25);
+    background: rgba(20, 20, 30, 0.9);
     border: 1px solid rgba(255, 255, 255, 0.35);
     border-radius: 6px;
     color: #ffffff;
@@ -182,6 +182,24 @@ body {
     height: 100%;
 }
 
+/* Mismo criterio que .ui-btn--desborda: si el texto no entra, se
+   pasa a la izquierda para que el recorte sea solo a la derecha. */
+.menu-express-boton.ui-btn--desborda {
+    justify-content: flex-start;
+    text-align: left;
+}
+
+.menu-express-boton:hover {
+        background: linear-gradient(rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0.12)),
+            rgba(20, 20, 30, 0.9);
+    }
+
+.menu-express-boton:active,
+.menu-express-boton.presionado {
+        background: linear-gradient(rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0.2)), rgba(20, 20, 30, 0.9);
+    }
+
+
 /* ==========================
    Forma: Radial (etapa 9) — anillo continuo de gajos. El
    contenedor mide diametro x diametro (fijado por JS,
@@ -208,22 +226,18 @@ body {
     padding: 0;
     border: none;
     border-radius: 0;
-    /* Antes tenía un fondo fijo (rgba(0,0,0,.32)) que ignoraba el
-       color de la fila que generó el menú — --menu-color lo fija
-       aplicarColorFondo() en menu_express_main.ts, mismo valor que
-       usa .menu-express-card en Cuadrícula (ver arriba). Fallback
-       sólido por si --menu-color no llegó a fijarse (color-mix sin
-       soporte, mismo criterio que .menu-express-card). */
-    background: var(--menu-color, rgba(20, 20, 30, 0.85));
+    background: rgba(20, 20, 30, 0.9);
 }
 
+/* Hover: overlay blanco semitransparente sobre el fondo base */
 .menu-express-boton--gajo:hover {
-    background: rgba(255, 255, 255, 0.16);
+    background: linear-gradient(rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0.12)),
+        rgba(20, 20, 30, 0.9);
 }
 
 .menu-express-boton--gajo:active,
 .menu-express-boton--gajo.presionado {
-    background: rgba(255, 255, 255, 0.3);
+    background: linear-gradient(rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0.2)), rgba(20, 20, 30, 0.9);
 }
 
 .menu-express-boton-etiqueta {
@@ -242,7 +256,7 @@ body {
    encima de los gajos (que se insertan antes en el DOM, pero por
    las dudas si algún gajo llegara a solaparlo geométricamente). */
 
-   .menu-express-radial-centro {
+.menu-express-radial-centro {
     position: absolute;
     left: 50%;
     top: 50%;
@@ -294,22 +308,6 @@ body {
     margin-top: 8px;
     width: max-content;
     max-width: 160px;
-}
-
-/* Mismo criterio que .ui-btn--desborda: si el texto no entra, se
-   pasa a la izquierda para que el recorte sea solo a la derecha. */
-.menu-express-boton.ui-btn--desborda {
-    justify-content: flex-start;
-    text-align: left;
-}
-
-.menu-express-boton:hover {
-    background: rgba(255, 255, 255, 0.15);
-}
-
-.menu-express-boton:active,
-.menu-express-boton.presionado {
-    background: rgba(255, 255, 255, 0.28);
 }
 
 /* ==========================
