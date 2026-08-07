@@ -48,6 +48,22 @@ body {
     height: 100%;
 }
 
+.menu-express-boton {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 0 10px;
+    background: rgba(0, 0, 0, 0.25);
+    border: 1px solid rgba(255, 255, 255, 0.35);
+    border-radius: 6px;
+    color: #ffffff;
+    cursor: pointer;
+    white-space: nowrap;
+    overflow: hidden;
+    transition: background-color 0.1s ease;
+}
+
 .menu-express-card {
     width: 100%;
     height: 100%;
@@ -279,22 +295,6 @@ body {
     max-width: 160px;
 }
 
-.menu-express-boton {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    text-align: center;
-    padding: 0 10px;
-    background: rgba(0, 0, 0, 0.25);
-    border: 1px solid rgba(255, 255, 255, 0.35);
-    border-radius: 6px;
-    color: #ffffff;
-    cursor: pointer;
-    white-space: nowrap;
-    overflow: hidden;
-    transition: background-color 0.1s ease;
-}
-
 /* Mismo criterio que .ui-btn--desborda: si el texto no entra, se
    pasa a la izquierda para que el recorte sea solo a la derecha. */
 .menu-express-boton.ui-btn--desborda {
@@ -329,9 +329,6 @@ body {
     border-color: var(--boton-color-borde);
 }
 
-.menu-express-boton--color-propio.menu-express-boton--gajo {
-    box-shadow: inset 0 0 0 2px var(--boton-color-borde);
-}
 
 /* ==========================
    Tamaños de botón (menu_extra.tamanoBoton) — valores base;

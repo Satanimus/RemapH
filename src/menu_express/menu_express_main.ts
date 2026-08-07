@@ -580,21 +580,49 @@ function crearGajo(
   const cx = radios.diametro / 2;
   const cy = radios.diametro / 2;
 
-  elemento.style.width = `${radios.diametro}px`;
-  elemento.style.height = `${radios.diametro}px`;
-  elemento.style.clipPath = `path("${pathGajo(
+  const path = pathGajo(
     cx,
     cy,
     radios.huecoRadio,
     radios.radioExterior,
     anguloInicio,
     anguloFin,
-  )}")`;
+  );
 
-  // La etiqueta se centra en el punto medio del gajo (ángulo medio,
-  // radio medio) — el botón en sí ocupa todo el anillo de fondo, así
-  // que centrarla con flex en el propio elemento la pondría en el
-  // centro del círculo, no en el medio del gajo.
+  elemento.style.width = `${radios.diametro}px`;
+  elemento.style.height = `${radios.diametro}px`;
+  elemento.style.clipPath = `path("${path}")`;
+
+  // Guardar el path en variable CSS para el borde
+  elemento.style.setProperty("--gajo-path", `"${path}"`);
+
+  // SVG para el borde (mismo path, stroke)
+  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  svg.setAttribute(
+    "style",
+    `
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    overflow: visible;
+  `,
+  );
+  svg.setAttribute("viewBox", `0 0 ${radios.diametro} ${radios.diametro}`);
+
+  const pathEl = document.createElementNS("http://www.w3.org/2000/svg", "path");
+  pathEl.setAttribute("d", path);
+  pathEl.setAttribute("fill", "none");
+  pathEl.setAttribute("stroke", "var(--boton-color-borde, transparent)");
+  pathEl.setAttribute("stroke-width", "2");
+  pathEl.setAttribute("stroke-linejoin", "round");
+  pathEl.setAttribute("stroke-linecap", "round");
+  svg.append(pathEl);
+  elemento.append(svg);
+
+  // Etiqueta del gajo
   const anguloMedio = (anguloInicio + anguloFin) / 2;
   const radioMedio = (radios.huecoRadio + radios.radioExterior) / 2;
   const puntoTexto = puntoEnAngulo(cx, cy, radioMedio, anguloMedio);
@@ -609,15 +637,14 @@ function crearGajo(
 
   elemento.append(etiqueta);
 
-  // El gajo está recortado con clip-path:path() — un `border` común
-  // no sigue ese contorno (se dibuja en la caja rectangular
-  // original, no en la forma recortada). Por eso el "borde" de Color
-  // Botón acá se simula con box-shadow inset (ver
-  // .menu-express-boton--color-propio.menu-express-boton--gajo en
-  // menu_express.css): un box-shadow inset SÍ respeta el recorte de
-  // clip-path, y da el mismo efecto visual de contorno interior que
-  // el border real de Cuadrícula/lista.
-  aplicarColorBorde(elemento, datos.colorBoton, boton.color);
+  // Aplicar color de borde (clase + variable CSS)
+  if (datos.colorBoton === "color" && boton.color) {
+    elemento.style.setProperty(
+      "--boton-color-borde",
+      `var(--tag-${boton.color})`,
+    );
+    elemento.classList.add("menu-express-boton--color-propio");
+  }
 
   adjuntarEventosBoton(elemento, boton);
 
