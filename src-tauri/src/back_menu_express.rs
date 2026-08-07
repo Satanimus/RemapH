@@ -230,6 +230,25 @@ pub struct MenuExpressDatosUI {
     pub color: String,
 }
 
+pub fn abrir_o_alternar(id: String, paquete: MenuExpressPaquete) {
+    let ya_abierto = con_registro(|mapa| mapa.contains_key(&id));
+
+    if ya_abierto {
+        cerrar(&id);
+        return;
+    }
+
+    let Some(app) = app_handle() else {
+        return;
+    };
+
+    con_registro(|mapa| {
+        mapa.insert(id.clone(), convertir_datos_ui(&paquete));
+    });
+
+    crear_ventana(app.clone(), id, paquete);
+}
+
 fn convertir_datos_ui(paquete: &MenuExpressPaquete) -> MenuExpressDatosUI {
     MenuExpressDatosUI {
         nombre: paquete.nombre.clone(),
@@ -305,8 +324,8 @@ fn label_de(id: &str) -> String {
 // resto de config.rs) — "recordar la última posición" no implica
 // sobrevivir a un reinicio de la app, solo a abrir/cerrar el
 // menú varias veces en la misma sesión. Se escribe en
-// on_window_event (CloseRequested, ver crear_ventana) y se lee
-// acá en abrir_o_alternar() para el próximo open.
+// on_window_event (CloseRequested y Moved, ver crear_ventana) y
+// se lee acá en abrir_o_alternar() para el próximo open.
 // ======================================================
 
 static ULTIMA_POSICION: Mutex<Option<HashMap<String, (i32, i32)>>> = Mutex::new(None);
@@ -327,36 +346,212 @@ fn ultima_posicion(id: &str) -> Option<(i32, i32)> {
 }
 
 // ======================================================
-// ⚡🪟 ABRIR O ALTERNAR
+// ⏱️ IGNORAR EL "Moved" FANTASMA DE LA CREACIÓN
 // ------------------------------------------------------
-// Único punto de entrada llamado desde runtime.rs. Alternar es
-// A NIVEL DE TRIGGER (ver header) — independiente del
-// Comportamiento Toggle/Efímero de la fila, que solo aplica al
-// hacer clic en un botón de adentro (etapa 7).
+// Windows manda WM_MOVE (→ WindowEvent::Moved) también cuando el
+// SO termina de posicionar la ventana recién creada — no solo
+// cuando el usuario la arrastra. Con builder.position(x, y) la
+// posición real de creación puede además diferir en unos pocos px
+// del valor pedido (redondeo de escalado DPI), así que ese Moved
+// "de fábrica" no es basura inofensiva: si se guardara como si
+// fuera un arrastre real, cada apertura en modo Cursor
+// contaminaría ULTIMA_POSICION con la posición del cursor de ESA
+// apertura, y alternar Cursor/Persistente (o incluso Persistente
+// solo, por el drift de redondeo) hacía que el menú "caminara"
+// solo por la pantalla de apertura en apertura.
+//
+// Por eso cada ventana registra el instante en que terminó
+// build() (VENTANA_LISTA_DESDE) y on_window_event descarta
+// cualquier Moved que llegue dentro de los primeros
+// IGNORAR_MOVED_MS — tiempo de sobra para el WM_MOVE de creación
+// (llega en el mismo tick de mensajes, prácticamente inmediato) y
+// corto de sobra para no comerse un arrastre real del usuario
+// (nadie arrastra una ventana recién aparecida en menos de
+// IGNORAR_MOVED_MS).
 // ======================================================
 
-pub fn abrir_o_alternar(id: String, paquete: MenuExpressPaquete) {
-    let ya_abierto = con_registro(|mapa| mapa.contains_key(&id));
+const IGNORAR_MOVED_MS: u128 = 250;
 
-    if ya_abierto {
-        cerrar(&id);
-        return;
+static VENTANA_LISTA_DESDE: Mutex<Option<HashMap<String, std::time::Instant>>> = Mutex::new(None);
+
+fn marcar_ventana_lista(id: &str) {
+    let mut guardia = VENTANA_LISTA_DESDE.lock().unwrap();
+    guardia
+        .get_or_insert_with(HashMap::new)
+        .insert(id.to_string(), std::time::Instant::now());
+}
+
+fn moved_es_de_creacion(id: &str) -> bool {
+    VENTANA_LISTA_DESDE
+        .lock()
+        .unwrap()
+        .as_ref()
+        .and_then(|mapa| mapa.get(id))
+        .map(|listo_desde| listo_desde.elapsed().as_millis() < IGNORAR_MOVED_MS)
+        .unwrap_or(false)
+}
+
+fn olvidar_ventana_lista(id: &str) {
+    if let Some(mapa) = VENTANA_LISTA_DESDE.lock().unwrap().as_mut() {
+        mapa.remove(id);
     }
+}
 
-    let Some(app) = app_handle() else {
-        // No debería pasar: inicializar() corre en setup(), antes de
-        // que cualquier trigger físico pueda llegar a compilarse y
-        // dispararse. Si pasa, no hay ventana que crear — se ignora
-        // en silencio (mismo criterio que el resto de Runtime ante
-        // datos/estado incompleto, ver compilador.rs).
-        return;
-    };
+// ======================================================
+// 📐 UBICAR VENTANA SEGÚN MODO DE UBICACIÓN
+// ------------------------------------------------------
+// La lógica de posicionamiento es diferente según el modo:
+//
+// • Cursor: el punto de referencia es el cursor. Para Radial,
+//   el cursor es el CENTRO del círculo. Para Cuadrícula, el
+//   cursor es una ESQUINA de la ventana (se elige cuál según
+//   en qué mitad del monitor cae el cursor), para que el menú
+//   nunca se salga del monitor.
+//
+// • Persistente: el punto guardado es la esquina superior-
+//   izquierda REAL de la ventana (lo que devuelve outer_position
+//   y Moved). NO se recalcula "hacia qué esquina crecer" —
+//   solo se clampea para que no quede fuera del monitor si
+//   cambió la resolución o se movió a otro monitor.
+// ======================================================
 
-    con_registro(|mapa| {
-        mapa.insert(id.clone(), convertir_datos_ui(&paquete));
+fn monitor_para_punto(app: &AppHandle, x: i32, y: i32) -> Option<(i32, i32, i32, i32, f64)> {
+    let monitores = app.available_monitors().ok()?;
+
+    let contenedor = monitores.iter().find(|m| {
+        let pos = m.position();
+        let size = m.size();
+        x >= pos.x && x < pos.x + size.width as i32 && y >= pos.y && y < pos.y + size.height as i32
     });
 
-    crear_ventana(app.clone(), id, paquete);
+    let elegido = contenedor.or_else(|| monitores.first())?;
+
+    let pos = elegido.position();
+    let size = elegido.size();
+
+    Some((
+        pos.x,
+        pos.y,
+        size.width as i32,
+        size.height as i32,
+        elegido.scale_factor(),
+    ))
+}
+
+/// Convierte coordenadas lógicas (px CSS) a físicas (píxeles reales)
+fn logico_a_fisico(valor: f64, escala: f64) -> i32 {
+    (valor * escala).round() as i32
+}
+
+/// Convierte coordenadas físicas a lógicas
+fn fisico_a_logico(valor: i32, escala: f64) -> f64 {
+    valor as f64 / escala
+}
+
+/// Clampea un punto (esquina superior-izquierda) para que la ventana
+/// quede completamente dentro del monitor que contiene el punto.
+/// NO recalcula la esquina de anclaje — solo recorta si se sale.
+fn clamp_esquina_a_monitor(
+    app: &AppHandle,
+    punto: (i32, i32),
+    tamano_ventana_logico: (f64, f64),
+) -> (f64, f64) {
+    let (px, py) = punto;
+    let (ancho_log, alto_log) = tamano_ventana_logico;
+
+    let Some((mon_x, mon_y, mon_ancho, mon_alto, escala)) = monitor_para_punto(app, px, py) else {
+        return (px as f64, py as f64);
+    };
+
+    let ancho = logico_a_fisico(ancho_log, escala);
+    let alto = logico_a_fisico(alto_log, escala);
+
+    let mon_derecha = mon_x + mon_ancho;
+    let mon_abajo = mon_y + mon_alto;
+
+    let x = px.clamp(mon_x, (mon_derecha - ancho).max(mon_x));
+    let y = py.clamp(mon_y, (mon_abajo - alto).max(mon_y));
+
+    (fisico_a_logico(x, escala), fisico_a_logico(y, escala))
+}
+
+/// Ubica la ventana para el modo Cursor.
+/// - Radial: el cursor es el CENTRO del círculo.
+/// - Cuadrícula: el cursor es una ESQUINA (se elige la que
+///   mantiene la ventana dentro del monitor).
+fn ubicar_para_cursor(
+    app: &AppHandle,
+    cursor: (i32, i32),
+    tamano_ventana_logico: (f64, f64),
+    es_radial: bool,
+) -> (f64, f64) {
+    let (cx, cy) = cursor;
+    let (ancho_log, alto_log) = tamano_ventana_logico;
+
+    let Some((mon_x, mon_y, mon_ancho, mon_alto, escala)) = monitor_para_punto(app, cx, cy) else {
+        return (cx as f64, cy as f64);
+    };
+
+    let ancho = logico_a_fisico(ancho_log, escala);
+    let alto = logico_a_fisico(alto_log, escala);
+
+    let mon_derecha = mon_x + mon_ancho;
+    let mon_abajo = mon_y + mon_alto;
+
+    let (x_fisico, y_fisico) = if es_radial {
+        // Radial: el cursor es el CENTRO del círculo.
+        let x = cx - ancho / 2;
+        let y = cy - alto / 2;
+
+        let x = x.clamp(mon_x, (mon_derecha - ancho).max(mon_x));
+        let y = y.clamp(mon_y, (mon_abajo - alto).max(mon_y));
+
+        (x, y)
+    } else {
+        // Cuadrícula: el cursor es una ESQUINA.
+        // Si el cursor está en la mitad derecha del monitor,
+        // la ventana crece hacia la izquierda (esquina superior-derecha).
+        // Si está en la mitad izquierda, crece hacia la derecha.
+        let hacia_izquierda = cx > mon_x + mon_ancho / 2;
+        let hacia_arriba = cy > mon_y + mon_alto / 2;
+
+        let x = if hacia_izquierda { cx - ancho } else { cx };
+        let y = if hacia_arriba { cy - alto } else { cy };
+
+        let x = x.clamp(mon_x, (mon_derecha - ancho).max(mon_x));
+        let y = y.clamp(mon_y, (mon_abajo - alto).max(mon_y));
+
+        (x, y)
+    };
+
+    (
+        fisico_a_logico(x_fisico, escala),
+        fisico_a_logico(y_fisico, escala),
+    )
+}
+
+/// Decide la posición de apertura según el modo de ubicación.
+fn ubicar_segun_ubicacion(
+    app: &AppHandle,
+    id: &str,
+    paquete: &MenuExpressPaquete,
+    tamano_ventana: (f64, f64),
+) -> Option<(f64, f64)> {
+    match paquete.ubicacion {
+        UbicacionMenu::Cursor => {
+            let cursor = crate::back_coordenada::obtener_cursor();
+            let es_radial = matches!(paquete.forma, FormaMenu::Radial);
+            Some(ubicar_para_cursor(app, cursor, tamano_ventana, es_radial))
+        }
+
+        UbicacionMenu::Persistente => {
+            // Persistente: la posición guardada es la esquina superior-izquierda
+            // REAL de la ventana. Solo se clampea para que no quede fuera del
+            // monitor si cambió resolución o se movió a otro monitor.
+            // NO se recalcula "hacia qué esquina crecer".
+            ultima_posicion(id).map(|punto| clamp_esquina_a_monitor(app, punto, tamano_ventana))
+        }
+    }
 }
 
 // ======================================================
@@ -463,14 +658,9 @@ fn crear_ventana(app: AppHandle, id: String, paquete: MenuExpressPaquete) {
 
     let (ancho, alto) = calcular_tamano_ventana(&paquete);
 
-    let posicion = match paquete.ubicacion {
-        UbicacionMenu::Cursor => Some(crate::back_coordenada::obtener_cursor()),
-        // Etapa 8: recordar la última posición real en memoria (por id,
-        // ver ULTIMA_POSICION arriba). Primera vez que se abre este id
-        // en la sesión → None, y se deja que Tauri elija la posición
-        // por defecto (no hay "última" todavía).
-        UbicacionMenu::Persistente => ultima_posicion(&id),
-    };
+    let tamano_ventana = (ancho, alto);
+
+    let posicion = ubicar_segun_ubicacion(&app, &id, &paquete, tamano_ventana);
 
     // Copias para el closure movido a run_on_main_thread — se
     // conservan `id`/`label` originales acá afuera para poder
@@ -504,12 +694,14 @@ fn crear_ventana(app: AppHandle, id: String, paquete: MenuExpressPaquete) {
         .devtools(true);
 
         if let Some((x, y)) = posicion {
-            builder = builder.position(x as f64, y as f64);
+            builder = builder.position(x, y);
         }
 
         match builder.build() {
             Ok(ventana) => {
                 let id_cierre = id_interno.clone();
+
+                marcar_ventana_lista(&id_cierre);
 
                 // Clon aparte para leer la posición desde dentro del
                 // closure de eventos (on_window_event no entrega la
@@ -522,11 +714,25 @@ fn crear_ventana(app: AppHandle, id: String, paquete: MenuExpressPaquete) {
                 // cerrar_todas, el propio botón [x] ya invocó el comando
                 // pero por si el usuario la cierra "a lo nativo") — se
                 // limpia el registro para que abrir_o_alternar() la trate
-                // como cerrada la próxima vez. En CloseRequested (la
-                // ventana todavía existe) también se guarda su posición
-                // actual, para que la próxima apertura con ubicacion =
-                // Persistente reaparezca ahí (etapa 8).
+                // como cerrada la próxima vez.
+                //
+                // La posición se guarda en DOS momentos:
+                // • Moved: cada vez que el usuario arrastra la ventana
+                //   (esto es lo que hace que "arrastrar y volver a abrir
+                //   después" funcione de verdad) — se ignora el/los
+                //   Moved que Windows manda al recién crearse la
+                //   ventana (ver moved_es_de_creacion), que NO son un
+                //   arrastre real y, si se guardaran, hacían que el
+                //   menú "caminara" solo de apertura en apertura.
+                // • CloseRequested: por las dudas Moved no haya llegado a
+                //   disparar (ej. drag terminado justo al cerrar).
                 ventana.on_window_event(move |evento| {
+                    if let tauri::WindowEvent::Moved(posicion) = evento {
+                        if !moved_es_de_creacion(&id_cierre) {
+                            recordar_posicion(&id_cierre, posicion.x, posicion.y);
+                        }
+                    }
+
                     if let tauri::WindowEvent::CloseRequested { .. } = evento {
                         if let Ok(posicion) = ventana_para_evento.outer_position() {
                             recordar_posicion(&id_cierre, posicion.x, posicion.y);
@@ -536,6 +742,8 @@ fn crear_ventana(app: AppHandle, id: String, paquete: MenuExpressPaquete) {
                     if let tauri::WindowEvent::CloseRequested { .. }
                     | tauri::WindowEvent::Destroyed = evento
                     {
+                        olvidar_ventana_lista(&id_cierre);
+
                         con_registro(|mapa| {
                             mapa.remove(&id_cierre);
                         });
