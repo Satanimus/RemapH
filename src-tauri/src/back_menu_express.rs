@@ -142,6 +142,17 @@
 //   cerró una en esta sesión, no hay "última" — se deja sin
 //   posición explícita y Tauri usa su default.
 //
+// La ventana NUNCA debe robarle el foco a la app activa (ni al
+// abrirse ni al clickear un botón de adentro) — el usuario tiene
+// que poder, por ejemplo, seguir pegando texto en la app que
+// estaba usando. .focused(true) en el builder ya no se usa (se
+// dejó en false); y evento.preventDefault() en el mousedown del
+// TS NO alcanza para el clic, porque Windows decide la activación
+// a nivel de sistema antes de que el evento llegue a la webview.
+// La única forma real es pedirle a Windows el estilo extendido
+// WS_EX_NOACTIVATE sobre el HWND nativo — ver desactivar_activacion()
+// más abajo, llamada apenas se crea la ventana (crear_ventana).
+//
 // boton_down/boton_up SIEMPRE mandan Iniciar+Detener por
 // separado (nunca iniciar_y_finalizar de cache.rs) — eso es
 // justamente lo que necesita Mantenido/Turbo: el down real
@@ -166,7 +177,14 @@ use serde::Serialize;
 use std::collections::HashMap;
 use std::sync::{Mutex, OnceLock};
 
-use tauri::{AppHandle, Manager, WebviewUrl, WebviewWindowBuilder};
+use tauri::{AppHandle, Manager, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
+
+// Para desactivar_activacion() — ver esa función más abajo.
+use raw_window_handle::{HasWindowHandle, RawWindowHandle};
+use windows_sys::Win32::Foundation::HWND;
+use windows_sys::Win32::UI::WindowsAndMessaging::{
+    GetWindowLongPtrW, SetWindowLongPtrW, GWL_EXSTYLE, WS_EX_NOACTIVATE,
+};
 
 // ======================================================
 // 📦 PAQUETE RECIBIDO DESDE RUNTIME
@@ -680,6 +698,50 @@ fn calcular_grid_cuadricula(n: usize, columnas: u32, filas: u32) -> (u32, u32) {
 }
 
 // ======================================================
+// 🚫 DESACTIVAR ACTIVACIÓN (WS_EX_NOACTIVATE)
+// ------------------------------------------------------
+// .focused(false) en el builder solo evita el robo de foco AL
+// ABRIR — no alcanza para los clics de después, porque Windows
+// activa cualquier ventana con la que se interactúa por mouse,
+// sin importar cómo se creó. Para que un clic sobre un botón de
+// adentro tampoco la active, hay que pedirle a Windows el estilo
+// extendido WS_EX_NOACTIVATE sobre el HWND real — con eso la
+// ventana sigue recibiendo los clics normalmente (los botones
+// funcionan igual), pero deja de pasar a primer plano al
+// clickearla, así que la app que el usuario tenía activa
+// conserva el foco (puede seguir pegando texto ahí, etc.).
+//
+// Se obtiene el HWND vía raw_window_handle::HasWindowHandle
+// (que WebviewWindow ya implementa) en vez de un método directo
+// de Tauri, porque la versión de Tauri usada acá no expone uno.
+// Si por lo que sea no se puede obtener el handle (no debería
+// pasar en Windows), simplemente no se aplica el estilo — la
+// ventana sigue funcionando, solo que sin este pulido.
+// ======================================================
+
+fn desactivar_activacion(ventana: &WebviewWindow) {
+    let Ok(handle) = ventana.window_handle() else {
+        return;
+    };
+
+    let RawWindowHandle::Win32(win32) = handle.as_raw() else {
+        return;
+    };
+
+    let hwnd: HWND = win32.hwnd.get() as *mut core::ffi::c_void;
+
+    unsafe {
+        let estilo_actual = GetWindowLongPtrW(hwnd, GWL_EXSTYLE);
+
+        SetWindowLongPtrW(
+            hwnd,
+            GWL_EXSTYLE,
+            estilo_actual | (WS_EX_NOACTIVATE as isize),
+        );
+    }
+}
+
+// ======================================================
 // 🏗️ CREAR VENTANA
 // ------------------------------------------------------
 // Corre en el hilo principal (run_on_main_thread) — este
@@ -757,7 +819,7 @@ fn crear_ventana(app: AppHandle, id: String, paquete: MenuExpressPaquete) {
         .shadow(false)
         .always_on_top(true)
         .skip_taskbar(true)
-        .focused(true)
+        .focused(false)
         .devtools(true);
 
         if let Some((x, y)) = posicion {
@@ -766,6 +828,8 @@ fn crear_ventana(app: AppHandle, id: String, paquete: MenuExpressPaquete) {
 
         match builder.build() {
             Ok(ventana) => {
+                desactivar_activacion(&ventana);
+
                 let id_cierre = id_interno.clone();
 
                 marcar_ventana_lista(&id_cierre);

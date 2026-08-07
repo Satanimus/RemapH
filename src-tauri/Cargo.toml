@@ -27,6 +27,12 @@ base64 = "0.22"
 # Acción Multimedia) — ver back_multimedia.rs.
 winmix = "0.1"
 
+# Acceso al HWND real de una ventana (raw_window_handle::HasWindowHandle,
+# que tauri::WebviewWindow ya implementa) — usado en back_menu_express.rs
+# para aplicarle WS_EX_NOACTIVATE y que clickear sus botones no le quite
+# el foco a la app activa. Misma versión (0.6) que usa Tauri 2.11 por dentro.
+raw-window-handle = "0.6"
+
 windows-sys = {
     version = ">=0.59, <=0.61",
     features = [
