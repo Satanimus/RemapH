@@ -174,6 +174,11 @@ function aplicarColorFondo(color: string): void {
     "--menu-color",
     `color-mix(in srgb, ${variable} 45%, rgba(20, 20, 30, 0.6))`,
   );
+
+  card.style.setProperty(
+    "--menu-gradient",
+    `radial-gradient(circle at 50% 30%, color-mix(in srgb, ${variable} 60%, rgba(30, 30, 45, 0.6)), color-mix(in srgb, ${variable} 25%, rgba(10, 10, 18, 0.9)))`,
+  );
 }
 
 // ======================================================
