@@ -39,7 +39,7 @@ export function crearCapturador(
   const tieneTrigger = trigger !== null && trigger.gatillo !== null;
 
   const boton = crearBoton({
-    texto: tieneTrigger ? triggerATexto(trigger) : "Capturar",
+    texto: tieneTrigger ? triggerATexto(trigger) : "🚩 Capturar",
 
     html: tieneTrigger
       ? `
@@ -49,7 +49,7 @@ export function crearCapturador(
                 ${triggerAHTML(trigger)}
             </div>
           `
-      : "Capturar",
+      : "🚩 Capturar",
 
     clase: "capturador",
   });

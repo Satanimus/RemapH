@@ -86,7 +86,7 @@ export function textoAccionMultimedia(comando: string | null): string {
   const opcion = TODOS.find((item) => item.valor === comando);
 
   if (!opcion) {
-    return "Multimedia";
+    return "🎵 Seleccionar";
   }
 
   return `${opcion.icono} ${opcion.texto}`;
@@ -102,5 +102,5 @@ export function textoAccionMultimedia(comando: string | null): string {
 // ======================================================
 
 export function textoExtraMultimedia(alcance: "global" | "en_app"): string {
-  return alcance === "en_app" ? "🎯 En App" : "🌐 Global";
+  return alcance === "en_app" ? "En App" : "Global";
 }

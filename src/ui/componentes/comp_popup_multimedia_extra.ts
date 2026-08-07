@@ -76,9 +76,9 @@ export function abrirPopupExtraMultimedia(
     deshabilitado?: boolean;
     titulo?: string;
   }[] = [
-    { texto: "🌐 Global", valor: "global" },
+    { texto: "Global", valor: "global" },
     {
-      texto: "🎯 En App",
+      texto: "En App",
       valor: "en_app",
       deshabilitado: !!motivo,
       titulo: motivo,
