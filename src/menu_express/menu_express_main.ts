@@ -71,6 +71,11 @@ interface MenuBotonDatos {
   filaId: string;
 
   renombrar: string;
+
+  // Color de la fila REFERENCIADA (back_menu_express.rs ya la
+  // resuelve al compilar) — "" si esa fila no tiene color asignado.
+  // Solo se usa como borde cuando datos.colorBoton === "color".
+  color: string;
 }
 
 interface MenuExpressDatos {
@@ -93,6 +98,10 @@ interface MenuExpressDatos {
   tamanoTexto: "pequeno" | "mediano" | "grande";
 
   color: string;
+
+  // Nueva variable global (pulido, punto "Color botón"): "color" |
+  // "monocromo" — ver ColorBotonMenu en core_menu_express.ts.
+  colorBoton: "color" | "monocromo";
 }
 
 // ======================================================
@@ -165,6 +174,36 @@ function aplicarColorFondo(color: string): void {
     "--menu-color",
     `color-mix(in srgb, ${variable} 45%, rgba(20, 20, 30, 0.6))`,
   );
+}
+
+// ======================================================
+// 🎨 BORDE DE COLOR POR BOTÓN — "Color Botón" (pulido)
+// ------------------------------------------------------
+// Monocromo (datos.colorBoton === "monocromo", default): no hace
+// nada — el botón/gajo se queda con el borde/color heredado de
+// siempre (el de la ventana, ver aplicarColorFondo). Color: cada
+// botón toma como borde el --tag-<color> de SU PROPIA fila
+// referenciada (boton.color, ya resuelto por back_menu_express.rs).
+// Si esa fila no tiene color asignado (boton.color === ""), NO se
+// toca el borde — se mantiene heredado de la ventana (mismo
+// resultado visual que Monocromo para ese botón puntual, spec).
+//
+// Se aplica sobre --boton-color-borde en vez de tocar `border`
+// directo, para que el mismo valor sirva tanto al borde real de
+// Cuadrícula/lista (.menu-express-boton) como al filtro/contorno del
+// gajo en Radial (que no tiene un "border" geométrico tradicional,
+// ver .menu-express-boton--gajo en menu_express.css).
+// ======================================================
+
+function aplicarColorBorde(
+  elemento: HTMLElement,
+  colorBoton: MenuExpressDatos["colorBoton"],
+  colorFila: string,
+): void {
+  if (colorBoton !== "color" || !colorFila) return;
+
+  elemento.style.setProperty("--boton-color-borde", `var(--tag-${colorFila})`);
+  elemento.classList.add("menu-express-boton--color-propio");
 }
 
 // ======================================================
@@ -436,6 +475,8 @@ function crearBoton(
   elemento.style.height = `${alto}px`;
   elemento.style.fontSize = `${tamanoTextoPx(datos.tamanoTexto)}px`;
 
+  aplicarColorBorde(elemento, datos.colorBoton, boton.color);
+
   adjuntarEventosBoton(elemento, boton);
 
   return elemento;
@@ -567,6 +608,16 @@ function crearGajo(
   etiqueta.style.maxWidth = `${radios.grosor - 8}px`;
 
   elemento.append(etiqueta);
+
+  // El gajo está recortado con clip-path:path() — un `border` común
+  // no sigue ese contorno (se dibuja en la caja rectangular
+  // original, no en la forma recortada). Por eso el "borde" de Color
+  // Botón acá se simula con box-shadow inset (ver
+  // .menu-express-boton--color-propio.menu-express-boton--gajo en
+  // menu_express.css): un box-shadow inset SÍ respeta el recorte de
+  // clip-path, y da el mismo efecto visual de contorno interior que
+  // el border real de Cuadrícula/lista.
+  aplicarColorBorde(elemento, datos.colorBoton, boton.color);
 
   adjuntarEventosBoton(elemento, boton);
 

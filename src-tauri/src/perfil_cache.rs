@@ -248,6 +248,16 @@ pub enum AccionCache {
         // funcional real: back_menu_express.rs lo usa como color base
         // del fondo semitransparente de la ventana (ver spec).
         color: String,
+        // Nueva variable global de popup Extra (pulido): decide si
+        // cada botón/gajo se tiñe con el color de SU PROPIA fila
+        // referenciada (Color) o hereda el color de fondo de la
+        // ventana de arriba (Monocromo, default — mismo criterio
+        // "decorativo pero funcional" que `color`, ver comentario
+        // arriba). El color efectivo POR BOTÓN ya viene resuelto en
+        // cada MenuBotonCache.color (ver más abajo) — acá solo se
+        // guarda el modo, para que back_menu_express.rs decida si
+        // reenviárselo a la ventana o no.
+        color_boton: ColorBotonMenu,
     },
 }
 
@@ -270,6 +280,32 @@ pub struct MenuBotonCache {
     pub fila_id: String,
 
     pub renombrar: String,
+
+    // Color de la FILA REFERENCIADA (fila_id) — no el color de la
+    // fila MenuExpress (ese es AccionCache::MenuExpress::color, el
+    // del fondo). Mismo vocabulario que la paleta de color de fila
+    // ("cyan"/"green"/etc., "" si esa fila no tiene color asignado).
+    // Solo tiene efecto visual cuando color_boton == Color (ver
+    // AccionCache::MenuExpress::color_boton) — resuelto acá en vez
+    // de en back_menu_express.rs para no tener que buscar la fila de
+    // nuevo del lado de la ventana (compilador.rs ya tiene
+    // perfil.remapeos a mano en convertir_menu_express).
+    pub color: String,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum ColorBotonMenu {
+    Monocromo,
+    Color,
+}
+
+impl ColorBotonMenu {
+    pub fn como_str(&self) -> &'static str {
+        match self {
+            ColorBotonMenu::Monocromo => "monocromo",
+            ColorBotonMenu::Color => "color",
+        }
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]

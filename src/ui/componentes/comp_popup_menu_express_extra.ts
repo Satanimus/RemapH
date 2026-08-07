@@ -20,6 +20,7 @@
 //   UBICACIÓN           → menuExtra.ubicacion
 //   TAMAÑO DE BOTONES   → menuExtra.tamanoBoton
 //   TAMAÑO DE TEXTO     → menuExtra.tamanoTexto
+//   COLOR BOTÓN         → menuExtra.colorBoton (pulido)
 // ======================================================
 
 import { mostrarPopup } from "./comp_popup_contenedor";
@@ -35,6 +36,7 @@ import type {
   ComportamientoMenu,
   UbicacionMenu,
   TamanoMenu,
+  ColorBotonMenu,
 } from "../../core/core_menu_express";
 
 import { crearGrupoOpciones, crearFilaPopup } from "./comp_popup_grupo";
@@ -299,6 +301,33 @@ export function abrirPopupExtraMenuExpress(
       "Tamaño de Texto",
       crearGrupoOpciones(tamanoOpciones, menuExtra.tamanoTexto, (valor) => {
         menuExtra.tamanoTexto = valor;
+
+        reconstruirFila(contexto.id);
+        redibujar();
+      }),
+    ),
+  );
+
+  // ----------------------------------
+  // COLOR BOTÓN
+  // ------------------------------------------------------
+  // Monocromo (default): los botones heredan el color de fondo de
+  // la ventana (color de la fila MenuExpress, sin cambios acá).
+  // Color: cada botón toma el borde del color de SU PROPIA fila
+  // referenciada — resuelto del lado de Rust (compilador.rs), esta
+  // fila del popup solo elige el modo.
+  // ----------------------------------
+
+  const colorBotonOpciones: { texto: string; valor: ColorBotonMenu }[] = [
+    { texto: "Color", valor: "color" },
+    { texto: "Monocromo", valor: "monocromo" },
+  ];
+
+  popup.append(
+    crearFilaPopup(
+      "Color Botón",
+      crearGrupoOpciones(colorBotonOpciones, menuExtra.colorBoton, (valor) => {
+        menuExtra.colorBoton = valor;
 
         reconstruirFila(contexto.id);
         redibujar();

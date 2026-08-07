@@ -135,9 +135,9 @@ use crate::cache;
 use crate::eventos::InputId;
 
 use crate::perfil_cache::{
-    AccionCache, AlcanceMultimedia, AppCache, ComandoMultimedia, ComportamientoMenu,
-    CoordenadaCache, ExtraCache, FormaMenu, MenuBotonCache, PostAccionCache, PuntoReferenciaCache,
-    RemapeoCache, TamanoMenu, TriggerCache, UbicacionCache, UbicacionMenu,
+    AccionCache, AlcanceMultimedia, AppCache, ColorBotonMenu, ComandoMultimedia,
+    ComportamientoMenu, CoordenadaCache, ExtraCache, FormaMenu, MenuBotonCache, PostAccionCache,
+    PuntoReferenciaCache, RemapeoCache, TamanoMenu, TriggerCache, UbicacionCache, UbicacionMenu,
 };
 
 use crate::perfil_json::{perfil_json, AppJson, CoordenadaJson, RemapeoJson};
@@ -351,11 +351,20 @@ fn convertir_menu_express(remapeo: &RemapeoJson, perfil: &perfil_json) -> Option
                 .iter()
                 .position(|fila| fila.id == boton.fila_id)?;
 
+            // Color de la fila REFERENCIADA (pulido, punto "Color
+            // botón") — no el color de la fila MenuExpress. Se
+            // resuelve acá porque perfil.remapeos ya está a mano
+            // (mismo find que resuelve `posicion` arriba); evita que
+            // back_menu_express.rs tenga que volver a buscar la fila
+            // del lado de la ventana.
+            let color = perfil.remapeos[posicion].color.clone();
+
             Some((
                 posicion,
                 MenuBotonCache {
                     fila_id: boton.fila_id.clone(),
                     renombrar: boton.renombrar.clone(),
+                    color,
                 },
             ))
         })
@@ -380,6 +389,7 @@ fn convertir_menu_express(remapeo: &RemapeoJson, perfil: &perfil_json) -> Option
         tamano_boton: convertir_tamano_menu(&remapeo.menu_extra.tamano_boton),
         tamano_texto: convertir_tamano_menu(&remapeo.menu_extra.tamano_texto),
         color: remapeo.color.clone(),
+        color_boton: convertir_color_boton_menu(&remapeo.menu_extra.color_boton),
     })
 }
 
@@ -401,6 +411,13 @@ fn convertir_ubicacion_menu(valor: &str) -> UbicacionMenu {
     match valor {
         "cursor" => UbicacionMenu::Cursor,
         _ => UbicacionMenu::Persistente,
+    }
+}
+
+fn convertir_color_boton_menu(valor: &str) -> ColorBotonMenu {
+    match valor {
+        "color" => ColorBotonMenu::Color,
+        _ => ColorBotonMenu::Monocromo,
     }
 }
 

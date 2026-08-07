@@ -27,6 +27,14 @@ export type UbicacionMenu = "persistente" | "cursor";
 
 export type TamanoMenu = "pequeno" | "mediano" | "grande";
 
+// Nueva variable global de popup Extra (pulido, punto "Color
+// botón"): Monocromo (default) deja los botones como estaban antes
+// — heredan el color de fondo de la ventana (menuExtra.color, la
+// FILA MenuExpress). Color le da a cada botón el borde del color de
+// SU PROPIA fila referenciada (ver MenuBotonPerfil.filaId más
+// abajo) — resuelto del lado de Rust (compilador.rs), no acá.
+export type ColorBotonMenu = "color" | "monocromo";
+
 // ======================================================
 // 🔘 BOTÓN DEL MENÚ
 // ------------------------------------------------------
@@ -75,6 +83,8 @@ export interface MenuExpressExtraPerfil {
   tamanoBoton: TamanoMenu;
 
   tamanoTexto: TamanoMenu;
+
+  colorBoton: ColorBotonMenu;
 }
 
 // ======================================================
@@ -104,6 +114,8 @@ export function crearMenuExtra(): MenuExpressExtraPerfil {
     tamanoBoton: "mediano",
 
     tamanoTexto: "mediano",
+
+    colorBoton: "monocromo",
   };
 }
 

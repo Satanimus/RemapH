@@ -314,6 +314,25 @@ pub struct MenuExpressExtraJson {
     pub tamano_boton: String,
 
     pub tamano_texto: String,
+
+    // Nueva variable global de popup Extra (pulido): "color" |
+    // "monocromo". Monocromo (default) deja los botones como
+    // estaban antes de este campo — heredan el color de la ventana
+    // menú (menuExtra ya no tiene voz acá, el color de fondo sigue
+    // siendo el de la FILA MenuExpress, ver AccionCache::
+    // MenuExpress::color). Color le da a cada botón el borde del
+    // color de SU PROPIA fila referenciada (fila_id) — ver
+    // compilador.rs::convertir_menu_express, que resuelve ese color
+    // por botón al compilar. #[serde(default)] para que perfiles
+    // guardados antes de este campo sigan cargando sin romper.
+    #[serde(default = "MenuExpressExtraJson::color_boton_default")]
+    pub color_boton: String,
+}
+
+impl MenuExpressExtraJson {
+    fn color_boton_default() -> String {
+        "monocromo".to_string()
+    }
 }
 
 impl Default for MenuExpressExtraJson {
@@ -326,6 +345,7 @@ impl Default for MenuExpressExtraJson {
             ubicacion: "persistente".to_string(),
             tamano_boton: "mediano".to_string(),
             tamano_texto: "mediano".to_string(),
+            color_boton: Self::color_boton_default(),
         }
     }
 }

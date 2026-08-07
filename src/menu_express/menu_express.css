@@ -192,7 +192,13 @@ body {
     padding: 0;
     border: none;
     border-radius: 0;
-    background: rgba(0, 0, 0, 0.32);
+    /* Antes tenía un fondo fijo (rgba(0,0,0,.32)) que ignoraba el
+       color de la fila que generó el menú — --menu-color lo fija
+       aplicarColorFondo() en menu_express_main.ts, mismo valor que
+       usa .menu-express-card en Cuadrícula (ver arriba). Fallback
+       sólido por si --menu-color no llegó a fijarse (color-mix sin
+       soporte, mismo criterio que .menu-express-card). */
+    background: var(--menu-color, rgba(20, 20, 30, 0.85));
 }
 
 .menu-express-boton--gajo:hover {
@@ -301,6 +307,28 @@ body {
 .menu-express-boton:active,
 .menu-express-boton.presionado {
     background: rgba(255, 255, 255, 0.28);
+}
+
+/* ==========================
+   Color Botón (pulido) — modo "Color": cada botón toma como borde
+   el --tag-<color> de SU PROPIA fila referenciada. --boton-color-
+   borde la fija aplicarColorBorde() en menu_express_main.ts, solo
+   cuando datos.colorBoton === "color" Y la fila referenciada tiene
+   color asignado (si no, el elemento se queda sin esta clase y
+   hereda el borde de siempre — spec).
+
+   Cuadrícula/lista: border real, sencillo.
+   Radial (gajo): el elemento está recortado con clip-path:path(),
+   así que un border común no seguiría el contorno del gajo — se usa
+   box-shadow inset en su lugar, que sí respeta el recorte.
+   ========================== */
+
+.menu-express-boton--color-propio {
+    border-color: var(--boton-color-borde);
+}
+
+.menu-express-boton--color-propio.menu-express-boton--gajo {
+    box-shadow: inset 0 0 0 2px var(--boton-color-borde);
 }
 
 /* ==========================

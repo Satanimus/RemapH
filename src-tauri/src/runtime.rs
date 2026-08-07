@@ -410,6 +410,7 @@ fn ejecutar_accion(
             tamano_boton,
             tamano_texto,
             color,
+            color_boton,
         } => {
             back_menu_express::abrir_o_alternar(
                 id,
@@ -424,6 +425,7 @@ fn ejecutar_accion(
                     tamano_boton,
                     tamano_texto,
                     color,
+                    color_boton,
                 },
             );
         }
