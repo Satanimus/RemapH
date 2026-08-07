@@ -467,6 +467,41 @@ fn monitor_para_punto(app: &AppHandle, x: i32, y: i32) -> Option<(i32, i32, i32,
 // Monitor::position/size, que son físicos), y solo el resultado
 // final se convierte a lógico — que es lo que
 // WebviewWindowBuilder::position() espera.
+
+// ======================================================
+// 📐 CLAMPEAR ESQUINA A MONITOR (para Persistente)
+// ------------------------------------------------------
+// Recibe un punto que es la esquina superior-izquierda REAL
+// de la ventana (lo que guarda ULTIMA_POSICION). Solo lo
+// clampea para que no quede fuera del monitor.
+// NO recalcula la esquina de anclaje (a diferencia de
+// ubicar_en_monitor con es_radial = false).
+// ======================================================
+
+fn clamp_esquina_a_monitor(
+    app: &AppHandle,
+    punto: (i32, i32),
+    tamano_ventana_logico: (f64, f64),
+) -> (f64, f64) {
+    let (px, py) = punto;
+    let (ancho_log, alto_log) = tamano_ventana_logico;
+
+    let Some((mon_x, mon_y, mon_ancho, mon_alto, escala)) = monitor_para_punto(app, px, py) else {
+        return (px as f64, py as f64);
+    };
+
+    let ancho = (ancho_log * escala).round() as i32;
+    let alto = (alto_log * escala).round() as i32;
+
+    let mon_derecha = mon_x + mon_ancho;
+    let mon_abajo = mon_y + mon_alto;
+
+    let x = px.clamp(mon_x, (mon_derecha - ancho).max(mon_x));
+    let y = py.clamp(mon_y, (mon_abajo - alto).max(mon_y));
+
+    (x as f64 / escala, y as f64 / escala)
+}
+
 fn ubicar_en_monitor(
     app: &AppHandle,
     punto: (i32, i32),
@@ -686,7 +721,11 @@ fn crear_ventana(app: AppHandle, id: String, paquete: MenuExpressPaquete) {
         // falta evitar que quede cortada si cambió de monitor/
         // resolución entre sesiones, no recalcular el anclaje.
         UbicacionMenu::Persistente => {
-            ultima_posicion(&id).map(|punto| ubicar_en_monitor(&app, punto, tamano_ventana, false))
+            ultima_posicion(&id).map(|punto| {
+                // Solo clampea para que no salga del monitor
+                // NO recalcula la esquina de anclaje
+                clamp_esquina_a_monitor(&app, punto, tamano_ventana)
+            })
         }
     };
 

@@ -241,6 +241,7 @@ body {
     border: 1px solid var(--border-light);
     padding: 6px;
     cursor: move;
+    pointer-events: auto;
 }
 
 .menu-express-radial-centro-titulo {
@@ -253,6 +254,7 @@ body {
     display: -webkit-box;
     -webkit-line-clamp: 2;
     -webkit-box-orient: vertical;
+    pointer-events: none;
 }
 
 .menu-express-radial-cerrar {
