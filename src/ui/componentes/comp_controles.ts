@@ -9,7 +9,6 @@ import { reconstruirFila } from "../ui_tabla_control";
 import { invoke } from "@tauri-apps/api/core";
 
 import {
-  abrirPopupCondicion,
   abrirPopupTipo,
   abrirPopupColor,
   abrirPopupExtra,
@@ -97,22 +96,6 @@ export function crearEstado(
   );
 
   return boton;
-}
-
-export function crearCondicion(
-  contexto: ContextoFila,
-  filaPerfil: FilaPerfil,
-): HTMLButtonElement {
-  return crearPopup({
-    texto: filaPerfil.condicion,
-    onClick: (evento) => {
-      abrirPopupCondicion(evento, (texto) => {
-        filaPerfil.condicion = texto;
-
-        reconstruirFila(contexto.id);
-      });
-    },
-  });
 }
 
 export function crearTipo(
