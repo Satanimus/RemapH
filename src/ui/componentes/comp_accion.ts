@@ -20,6 +20,8 @@ import { abrirPopupAccionMultimedia } from "./comp_popup_multimedia";
 
 import { abrirEditorMenuExpress } from "./comp_popup_menu_express_editor";
 
+import { abrirEditorPortapapeles } from "./comp_popup_portapapeles_editor";
+
 // ======================================================
 // CREAR ACCIÓN
 // ======================================================
@@ -59,8 +61,19 @@ export function crearAccion(
     case "macro":
       return crearAccionMacro();
 
-    case "portapapeles":
-      return crearAccionPortapapeles();
+    // El clic abre el editor (solo Nombre de la ventana) — ver
+    // comp_popup_portapapeles_editor.ts.
+    case "portapapeles": {
+      const boton = crearAccionPortapapeles(filaPerfil);
+
+      boton.addEventListener("click", (evento) => {
+        abrirEditorPortapapeles(evento, contexto, filaPerfil);
+
+        alModificar();
+      });
+
+      return boton;
+    }
 
     // El extra Coordenada (dentro de Tecla/Mouse) no tiene un botón
     // propio: reusa este mismo capturador — lo capturado es lo que se

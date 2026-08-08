@@ -10,6 +10,8 @@ import { textoAccionMultimedia } from "../../core/core_multimedia";
 
 import { textoMenuAccion } from "../../core/core_menu_express";
 
+import { textoPortapapelesAccion } from "../../core/core_portapapeles";
+
 export function crearAccionTeclado(): HTMLButtonElement {
   return crearBoton({
     texto: "Capturar",
@@ -45,9 +47,15 @@ export function crearAccionMacro(): HTMLButtonElement {
   });
 }
 
-export function crearAccionPortapapeles(): HTMLButtonElement {
+// El editor propio (comp_popup_portapapeles_editor.ts) se conecta
+// desde comp_accion.ts — acá el botón solo muestra el nombre de la
+// ventana (o el default "📋 Editar"), mismo criterio que
+// crearAccionMenuExpress().
+export function crearAccionPortapapeles(
+  filaPerfil: FilaPerfil,
+): HTMLButtonElement {
   return crearBoton({
-    texto: "Portapapeles",
+    texto: textoPortapapelesAccion(filaPerfil.portapapelesAccion),
     clase: "capturador",
   });
 }

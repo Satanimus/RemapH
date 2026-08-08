@@ -30,11 +30,15 @@ import { textoExtraMultimedia } from "../../core/core_multimedia";
 
 import { abrirPopupExtraMenuExpress } from "./comp_popup_menu_express_extra";
 
+import { abrirPopupExtraPortapapeles } from "./comp_popup_portapapeles_extra";
+
 import {
   textoMenuExtra,
   crearMenuAccion,
   crearMenuExtra,
 } from "../../core/core_menu_express";
+
+import { textoPortapapelesExtra } from "../../core/core_portapapeles";
 
 import { crearCoordenada } from "../../core/core_coordenada";
 
@@ -185,6 +189,18 @@ export function crearExtra(
       texto: textoMenuExtra(filaPerfil.menuExtra),
       onClick: (evento) => {
         abrirPopupExtraMenuExpress(evento, contexto, filaPerfil);
+      },
+    });
+  }
+
+  // portapapeles tiene su propio popup Extra (Comportamiento/
+  // Ubicación/Tamaños/Límite) — igual de persistente que los
+  // anteriores.
+  if (filaPerfil.tipo === "portapapeles") {
+    return crearPopup({
+      texto: textoPortapapelesExtra(filaPerfil.portapapelesExtra),
+      onClick: (evento) => {
+        abrirPopupExtraPortapapeles(evento, contexto, filaPerfil);
       },
     });
   }
