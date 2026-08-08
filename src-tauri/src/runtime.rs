@@ -241,6 +241,7 @@ use crate::back_coordenada;
 use crate::back_interception;
 
 use crate::back_menu_express;
+use crate::back_portapapeles;
 
 pub use crate::cache::OrdenRuntime;
 
@@ -445,12 +446,36 @@ fn ejecutar_accion(
             );
         }
 
-        // Placeholder (Etapa B del plan Portapapeles): el tipo ya
-        // compila a AccionCache::Portapapeles, pero todavía no existe
-        // back_portapapeles.rs ni la ventana — no hace nada. Se
-        // conecta de verdad en la Etapa I ("Conexión física"), mismo
-        // criterio que el brazo MenuExpress de acá arriba.
-        AccionCache::Portapapeles { .. } => {}
+        // Alternar la ventana flotante de Portapapeles — mismo
+        // criterio que el brazo MenuExpress de arriba:
+        // abrir_o_alternar() decide sola si toca crear la ventana o
+        // cerrar la que ya estaba abierta para este id (mismo
+        // trigger = toggle). El id de la ORDEN (no de la Acción) es
+        // el mismo RemapeoJson::id de la fila Portapapeles — el
+        // mismo que identifica sus fijados y su entrada en ACTIVOS
+        // (ver back_portapapeles.rs).
+        AccionCache::Portapapeles {
+            nombre,
+            comportamiento,
+            ubicacion,
+            tamano_boton,
+            tamano_texto,
+            limite,
+            color,
+        } => {
+            back_portapapeles::abrir_o_alternar(
+                id,
+                back_portapapeles::PortapapelesPaquete {
+                    nombre,
+                    comportamiento,
+                    ubicacion,
+                    tamano_boton,
+                    tamano_texto,
+                    limite,
+                    color,
+                },
+            );
+        }
     }
 }
 

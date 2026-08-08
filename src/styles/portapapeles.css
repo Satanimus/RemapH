@@ -1,0 +1,386 @@
+/* ======================================================
+   📋🪟 portapapeles.css
+   ------------------------------------------------------
+   Estilos propios de la ventana flotante de Portapapeles. NO
+   importa styl_general.css (fondo sólido, rompería la
+   transparencia — mismo motivo que menu_express.css). Reutiliza
+   solo las variables centralizadas en styl_variables.css,
+   incluidas las --tag-<color> de la paleta de filas: la barra
+   superior se tiñe con el color de la fila (spec: "hereda el
+   color de la fila en RemapH").
+
+   Layout: siempre lista vertical (Portapapeles nunca es Radial,
+   a diferencia de MenuExpress) — header con nombre + [x], lista
+   de fijados, separador tenue, lista de rotativos, barra
+   inferior con [Modo Registro] [Limpiar todo]. Cada fila de
+   elemento tiene: [Fijar/Desfijar] [nombre] [...].
+   ====================================================== */
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+html,
+body {
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background: transparent;
+    font-family: var(--font);
+    font-size: var(--fs13);
+    color: #ffffff;
+    user-select: none;
+}
+
+/* Mismo motivo que #menu-express en menu_express.css: sin esto
+   #portapapeles queda con altura auto y la tarjeta no llena la
+   ventana. */
+#portapapeles {
+    width: 100%;
+    height: 100%;
+}
+
+.portapapeles-card {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    background: var(--portapapeles-gradient, var(--portapapeles-color, rgba(20, 20, 30, 0.6)));
+    border: 1px solid var(--border-light);
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+/* ==========================
+   Header
+   ========================== */
+
+.portapapeles-header {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 4px;
+    background: rgba(255, 255, 255, 0.08);
+    flex-shrink: 0;
+    cursor: move;
+}
+
+.portapapeles-titulo {
+    flex: 1;
+    font-size: var(--fs11);
+    letter-spacing: 0.03em;
+    opacity: 0.9;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.portapapeles-cerrar {
+    width: 15px;
+    height: 15px;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    border: 1px solid var(--border-light);
+    border-radius: 3px;
+    color: #ffffff;
+    font-size: var(--fs11);
+    line-height: 1;
+    padding: 0;
+    cursor: pointer;
+    /* Sin data-tauri-drag-region — no debe arrastrar la ventana. */
+}
+
+.portapapeles-cerrar:hover {
+    border-color: var(--highlight-red);
+    color: var(--highlight-red);
+}
+
+/* ==========================
+   Cuerpo (lista de elementos)
+   ========================== */
+
+.portapapeles-cuerpo {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 6px;
+    overflow-y: auto;
+    overflow-x: hidden;
+}
+
+.portapapeles-separador {
+    height: 1px;
+    margin: 2px 4px;
+    background: rgba(255, 255, 255, 0.15);
+    flex-shrink: 0;
+}
+
+.portapapeles-vacio {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 12px;
+    color: var(--text-disabled);
+    font-size: var(--fs12);
+}
+
+/* ==========================
+   Fila de un elemento: [Fijar] [nombre] [...]
+   ========================== */
+
+.portapapeles-fila {
+    position: relative;
+    display: flex;
+    align-items: stretch;
+    gap: 4px;
+    flex-shrink: 0;
+}
+
+.portapapeles-boton-fijar {
+    flex-shrink: 0;
+    width: 26px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(20, 20, 30, 0.7);
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    border-radius: 6px;
+    color: #ffffff;
+    font-size: var(--fs13);
+    cursor: pointer;
+    transition: background-color 0.1s ease;
+}
+
+.portapapeles-boton-fijar:hover {
+    background: rgba(255, 255, 255, 0.12);
+}
+
+.portapapeles-boton-fijar.fijado {
+    color: var(--highlight);
+    border-color: var(--highlight);
+}
+
+.portapapeles-boton-nombre {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    padding: 0 10px;
+    background: rgba(20, 20, 30, 0.9);
+    border: 1px solid rgba(255, 255, 255, 0.35);
+    border-radius: 6px;
+    color: #ffffff;
+    text-align: left;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    cursor: pointer;
+    transition: background-color 0.1s ease;
+}
+
+.portapapeles-boton-nombre:hover {
+    background: linear-gradient(rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0.12)),
+        rgba(20, 20, 30, 0.9);
+}
+
+.portapapeles-boton-nombre:active,
+.portapapeles-boton-nombre.presionado {
+    background: linear-gradient(rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0.2)),
+        rgba(20, 20, 30, 0.9);
+}
+
+.portapapeles-boton-opciones {
+    flex-shrink: 0;
+    width: 22px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    border-radius: 6px;
+    color: var(--text-soft);
+    font-size: var(--fs12);
+    line-height: 1;
+    cursor: pointer;
+    transition: background-color 0.1s ease;
+}
+
+.portapapeles-boton-opciones:hover {
+    background: rgba(255, 255, 255, 0.12);
+    color: #ffffff;
+}
+
+/* ==========================
+   Tooltip de previsualización (hover sobre el nombre)
+   ========================== */
+
+.portapapeles-tooltip {
+    position: fixed;
+    z-index: 20;
+    max-width: 260px;
+    padding: 8px 10px;
+    background: rgba(15, 15, 20, 0.97);
+    border: 1px solid var(--border-light);
+    border-radius: 6px;
+    color: #ffffff;
+    font-size: var(--fs12);
+    line-height: 1.4;
+    white-space: pre-wrap;
+    word-break: break-word;
+    pointer-events: none;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+
+.portapapeles-tooltip img {
+    display: block;
+    max-width: 240px;
+    max-height: 180px;
+    object-fit: contain;
+    border-radius: 4px;
+}
+
+/* ==========================
+   Barra inferior: [Modo Registro] [Limpiar todo]
+   ========================== */
+
+.portapapeles-barra-inferior {
+    display: flex;
+    gap: 6px;
+    padding: 6px;
+    flex-shrink: 0;
+    background: rgba(255, 255, 255, 0.06);
+}
+
+.portapapeles-boton-barra {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 6px 8px;
+    background: rgba(20, 20, 30, 0.85);
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    border-radius: 6px;
+    color: #ffffff;
+    font-size: var(--fs11);
+    cursor: pointer;
+    transition: background-color 0.1s ease;
+}
+
+.portapapeles-boton-barra:hover {
+    background: rgba(255, 255, 255, 0.12);
+}
+
+.portapapeles-boton-barra.activo {
+    background: color-mix(in srgb, var(--highlight) 30%, rgba(20, 20, 30, 0.85));
+    border-color: var(--highlight);
+    color: var(--highlight);
+}
+
+/* ==========================
+   Popup genérico (Renombrar/Editar/Eliminar, y Opciones [...])
+   Overlay simple centrado en la propia ventana — no es una
+   ventana Tauri nueva, vive dentro de portapapeles.html.
+   ========================== */
+
+.portapapeles-popup-overlay {
+    position: absolute;
+    inset: 0;
+    z-index: 30;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.45);
+}
+
+.portapapeles-popup {
+    width: 88%;
+    max-width: 260px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 10px;
+    background: rgba(25, 25, 32, 0.98);
+    border: 1px solid var(--border-light);
+    border-radius: 8px;
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.5);
+}
+
+.portapapeles-popup-titulo {
+    font-size: var(--fs12);
+    opacity: 0.85;
+}
+
+.portapapeles-popup-opcion {
+    padding: 6px 8px;
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 6px;
+    color: #ffffff;
+    text-align: left;
+    font-size: var(--fs12);
+    cursor: pointer;
+}
+
+.portapapeles-popup-opcion:hover {
+    background: rgba(255, 255, 255, 0.14);
+}
+
+.portapapeles-popup-opcion.peligro {
+    color: var(--highlight-red);
+    border-color: var(--highlight-red);
+}
+
+.portapapeles-popup-input {
+    padding: 6px 8px;
+    background: rgba(0, 0, 0, 0.35);
+    border: 1px solid var(--border-light);
+    border-radius: 6px;
+    color: #ffffff;
+    font-size: var(--fs12);
+    font-family: var(--font);
+}
+
+.portapapeles-popup-textarea {
+    min-height: 90px;
+    resize: vertical;
+    padding: 6px 8px;
+    background: rgba(0, 0, 0, 0.35);
+    border: 1px solid var(--border-light);
+    border-radius: 6px;
+    color: #ffffff;
+    font-size: var(--fs12);
+    font-family: var(--font);
+}
+
+.portapapeles-popup-acciones {
+    display: flex;
+    gap: 6px;
+    justify-content: flex-end;
+}
+
+.portapapeles-popup-boton {
+    padding: 5px 10px;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    border-radius: 6px;
+    color: #ffffff;
+    font-size: var(--fs11);
+    cursor: pointer;
+}
+
+.portapapeles-popup-boton:hover {
+    background: rgba(255, 255, 255, 0.16);
+}
+
+.portapapeles-popup-boton.primario {
+    background: color-mix(in srgb, var(--highlight) 35%, rgba(20, 20, 30, 0.85));
+    border-color: var(--highlight);
+}

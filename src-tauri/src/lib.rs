@@ -55,6 +55,12 @@ pub fn run() {
             // termina de inicializar.
             back_menu_express::inicializar(app.handle().clone());
 
+            // Mismo motivo/momento que arriba, para back_portapapeles.rs
+            // (Etapa G/H) — abrir_o_alternar() también va a llegar
+            // desde el hilo de entrada física (Etapa I), no desde un
+            // comando Tauri.
+            back_portapapeles::inicializar(app.handle().clone());
+
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -102,6 +108,20 @@ pub fn run() {
             comandos::establecer_menu_texto_pequeno,
             comandos::establecer_menu_texto_mediano,
             comandos::establecer_menu_texto_grande,
+            comandos::obtener_datos_portapapeles,
+            comandos::cerrar_portapapeles,
+            comandos::portapapeles_toggle_registro,
+            comandos::portapapeles_fijar,
+            comandos::portapapeles_desfijar,
+            comandos::portapapeles_renombrar,
+            comandos::portapapeles_editar,
+            comandos::portapapeles_eliminar,
+            comandos::portapapeles_limpiar_todo,
+            comandos::portapapeles_pegar,
+            comandos::obtener_tamanos_portapapeles,
+            comandos::establecer_portapapeles_boton_pequeno,
+            comandos::establecer_portapapeles_boton_mediano,
+            comandos::establecer_portapapeles_boton_grande,
         ])
         .run(tauri::generate_context!())
         .expect("error al ejecutar Tauri");

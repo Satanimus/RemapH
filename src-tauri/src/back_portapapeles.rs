@@ -1,7 +1,7 @@
 // ======================================================
 // 📋 back_portapapeles
 // ======================================================
-// ETAPA E DEL PLAN "PORTAPAPELES"
+// ETAPAS E, F Y G DEL PLAN "PORTAPAPELES"
 // ------------------------------------------------------
 // 1. ¿Qué hace este archivo?
 //
@@ -12,14 +12,33 @@
 //   ├── Imagen_13.45.55.png              (rotativo)
 //   └── la ciudad es.txt                 (rotativo)
 //
-// Funciones PURAS de manejo de archivos: nombrar, guardar un
-// elemento nuevo como rotativo, listar (rotativos / fijados de un
+// (Etapa E) Funciones PURAS de manejo de archivos: nombrar, guardar
+// un elemento nuevo como rotativo, listar (rotativos / fijados de un
 // id), aplicar el límite del pool, fijar/desfijar, renombrar, editar
-// contenido de texto, eliminar. Ninguna función de este archivo
-// sabe qué filas están en modo Registro, ni conoce ACTIVOS, ni
-// escucha el portapapeles del sistema — solo entiende la carpeta y
-// sus archivos. Testeable con datos de prueba (ver tests al final),
-// sin ventana ni listener de por medio.
+// contenido de texto, eliminar. Estas funciones no saben qué filas
+// están en modo Registro ni escuchan el portapapeles del sistema —
+// solo entienden la carpeta y sus archivos.
+//
+// (Etapa F) Dueño también del estado ACTIVOS (qué ids de fila están
+// en modo Registro ahora mismo y con qué límite cada uno), del
+// límite EFECTIVO entre todos ellos, y del arranque (una sola vez
+// por proceso) del listener real de back_portapapeles_captura.rs.
+// en_cambio_del_sistema() es el punto donde un aviso real de cambio
+// del portapapeles termina convirtiéndose (o no, según ACTIVOS) en
+// un archivo nuevo del pool.
+//
+// (Etapa G) Dueño también de las ventanas flotantes nativas de
+// Portapapeles — mismo patrón que back_menu_express.rs (registro
+// ABIERTOS_VENTANAS + AppHandle global + posicionamiento Persistente/
+// Cursor + WS_EX_NOACTIVATE). abrir_o_alternar() aplica las reglas
+// de apertura del plan (según ACTIVOS, ver construir_datos) para
+// decidir si la ventana abre en modo Registro (mostrando todo el
+// pool) o en Simple (mostrando/generando un solo rotativo actual).
+//
+// Testeable con datos de prueba (ver tests al final), sin ventana
+// real de Windows detrás (crear_ventana() sí la necesita, pero el
+// armado de datos — construir_datos()/resolver_elemento_simple() —
+// se puede probar aparte).
 //
 // Pool de rotativos: GLOBAL y compartido (una sola carpeta, un solo
 // listado) — cada fila tipo "portapapeles" es solo un visualizador
@@ -38,17 +57,32 @@
 // ------------------------------------------------------
 // 2. ¿Quién llama este archivo?
 //
-// Todavía nadie — Etapa F lo conecta con el listener de
-// back_portapapeles_captura.rs y el estado ACTIVOS (modo Registro);
-// Etapa G lo conecta con la ventana; Etapa H lo expone como
-// comandos Tauri.
+// back_portapapeles_captura::en_cambio_portapapeles() (Etapa D) ya
+// llama a en_cambio_del_sistema() acá abajo cada vez que Windows
+// avisa un cambio real del portapapeles — es la única conexión entre
+// el listener y el pool de archivos.
+//
+// ETAPA G: todavía nadie más llama a abrir_o_alternar()/inicializar()/
+// cerrar()/cerrar_todas()/obtener_datos() — Etapa I conecta
+// abrir_o_alternar() con el brazo AccionCache::Portapapeles de
+// runtime.rs (mismo criterio que back_menu_express.rs), lib.rs/
+// setup() llama inicializar() recién cuando se agregue ahí, y Etapa H
+// expone el resto (toggle Registro, fijar, etc.) como comandos Tauri
+// finos que delegan acá. Hasta entonces, el compilador va a avisar
+// con warnings de "función/struct nunca usada" para varias de las
+// funciones públicas de esta etapa (abrir_o_alternar, inicializar,
+// cerrar_todas, obtener_datos) — es esperable, mismo caso que pasó
+// con back_portapapeles_captura.rs en la Etapa D, y desaparece solo
+// a medida que Etapas H/I las conecten.
 // ------------------------------------------------------
 // 3. ¿Qué información recibe?
 //
 // Contenido de portapapeles (ContenidoPortapapeles, de
 // back_portapapeles_captura.rs), rutas de archivos ya existentes en
-// el pool, e ids de Portapapeles (String, el mismo
-// RemapeoCache::id de la fila).
+// el pool, ids de Portapapeles (String, el mismo RemapeoCache::id de
+// la fila), y — Etapa G — un PortapapelesPaquete (espejo de
+// AccionCache::Portapapeles) para abrir_o_alternar()/inicializar(app)
+// para fijar el AppHandle global.
 // ------------------------------------------------------
 // 4. ¿Qué información entrega?
 //
@@ -56,7 +90,12 @@
 // id dueño si aplica, fecha de modificación) — listas de estos para
 // listar_rotativos()/listar_fijados(), o una ruta sola para las
 // operaciones de escritura (guardar_rotativo, fijar, desfijar,
-// renombrar).
+// renombrar). Etapa F agrega: esta_activo()/hay_algun_activo() (bool)
+// y limite_efectivo() (u32) que Etapa G ya usa para decidir cómo
+// abrir cada ventana según las reglas del plan. Etapa G agrega:
+// PortapapelesDatosUI (paquete completo ya serializable para la
+// ventana — nombre/comportamiento/ubicacion/tamaños/límite/color +
+// fijados/rotativos en vocabulario UI) vía obtener_datos(id).
 // ------------------------------------------------------
 // 5. Reglas / decisiones
 //
@@ -96,9 +135,80 @@
 //   nombre con el id pedido — no hace falta una función aparte.
 // • aplicar_limite() opera sobre el pool global de rotativos (no por
 //   fila) — el límite EFECTIVO entre varios Portapapeles activos a
-//   la vez lo calcula Etapa F; acá solo se aplica el número que
-//   llega.
+//   la vez lo calcula Etapa F (ver limite_efectivo() más abajo);
+//   aplicar_limite() en sí solo aplica el número que llega.
 // • editar_texto() rechaza archivos que no sean .txt.
+//
+// ETAPA F — ACTIVOS, arranque/parada de la captura real:
+// • ACTIVOS es el conjunto de ids de fila en modo Registro en este
+//   momento, con el límite que CADA una pidió (plan: "El número de
+//   cada Portapapeles indica solo el número que muestra, es
+//   individual"). Vive solo en memoria — igual que ABIERTOS en
+//   back_menu_express.rs, no sobrevive a un reinicio (spec: "Al
+//   reiniciar el programa, vuelve a Simple").
+// • limite_efectivo() es el MAYOR límite entre todos los ids
+//   activos ahora mismo (plan: "de todos los que están en modo
+//   registro en ese momento, el mayor es el que manda"). Con
+//   ACTIVOS vacío no importa (no se escribe nada), así que se
+//   define en 0 para ese caso.
+// • activar_registro() є idempotente por id: si el id ya estaba en
+//   ACTIVOS, solo actualiza su límite pedido (no reinicia nada). El
+//   hilo listener (back_portapapeles_captura::iniciar_monitor(),
+//   Etapa D) se arranca una única vez en todo el proceso, la
+//   PRIMERA vez que ACTIVOS pasa de vacío a no-vacío — no en cada
+//   activar_registro(): RegisterClassExW fallaría si se llamara dos
+//   veces (ver header de back_portapapeles_captura.rs). Un
+//   AtomicBool propio marca si ya se arrancó.
+// • desactivar_registro() saca el id de ACTIVOS. El hilo del
+//   listener NO se detiene (no existe forma de pararlo, mismo
+//   criterio que back_app::iniciar_monitor() — "corre de por vida,
+//   no hay orden de detenerlo") — pero como en_cambio_del_sistema()
+//   solo escribe si hay_algun_activo(), un ACTIVOS vacío es
+//   funcionalmente "sin captura", que es lo que pide el plan
+//   ("cuando vuelve a vacío, la detiene" — se detiene el EFECTO,
+//   guardar archivos, no el hilo en sí).
+// • en_cambio_del_sistema() es lo que back_portapapeles_captura::
+//   en_cambio_portapapeles() llama en cada aviso real de Windows
+//   (Etapa D ya lo tenía pendiente, ver su propio header). Si
+//   ACTIVOS está vacío, no hace nada (ningún Portapapeles está
+//   registrando). Si no, guarda el contenido como rotativo nuevo y
+//   aplica el límite efectivo — en ESE orden, porque aplicar_limite
+//   antes de guardar podría dejar pasar el elemento recién creado
+//   si el límite es 0 o si el conteo queda justo en el borde.
+//
+// ETAPA G — ventana real:
+// • Reglas de apertura (según ACTIVOS), ver construir_datos():
+//   1) id ya en ACTIVOS → modo Registro: se listan TODOS los
+//      rotativos del pool (ya recortados al límite por
+//      en_cambio_del_sistema() en su momento) — no se genera nada
+//      nuevo al abrir, solo se listan.
+//   2) ACTIVOS no vacío pero con OTRO id → Simple, mostrando el
+//      último rotativo YA EXISTENTE sin generar uno nuevo (evita
+//      duplicar mientras otro Portapapeles está registrando).
+//   3) ACTIVOS vacío → Simple normal: resolver_elemento_simple()
+//      lee el portapapeles del sistema y reusa el rotativo más
+//      reciente si su contenido coincide (mismo_contenido()), o
+//      genera uno nuevo si no. Si el portapapeles del sistema no
+//      tiene nada legible, se muestra igual el rotativo más
+//      reciente que ya hubiera (no se vacía la ventana solo porque
+//      AHORA el portapapeles tiene, por ejemplo, un archivo copiado
+//      del explorador — algo que este tipo no guarda).
+// • Los FIJADOS de la fila se listan siempre, en cualquiera de los 3
+//   casos — viven aparte de ACTIVOS, son exclusivos de ese id.
+// • mismo_contenido() compara CONTENIDO real (texto UTF-8 tal cual;
+//   imagen decodificando el .png guardado de vuelta a RGBA8 y
+//   comparando píxeles), nunca por nombre — el nombre de un texto ya
+//   viene recortado a 20 caracteres, así que dos textos distintos
+//   con el mismo prefijo no deben confundirse.
+// • Portapapeles siempre es una lista vertical — a diferencia de
+//   MenuExpress no existe una variante "Radial", así que
+//   ubicar_en_monitor() acá no recibe es_radial (siempre cuadrícula/
+//   esquina).
+// • comportamiento (Toggle/Efímero) viaja en PortapapelesPaquete
+//   porque así compila AccionCache::Portapapeles, pero esta etapa no
+//   le da ningún efecto propio todavía (Portapapeles no tiene
+//   botones ejecutables adentro como MenuExpress — click en un
+//   elemento pega, no dispara un remapeo con down/up propio).
 // ------------------------------------------------------
 // 6. Funciones del archivo
 //
@@ -120,17 +230,59 @@
 //     Sobrescribe el contenido de un elemento de texto.
 // eliminar()
 //     Borra un elemento del pool.
+// activar_registro() / desactivar_registro()
+//     Agregan/sacan un id de ACTIVOS y arrancan el listener si hace
+//     falta (Etapa F).
+// esta_activo() / hay_algun_activo()
+//     Consultas de ACTIVOS para que Etapa G decida cómo abrir la
+//     ventana (Etapa F).
+// limite_efectivo()
+//     El mayor límite pedido entre los ids activos ahora (Etapa F).
+// en_cambio_del_sistema()
+//     Reacciona a un cambio real del portapapeles: si hay algún
+//     activo, guarda el rotativo y aplica el límite (Etapa F).
+// inicializar(app)
+//     Guarda el AppHandle global — llamado una sola vez desde
+//     setup() de tauri::Builder, cuando lib.rs lo agregue (Etapa G,
+//     conexión real en Etapa I).
+// abrir_o_alternar(id, paquete)
+//     Si ya hay ventana abierta para ese id, la cierra (toggle a
+//     nivel de trigger); si no, arma los datos según ACTIVOS y crea
+//     la ventana (Etapa G).
+// crear_ventana(app, id, paquete)
+//     Arma y muestra la ventana nativa real, en el hilo principal
+//     (Etapa G).
+// cerrar(id) / cerrar_todas()
+//     Cierran una ventana puntual, o todas (para Etapa L) (Etapa G).
+// obtener_datos(id)
+//     Consulta de sólo lectura del registro de ventanas abiertas —
+//     la propia ventana la llama al cargar (Etapa G).
+// construir_datos(id, paquete) / resolver_elemento_simple() /
+// mismo_contenido()
+//     Lógica interna de armado de datos según ACTIVOS y de
+//     reuso/generación del rotativo en modo Simple (Etapa G).
 // ======================================================
 
+use std::collections::HashMap;
 use std::fs;
 use std::io::BufWriter;
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Mutex, OnceLock};
 use std::time::SystemTime;
+
+use serde::Serialize;
+
+use tauri::{AppHandle, Manager, WebviewUrl, WebviewWindowBuilder};
 
 use windows_sys::Win32::Foundation::SYSTEMTIME;
 use windows_sys::Win32::System::SystemInformation::GetLocalTime;
+use windows_sys::Win32::UI::Input::KeyboardAndMouse::{
+    SendInput, INPUT, INPUT_0, INPUT_KEYBOARD, KEYBDINPUT, KEYEVENTF_KEYUP, VIRTUAL_KEY, VK_CONTROL,
+};
 
-use crate::back_portapapeles_captura::ContenidoPortapapeles;
+use crate::back_portapapeles_captura::{self, ContenidoPortapapeles};
+use crate::perfil_cache::{ComportamientoMenu, TamanoBotonPortapapeles, TamanoMenu, UbicacionMenu};
 
 // ======================================================
 // 📏 CONSTANTES
@@ -548,6 +700,1126 @@ pub fn eliminar(ruta: &Path) -> Result<(), String> {
 }
 
 // ======================================================
+// 🟢 ACTIVOS (ids en modo Registro) — ETAPA F
+// ------------------------------------------------------
+// id de fila -> límite que ESA fila pidió (columna Extra,
+// AccionCache::Portapapeles::limite). La presencia de un id acá ES
+// "está en modo Registro" — mismo criterio que ABIERTOS en
+// back_menu_express.rs (la existencia de la entrada es la fuente de
+// verdad). Solo en memoria: no persiste (spec: "Al reiniciar el
+// programa, vuelve a Simple").
+// ======================================================
+
+static ACTIVOS: Mutex<Option<HashMap<String, u32>>> = Mutex::new(None);
+
+// Si el hilo listener de back_portapapeles_captura::iniciar_monitor()
+// ya se arrancó en este proceso. Solo puede pasar de false a true, y
+// solo una vez — RegisterClassExW fallaría en un segundo intento
+// (ver header de back_portapapeles_captura.rs).
+static LISTENER_ARRANCADO: AtomicBool = AtomicBool::new(false);
+
+fn con_activos<R>(f: impl FnOnce(&mut HashMap<String, u32>) -> R) -> R {
+    let mut guardia = ACTIVOS.lock().unwrap();
+    let mapa = guardia.get_or_insert_with(HashMap::new);
+    f(mapa)
+}
+
+/// Agrega (o actualiza el límite de) un id en modo Registro. Arranca
+/// el listener real la primera vez que ACTIVOS pasa de vacío a
+/// no-vacío en todo el proceso — nunca más de una vez.
+pub fn activar_registro(id_portapapeles: &str, limite: u32) {
+    con_activos(|activos| {
+        activos.insert(id_portapapeles.to_string(), limite);
+    });
+
+    if LISTENER_ARRANCADO
+        .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
+        .is_ok()
+    {
+        back_portapapeles_captura::iniciar_monitor();
+    }
+}
+
+/// Saca un id de modo Registro. El hilo listener sigue corriendo
+/// (no hay forma de detenerlo, mismo criterio que
+/// back_app::iniciar_monitor()) pero en_cambio_del_sistema() deja de
+/// escribir en cuanto hay_algun_activo() es false — el EFECTO de
+/// "dejar de registrar" queda cubierto igual.
+pub fn desactivar_registro(id_portapapeles: &str) {
+    con_activos(|activos| {
+        activos.remove(id_portapapeles);
+    });
+}
+
+/// ¿Esta fila está en modo Registro ahora mismo?
+pub fn esta_activo(id_portapapeles: &str) -> bool {
+    con_activos(|activos| activos.contains_key(id_portapapeles))
+}
+
+/// ¿Hay ALGÚN Portapapeles en modo Registro ahora mismo (de
+/// cualquier id)? — lo usa Etapa G para decidir si una ventana que
+/// se abre para un id distinto al activo debe mostrarse en Simple
+/// sin generar un rotativo nuevo (regla de apertura del plan).
+pub fn hay_algun_activo() -> bool {
+    con_activos(|activos| !activos.is_empty())
+}
+
+/// El mayor límite pedido entre todos los ids activos ahora mismo
+/// (plan: "el mayor es el que manda"). 0 si no hay ninguno activo
+/// (en ese caso en_cambio_del_sistema() no llega a usarlo, porque no
+/// escribe nada).
+pub fn limite_efectivo() -> u32 {
+    con_activos(|activos| activos.values().copied().max().unwrap_or(0))
+}
+
+// ======================================================
+// 🔔 EN CAMBIO DEL SISTEMA — ETAPA F
+// ------------------------------------------------------
+// Llamado por back_portapapeles_captura::en_cambio_portapapeles()
+// en cada aviso real de Windows (WM_CLIPBOARDUPDATE). Si no hay
+// ningún Portapapeles en modo Registro, no hace nada — el pool no
+// crece con cambios de portapapeles ajenos a la app cuando nadie
+// está mirando en modo Registro (el modo Simple lee el portapapeles
+// bajo demanda al abrir la ventana, Etapa G, no reacciona a este
+// aviso). Si hay algún activo, guarda el contenido como rotativo
+// nuevo y recién DESPUÉS aplica el límite efectivo, para no borrar
+// por error el elemento que se acaba de crear.
+// ======================================================
+
+pub fn en_cambio_del_sistema(contenido: &ContenidoPortapapeles) {
+    if ignorar_proximo_cambio() {
+        return;
+    }
+
+    if !hay_algun_activo() {
+        return;
+    }
+
+    if guardar_rotativo(contenido).is_ok() {
+        let _ = aplicar_limite(limite_efectivo());
+    }
+}
+
+// ======================================================
+// 🔒 BLOQUEO ANTI-DUPLICADO (tras pegar) — ETAPA H
+// ------------------------------------------------------
+// spec: "Al clickear en [el nombre de un elemento] se pega el
+// contenido del archivo al portapapeles y a la ventana activa. Hacer
+// esto debe bloquear el modo automático de crear archivo por
+// modificación de portapapeles, para no generar un duplicado."
+//
+// pegar() (más abajo) escribe al portapapeles del sistema con
+// arboard antes de simular Ctrl+V — eso por sí solo ya dispara
+// WM_CLIPBOARDUPDATE en el listener de back_portapapeles_captura.rs,
+// como cualquier otro cambio real. Sin este bloqueo, en_cambio_del_
+// sistema() (si hay algún Registro activo) o resolver_elemento_
+// simple() (si no hay ninguno) tratarían ese aviso como un cambio
+// nuevo del usuario y generarían un rotativo duplicado del mismo
+// contenido que ya existía.
+//
+// Se usa un timestamp con expiración corta (no solo un booleano) en
+// vez de "bloqueado hasta que llegue el próximo aviso": si por lo
+// que sea el aviso de Windows nunca llega (falla puntual del
+// listener, foco robado a mitad de camino, etc.), un booleano sin
+// vencimiento dejaría el pool bloqueado para siempre. Con
+// expiración, como mucho se pierde un aviso real dentro de esa
+// ventana muy corta — mismo tipo de trade-off que IGNORAR_MOVED_MS
+// más abajo (Etapa G).
+// ======================================================
+
+const IGNORAR_PROXIMO_CAMBIO_MS: u128 = 400;
+
+static IGNORAR_HASTA: Mutex<Option<std::time::Instant>> = Mutex::new(None);
+
+fn marcar_ignorar_proximo_cambio() {
+    let vencimiento = std::time::Instant::now()
+        + std::time::Duration::from_millis(IGNORAR_PROXIMO_CAMBIO_MS as u64);
+
+    *IGNORAR_HASTA.lock().unwrap() = Some(vencimiento);
+}
+
+fn ignorar_proximo_cambio() -> bool {
+    let mut guardia = IGNORAR_HASTA.lock().unwrap();
+
+    match *guardia {
+        Some(vencimiento) if std::time::Instant::now() < vencimiento => {
+            // Se consume: el bloqueo cubre el próximo aviso, no
+            // todos los avisos hasta que venza el timer — si el
+            // usuario copia algo nuevo de verdad un instante después
+            // de pegar, ese cambio sí debe registrarse.
+            *guardia = None;
+            true
+        }
+        _ => false,
+    }
+}
+
+// ======================================================
+// 📌➡️📋 PEGAR — ETAPA H
+// ------------------------------------------------------
+// spec: click en el nombre de un elemento → "se pega el contenido
+// del archivo al portapapeles y a la ventana activa". Dos pasos:
+//
+// 1) Lee el archivo (texto o imagen, según extensión) y lo escribe
+//    al portapapeles del sistema (back_portapapeles_captura::
+//    escribir_portapapeles) — esto es lo que "pega al portapapeles".
+// 2) Simula Ctrl+V con SendInput — esto es lo que "pega a la ventana
+//    activa". La ventana de Portapapeles nunca tiene foco (creada
+//    con WS_EX_NOACTIVATE, Etapa G) así que Ctrl+V le llega a la
+//    ventana que el usuario tenía activa antes de abrir el
+//    Portapapeles, que sigue siéndolo.
+//
+// Antes de escribir al portapapeles se marca el bloqueo anti-
+// duplicado (ver arriba) — el propio paso 1 dispara
+// WM_CLIPBOARDUPDATE en el listener, y sin el bloqueo eso generaría
+// un rotativo duplicado del mismo contenido que ya existía en el
+// pool.
+// ======================================================
+
+pub fn pegar(ruta: &Path) -> Result<(), String> {
+    let contenido = contenido_desde_archivo(ruta)?;
+
+    marcar_ignorar_proximo_cambio();
+
+    back_portapapeles_captura::escribir_portapapeles(&contenido)?;
+
+    simular_ctrl_v();
+
+    Ok(())
+}
+
+fn contenido_desde_archivo(ruta: &Path) -> Result<ContenidoPortapapeles, String> {
+    let extension = ruta
+        .extension()
+        .and_then(|ext| ext.to_str())
+        .unwrap_or_default()
+        .to_lowercase();
+
+    match extension.as_str() {
+        "txt" => {
+            let texto = fs::read_to_string(ruta).map_err(|error| error.to_string())?;
+            Ok(ContenidoPortapapeles::Texto(texto))
+        }
+
+        "png" => {
+            let (ancho, alto) = dimensiones_png(ruta)
+                .ok_or_else(|| "no se pudo leer el tamaño de la imagen".to_string())?;
+
+            let pixeles = decodificar_png_rgba8(ruta)
+                .ok_or_else(|| "no se pudo decodificar la imagen".to_string())?;
+
+            Ok(ContenidoPortapapeles::Imagen {
+                ancho: ancho as usize,
+                alto: alto as usize,
+                pixeles,
+            })
+        }
+
+        _ => Err(format!("extensión no soportada: {extension}")),
+    }
+}
+
+fn dimensiones_png(ruta: &Path) -> Option<(u32, u32)> {
+    let archivo = fs::File::open(ruta).ok()?;
+    let decodificador = png::Decoder::new(archivo);
+    let lector = decodificador.read_info().ok()?;
+    let info = lector.info();
+
+    Some((info.width, info.height))
+}
+
+// ======================================================
+// ⌨️ SIMULAR CTRL+V (SendInput crudo)
+// ------------------------------------------------------
+// Mismo patrón que back_multimedia.rs::enviar_vk — down de Ctrl,
+// down de V, up de V, up de Ctrl, todo en un solo SendInput (4
+// eventos). Sin KEYEVENTF_EXTENDEDKEY acá: Ctrl y V no son teclas
+// extendidas (a diferencia de las teclas multimedia de
+// back_multimedia.rs), así que no corresponde marcarlas así.
+//
+// VK_V no existe como constante en windows-sys (ni en la Win32 API
+// en general): Winuser.h no define constantes para las teclas
+// alfanuméricas A-Z/0-9, sus virtual-key codes son directamente su
+// valor ASCII en mayúscula (documentación oficial de Microsoft,
+// "Keyboard Input" — "there is no constant named VK_A [...] just
+// use the numeric value"). 0x56 es 'V'.
+// ======================================================
+
+const VK_V: VIRTUAL_KEY = 0x56;
+
+fn simular_ctrl_v() {
+    let mut eventos = [
+        input_teclado(VK_CONTROL, false),
+        input_teclado(VK_V, false),
+        input_teclado(VK_V, true),
+        input_teclado(VK_CONTROL, true),
+    ];
+
+    unsafe {
+        SendInput(
+            eventos.len() as u32,
+            eventos.as_mut_ptr(),
+            std::mem::size_of::<INPUT>() as i32,
+        );
+    }
+}
+
+fn input_teclado(vk: VIRTUAL_KEY, soltar: bool) -> INPUT {
+    INPUT {
+        r#type: INPUT_KEYBOARD,
+        Anonymous: INPUT_0 {
+            ki: KEYBDINPUT {
+                wVk: vk,
+                wScan: 0,
+                dwFlags: if soltar { KEYEVENTF_KEYUP } else { 0 },
+                time: 0,
+                dwExtraInfo: 0,
+            },
+        },
+    }
+}
+
+// ======================================================
+// 🪟 VENTANA DE PORTAPAPELES — ETAPA G
+// ------------------------------------------------------
+// Ciclo de vida de la ventana real, paralelo a
+// back_menu_express.rs (mismo registro ABIERTOS + AppHandle global,
+// mismo criterio de posicionamiento Persistente/Cursor y
+// WS_EX_NOACTIVATE). A diferencia de MenuExpress, acá no hay
+// "botones" que compilar de antemano: el contenido (fijados/
+// rotativos) se lee del pool de archivos (Etapa E) recién al armar
+// los datos de la ventana, según el modo que le toque abrir según
+// ACTIVOS (reglas del plan, ver más abajo).
+// ======================================================
+
+// ======================================================
+// 📦 PAQUETE RECIBIDO DESDE RUNTIME
+// ------------------------------------------------------
+// Espejo exacto de los campos de AccionCache::Portapapeles (ver
+// perfil_cache.rs) — separado en su propio struct acá, mismo
+// criterio que MenuExpressPaquete en back_menu_express.rs. El campo
+// `comportamiento` viaja igual que en MenuExpress pero, a
+// diferencia de ahí, Portapapeles no tiene botones ejecutables
+// adentro (click en un elemento pega contenido, no dispara un
+// remapeo) — por ahora no tiene efecto propio en esta ventana; se
+// conserva en el paquete solo porque así compila el AccionCache, no
+// se descarta por si acaso Etapa H/J le encuentra un uso (ej. cerrar
+// sola tras pegar, análogo a un menú Efímero).
+//
+// Deriva Clone: además de crear_ventana(), lo necesita
+// refrescar_datos() (Etapa H) para reconstruir PortapapelesDatosUI
+// cada vez que una operación (fijar/renombrar/editar/eliminar/
+// toggle Registro) cambia el pool — el paquete se guarda junto a los
+// datos en ABIERTOS_VENTANAS precisamente para eso, ver más abajo.
+// ======================================================
+
+#[derive(Clone)]
+pub struct PortapapelesPaquete {
+    pub nombre: String,
+    pub comportamiento: ComportamientoMenu,
+    pub ubicacion: UbicacionMenu,
+    pub tamano_boton: TamanoBotonPortapapeles,
+    pub tamano_texto: TamanoMenu,
+    pub limite: u32,
+    pub color: String,
+}
+
+// ======================================================
+// 🖥️ DATOS SERIALIZABLES PARA LA VENTANA (TS)
+// ------------------------------------------------------
+// Mismo vocabulario string que va a usar core_portapapeles.ts /
+// portapapeles_main.ts (Etapa J) — la ventana no conoce los enums de
+// Rust. camelCase vía rename_all, mismo criterio que
+// MenuExpressDatosUI.
+// ======================================================
+
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ElementoPortapapelesUI {
+    // Ruta absoluta como String — identificador único y estable
+    // frente a la ventana (fijar/renombrar/editar/eliminar la usan
+    // para saber sobre qué archivo operar, ver Etapa H). Cambia si
+    // el archivo se renombra/fija/desfija (rename físico), momento
+    // en el que obtener_datos() ya sirve la ruta nueva de todos
+    // modos (Etapa H vuelve a pedir los datos tras cada operación).
+    pub ruta: String,
+
+    pub nombre: String,
+
+    pub extension: String,
+
+    pub fijado: bool,
+
+    // Timestamp Unix en milisegundos — más simple de ordenar/mostrar
+    // del lado TS que un SystemTime. La ventana no reordena sola (ya
+    // llega ordenado, ver construir_datos), esto es solo para que
+    // pueda mostrar "hace X" si quiere.
+    pub modificado_ms: u64,
+}
+
+fn modificado_a_ms(momento: SystemTime) -> u64 {
+    momento
+        .duration_since(SystemTime::UNIX_EPOCH)
+        .map(|duracion| duracion.as_millis() as u64)
+        .unwrap_or(0)
+}
+
+fn elemento_a_ui(elemento: &ElementoPortapapeles) -> ElementoPortapapelesUI {
+    ElementoPortapapelesUI {
+        ruta: elemento.ruta.to_string_lossy().into_owned(),
+        nombre: elemento.nombre.clone(),
+        extension: elemento.extension.clone(),
+        fijado: elemento.fijado,
+        modificado_ms: modificado_a_ms(elemento.modificado),
+    }
+}
+
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PortapapelesDatosUI {
+    pub nombre: String,
+
+    pub comportamiento: String,
+
+    pub ubicacion: String,
+
+    pub tamano_boton: String,
+
+    pub tamano_texto: String,
+
+    // Límite que ESTA fila pide — la ventana lo muestra en su popup
+    // Extra (Etapa J), no necesariamente el límite EFECTIVO del pool
+    // (ese es un detalle interno de back_portapapeles.rs, no de la
+    // fila que el usuario está editando).
+    pub limite: u32,
+
+    pub color: String,
+
+    // Si está true, esta ventana es la que está en modo Registro
+    // ahora mismo (esta_activo(id) — ver más abajo). La propia
+    // ventana usa esto para pintar el toggle "Modo Registro" ya
+    // encendido al cargar, sin depender de un segundo viaje.
+    pub registro_activo: bool,
+
+    pub fijados: Vec<ElementoPortapapelesUI>,
+
+    // Rotativos a mostrar — nunca vacío y "sin nada" a la vez: si no
+    // hay ningún rotativo (pool vacío y portapapeles del sistema
+    // tampoco tiene nada legible), esta lista queda vacía y la
+    // ventana muestra "Portapapel vacío" (spec) en vez de una fila.
+    pub rotativos: Vec<ElementoPortapapelesUI>,
+}
+
+// ======================================================
+// 🌐 APPHANDLE GLOBAL
+// ------------------------------------------------------
+// Mismo criterio que back_menu_express.rs::APP — el trigger que abre
+// una ventana Portapapeles llega desde el hilo de entrada física
+// (Etapa I), no desde un comando Tauri, así que no hay forma de
+// recibirlo como parámetro en ese momento. Se fija en el setup() de
+// tauri::Builder (ver lib.rs), una sola vez.
+// ======================================================
+
+static APP: OnceLock<AppHandle> = OnceLock::new();
+
+/// Llamado una sola vez desde el setup() de tauri::Builder.
+pub fn inicializar(app: AppHandle) {
+    let _ = APP.set(app);
+}
+
+fn app_handle() -> Option<&'static AppHandle> {
+    APP.get()
+}
+
+// ======================================================
+// 🗃️ REGISTRO DE VENTANAS ABIERTAS
+// ------------------------------------------------------
+// id de la fila -> (paquete original + datos ya convertidos a
+// vocabulario UI). Igual que ABIERTOS en back_menu_express.rs, la
+// existencia de una entrada acá ES la fuente de verdad de "hay una
+// ventana abierta para este id". Nombre propio (ABIERTOS_VENTANAS,
+// no ABIERTOS a secas) para no chocar si algún día ambos módulos se
+// funden — no hace falta acá, pero cuesta nada.
+//
+// Se guarda también el PAQUETE original (no solo los datos ya
+// convertidos) porque los comandos de mutación (Etapa H: fijar/
+// renombrar/editar/eliminar/limpiar/toggle Registro) necesitan poder
+// reconstruir PortapapelesDatosUI después de cada operación —
+// construir_datos() pide un &PortapapelesPaquete, y esos comandos
+// solo reciben un id de String desde JS, no el paquete completo (la
+// ventana no lo re-envía en cada click). Ver refrescar_datos() más
+// abajo.
+// ======================================================
+
+struct VentanaAbierta {
+    paquete: PortapapelesPaquete,
+    datos: PortapapelesDatosUI,
+}
+
+static ABIERTOS_VENTANAS: Mutex<Option<HashMap<String, VentanaAbierta>>> = Mutex::new(None);
+
+fn con_ventanas<R>(f: impl FnOnce(&mut HashMap<String, VentanaAbierta>) -> R) -> R {
+    let mut guardia = ABIERTOS_VENTANAS.lock().unwrap();
+    let mapa = guardia.get_or_insert_with(HashMap::new);
+    f(mapa)
+}
+
+fn label_de(id: &str) -> String {
+    format!("portapapeles_{id}")
+}
+
+// ======================================================
+// 📍 ÚLTIMA POSICIÓN (ubicacion = Persistente)
+// ------------------------------------------------------
+// Mismo mecanismo que ULTIMA_POSICION en back_menu_express.rs — solo
+// en memoria, por id, actualizado al mover/cerrar la ventana.
+// ======================================================
+
+static ULTIMA_POSICION: Mutex<Option<HashMap<String, (i32, i32)>>> = Mutex::new(None);
+
+fn recordar_posicion(id: &str, x: i32, y: i32) {
+    let mut guardia = ULTIMA_POSICION.lock().unwrap();
+    guardia
+        .get_or_insert_with(HashMap::new)
+        .insert(id.to_string(), (x, y));
+}
+
+fn ultima_posicion(id: &str) -> Option<(i32, i32)> {
+    ULTIMA_POSICION
+        .lock()
+        .unwrap()
+        .as_ref()
+        .and_then(|mapa| mapa.get(id).copied())
+}
+
+// Mismo problema/solución que IGNORAR_MOVED_MS en
+// back_menu_express.rs — Windows manda un Moved "de fábrica" al
+// crear la ventana, que no es un arrastre real del usuario.
+const IGNORAR_MOVED_MS: u128 = 250;
+
+static VENTANA_LISTA_DESDE: Mutex<Option<HashMap<String, std::time::Instant>>> = Mutex::new(None);
+
+fn marcar_ventana_lista(id: &str) {
+    let mut guardia = VENTANA_LISTA_DESDE.lock().unwrap();
+    guardia
+        .get_or_insert_with(HashMap::new)
+        .insert(id.to_string(), std::time::Instant::now());
+}
+
+fn moved_es_de_creacion(id: &str) -> bool {
+    VENTANA_LISTA_DESDE
+        .lock()
+        .unwrap()
+        .as_ref()
+        .and_then(|mapa| mapa.get(id))
+        .map(|listo_desde| listo_desde.elapsed().as_millis() < IGNORAR_MOVED_MS)
+        .unwrap_or(false)
+}
+
+fn olvidar_ventana_lista(id: &str) {
+    if let Some(mapa) = VENTANA_LISTA_DESDE.lock().unwrap().as_mut() {
+        mapa.remove(id);
+    }
+}
+
+// ======================================================
+// 📐 UBICAR EN MONITOR
+// ------------------------------------------------------
+// Idéntico a back_menu_express.rs (mismo bug histórico evitado:
+// mezclar coordenadas físicas y lógicas sin convertir). Portapapeles
+// solo usa la variante "cuadrícula" (es_radial = false) — no existe
+// una forma Radial para esta ventana, siempre es una lista vertical.
+// ======================================================
+
+fn monitor_para_punto(app: &AppHandle, x: i32, y: i32) -> Option<(i32, i32, i32, i32, f64)> {
+    let monitores = app.available_monitors().ok()?;
+
+    let contenedor = monitores.iter().find(|m| {
+        let pos = m.position();
+        let size = m.size();
+        x >= pos.x && x < pos.x + size.width as i32 && y >= pos.y && y < pos.y + size.height as i32
+    });
+
+    let elegido = contenedor.or_else(|| monitores.first())?;
+
+    let pos = elegido.position();
+    let size = elegido.size();
+
+    Some((
+        pos.x,
+        pos.y,
+        size.width as i32,
+        size.height as i32,
+        elegido.scale_factor(),
+    ))
+}
+
+fn clamp_esquina_a_monitor(
+    app: &AppHandle,
+    punto: (i32, i32),
+    tamano_ventana_logico: (f64, f64),
+) -> (f64, f64) {
+    let (px, py) = punto;
+    let (ancho_log, alto_log) = tamano_ventana_logico;
+
+    let Some((mon_x, mon_y, mon_ancho, mon_alto, escala)) = monitor_para_punto(app, px, py) else {
+        return (px as f64, py as f64);
+    };
+
+    let ancho = (ancho_log * escala).round() as i32;
+    let alto = (alto_log * escala).round() as i32;
+
+    let mon_derecha = mon_x + mon_ancho;
+    let mon_abajo = mon_y + mon_alto;
+
+    let x = px.clamp(mon_x, (mon_derecha - ancho).max(mon_x));
+    let y = py.clamp(mon_y, (mon_abajo - alto).max(mon_y));
+
+    (x as f64 / escala, y as f64 / escala)
+}
+
+fn ubicar_en_monitor(
+    app: &AppHandle,
+    punto: (i32, i32),
+    tamano_ventana_logico: (f64, f64),
+) -> (f64, f64) {
+    let (px, py) = punto;
+
+    let Some((mon_x, mon_y, mon_ancho, mon_alto, escala)) = monitor_para_punto(app, px, py) else {
+        return (px as f64, py as f64);
+    };
+
+    let ancho = (tamano_ventana_logico.0 * escala).round() as i32;
+    let alto = (tamano_ventana_logico.1 * escala).round() as i32;
+
+    let mon_derecha = mon_x + mon_ancho;
+    let mon_abajo = mon_y + mon_alto;
+
+    // Siempre "cuadrícula" (Portapapeles nunca es Radial): se elige
+    // la esquina de la ventana que coincide con el punto según en
+    // qué mitad del monitor cae ese punto — mismo criterio que
+    // back_menu_express.rs::ubicar_en_monitor con es_radial = false.
+    let hacia_izquierda = px > mon_x + mon_ancho / 2;
+    let hacia_arriba = py > mon_y + mon_alto / 2;
+
+    let x = if hacia_izquierda { px - ancho } else { px };
+    let y = if hacia_arriba { py - alto } else { py };
+
+    let x = x.clamp(mon_x, (mon_derecha - ancho).max(mon_x));
+    let y = y.clamp(mon_y, (mon_abajo - alto).max(mon_y));
+
+    (x as f64 / escala, y as f64 / escala)
+}
+
+// ======================================================
+// 🚫 DESACTIVAR ACTIVACIÓN (WS_EX_NOACTIVATE)
+// ------------------------------------------------------
+// Idéntico criterio que back_menu_express.rs::desactivar_activacion
+// — la ventana no debe robarle el foco a la app activa, ni al
+// abrirse ni al clickear un elemento de adentro (spec: pegar
+// contenido en la ventana activa del usuario, que tiene que seguir
+// siendo la app de antes, no esta ventana).
+// ======================================================
+
+fn desactivar_activacion(ventana: &tauri::WebviewWindow) {
+    use raw_window_handle::{HasWindowHandle, RawWindowHandle};
+    use windows_sys::Win32::Foundation::HWND;
+    use windows_sys::Win32::UI::WindowsAndMessaging::{
+        GetWindowLongPtrW, SetWindowLongPtrW, GWL_EXSTYLE, WS_EX_NOACTIVATE,
+    };
+
+    let Ok(handle) = ventana.window_handle() else {
+        return;
+    };
+
+    let RawWindowHandle::Win32(win32) = handle.as_raw() else {
+        return;
+    };
+
+    let hwnd: HWND = win32.hwnd.get() as *mut core::ffi::c_void;
+
+    unsafe {
+        let estilo_actual = GetWindowLongPtrW(hwnd, GWL_EXSTYLE);
+
+        SetWindowLongPtrW(
+            hwnd,
+            GWL_EXSTYLE,
+            estilo_actual | (WS_EX_NOACTIVATE as isize),
+        );
+    }
+}
+
+// ======================================================
+// 🔍 ¿ESTE ARCHIVO YA TIENE ESTE CONTENIDO?
+// ------------------------------------------------------
+// Usado por resolver_elemento_simple() para decidir si el rotativo
+// más reciente del pool YA es una copia de lo que hay ahora mismo en
+// el portapapeles del sistema — si lo es, se reusa en vez de generar
+// un duplicado (spec: "Al cerrar la ventana y volver a abrirla se
+// debería mostrar ese archivo", no uno nuevo con el mismo texto).
+// Compara bytes crudos en ambos casos (texto: UTF-8 tal cual;
+// imagen: los mismos bytes RGBA8 que ya guardó guardar_png) — nunca
+// compara por nombre, porque el nombre de texto ya viene recortado a
+// 20 caracteres y dos textos distintos podrían compartir ese
+// prefijo.
+// ======================================================
+
+fn mismo_contenido(elemento: &ElementoPortapapeles, contenido: &ContenidoPortapapeles) -> bool {
+    match contenido {
+        ContenidoPortapapeles::Texto(texto) => {
+            if elemento.extension != "txt" {
+                return false;
+            }
+
+            fs::read_to_string(&elemento.ruta)
+                .map(|actual| actual == *texto)
+                .unwrap_or(false)
+        }
+
+        ContenidoPortapapeles::Imagen { pixeles, .. } => {
+            if elemento.extension != "png" {
+                return false;
+            }
+
+            // Decodifica el .png ya guardado y compara sus píxeles
+            // RGBA8 contra los del portapapeles actual — más honesto
+            // que comparar el archivo .png byte a byte (dos
+            // codificaciones del mismo bitmap no tienen por qué dar
+            // el mismo binario). Si por lo que sea no se puede
+            // decodificar, se asume que no coincide (mejor un
+            // duplicado ocasional que reusar algo que no es lo
+            // mismo).
+            decodificar_png_rgba8(&elemento.ruta)
+                .map(|actual| actual == *pixeles)
+                .unwrap_or(false)
+        }
+    }
+}
+
+fn decodificar_png_rgba8(ruta: &Path) -> Option<Vec<u8>> {
+    let archivo = fs::File::open(ruta).ok()?;
+    let mut decodificador = png::Decoder::new(archivo);
+
+    // El .png del pool siempre se guardó como RGBA8 sin paleta (ver
+    // guardar_png() más arriba) — se fuerza la misma transformación
+    // acá para no depender del default de la versión del crate, y
+    // así comparar siempre RGBA8 contra RGBA8.
+    decodificador.set_transformations(png::Transformations::EXPAND);
+
+    let mut lector = decodificador.read_info().ok()?;
+
+    // Se copian ancho/alto a variables propias (u32, no una
+    // referencia) para soltar el préstamo de lector.info() antes de
+    // pedir el préstamo mutable de next_frame() más abajo.
+    let info = lector.info();
+    let (ancho, alto) = (info.width, info.height);
+
+    // Buffer calculado a mano (ancho × alto × 4 canales RGBA8) en
+    // vez de Reader::output_buffer_size(): esa API cambió de firma
+    // entre versiones del crate (usize en unas, Option<usize> en
+    // otras — ver CHANGES.md de image-png), y el archivo siempre es
+    // RGBA8 sin interlace (así lo escribió guardar_png(), con
+    // set_color(Rgba) + set_depth(Eight) y sin set_interlaced), así
+    // que el tamaño exacto es simplemente ancho * alto * 4 — no hace
+    // falta preguntarle al reader.
+    let tamano = ancho as usize * alto as usize * 4;
+    let mut buffer = vec![0u8; tamano];
+
+    let info_frame = lector.next_frame(&mut buffer).ok()?;
+
+    buffer.truncate(info_frame.buffer_size());
+
+    Some(buffer)
+}
+
+// ======================================================
+// 🔄 RESOLVER ELEMENTO ACTUAL DEL MODO SIMPLE
+// ------------------------------------------------------
+// Regla de "Comportamiento Simple" del spec: al abrir en Simple
+// normal (ACTIVOS vacío, ver construir_datos), se lee el
+// portapapeles del sistema; si coincide con el rotativo más
+// reciente que ya existe, se reusa ese archivo (no se genera uno
+// nuevo); si no coincide (o no había ninguno), se guarda uno nuevo.
+// Si el portapapeles del sistema no tiene nada legible, se usa el
+// rotativo más reciente que ya exista (spec: "el elemento actual
+// del portapapeles (si hay algo) o vacío si no hay nada" — nada
+// legible AHORA no borra lo que ya estaba mostrado la última vez).
+// None solo si no hay ni portapapeles legible ni rotativo previo —
+// ahí la ventana muestra "Portapapel vacío".
+// ======================================================
+
+fn resolver_elemento_simple() -> Option<ElementoPortapapeles> {
+    let mas_reciente = listar_rotativos()
+        .ok()
+        .and_then(|lista| lista.into_iter().next());
+
+    let Some(contenido) = back_portapapeles_captura::leer_portapapeles() else {
+        return mas_reciente;
+    };
+
+    if let Some(elemento) = &mas_reciente {
+        if mismo_contenido(elemento, &contenido) {
+            return mas_reciente;
+        }
+    }
+
+    guardar_rotativo(&contenido)
+        .ok()
+        .and_then(|ruta| elemento_desde_ruta(ruta))
+        .or(mas_reciente)
+}
+
+// ======================================================
+// 🏗️ CONSTRUIR DATOS DE LA VENTANA
+// ------------------------------------------------------
+// Arma el PortapapelesDatosUI completo aplicando las reglas de
+// apertura del plan, según el estado actual de ACTIVOS:
+//
+// • Si `id` ya está en ACTIVOS → modo Registro: la lista de
+//   rotativos son TODOS los que hay en el pool (hasta el límite ya
+//   aplicado por en_cambio_del_sistema()/aplicar_limite() en su
+//   momento) — no se genera nada nuevo acá, solo se listan.
+// • Si ACTIVOS no está vacío pero con OTRO id activo → Simple, pero
+//   mostrando el último rotativo YA EXISTENTE sin generar uno nuevo
+//   (evita duplicar mientras otro Portapapeles está registrando) —
+//   spec: "abre en Simple, mostrando el último rotativo ya
+//   existente, sin crear uno nuevo".
+// • Si ACTIVOS está vacío → Simple normal: resolver_elemento_simple()
+//   (lee el portapapeles del sistema, genera o reusa).
+//
+// Los FIJADOS de esta fila se listan siempre, sin importar el modo
+// (viven aparte de ACTIVOS, exclusivos de este id).
+// ======================================================
+
+fn construir_datos(id: &str, paquete: &PortapapelesPaquete) -> PortapapelesDatosUI {
+    let fijados = listar_fijados(id)
+        .unwrap_or_default()
+        .iter()
+        .map(elemento_a_ui)
+        .collect();
+
+    let registro_activo = esta_activo(id);
+
+    let rotativos: Vec<ElementoPortapapelesUI> = if registro_activo {
+        listar_rotativos()
+            .unwrap_or_default()
+            .iter()
+            .map(elemento_a_ui)
+            .collect()
+    } else if hay_algun_activo() {
+        listar_rotativos()
+            .unwrap_or_default()
+            .into_iter()
+            .next()
+            .map(|elemento| vec![elemento_a_ui(&elemento)])
+            .unwrap_or_default()
+    } else {
+        resolver_elemento_simple()
+            .map(|elemento| vec![elemento_a_ui(&elemento)])
+            .unwrap_or_default()
+    };
+
+    PortapapelesDatosUI {
+        nombre: paquete.nombre.clone(),
+        comportamiento: paquete.comportamiento.como_str().to_string(),
+        ubicacion: paquete.ubicacion.como_str().to_string(),
+        tamano_boton: paquete.tamano_boton.como_str().to_string(),
+        tamano_texto: paquete.tamano_texto.como_str().to_string(),
+        limite: paquete.limite,
+        color: paquete.color.clone(),
+        registro_activo,
+        fijados,
+        rotativos,
+    }
+}
+
+// ======================================================
+// ⚡🪟 ABRIR O ALTERNAR
+// ------------------------------------------------------
+// Único punto de entrada que va a llamar runtime.rs (Etapa I) —
+// mismo criterio que back_menu_express.rs::abrir_o_alternar: alterna
+// A NIVEL DE TRIGGER (volver a presionar el mismo trigger cierra SU
+// ventana), sin importar comportamiento/modo.
+// ======================================================
+
+pub fn abrir_o_alternar(id: String, paquete: PortapapelesPaquete) {
+    let ya_abierto = con_ventanas(|mapa| mapa.contains_key(&id));
+
+    if ya_abierto {
+        cerrar(&id);
+        return;
+    }
+
+    let Some(app) = app_handle() else {
+        return;
+    };
+
+    let datos = construir_datos(&id, &paquete);
+
+    con_ventanas(|mapa| {
+        mapa.insert(
+            id.clone(),
+            VentanaAbierta {
+                paquete: paquete.clone(),
+                datos,
+            },
+        );
+    });
+
+    crear_ventana(app.clone(), id, paquete);
+}
+
+// ======================================================
+// 📐 TAMAÑO DE VENTANA
+// ------------------------------------------------------
+// Portapapeles siempre es una lista vertical (nunca Radial/
+// Cuadrícula como MenuExpress): ancho fijo por tamaño de botón,
+// alto según cantidad de filas a mostrar (fijados + rotativos, más
+// el header y la barra de botones inferior "Modo Registro"/"Limpiar
+// todo" — ver spec, diagrama "VENTANA PORTAPAPELES"). Mismo criterio
+// que back_menu_express.rs::calcular_tamano_ventana: los px vienen
+// de config.rs (Etapa C), único lugar con el valor real — si cambia
+// ahí, este cálculo ya lo respeta solo.
+// ======================================================
+
+const ALTO_HEADER: f64 = 32.0;
+const ALTO_BARRA_INFERIOR: f64 = 40.0;
+const ALTO_SEPARADOR: f64 = 9.0;
+const ESPACIO_ENTRE_FILAS: f64 = 4.0;
+const PADDING_CUERPO: f64 = 12.0;
+const ANCHO_EXTRA_BOTON_ACCIONES: f64 = 90.0;
+const MAX_FILAS_VISIBLES: f64 = 8.0;
+
+fn tamano_boton_px(tamano: &TamanoBotonPortapapeles) -> (f64, f64) {
+    let (ancho, alto) = match tamano {
+        TamanoBotonPortapapeles::Pequeno => crate::config::portapapeles_boton_pequeno(),
+        TamanoBotonPortapapeles::Mediano => crate::config::portapapeles_boton_mediano(),
+        TamanoBotonPortapapeles::Grande => crate::config::portapapeles_boton_grande(),
+    };
+
+    (ancho as f64, alto as f64)
+}
+
+fn calcular_tamano_ventana(
+    paquete: &PortapapelesPaquete,
+    datos: &PortapapelesDatosUI,
+) -> (f64, f64) {
+    let (ancho_boton, alto_boton) = tamano_boton_px(&paquete.tamano_boton);
+
+    let total_filas = datos.fijados.len() + datos.rotativos.len();
+    // Al menos 1 fila de alto para el caso "Portapapel vacío" (spec:
+    // se muestra un texto en el lugar donde iría la fila rotativa).
+    let filas_visibles = (total_filas.max(1) as f64).min(MAX_FILAS_VISIBLES);
+
+    let hay_separador = !datos.fijados.is_empty() && !datos.rotativos.is_empty();
+
+    let alto_filas =
+        filas_visibles * alto_boton + (filas_visibles - 1.0).max(0.0) * ESPACIO_ENTRE_FILAS;
+
+    let alto = ALTO_HEADER
+        + PADDING_CUERPO
+        + alto_filas
+        + if hay_separador { ALTO_SEPARADOR } else { 0.0 }
+        + ALTO_BARRA_INFERIOR;
+
+    let ancho = ancho_boton + ANCHO_EXTRA_BOTON_ACCIONES;
+
+    (ancho.clamp(220.0, 600.0), alto.clamp(140.0, 700.0))
+}
+
+// ======================================================
+// 🏗️ CREAR VENTANA
+// ------------------------------------------------------
+// Corre en el hilo principal (run_on_main_thread) — mismo motivo que
+// back_menu_express.rs::crear_ventana: este disparo va a llegar
+// desde el hilo de entrada física (Etapa I), no desde un comando
+// Tauri async, así que WebviewWindowBuilder::build() necesita
+// marshalling explícito al hilo principal (WebView2 lo exige).
+// ======================================================
+
+fn crear_ventana(app: AppHandle, id: String, paquete: PortapapelesPaquete) {
+    let label = label_de(&id);
+
+    let datos = con_ventanas(|mapa| mapa.get(&id).map(|ventana| ventana.datos.clone()));
+
+    let Some(datos) = datos else {
+        // No debería pasar (abrir_o_alternar ya insertó antes de
+        // llamar acá) — por las dudas, no hay datos que mostrar.
+        con_ventanas(|mapa| {
+            mapa.remove(&id);
+        });
+
+        return;
+    };
+
+    let tamano_ventana = calcular_tamano_ventana(&paquete, &datos);
+    let (ancho, alto) = tamano_ventana;
+
+    let posicion = match &paquete.ubicacion {
+        UbicacionMenu::Cursor => {
+            let cursor = crate::back_coordenada::obtener_cursor();
+            Some(ubicar_en_monitor(&app, cursor, tamano_ventana))
+        }
+        UbicacionMenu::Persistente => {
+            ultima_posicion(&id).map(|punto| clamp_esquina_a_monitor(&app, punto, tamano_ventana))
+        }
+    };
+
+    let id_interno = id.clone();
+    let label_interno = label.clone();
+    let app_interno = app.clone();
+
+    let resultado = app.run_on_main_thread(move || {
+        let mut builder = WebviewWindowBuilder::new(
+            &app_interno,
+            &label_interno,
+            WebviewUrl::App(format!("portapapeles.html?id={id_interno}").into()),
+        )
+        .title("RemapH — Portapapeles")
+        .inner_size(ancho, alto)
+        .resizable(false)
+        .decorations(false)
+        .transparent(true)
+        .shadow(false)
+        .always_on_top(true)
+        .skip_taskbar(true)
+        .focused(false)
+        .devtools(true);
+
+        if let Some((x, y)) = posicion {
+            builder = builder.position(x, y);
+        }
+
+        match builder.build() {
+            Ok(ventana) => {
+                desactivar_activacion(&ventana);
+
+                let id_cierre = id_interno.clone();
+
+                marcar_ventana_lista(&id_cierre);
+
+                let ventana_para_evento = ventana.clone();
+
+                ventana.on_window_event(move |evento| {
+                    if let tauri::WindowEvent::Moved(posicion) = evento {
+                        if !moved_es_de_creacion(&id_cierre) {
+                            recordar_posicion(&id_cierre, posicion.x, posicion.y);
+                        }
+                    }
+
+                    if let tauri::WindowEvent::CloseRequested { .. } = evento {
+                        if let Ok(posicion) = ventana_para_evento.outer_position() {
+                            recordar_posicion(&id_cierre, posicion.x, posicion.y);
+                        }
+                    }
+
+                    if let tauri::WindowEvent::CloseRequested { .. }
+                    | tauri::WindowEvent::Destroyed = evento
+                    {
+                        olvidar_ventana_lista(&id_cierre);
+
+                        con_ventanas(|mapa| {
+                            mapa.remove(&id_cierre);
+                        });
+                    }
+                });
+            }
+
+            Err(error) => {
+                eprintln!("[Portapapeles] no se pudo crear la ventana: {error}");
+
+                con_ventanas(|mapa| {
+                    mapa.remove(&id_interno);
+                });
+            }
+        }
+    });
+
+    if let Err(error) = resultado {
+        eprintln!("[Portapapeles] run_on_main_thread falló para {label}: {error}");
+
+        con_ventanas(|mapa| {
+            mapa.remove(&id);
+        });
+    }
+}
+
+// ======================================================
+// 🚪 CERRAR / CERRAR TODAS
+// ------------------------------------------------------
+// Mismo criterio que back_menu_express.rs. cerrar_todas() la va a
+// llamar compilador.rs en cada recompilación (Etapa L) — acá ya
+// queda lista para eso, aunque todavía nadie la invoque.
+// ======================================================
+
+pub fn cerrar(id: &str) {
+    if let Some(app) = app_handle() {
+        if let Some(ventana) = app.get_webview_window(&label_de(id)) {
+            let _ = ventana.close();
+        }
+    }
+
+    con_ventanas(|mapa| {
+        mapa.remove(id);
+    });
+}
+
+pub fn cerrar_todas() {
+    let ids: Vec<String> = con_ventanas(|mapa| mapa.keys().cloned().collect());
+
+    for id in ids {
+        cerrar(&id);
+    }
+}
+
+// ======================================================
+// 📤 OBTENER DATOS
+// ------------------------------------------------------
+// Consulta de sólo lectura — la propia ventana la llama al cargar
+// (Etapa J), con el id que vino en la URL (?id=...), y de nuevo tras
+// cada operación que cambie el pool (fijar/renombrar/editar/
+// eliminar/limpiar/toggle Registro — Etapa H), para no tener que
+// duplicar en TS la lógica de qué mostrar según el modo.
+// ======================================================
+
+pub fn obtener_datos(id: &str) -> Option<PortapapelesDatosUI> {
+    con_ventanas(|mapa| mapa.get(id).map(|ventana| ventana.datos.clone()))
+}
+
+// ======================================================
+// 🔄 REFRESCAR DATOS — ETAPA H
+// ------------------------------------------------------
+// Reconstruye PortapapelesDatosUI desde cero (misma lógica que
+// abrir_o_alternar: construir_datos() según ACTIVOS) y actualiza la
+// entrada en ABIERTOS_VENTANAS, reusando el PortapapelesPaquete que
+// ya se guardó al abrir la ventana. Los comandos Tauri de mutación
+// (fijar/desfijar/renombrar/editar/eliminar/limpiar_todo/toggle
+// Registro, en comandos.rs) llaman esto después de aplicar el cambio
+// real sobre el pool, y le devuelven el resultado a la ventana en la
+// misma respuesta — así la ventana no necesita un segundo viaje
+// (mutar + obtener_datos por separado).
+//
+// Si `id` no tiene ventana abierta (alguien llamó a un comando de
+// mutación para un Portapapeles que ya se cerró, ej. una operación
+// en vuelo que resuelve tarde), no hace nada — no hay a quién
+// refrescarle nada.
+// ======================================================
+
+pub fn refrescar_datos(id: &str) -> Option<PortapapelesDatosUI> {
+    let paquete = con_ventanas(|mapa| mapa.get(id).map(|ventana| ventana.paquete.clone()))?;
+
+    let datos = construir_datos(id, &paquete);
+
+    con_ventanas(|mapa| {
+        if let Some(ventana) = mapa.get_mut(id) {
+            ventana.datos = datos.clone();
+        }
+    });
+
+    Some(datos)
+}
+
+// ======================================================
 // 🧪 TESTS
 // ------------------------------------------------------
 // Usan std::env::temp_dir() para los archivos sueltos (no dependen
@@ -684,5 +1956,307 @@ mod tests {
         assert!(!ruta_renombrada.exists());
 
         let _ = fs::remove_dir_all(&base);
+    }
+
+    // --------------------------------------------------
+    // ETAPA F — ACTIVOS / límite efectivo
+    // --------------------------------------------------
+    // No prueban el arranque real del listener (eso exige un entorno
+    // Windows con mensajes de verdad) ni tocan LISTENER_ARRANCADO —
+    // solo la lógica pura de ACTIVOS, que es lo que puede quedar mal
+    // sin depender de Windows.
+    // --------------------------------------------------
+
+    #[test]
+    fn activar_agrega_y_desactivar_saca_del_registro() {
+        let id = "id-test-activos-1";
+
+        assert!(!esta_activo(id));
+
+        con_activos(|activos| {
+            activos.insert(id.to_string(), 10);
+        });
+        assert!(esta_activo(id));
+        assert!(hay_algun_activo());
+
+        con_activos(|activos| {
+            activos.remove(id);
+        });
+        assert!(!esta_activo(id));
+    }
+
+    #[test]
+    fn limite_efectivo_es_el_mayor_entre_los_activos() {
+        con_activos(|activos| {
+            activos.clear();
+            activos.insert("a".to_string(), 5);
+            activos.insert("b".to_string(), 15);
+            activos.insert("c".to_string(), 10);
+        });
+
+        assert_eq!(limite_efectivo(), 15);
+
+        con_activos(|activos| activos.clear());
+        assert_eq!(limite_efectivo(), 0);
+    }
+
+    #[test]
+    fn en_cambio_del_sistema_no_escribe_sin_activos() {
+        let base = std::env::temp_dir().join("remaph_test_en_cambio_sin_activos");
+        fs::create_dir_all(&base).unwrap();
+        std::env::set_var("APPDATA", &base);
+
+        if let Ok(carpeta) = carpeta() {
+            let _ = fs::remove_dir_all(&carpeta);
+            fs::create_dir_all(&carpeta).unwrap();
+        }
+
+        con_activos(|activos| activos.clear());
+
+        let contenido = ContenidoPortapapeles::Texto("no debería guardarse".to_string());
+        en_cambio_del_sistema(&contenido);
+
+        assert_eq!(listar_rotativos().unwrap().len(), 0);
+
+        let _ = fs::remove_dir_all(&base);
+    }
+
+    #[test]
+    fn en_cambio_del_sistema_guarda_y_aplica_limite_con_activos() {
+        let base = std::env::temp_dir().join("remaph_test_en_cambio_con_activos");
+        fs::create_dir_all(&base).unwrap();
+        std::env::set_var("APPDATA", &base);
+
+        if let Ok(carpeta) = carpeta() {
+            let _ = fs::remove_dir_all(&carpeta);
+            fs::create_dir_all(&carpeta).unwrap();
+        }
+
+        con_activos(|activos| {
+            activos.clear();
+            activos.insert("id-test-en-cambio".to_string(), 2);
+        });
+
+        for texto in ["uno", "dos", "tres"] {
+            en_cambio_del_sistema(&ContenidoPortapapeles::Texto(texto.to_string()));
+            // Windows no garantiza resolución de sub-milisegundo en
+            // la fecha de modificación de un archivo recién creado;
+            // sin esta pequeña espera, dos guardados muy seguidos
+            // podrían empatar en fecha y volver el orden de
+            // aplicar_limite() no determinístico para este test.
+            std::thread::sleep(std::time::Duration::from_millis(10));
+        }
+
+        let rotativos = listar_rotativos().unwrap();
+        assert_eq!(rotativos.len(), 2);
+        assert_eq!(rotativos[0].nombre, "tres");
+        assert_eq!(rotativos[1].nombre, "dos");
+
+        con_activos(|activos| activos.clear());
+        let _ = fs::remove_dir_all(&base);
+    }
+
+    // --------------------------------------------------
+    // ETAPA G — mismo_contenido / resolver_elemento_simple /
+    // construir_datos / calcular_tamano_ventana
+    // --------------------------------------------------
+    // Ninguno de estos tests crea una ventana real (eso exige
+    // Windows + Tauri corriendo) — solo prueban la lógica de armado
+    // de datos, que es pura sobre el pool de archivos + ACTIVOS.
+    // --------------------------------------------------
+
+    fn paquete_de_prueba(nombre: &str, limite: u32) -> PortapapelesPaquete {
+        PortapapelesPaquete {
+            nombre: nombre.to_string(),
+            comportamiento: ComportamientoMenu::Toggle,
+            ubicacion: UbicacionMenu::Persistente,
+            tamano_boton: TamanoBotonPortapapeles::Mediano,
+            tamano_texto: TamanoMenu::Mediano,
+            limite,
+            color: "cyan".to_string(),
+        }
+    }
+
+    #[test]
+    fn mismo_contenido_detecta_texto_igual_y_distinto() {
+        let base = std::env::temp_dir().join("remaph_test_mismo_contenido_texto");
+        fs::create_dir_all(&base).unwrap();
+        std::env::set_var("APPDATA", &base);
+
+        if let Ok(carpeta) = carpeta() {
+            let _ = fs::remove_dir_all(&carpeta);
+            fs::create_dir_all(&carpeta).unwrap();
+        }
+
+        let ruta = guardar_rotativo(&ContenidoPortapapeles::Texto("hola".to_string())).unwrap();
+        let elemento = elemento_desde_ruta(ruta).unwrap();
+
+        assert!(mismo_contenido(
+            &elemento,
+            &ContenidoPortapapeles::Texto("hola".to_string())
+        ));
+        assert!(!mismo_contenido(
+            &elemento,
+            &ContenidoPortapapeles::Texto("chau".to_string())
+        ));
+
+        let _ = fs::remove_dir_all(&base);
+    }
+
+    #[test]
+    fn mismo_contenido_detecta_imagen_igual_y_distinta() {
+        let base = std::env::temp_dir().join("remaph_test_mismo_contenido_imagen");
+        fs::create_dir_all(&base).unwrap();
+        std::env::set_var("APPDATA", &base);
+
+        if let Ok(carpeta) = carpeta() {
+            let _ = fs::remove_dir_all(&carpeta);
+            fs::create_dir_all(&carpeta).unwrap();
+        }
+
+        let pixeles_a = vec![255, 0, 0, 255, 0, 255, 0, 255];
+        let pixeles_b = vec![0, 0, 255, 255, 0, 0, 0, 255];
+
+        let ruta = guardar_rotativo(&ContenidoPortapapeles::Imagen {
+            ancho: 2,
+            alto: 1,
+            pixeles: pixeles_a.clone(),
+        })
+        .unwrap();
+        let elemento = elemento_desde_ruta(ruta).unwrap();
+
+        assert!(mismo_contenido(
+            &elemento,
+            &ContenidoPortapapeles::Imagen {
+                ancho: 2,
+                alto: 1,
+                pixeles: pixeles_a,
+            }
+        ));
+        assert!(!mismo_contenido(
+            &elemento,
+            &ContenidoPortapapeles::Imagen {
+                ancho: 2,
+                alto: 1,
+                pixeles: pixeles_b,
+            }
+        ));
+
+        let _ = fs::remove_dir_all(&base);
+    }
+
+    #[test]
+    fn construir_datos_modo_simple_normal_sin_activos() {
+        let base = std::env::temp_dir().join("remaph_test_construir_simple");
+        fs::create_dir_all(&base).unwrap();
+        std::env::set_var("APPDATA", &base);
+
+        if let Ok(carpeta) = carpeta() {
+            let _ = fs::remove_dir_all(&carpeta);
+            fs::create_dir_all(&carpeta).unwrap();
+        }
+
+        con_activos(|activos| activos.clear());
+
+        // Sin portapapeles del sistema legible en este entorno de
+        // test (no hay Windows real detrás de arboard acá), y sin
+        // ningún rotativo previo → debe quedar vacío, no romper.
+        let paquete = paquete_de_prueba("Mi Portapapeles", 10);
+        let datos = construir_datos("id-construir-simple", &paquete);
+
+        assert!(!datos.registro_activo);
+        assert_eq!(datos.rotativos.len(), 0);
+        assert_eq!(datos.fijados.len(), 0);
+        assert_eq!(datos.nombre, "Mi Portapapeles");
+
+        let _ = fs::remove_dir_all(&base);
+    }
+
+    #[test]
+    fn construir_datos_modo_registro_lista_todos_los_rotativos() {
+        let base = std::env::temp_dir().join("remaph_test_construir_registro");
+        fs::create_dir_all(&base).unwrap();
+        std::env::set_var("APPDATA", &base);
+
+        if let Ok(carpeta) = carpeta() {
+            let _ = fs::remove_dir_all(&carpeta);
+            fs::create_dir_all(&carpeta).unwrap();
+        }
+
+        let id = "id-construir-registro";
+
+        con_activos(|activos| {
+            activos.clear();
+            activos.insert(id.to_string(), 10);
+        });
+
+        for texto in ["uno", "dos"] {
+            guardar_rotativo(&ContenidoPortapapeles::Texto(texto.to_string())).unwrap();
+            std::thread::sleep(std::time::Duration::from_millis(10));
+        }
+
+        let paquete = paquete_de_prueba("Registro", 10);
+        let datos = construir_datos(id, &paquete);
+
+        assert!(datos.registro_activo);
+        assert_eq!(datos.rotativos.len(), 2);
+
+        con_activos(|activos| activos.clear());
+        let _ = fs::remove_dir_all(&base);
+    }
+
+    #[test]
+    fn construir_datos_modo_simple_con_otro_id_activo_no_duplica() {
+        let base = std::env::temp_dir().join("remaph_test_construir_otro_activo");
+        fs::create_dir_all(&base).unwrap();
+        std::env::set_var("APPDATA", &base);
+
+        if let Ok(carpeta) = carpeta() {
+            let _ = fs::remove_dir_all(&carpeta);
+            fs::create_dir_all(&carpeta).unwrap();
+        }
+
+        guardar_rotativo(&ContenidoPortapapeles::Texto("ya existente".to_string())).unwrap();
+
+        con_activos(|activos| {
+            activos.clear();
+            activos.insert("otro-id-activo".to_string(), 10);
+        });
+
+        let paquete = paquete_de_prueba("Simple pasivo", 10);
+        let datos = construir_datos("id-que-no-esta-activo", &paquete);
+
+        assert!(!datos.registro_activo);
+        assert_eq!(datos.rotativos.len(), 1);
+        assert_eq!(datos.rotativos[0].nombre, "ya existente");
+
+        // No debe haber generado un rotativo nuevo — sigue habiendo
+        // exactamente 1 en el pool.
+        assert_eq!(listar_rotativos().unwrap().len(), 1);
+
+        con_activos(|activos| activos.clear());
+        let _ = fs::remove_dir_all(&base);
+    }
+
+    #[test]
+    fn calcular_tamano_ventana_no_es_cero_con_lista_vacia() {
+        let paquete = paquete_de_prueba("Vacío", 10);
+        let datos = PortapapelesDatosUI {
+            nombre: paquete.nombre.clone(),
+            comportamiento: "toggle".to_string(),
+            ubicacion: "persistente".to_string(),
+            tamano_boton: "mediano".to_string(),
+            tamano_texto: "mediano".to_string(),
+            limite: 10,
+            color: "cyan".to_string(),
+            registro_activo: false,
+            fijados: vec![],
+            rotativos: vec![],
+        };
+
+        let (ancho, alto) = calcular_tamano_ventana(&paquete, &datos);
+
+        assert!(ancho > 0.0);
+        assert!(alto > 0.0);
     }
 }

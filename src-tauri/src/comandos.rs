@@ -660,3 +660,162 @@ pub fn menu_express_boton_down(fila_id: String) {
 pub fn menu_express_boton_up(id_menu: String, fila_id: String) -> bool {
     crate::back_menu_express::boton_up(&id_menu, &fila_id)
 }
+
+// ======================================================
+// 📋 PORTAPAPELES — VENTANA FLOTANTE
+// ------------------------------------------------------
+// Igual criterio que MenuExpress: abrir_o_alternar() NO es un
+// comando Tauri (runtime.rs la llama directo, Etapa I). Acá solo lo
+// que la propia ventana necesita invocar. Los comandos de mutación
+// (fijar/desfijar/renombrar/editar/eliminar/limpiar_todo/toggle
+// Registro/pegar) devuelven Option<PortapapelesDatosUI> — el mismo
+// back_portapapeles::refrescar_datos() tras aplicar el cambio, para
+// que la ventana reciba el estado ya actualizado en la misma
+// respuesta y no necesite un segundo viaje. None si la mutación
+// falló (además del propio Result<_, String> que reporta el motivo)
+// o si la ventana ya se había cerrado mientras la operación estaba
+// en vuelo.
+// ======================================================
+
+#[tauri::command]
+pub fn obtener_datos_portapapeles(
+    id: String,
+) -> Option<crate::back_portapapeles::PortapapelesDatosUI> {
+    crate::back_portapapeles::obtener_datos(&id)
+}
+
+#[tauri::command]
+pub fn cerrar_portapapeles(id: String) {
+    crate::back_portapapeles::cerrar(&id);
+}
+
+#[tauri::command]
+pub fn portapapeles_toggle_registro(
+    id: String,
+    activar: bool,
+    limite: u32,
+) -> Option<crate::back_portapapeles::PortapapelesDatosUI> {
+    if activar {
+        crate::back_portapapeles::activar_registro(&id, limite);
+    } else {
+        crate::back_portapapeles::desactivar_registro(&id);
+    }
+
+    crate::back_portapapeles::refrescar_datos(&id)
+}
+
+#[tauri::command]
+pub fn portapapeles_fijar(
+    id: String,
+    ruta: String,
+) -> Result<Option<crate::back_portapapeles::PortapapelesDatosUI>, String> {
+    crate::back_portapapeles::fijar(std::path::Path::new(&ruta), &id)?;
+
+    Ok(crate::back_portapapeles::refrescar_datos(&id))
+}
+
+#[tauri::command]
+pub fn portapapeles_desfijar(
+    id: String,
+    ruta: String,
+) -> Result<Option<crate::back_portapapeles::PortapapelesDatosUI>, String> {
+    crate::back_portapapeles::desfijar(std::path::Path::new(&ruta))?;
+
+    Ok(crate::back_portapapeles::refrescar_datos(&id))
+}
+
+#[tauri::command]
+pub fn portapapeles_renombrar(
+    id: String,
+    ruta: String,
+    nuevo_nombre: String,
+) -> Result<Option<crate::back_portapapeles::PortapapelesDatosUI>, String> {
+    crate::back_portapapeles::renombrar(std::path::Path::new(&ruta), &nuevo_nombre)?;
+
+    Ok(crate::back_portapapeles::refrescar_datos(&id))
+}
+
+#[tauri::command]
+pub fn portapapeles_editar(
+    id: String,
+    ruta: String,
+    contenido: String,
+) -> Result<Option<crate::back_portapapeles::PortapapelesDatosUI>, String> {
+    crate::back_portapapeles::editar_texto(std::path::Path::new(&ruta), &contenido)?;
+
+    Ok(crate::back_portapapeles::refrescar_datos(&id))
+}
+
+#[tauri::command]
+pub fn portapapeles_eliminar(
+    id: String,
+    ruta: String,
+) -> Result<Option<crate::back_portapapeles::PortapapelesDatosUI>, String> {
+    crate::back_portapapeles::eliminar(std::path::Path::new(&ruta))?;
+
+    Ok(crate::back_portapapeles::refrescar_datos(&id))
+}
+
+#[tauri::command]
+pub fn portapapeles_limpiar_todo(
+    id: String,
+) -> Result<Option<crate::back_portapapeles::PortapapelesDatosUI>, String> {
+    // "Limpiar todo" borra los ROTATIVOS (spec: "Botón 'Limpiar
+    // todo' Borra todos los rotativos") — los fijados de esta fila
+    // no se tocan, son un pool aparte (Etapa E).
+    for elemento in crate::back_portapapeles::listar_rotativos()? {
+        crate::back_portapapeles::eliminar(&elemento.ruta)?;
+    }
+
+    Ok(crate::back_portapapeles::refrescar_datos(&id))
+}
+
+#[tauri::command]
+pub fn portapapeles_pegar(ruta: String) -> Result<(), String> {
+    crate::back_portapapeles::pegar(std::path::Path::new(&ruta))
+}
+
+// ======================================================
+// 📋 PORTAPAPELES — TAMAÑOS CONFIGURABLES
+// ------------------------------------------------------
+// Solo tamaño de BOTÓN tiene funciones propias (portapapeles_boton_
+// pequeno/mediano/grande en config.rs, Etapa C) — el tamaño de TEXTO
+// reusa menu_texto_pequeno/mediano/grande tal cual (ver config.rs),
+// así que ya están cubiertos por establecer_menu_texto_pequeno/
+// mediano/grande, comandos existentes de MenuExpress, sin duplicar
+// acá. Mismo criterio par obtener/establecer que
+// obtener_tamanos_menu_express: un solo comando de lectura combinada
+// (la ventana necesita los 3 juntos al cargar), setters individuales
+// para un futuro panel de configuración.
+// ======================================================
+
+#[derive(Serialize)]
+pub struct PortapapelesTamanosJson {
+    pub boton_pequeno: (u64, u64),
+    pub boton_mediano: (u64, u64),
+    pub boton_grande: (u64, u64),
+}
+
+#[tauri::command]
+pub fn obtener_tamanos_portapapeles() -> PortapapelesTamanosJson {
+    PortapapelesTamanosJson {
+        boton_pequeno: config::portapapeles_boton_pequeno(),
+        boton_mediano: config::portapapeles_boton_mediano(),
+        boton_grande: config::portapapeles_boton_grande(),
+    }
+}
+
+#[tauri::command]
+pub fn establecer_portapapeles_boton_pequeno(ancho: u64, alto: u64) {
+    config::establecer_portapapeles_boton_pequeno(ancho, alto)
+}
+
+#[tauri::command]
+pub fn establecer_portapapeles_boton_mediano(ancho: u64, alto: u64) {
+    config::establecer_portapapeles_boton_mediano(ancho, alto)
+}
+
+#[tauri::command]
+pub fn establecer_portapapeles_boton_grande(ancho: u64, alto: u64) {
+    config::establecer_portapapeles_boton_grande(ancho, alto)
+}

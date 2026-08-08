@@ -183,14 +183,14 @@ body {
 }
 
 .menu-express-boton:hover {
-        background: linear-gradient(rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0.12)),
-            rgba(20, 20, 30, 0.9);
-    }
+    background: linear-gradient(rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0.12)),
+        rgba(20, 20, 30, 0.9);
+}
 
 .menu-express-boton:active,
 .menu-express-boton.presionado {
-        background: linear-gradient(rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0.2)), rgba(20, 20, 30, 0.9);
-    }
+    background: linear-gradient(rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0.2)), rgba(20, 20, 30, 0.9);
+}
 
 
 /* ==========================

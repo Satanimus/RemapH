@@ -21,22 +21,31 @@
 // en vez de manejar a mano los formatos crudos del portapapeles
 // (CF_UNICODETEXT / CF_DIB) — arboard ya sabe hacer esa traducción.
 //
-// Este módulo NO escribe archivos, NO sabe qué filas están en
-// modo Registro, y NO conoce ACTIVOS — por ahora, ante cada
-// cambio, solo lo LOGGEA por consola. Queda listo para que la
-// Etapa F conecte el aviso real con el pool de archivos.
+// Este módulo en sí NO escribe archivos, NO sabe qué filas están
+// en modo Registro, y NO conoce ACTIVOS directamente — sigue sin
+// saber nada de eso. Lo único que hace ante cada aviso es leer el
+// contenido y pasárselo tal cual a
+// back_portapapeles::en_cambio_del_sistema() (ETAPA F), que es
+// quien decide si hay que guardarlo o no (según ACTIVOS) y aplica
+// el límite. Ese único punto de contacto mantiene la separación:
+// este archivo solo sabe "detectar y leer", back_portapapeles.rs
+// solo sabe "decidir y guardar".
+// El módulo también sabe ESCRIBIR al portapapeles del sistema
+// (escribir_portapapeles(), ETAPA H) — lo usa back_portapapeles::
+// pegar() para el click en un elemento (spec: "se pega el contenido
+// del archivo al portapapeles"). Sigue siendo el único lugar del
+// proyecto que toca arboard directamente, por simetría con
+// leer_portapapeles().
 // ------------------------------------------------------
 // 2. ¿Quién llama este archivo?
 //
-// Todavía nadie. El módulo está declarado en lib.rs (necesario
-// para que este archivo forme parte de la compilación), pero no
-// se agrega la llamada a iniciar_monitor() desde lib.rs/setup()
-// en esta etapa — se conecta recién en la Etapa F, cuando el
-// primer Portapapeles entra en modo Registro (ver
-// back_portapapeles.rs). Hasta entonces, el compilador va a
-// avisar con warnings de "función nunca usada" para las
-// funciones públicas de este archivo — es esperable y
-// desaparece solo en la Etapa F.
+// iniciar_monitor() todavía no se llama desde lib.rs/setup() — se
+// arranca recién la primera vez que un Portapapeles entra en modo
+// Registro, vía back_portapapeles::activar_registro() (ETAPA F).
+// Hasta que eso ocurra por primera vez en una sesión, el hilo
+// listener de este archivo simplemente no existe todavía.
+// escribir_portapapeles() la llama back_portapapeles::pegar()
+// (ETAPA H) cada vez que el usuario clickea un elemento.
 // ------------------------------------------------------
 // 3. ¿Qué información recibe?
 //
@@ -140,6 +149,40 @@ pub fn leer_portapapeles() -> Option<ContenidoPortapapeles> {
 }
 
 // ======================================================
+// 📤 ESCRIBIR PORTAPAPELES — ETAPA H
+// ------------------------------------------------------
+// Usado por back_portapapeles::pegar() al clickear un elemento.
+// Simétrico a leer_portapapeles(): mismo arboard, mismo formato
+// (ContenidoPortapapeles), sin tocar CF_UNICODETEXT/CF_DIB a mano.
+// ======================================================
+
+pub fn escribir_portapapeles(contenido: &ContenidoPortapapeles) -> Result<(), String> {
+    let mut portapapeles = arboard::Clipboard::new().map_err(|error| error.to_string())?;
+
+    match contenido {
+        ContenidoPortapapeles::Texto(texto) => portapapeles
+            .set_text(texto.clone())
+            .map_err(|error| error.to_string()),
+
+        ContenidoPortapapeles::Imagen {
+            ancho,
+            alto,
+            pixeles,
+        } => {
+            let imagen = arboard::ImageData {
+                width: *ancho,
+                height: *alto,
+                bytes: std::borrow::Cow::Borrowed(pixeles),
+            };
+
+            portapapeles
+                .set_image(imagen)
+                .map_err(|error| error.to_string())
+        }
+    }
+}
+
+// ======================================================
 // 👁️ MONITOR DE PORTAPAPELES
 // ======================================================
 
@@ -232,21 +275,45 @@ unsafe extern "system" fn wndproc_portapapeles(
 // ======================================================
 // 🔔 EN CAMBIO DE PORTAPAPELES
 // ------------------------------------------------------
-// Por ahora solo loggea — Etapa F lo conecta con el pool de
-// archivos real (ver header, sección 1).
+// ETAPA F: además de loggear (se mantiene, es útil para depurar),
+// delega en back_portapapeles::en_cambio_del_sistema() — ese
+// archivo decide si hay algún Portapapeles en modo Registro y, si
+// lo hay, guarda el rotativo y aplica el límite. Si el portapapeles
+// cambió a algo no legible (None — un formato que no es ni texto ni
+// imagen, ej. copiar un archivo del explorador), no se llama a nada
+// más: el spec solo pide guardar texto e imágenes.
+//
+// Corta antes de leer el portapapeles si no hay ningún Portapapeles
+// en modo Registro — evita crear un arboard::Clipboard y copiar
+// bytes de imagen en el caso normal (el usuario copiando cosas sin
+// tener ninguna ventana Portapapeles en modo Registro abierta), que
+// va a ser el caso más frecuente. Esto es solo una optimización: si
+// justo se activa un Registro entre este chequeo y el próximo aviso
+// real, ese próximo aviso sí se procesa normal — no se pierde nada
+// más que un aviso puntual mientras nadie estaba mirando.
 // ======================================================
 
 fn en_cambio_portapapeles() {
+    if !crate::back_portapapeles::hay_algun_activo() {
+        return;
+    }
+
     match leer_portapapeles() {
         Some(ContenidoPortapapeles::Texto(texto)) => {
             println!(
                 "📋 Portapapeles: texto ({} caracteres)",
                 texto.chars().count()
             );
+
+            crate::back_portapapeles::en_cambio_del_sistema(&ContenidoPortapapeles::Texto(texto));
         }
 
-        Some(ContenidoPortapapeles::Imagen { ancho, alto, .. }) => {
-            println!("📋 Portapapeles: imagen {}x{}", ancho, alto);
+        Some(imagen @ ContenidoPortapapeles::Imagen { .. }) => {
+            if let ContenidoPortapapeles::Imagen { ancho, alto, .. } = &imagen {
+                println!("📋 Portapapeles: imagen {}x{}", ancho, alto);
+            }
+
+            crate::back_portapapeles::en_cambio_del_sistema(&imagen);
         }
 
         None => {

@@ -1,0 +1,26 @@
+<!-- ======================================================
+📋🪟 portapapeles.html
+------------------------------------------------------
+Cuarta página independiente (ver vite.config.ts). Ventana
+flotante de un Portapapeles: transparente, siempre encima,
+arrastrable — ver back_portapapeles.rs (crear_ventana) para
+las propiedades de la ventana en sí. El id del Portapapeles a
+mostrar viaja en la query string (?id=...), leído por
+portapapeles_main.ts.
+====================================================== -->
+
+<!doctype html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>RemapH — Portapapeles</title>
+</head>
+
+<body>
+    <main id="portapapeles"></main>
+    <script type="module" src="/src/portapapeles/portapapeles_main.ts"></script>
+</body>
+
+</html>

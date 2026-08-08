@@ -19,6 +19,9 @@ export default defineConfig(async () => ({
   // (WebviewUrl::App("menu_express.html?id=...") — ver
   // back_menu_express.rs). Mismo motivo que captura: sin esto Vite
   // no la compila y la ventana carga en blanco (404).
+  // Cuarta página independiente: la ventana overlay de Portapapeles
+  // (WebviewUrl::App("portapapeles.html?id=...") — ver
+  // back_portapapeles.rs, Etapa G/crear_ventana). Mismo motivo.
   build: {
     rollupOptions: {
       input: {
@@ -26,6 +29,9 @@ export default defineConfig(async () => ({
         captura: fileURLToPath(new URL("./captura.html", import.meta.url)),
         menuExpress: fileURLToPath(
           new URL("./menu_express.html", import.meta.url),
+        ),
+        portapapeles: fileURLToPath(
+          new URL("./portapapeles.html", import.meta.url),
         ),
       },
     },
