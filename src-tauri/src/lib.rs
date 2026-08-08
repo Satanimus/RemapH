@@ -13,6 +13,8 @@ mod back_interception;
 mod back_menu_express;
 mod back_mouse;
 mod back_multimedia;
+mod back_portapapeles;
+mod back_portapapeles_captura;
 mod back_teclas;
 mod cache;
 mod captura_coordenada;

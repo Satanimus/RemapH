@@ -43,12 +43,24 @@ arboard = "3"
 # el foco a la app activa. Misma versión (0.6) que usa Tauri 2.11 por dentro.
 raw-window-handle = "0.6"
 
+# Codificar los elementos tipo imagen del pool de Portapapeles como
+# .png (etapa E, ver back_portapapeles.rs) a partir de los píxeles
+# RGBA8 que ya entrega arboard/back_portapapeles_captura.rs. Se usa
+# el crate png directo (encoder de bajo nivel) en vez del crate image
+# completo: acá solo se ESCRIBE, nunca se decodifica un .png de
+# vuelta a píxeles, así que no hace falta el resto de los formatos
+# que trae image. Misma versión (0.18) que ya resuelve el árbol de
+# dependencias por arboard.
+png = "0.18"
+
 windows-sys = {
     version = ">=0.59, <=0.61",
     features = [
         "Win32_Foundation",
+        "Win32_System_DataExchange",
         "Win32_System_Diagnostics_ToolHelp",
         "Win32_System_LibraryLoader",
+        "Win32_System_SystemInformation",
         "Win32_System_Threading",
         "Win32_UI_Input_KeyboardAndMouse",
         "Win32_UI_WindowsAndMessaging",

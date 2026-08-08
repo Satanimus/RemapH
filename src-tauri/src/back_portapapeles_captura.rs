@@ -28,10 +28,15 @@
 // ------------------------------------------------------
 // 2. ¿Quién llama este archivo?
 //
-// Todavía nadie (no se agrega la llamada a iniciar_monitor()
-// desde lib.rs/setup() en esta etapa) — se conecta recién en la
-// Etapa F, cuando el primer Portapapeles entra en modo Registro
-// (ver back_portapapeles.rs).
+// Todavía nadie. El módulo está declarado en lib.rs (necesario
+// para que este archivo forme parte de la compilación), pero no
+// se agrega la llamada a iniciar_monitor() desde lib.rs/setup()
+// en esta etapa — se conecta recién en la Etapa F, cuando el
+// primer Portapapeles entra en modo Registro (ver
+// back_portapapeles.rs). Hasta entonces, el compilador va a
+// avisar con warnings de "función nunca usada" para las
+// funciones públicas de este archivo — es esperable y
+// desaparece solo en la Etapa F.
 // ------------------------------------------------------
 // 3. ¿Qué información recibe?
 //
