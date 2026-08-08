@@ -14,6 +14,8 @@ import { textoAccionMultimedia } from "./core_multimedia";
 
 import { textoMenuAccion } from "./core_menu_express";
 
+import { textoPortapapelesAccion } from "./core_portapapeles";
+
 // ======================================================
 // 📋 CLONAR FILA POR ID
 // ======================================================
@@ -100,11 +102,22 @@ export function moverFilaPorId(
 // agregados aparentaba "vacío" y se podía eliminar sin la
 // confirmación extra que sí exige cualquier otra fila con algo
 // configurado (ver uso en comp_popup_abrir.ts).
+//
+// portapapeles tampoco usa accion.gatillo, pero a diferencia de
+// menu_express no necesita ningún paso de configuración previo
+// para funcionar (abre el visualizador del pool compartido tal
+// cual, ver core_portapapeles.ts) — se considera "con acción"
+// siempre, para pedir la misma confirmación extra al eliminarla
+// que cualquier fila ya funcional.
 // ======================================================
 
 export function filaTieneAccion(filaPerfil: FilaPerfil): boolean {
   if (filaPerfil.tipo === "menu_express") {
     return filaPerfil.menuAccion.botones.length > 0;
+  }
+
+  if (filaPerfil.tipo === "portapapeles") {
+    return true;
   }
 
   return !!filaPerfil.accion?.gatillo;
@@ -132,7 +145,7 @@ export function textoAccionFila(filaPerfil: FilaPerfil): string {
       return "Macro";
 
     case "portapapeles":
-      return "Portapapeles";
+      return textoPortapapelesAccion(filaPerfil.portapapelesAccion);
 
     default:
       return filaPerfil.accion?.gatillo

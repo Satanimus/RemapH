@@ -16,6 +16,15 @@ import type {
 } from "./core_menu_express";
 import { crearMenuAccion, crearMenuExtra } from "./core_menu_express";
 
+import type {
+  PortapapelesAccionPerfil,
+  PortapapelesExtraPerfil,
+} from "./core_portapapeles";
+import {
+  crearPortapapelesAccion,
+  crearPortapapelesExtra,
+} from "./core_portapapeles";
+
 // ======================================================
 // 👤 PERFIL
 // ======================================================
@@ -76,6 +85,15 @@ export interface FilaPerfil {
 
   menuExtra: MenuExpressExtraPerfil;
 
+  // Solo relevantes cuando tipo === "portapapeles". El id de la
+  // propia fila ES el id del Portapapeles (mismo criterio que
+  // menuAccion/menuExtra). portapapelesAccion es solo el nombre de
+  // la ventana; portapapelesExtra es comportamiento/ubicación/
+  // tamaños/límite. Ver core_portapapeles.ts.
+  portapapelesAccion: PortapapelesAccionPerfil;
+
+  portapapelesExtra: PortapapelesExtraPerfil;
+
   app: AppPerfil;
 
   color: string;
@@ -112,6 +130,10 @@ export function crearFila(): FilaPerfil {
     menuAccion: crearMenuAccion(),
 
     menuExtra: crearMenuExtra(),
+
+    portapapelesAccion: crearPortapapelesAccion(),
+
+    portapapelesExtra: crearPortapapelesExtra(),
 
     app: {
       programa: null,
@@ -175,5 +197,16 @@ export function clonarFila(fila: FilaPerfil): FilaPerfil {
     },
 
     menuExtra: { ...fila.menuExtra },
+
+    // La fila clonada es una fila nueva con su propio id — si el
+    // original era un Portapapeles, la clonada es un visualizador
+    // NUEVO e independiente del mismo pool compartido (no hereda
+    // fijados: esos quedan asociados al id original, ver
+    // back_portapapeles.rs). Alcanza con copia superficial: ningún
+    // campo de portapapelesAccion/portapapelesExtra es un array u
+    // objeto anidado.
+    portapapelesAccion: { ...fila.portapapelesAccion },
+
+    portapapelesExtra: { ...fila.portapapelesExtra },
   };
 }

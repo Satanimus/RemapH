@@ -35,6 +35,11 @@ import type {
   MenuExpressExtraPerfil,
 } from "./core_menu_express";
 
+import type {
+  PortapapelesAccionPerfil,
+  PortapapelesExtraPerfil,
+} from "./core_portapapeles";
+
 import { traducirLote } from "./core_traductor";
 
 // ======================================================
@@ -87,6 +92,13 @@ interface RemapeoJson {
   menu_accion: MenuAccionPerfil;
 
   menu_extra: MenuExpressExtraPerfil;
+
+  // Snake_case a propósito, mismo criterio que menu_accion/
+  // menu_extra: el nombre viaja igual en el JSON sin traducción
+  // adicional. Ver core_portapapeles.ts.
+  portapapeles_accion: PortapapelesAccionPerfil;
+
+  portapapeles_extra: PortapapelesExtraPerfil;
 
   color: string;
 
@@ -218,6 +230,10 @@ function convertirRemapeo(
     menuAccion: remapeo.menu_accion,
 
     menuExtra: remapeo.menu_extra,
+
+    portapapelesAccion: remapeo.portapapeles_accion,
+
+    portapapelesExtra: remapeo.portapapeles_extra,
 
     color: remapeo.color,
 
