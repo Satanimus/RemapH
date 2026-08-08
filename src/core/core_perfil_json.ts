@@ -301,13 +301,16 @@ function convertirTipo(fuente: string): TipoEntrada {
 
 function convertirCondicion(
   condicion: string,
-): "simple" | "mantenido" | "doble" {
+): "simple" | "mantenido" | "doble" | "triple" {
   switch (condicion) {
     case "mantenido":
       return "mantenido";
 
     case "doble":
       return "doble";
+
+    case "triple":
+      return "triple";
 
     default:
       return "simple";

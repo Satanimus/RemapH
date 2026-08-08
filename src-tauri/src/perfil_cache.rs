@@ -150,6 +150,8 @@ pub enum CondicionTrigger {
 
     Doble,
 
+    Triple,
+
     Mantenido,
 }
 
@@ -196,13 +198,16 @@ pub enum AccionCache {
     // garantiza al menos el gatillo.
     //
     // El segundo campo es la condición capturada para esta Acción
-    // (Simple/Doble/Mantenido) — antes se descartaba al compilar y
-    // toda Acción se ejecutaba como si fuera Simple. Runtime decide
-    // con esto cómo ejecutar el combo (ver ejecutar_emitir() en
-    // runtime.rs):
+    // (Simple/Doble/Triple/Mantenido) — antes se descartaba al
+    // compilar y toda Acción se ejecutaba como si fuera Simple.
+    // Runtime decide con esto cómo ejecutar el combo (ver
+    // ejecutar_emitir() en runtime.rs):
     // • Simple    → un solo down+up.
     // • Doble     → dos down+up, separados por
     //               config::delay_entre_salida_doble().
+    // • Triple    → tres down+up, separados por el mismo
+    //               config::delay_entre_salida_doble() (se reusa,
+    //               sin campo propio).
     // • Mantenido → down, espera config::tiempo_salida_mantenido(),
     //               up.
     Emitir(Vec<InputId>, CondicionTrigger),

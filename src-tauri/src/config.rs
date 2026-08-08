@@ -53,6 +53,15 @@
 //     Tiempo máximo para detectar Doble.
 //     También define cuánto espera AnalizadorTrigger antes de decidir que una secuencia terminó.
 //
+// tiempo_triple()
+// establecer_tiempo_triple()
+//     Tiempo máximo, contado desde el Up del primer toque, para
+//     detectar Triple. Reemplaza a tiempo_doble en ese rol cuando
+//     existe al menos un binding Triple candidato para la entrada
+//     (ver analizador_trigger.rs, fase Triple) — es una ventana más
+//     larga porque tiene que alcanzar a entrar un tercer toque, no
+//     solo un segundo.
+//
 // tiempo_mantenido()
 // establecer_tiempo_mantenido()
 //     Tiempo mínimo para detectar Mantenido.
@@ -144,6 +153,12 @@ pub const NOMBRE_APP: &str = "RemapH";
 static TIEMPO_DOBLE: AtomicU64 = AtomicU64::new(250);
 
 // ======================================================
+// ⏱️ TIEMPO TRIPLE
+// ======================================================
+
+static TIEMPO_TRIPLE: AtomicU64 = AtomicU64::new(380);
+
+// ======================================================
 // ⏳ TIEMPO MANTENIDO
 // ======================================================
 
@@ -169,6 +184,22 @@ pub fn tiempo_doble() -> u64 {
 
 pub fn establecer_tiempo_doble(valor: u64) {
     TIEMPO_DOBLE.store(valor, Ordering::Relaxed);
+}
+
+// ======================================================
+// 📥 LEER TIEMPO TRIPLE
+// ======================================================
+
+pub fn tiempo_triple() -> u64 {
+    TIEMPO_TRIPLE.load(Ordering::Relaxed)
+}
+
+// ======================================================
+// 📤 ESCRIBIR TIEMPO TRIPLE
+// ======================================================
+
+pub fn establecer_tiempo_triple(valor: u64) {
+    TIEMPO_TRIPLE.store(valor, Ordering::Relaxed);
 }
 
 // ======================================================

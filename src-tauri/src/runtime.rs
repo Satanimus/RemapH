@@ -526,7 +526,7 @@ fn emitir(input: InputId) {
 }
 
 // ======================================================
-// ⚡ EJECUTAR EMITIR (según condición: Simple/Doble/Mantenido)
+// ⚡ EJECUTAR EMITIR (según condición: Simple/Doble/Triple/Mantenido)
 // ------------------------------------------------------
 // Único lugar que decide, para un Emitir sin Extra, cómo
 // ejecutar el combo según la condición capturada en la
@@ -536,6 +536,11 @@ fn emitir(input: InputId) {
 // • Doble     → un combo completo, espera
 //               config::delay_entre_salida_doble(), y
 //               repite el combo completo.
+// • Triple    → un combo completo, espera
+//               config::delay_entre_salida_doble(), repite,
+//               espera de nuevo el mismo delay, y repite una
+//               tercera vez (reusa el delay de Doble, sin
+//               campo propio en config.rs).
 // • Mantenido → solo el DOWN del combo, espera
 //               config::tiempo_salida_mantenido(), y recién
 //               ahí manda el UP.
@@ -548,6 +553,18 @@ fn ejecutar_emitir(inputs: &[InputId], condicion: &CondicionTrigger) {
         CondicionTrigger::Simple => emitir_combo(inputs),
 
         CondicionTrigger::Doble => {
+            emitir_combo(inputs);
+
+            thread::sleep(Duration::from_millis(config::delay_entre_salida_doble()));
+
+            emitir_combo(inputs);
+        }
+
+        CondicionTrigger::Triple => {
+            emitir_combo(inputs);
+
+            thread::sleep(Duration::from_millis(config::delay_entre_salida_doble()));
+
             emitir_combo(inputs);
 
             thread::sleep(Duration::from_millis(config::delay_entre_salida_doble()));

@@ -5,7 +5,7 @@
 import type { Entrada } from "./core_entrada";
 import { normalizarEntrada } from "./core_normalizar_trigger";
 
-export type CondicionTrigger = "simple" | "mantenido" | "doble";
+export type CondicionTrigger = "simple" | "mantenido" | "doble" | "triple";
 
 export interface Trigger {
   modificadores: Entrada[];
@@ -50,6 +50,10 @@ export function triggerATexto(trigger: Trigger): string {
 
     case "doble":
       texto = `${texto} ×2`;
+      break;
+
+    case "triple":
+      texto = `${texto} ×3`;
       break;
   }
 
@@ -106,6 +110,10 @@ export function triggerAHTML(trigger: Trigger): string {
 
   if (trigger.condicion === "doble") {
     partes.push(`<span class="trigger-sintaxis"> ×2</span>`);
+  }
+
+  if (trigger.condicion === "triple") {
+    partes.push(`<span class="trigger-sintaxis"> ×3</span>`);
   }
 
   return partes.join("");

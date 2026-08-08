@@ -438,14 +438,22 @@ pub fn recibir_down(input: InputId) {
     if posibles == exactas && exactas >= 1 {
         marcar_esperando_condicion(id);
         let gatillo = entrada_actual.last().cloned().unwrap();
-        // Solo hace falta la Fase B (esperar tiempo_doble) si entre las
-        // candidatas reales de esta entrada hay al menos un binding
-        // Doble — si no, esperar ese tiempo no descarta nada real, es
-        // demora pura (ver analizador_trigger::procesar, Up-handler).
+        // Solo hace falta salir de la Fase Mantenido hacia una espera
+        // de ambigüedad (Doble o Triple) si entre las candidatas reales
+        // de esta entrada hay al menos un binding que lo pida — si no,
+        // esperar ese tiempo no descarta nada real, es demora pura (ver
+        // analizador_trigger::procesar, Up-handler).
         let necesita_doble = candidatas
             .iter()
             .any(|c| c.trigger.condicion == CondicionTrigger::Doble);
-        analizador_trigger::iniciar_timer(gatillo, necesita_doble);
+        // Triple manda sobre Doble: si hay al menos un binding Triple
+        // candidato, la espera post-Up1 usa la ventana tiempo_triple
+        // completa (ver analizador_trigger.rs, fase Triple) en vez de
+        // resolver Doble apenas llega el segundo Down.
+        let necesita_triple = candidatas
+            .iter()
+            .any(|c| c.trigger.condicion == CondicionTrigger::Triple);
+        analizador_trigger::iniciar_timer(gatillo, necesita_doble, necesita_triple);
         entrada::retener();
         return;
     }

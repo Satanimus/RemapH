@@ -358,6 +358,8 @@ fn convertir_condicion(condicion: &str) -> crate::perfil_cache::CondicionTrigger
 
         "doble" => crate::perfil_cache::CondicionTrigger::Doble,
 
+        "triple" => crate::perfil_cache::CondicionTrigger::Triple,
+
         "mantenido" => crate::perfil_cache::CondicionTrigger::Mantenido,
 
         _ => panic!("Condición no soportada: {}", condicion),
@@ -451,6 +453,8 @@ fn condicion_a_texto(condicion: &crate::perfil_cache::CondicionTrigger) -> Strin
         crate::perfil_cache::CondicionTrigger::Simple => "simple".to_string(),
 
         crate::perfil_cache::CondicionTrigger::Doble => "doble".to_string(),
+
+        crate::perfil_cache::CondicionTrigger::Triple => "triple".to_string(),
 
         crate::perfil_cache::CondicionTrigger::Mantenido => "mantenido".to_string(),
     }
