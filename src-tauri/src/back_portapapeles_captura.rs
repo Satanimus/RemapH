@@ -39,11 +39,12 @@
 // ------------------------------------------------------
 // 2. ¿Quién llama este archivo?
 //
-// iniciar_monitor() todavía no se llama desde lib.rs/setup() — se
-// arranca recién la primera vez que un Portapapeles entra en modo
-// Registro, vía back_portapapeles::activar_registro() (ETAPA F).
-// Hasta que eso ocurra por primera vez en una sesión, el hilo
-// listener de este archivo simplemente no existe todavía.
+// asegurar_listener() / detener_listener() (ETAPA J.1) las llama
+// back_portapapeles.rs en cada uno de sus puntos donde cambia si
+// "debe existir" el listener (abrir/cerrar ventana, activar/
+// desactivar Registro) — ver debe_existir_listener() ahí. Ninguno
+// de los dos hace nada si el estado ya es el pedido (arrancar
+// estando ya arrancado, o detener estando ya detenido).
 // escribir_portapapeles() la llama back_portapapeles::pegar()
 // (ETAPA H) cada vez que el usuario clickea un elemento.
 // ------------------------------------------------------
@@ -68,13 +69,22 @@
 //   vs. captura de pantalla) y no debería ser ambiguo en la
 //   práctica — si en Etapa E/G aparece un caso real donde esto
 //   da un resultado no deseado, se ajusta el orden ahí.
-// • El hilo nunca termina (mismo criterio que back_app::
-//   iniciar_monitor() — corre de por vida, no hay orden de
-//   detenerlo).
-// • Solo se llama una vez: RegisterClassExW fallaría en una
-//   segunda llamada con el mismo nombre de clase (no hay guarda
-//   explícita acá, mismo criterio que back_app::iniciar_monitor(),
-//   que tampoco se protege contra llamados repetidos).
+// • ETAPA J.1 — el hilo YA NO corre de por vida: arranca con
+//   asegurar_listener() y se detiene con detener_listener(). La
+//   CLASE de ventana (RegisterClassExW) sí se registra una única
+//   vez por proceso (una clase registrada dos veces falla) — un
+//   AtomicBool propio (CLASE_REGISTRADA) lo garantiza, separado de
+//   "está corriendo ahora" (LISTENER_CORRIENDO). Cada arranque
+//   crea una ventana mensaje-only NUEVA sobre esa misma clase ya
+//   registrada; cada parada la destruye. Mismo criterio de fondo
+//   que back_app::iniciar_monitor() (hilo dedicado + loop de
+//   mensajes), pero ahí no hace falta detenerlo nunca — acá sí,
+//   porque el listener de Portapapeles no debe quedar leyendo el
+//   portapapeles del sistema cuando no hay nada mirando (ni
+//   Registro activo ni ventana abierta).
+// • asegurar_listener() es IDEMPOTENTE: llamarla estando ya
+//   corriendo no hace nada (compare_exchange en LISTENER_CORRIENDO).
+//   Mismo criterio para detener_listener() estando ya detenido.
 // ------------------------------------------------------
 // 6. Funciones del archivo
 //
@@ -82,26 +92,36 @@
 //     Texto(String) | Imagen{ancho, alto, pixeles RGBA8}.
 // leer_portapapeles()
 //     Lee el contenido actual del portapapeles bajo demanda.
-// iniciar_monitor()
-//     Crea la ventana mensaje-only, instala
-//     AddClipboardFormatListener y arranca el loop de mensajes
-//     en un hilo dedicado.
+// asegurar_listener()
+//     Arranca el hilo/ventana/AddClipboardFormatListener si no
+//     estaba corriendo ya. Sin efecto si ya estaba corriendo.
+// detener_listener()
+//     Pide al hilo que termine (PostMessageW WM_CLOSE) si estaba
+//     corriendo. Sin efecto si ya estaba detenido.
 // wndproc_portapapeles()
-//     Procedimiento de ventana: intercepta WM_CLIPBOARDUPDATE,
-//     delega el resto a DefWindowProcW.
+//     Procedimiento de ventana: intercepta WM_CLIPBOARDUPDATE (avisa
+//     el cambio) y WM_DESTROY (corta el loop de mensajes con
+//     PostQuitMessage), delega el resto a DefWindowProcW.
 // en_cambio_portapapeles()
-//     Reacciona a cada aviso — por ahora, solo loggea.
+//     Reacciona a cada aviso — lee el portapapeles y delega en
+//     back_portapapeles::en_cambio_del_sistema().
 // ======================================================
+
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Mutex;
 
 use windows_sys::Win32::Foundation::{HINSTANCE, HWND, LPARAM, LRESULT, WPARAM};
 
-use windows_sys::Win32::System::DataExchange::AddClipboardFormatListener;
+use windows_sys::Win32::System::DataExchange::{
+    AddClipboardFormatListener, RemoveClipboardFormatListener,
+};
 
 use windows_sys::Win32::System::LibraryLoader::GetModuleHandleW;
 
 use windows_sys::Win32::UI::WindowsAndMessaging::{
-    CreateWindowExW, DefWindowProcW, DispatchMessageW, GetMessageW, RegisterClassExW,
-    TranslateMessage, HWND_MESSAGE, MSG, WM_CLIPBOARDUPDATE, WNDCLASSEXW,
+    CreateWindowExW, DefWindowProcW, DispatchMessageW, GetMessageW, PostMessageW, PostQuitMessage,
+    RegisterClassExW, TranslateMessage, HWND_MESSAGE, MSG, WM_CLIPBOARDUPDATE, WM_CLOSE,
+    WM_DESTROY, WNDCLASSEXW,
 };
 
 // ======================================================
@@ -183,37 +203,73 @@ pub fn escribir_portapapeles(contenido: &ContenidoPortapapeles) -> Result<(), St
 }
 
 // ======================================================
-// 👁️ MONITOR DE PORTAPAPELES
+// 👁️ MONITOR DE PORTAPAPELES — arranque/parada real (ETAPA J.1)
+// ------------------------------------------------------
+// LISTENER_CORRIENDO: true mientras el hilo/ventana/listener están
+// activos ahora mismo. HWND_ACTUAL: handle de la ventana mensaje-
+// only viva (None si no hay ninguna) — HWND es `isize` en
+// windows-sys ≥0.52 (no un puntero crudo), así que guardarlo en un
+// Mutex normal es seguro entre hilos sin wrapper unsafe aparte.
+// CLASE_REGISTRADA: aparte de LISTENER_CORRIENDO — la clase de
+// ventana se registra una única vez por proceso y se reutiliza en
+// cada arranque siguiente (RegisterClassExW falla si se llama dos
+// veces con el mismo nombre).
 // ======================================================
 
-pub fn iniciar_monitor() {
+static LISTENER_CORRIENDO: AtomicBool = AtomicBool::new(false);
+static CLASE_REGISTRADA: AtomicBool = AtomicBool::new(false);
+static HWND_ACTUAL: Mutex<Option<HWND>> = Mutex::new(None);
+
+const NOMBRE_CLASE: &str = "RemapHPortapapelesListener";
+
+/// Arranca el listener si no estaba corriendo. Sin efecto si ya
+/// estaba corriendo (lo llama back_portapapeles.rs cada vez que
+/// "debe existir" pasa a ser true — puede llamarse de más sin
+/// problema).
+pub fn asegurar_listener() {
+    if LISTENER_CORRIENDO
+        .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
+        .is_err()
+    {
+        return;
+    }
+
     std::thread::spawn(|| unsafe {
-        let nombre_clase: Vec<u16> = "RemapHPortapapelesListener"
+        let nombre_clase: Vec<u16> = NOMBRE_CLASE
             .encode_utf16()
             .chain(std::iter::once(0))
             .collect();
 
         let instancia = GetModuleHandleW(std::ptr::null()) as HINSTANCE;
 
-        let clase = WNDCLASSEXW {
-            cbSize: std::mem::size_of::<WNDCLASSEXW>() as u32,
-            style: 0,
-            lpfnWndProc: Some(wndproc_portapapeles),
-            cbClsExtra: 0,
-            cbWndExtra: 0,
-            hInstance: instancia,
-            hIcon: std::ptr::null_mut(),
-            hCursor: std::ptr::null_mut(),
-            hbrBackground: std::ptr::null_mut(),
-            lpszMenuName: std::ptr::null(),
-            lpszClassName: nombre_clase.as_ptr(),
-            hIconSm: std::ptr::null_mut(),
-        };
+        if CLASE_REGISTRADA
+            .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
+            .is_ok()
+        {
+            let clase = WNDCLASSEXW {
+                cbSize: std::mem::size_of::<WNDCLASSEXW>() as u32,
+                style: 0,
+                lpfnWndProc: Some(wndproc_portapapeles),
+                cbClsExtra: 0,
+                cbWndExtra: 0,
+                hInstance: instancia,
+                hIcon: std::ptr::null_mut(),
+                hCursor: std::ptr::null_mut(),
+                hbrBackground: std::ptr::null_mut(),
+                lpszMenuName: std::ptr::null(),
+                lpszClassName: nombre_clase.as_ptr(),
+                hIconSm: std::ptr::null_mut(),
+            };
 
-        if RegisterClassExW(&clase) == 0 {
-            println!("⚠️ No se pudo registrar la clase de ventana del listener de Portapapeles.");
+            if RegisterClassExW(&clase) == 0 {
+                println!(
+                    "⚠️ No se pudo registrar la clase de ventana del listener de Portapapeles."
+                );
 
-            return;
+                LISTENER_CORRIENDO.store(false, Ordering::SeqCst);
+
+                return;
+            }
         }
 
         let hwnd = CreateWindowExW(
@@ -234,14 +290,20 @@ pub fn iniciar_monitor() {
         if hwnd.is_null() {
             println!("⚠️ No se pudo crear la ventana del listener de Portapapeles.");
 
+            LISTENER_CORRIENDO.store(false, Ordering::SeqCst);
+
             return;
         }
 
         if AddClipboardFormatListener(hwnd) == 0 {
             println!("⚠️ No se pudo instalar el listener de Portapapeles.");
 
+            LISTENER_CORRIENDO.store(false, Ordering::SeqCst);
+
             return;
         }
+
+        *HWND_ACTUAL.lock().unwrap() = Some(hwnd);
 
         let mut mensaje: MSG = std::mem::zeroed();
 
@@ -250,7 +312,35 @@ pub fn iniciar_monitor() {
 
             DispatchMessageW(&mensaje);
         }
+
+        // Llegó WM_QUIT (ver wndproc_portapapeles, WM_DESTROY) — el
+        // hilo termina acá. Deja todo listo para un próximo
+        // asegurar_listener(): la clase sigue registrada (no se
+        // desregistra nunca), pero HWND_ACTUAL y LISTENER_CORRIENDO
+        // vuelven a su estado "detenido".
+        *HWND_ACTUAL.lock().unwrap() = None;
+
+        LISTENER_CORRIENDO.store(false, Ordering::SeqCst);
     });
+}
+
+/// Pide al listener que termine, si estaba corriendo. Sin efecto si
+/// ya estaba detenido (lo llama back_portapapeles.rs cada vez que
+/// "debe existir" pasa a ser false).
+pub fn detener_listener() {
+    let hwnd = HWND_ACTUAL.lock().unwrap().take();
+
+    if let Some(hwnd) = hwnd {
+        unsafe {
+            RemoveClipboardFormatListener(hwnd);
+
+            // DefWindowProcW ya destruye la ventana ante WM_CLOSE;
+            // wndproc_portapapeles intercepta el WM_DESTROY que eso
+            // genera y llama PostQuitMessage(0) para cortar el loop
+            // GetMessageW del hilo (ver arriba).
+            PostMessageW(hwnd, WM_CLOSE, 0, 0);
+        }
+    }
 }
 
 // ======================================================
@@ -269,32 +359,39 @@ unsafe extern "system" fn wndproc_portapapeles(
         return 0;
     }
 
+    // ETAPA J.1: WM_DESTROY llega como consecuencia del WM_CLOSE que
+    // manda detener_listener() (vía DefWindowProcW, más abajo).
+    // PostQuitMessage(0) es lo que hace que GetMessageW() del loop en
+    // asegurar_listener() devuelva 0 y el hilo termine.
+    if mensaje == WM_DESTROY {
+        PostQuitMessage(0);
+
+        return 0;
+    }
+
     DefWindowProcW(hwnd, mensaje, wparam, lparam)
 }
 
 // ======================================================
 // 🔔 EN CAMBIO DE PORTAPAPELES
 // ------------------------------------------------------
-// ETAPA F: además de loggear (se mantiene, es útil para depurar),
-// delega en back_portapapeles::en_cambio_del_sistema() — ese
-// archivo decide si hay algún Portapapeles en modo Registro y, si
-// lo hay, guarda el rotativo y aplica el límite. Si el portapapeles
-// cambió a algo no legible (None — un formato que no es ni texto ni
-// imagen, ej. copiar un archivo del explorador), no se llama a nada
-// más: el spec solo pide guardar texto e imágenes.
+// Delega en back_portapapeles::en_cambio_del_sistema() — ese
+// archivo decide qué hacer según el estado (algún Registro activo,
+// o solo alguna ventana Simple abierta) y notifica a las ventanas
+// abiertas (ETAPA J.1). Si el portapapeles cambió a algo no legible
+// (None — un formato que no es ni texto ni imagen, ej. copiar un
+// archivo del explorador), no se llama a nada más: el spec solo
+// pide guardar texto e imágenes.
 //
-// Corta antes de leer el portapapeles si no hay ningún Portapapeles
-// en modo Registro — evita crear un arboard::Clipboard y copiar
-// bytes de imagen en el caso normal (el usuario copiando cosas sin
-// tener ninguna ventana Portapapeles en modo Registro abierta), que
-// va a ser el caso más frecuente. Esto es solo una optimización: si
-// justo se activa un Registro entre este chequeo y el próximo aviso
-// real, ese próximo aviso sí se procesa normal — no se pierde nada
-// más que un aviso puntual mientras nadie estaba mirando.
+// Corta antes de leer el portapapeles si no hay ningún motivo para
+// procesar el aviso (ni Registro activo ni ventana abierta) — evita
+// crear un arboard::Clipboard y copiar bytes de imagen quedando el
+// listener corriendo apenas un instante de más entre que "debe
+// existir" pasa a false y detener_listener() lo corta de verdad.
 // ======================================================
 
 fn en_cambio_portapapeles() {
-    if !crate::back_portapapeles::hay_algun_activo() {
+    if !crate::back_portapapeles::debe_procesar_cambio() {
         return;
     }
 

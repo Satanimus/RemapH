@@ -151,30 +151,32 @@
 //   registro en ese momento, el mayor es el que manda"). Con
 //   ACTIVOS vacío no importa (no se escribe nada), así que se
 //   define en 0 para ese caso.
-// • activar_registro() є idempotente por id: si el id ya estaba en
-//   ACTIVOS, solo actualiza su límite pedido (no reinicia nada). El
-//   hilo listener (back_portapapeles_captura::iniciar_monitor(),
-//   Etapa D) se arranca una única vez en todo el proceso, la
-//   PRIMERA vez que ACTIVOS pasa de vacío a no-vacío — no en cada
-//   activar_registro(): RegisterClassExW fallaría si se llamara dos
-//   veces (ver header de back_portapapeles_captura.rs). Un
-//   AtomicBool propio marca si ya se arrancó.
-// • desactivar_registro() saca el id de ACTIVOS. El hilo del
-//   listener NO se detiene (no existe forma de pararlo, mismo
-//   criterio que back_app::iniciar_monitor() — "corre de por vida,
-//   no hay orden de detenerlo") — pero como en_cambio_del_sistema()
-//   solo escribe si hay_algun_activo(), un ACTIVOS vacío es
-//   funcionalmente "sin captura", que es lo que pide el plan
-//   ("cuando vuelve a vacío, la detiene" — se detiene el EFECTO,
-//   guardar archivos, no el hilo en sí).
+// • activar_registro() es idempotente por id: si el id ya estaba en
+//   ACTIVOS, solo actualiza su límite pedido (no reinicia nada).
+// • ETAPA J.1 (reemplaza el diseño original "el listener arranca una
+//   vez y nunca se detiene"): ahora hay UN SOLO listener nativo
+//   (back_portapapeles_captura::asegurar_listener() / detener_
+//   listener()) cuya existencia sigue a debe_existir_listener() —
+//   true si hay algún id en ACTIVOS O alguna ventana de Portapapeles
+//   abierta (en cualquier modo). activar_registro(), desactivar_
+//   registro(), abrir_o_alternar() y cerrar() (más el cierre por
+//   [x]/Alt+F4, en crear_ventana()) llaman asegurar_listener() o
+//   detener_listener_si_no_hace_falta() según corresponda en cada
+//   uno de esos 4 puntos donde el estado puede cambiar. Ambas
+//   funciones del listener son idempotentes, así que llamarlas de
+//   más nunca es un problema.
 // • en_cambio_del_sistema() es lo que back_portapapeles_captura::
-//   en_cambio_portapapeles() llama en cada aviso real de Windows
-//   (Etapa D ya lo tenía pendiente, ver su propio header). Si
-//   ACTIVOS está vacío, no hace nada (ningún Portapapeles está
-//   registrando). Si no, guarda el contenido como rotativo nuevo y
-//   aplica el límite efectivo — en ESE orden, porque aplicar_limite
-//   antes de guardar podría dejar pasar el elemento recién creado
-//   si el límite es 0 o si el conteo queda justo en el borde.
+//   en_cambio_portapapeles() llama en cada aviso real de Windows.
+//   Dos ramas (ver su propio comentario más abajo): si hay algún
+//   Registro activo, guarda rotativo + aplica el límite efectivo
+//   (comportamiento original, sin cambios); si no hay Registro pero
+//   sí alguna ventana Simple abierta, reusa el rotativo más reciente
+//   si el contenido no cambió o guarda uno nuevo si cambió (mismo
+//   criterio que resolver_elemento_simple() al abrir), sin aplicar
+//   ningún límite. En ambos casos, al final notifica (Tauri emit) a
+//   cada ventana de Portapapeles abierta con sus datos ya
+//   recalculados — así ninguna necesita cerrarse/reabrirse para
+//   verse actualizada.
 //
 // ETAPA G — ventana real:
 // • Reglas de apertura (según ACTIVOS), ver construir_datos():
@@ -231,16 +233,25 @@
 // eliminar()
 //     Borra un elemento del pool.
 // activar_registro() / desactivar_registro()
-//     Agregan/sacan un id de ACTIVOS y arrancan el listener si hace
-//     falta (Etapa F).
+//     Agregan/sacan un id de ACTIVOS y aseguran/revisan el listener
+//     según haga falta (Etapa F, arranque/parada real en Etapa J.1).
 // esta_activo() / hay_algun_activo()
 //     Consultas de ACTIVOS para que Etapa G decida cómo abrir la
 //     ventana (Etapa F).
 // limite_efectivo()
 //     El mayor límite pedido entre los ids activos ahora (Etapa F).
+// hay_alguna_ventana_abierta() / debe_existir_listener() /
+// debe_procesar_cambio() / detener_listener_si_no_hace_falta()
+//     Condición y helpers de arranque/parada del listener único
+//     (Etapa J.1).
 // en_cambio_del_sistema()
-//     Reacciona a un cambio real del portapapeles: si hay algún
-//     activo, guarda el rotativo y aplica el límite (Etapa F).
+//     Reacciona a un cambio real del portapapeles: guarda/reusa el
+//     rotativo según haya Registro activo o solo ventana Simple
+//     abierta, y notifica a las ventanas abiertas (Etapa F, ETAPA
+//     J.1).
+// notificar_ventanas_abiertas()
+//     Recalcula y emite (Tauri event) los datos de cada ventana de
+//     Portapapeles abierta (Etapa J.1).
 // inicializar(app)
 //     Guarda el AppHandle global — llamado una sola vez desde
 //     setup() de tauri::Builder, cuando lib.rs lo agregue (Etapa G,
@@ -267,13 +278,12 @@ use std::collections::HashMap;
 use std::fs;
 use std::io::BufWriter;
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Mutex, OnceLock};
 use std::time::SystemTime;
 
 use serde::Serialize;
 
-use tauri::{AppHandle, Manager, WebviewUrl, WebviewWindowBuilder};
+use tauri::{AppHandle, Emitter, Manager, WebviewUrl, WebviewWindowBuilder};
 
 use windows_sys::Win32::Foundation::SYSTEMTIME;
 use windows_sys::Win32::System::SystemInformation::GetLocalTime;
@@ -712,43 +722,33 @@ pub fn eliminar(ruta: &Path) -> Result<(), String> {
 
 static ACTIVOS: Mutex<Option<HashMap<String, u32>>> = Mutex::new(None);
 
-// Si el hilo listener de back_portapapeles_captura::iniciar_monitor()
-// ya se arrancó en este proceso. Solo puede pasar de false a true, y
-// solo una vez — RegisterClassExW fallaría en un segundo intento
-// (ver header de back_portapapeles_captura.rs).
-static LISTENER_ARRANCADO: AtomicBool = AtomicBool::new(false);
-
 fn con_activos<R>(f: impl FnOnce(&mut HashMap<String, u32>) -> R) -> R {
     let mut guardia = ACTIVOS.lock().unwrap();
     let mapa = guardia.get_or_insert_with(HashMap::new);
     f(mapa)
 }
 
-/// Agrega (o actualiza el límite de) un id en modo Registro. Arranca
-/// el listener real la primera vez que ACTIVOS pasa de vacío a
-/// no-vacío en todo el proceso — nunca más de una vez.
+/// Agrega (o actualiza el límite de) un id en modo Registro y se
+/// asegura de que el listener esté corriendo (ETAPA J.1 — ya no
+/// "una sola vez para siempre": asegurar_listener() es idempotente,
+/// así que llamarla de más no tiene costo).
 pub fn activar_registro(id_portapapeles: &str, limite: u32) {
     con_activos(|activos| {
         activos.insert(id_portapapeles.to_string(), limite);
     });
 
-    if LISTENER_ARRANCADO
-        .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
-        .is_ok()
-    {
-        back_portapapeles_captura::iniciar_monitor();
-    }
+    back_portapapeles_captura::asegurar_listener();
 }
 
-/// Saca un id de modo Registro. El hilo listener sigue corriendo
-/// (no hay forma de detenerlo, mismo criterio que
-/// back_app::iniciar_monitor()) pero en_cambio_del_sistema() deja de
-/// escribir en cuanto hay_algun_activo() es false — el EFECTO de
-/// "dejar de registrar" queda cubierto igual.
+/// Saca un id de modo Registro. Si ya no queda ningún motivo para
+/// que el listener siga corriendo (ni Registro activo ni ventana
+/// abierta — ver debe_existir_listener()), lo detiene.
 pub fn desactivar_registro(id_portapapeles: &str) {
     con_activos(|activos| {
         activos.remove(id_portapapeles);
     });
+
+    detener_listener_si_no_hace_falta();
 }
 
 /// ¿Esta fila está en modo Registro ahora mismo?
@@ -773,17 +773,70 @@ pub fn limite_efectivo() -> u32 {
 }
 
 // ======================================================
-// 🔔 EN CAMBIO DEL SISTEMA — ETAPA F
+// 👁️ CONDICIÓN DEL LISTENER — ETAPA J.1
+// ------------------------------------------------------
+// "Debe existir" el listener nativo mientras haya algún motivo para
+// mirar el portapapeles del sistema: algún Registro activo (de
+// cualquier id) O alguna ventana de Portapapeles abierta ahora mismo
+// (en cualquier modo — una Simple también necesita el listener para
+// poder actualizarse sola, ver en_cambio_del_sistema() más abajo).
+// debe_procesar_cambio() es la misma condición, expuesta para que
+// back_portapapeles_captura::en_cambio_portapapeles() pueda cortar
+// temprano sin leer el portapapeles si por algún motivo el listener
+// siguiera vivo un instante después de que la condición ya dio
+// false (ver detener_listener_si_no_hace_falta()).
+// ======================================================
+
+fn hay_alguna_ventana_abierta() -> bool {
+    con_ventanas(|mapa| !mapa.is_empty())
+}
+
+fn debe_existir_listener() -> bool {
+    hay_algun_activo() || hay_alguna_ventana_abierta()
+}
+
+pub fn debe_procesar_cambio() -> bool {
+    debe_existir_listener()
+}
+
+/// Detiene el listener si, tras el cambio que se acaba de aplicar
+/// (cerrar una ventana o sacar un id de ACTIVOS), ya no queda ningún
+/// motivo para que siga corriendo. Sin efecto si sigue haciendo
+/// falta, o si ya estaba detenido.
+fn detener_listener_si_no_hace_falta() {
+    if !debe_existir_listener() {
+        back_portapapeles_captura::detener_listener();
+    }
+}
+
+// ======================================================
+// 🔔 EN CAMBIO DEL SISTEMA — ETAPA F, reescrita en ETAPA J.1
 // ------------------------------------------------------
 // Llamado por back_portapapeles_captura::en_cambio_portapapeles()
-// en cada aviso real de Windows (WM_CLIPBOARDUPDATE). Si no hay
-// ningún Portapapeles en modo Registro, no hace nada — el pool no
-// crece con cambios de portapapeles ajenos a la app cuando nadie
-// está mirando en modo Registro (el modo Simple lee el portapapeles
-// bajo demanda al abrir la ventana, Etapa G, no reacciona a este
-// aviso). Si hay algún activo, guarda el contenido como rotativo
-// nuevo y recién DESPUÉS aplica el límite efectivo, para no borrar
-// por error el elemento que se acaba de crear.
+// en cada aviso real de Windows (WM_CLIPBOARDUPDATE). Dos ramas:
+//
+// • Si hay algún Registro activo (de cualquier id): comportamiento
+//   original, sin cambios — guarda el contenido como rotativo nuevo
+//   y recién DESPUÉS aplica el límite efectivo (para no borrar por
+//   error el elemento que se acaba de crear).
+// • Si no hay Registro pero sí alguna ventana Simple abierta: mismo
+//   criterio que resolver_elemento_simple() al abrir una ventana —
+//   si el contenido nuevo es igual al rotativo más reciente, no
+//   hace nada (ya está reflejado); si es distinto, guarda uno nuevo.
+//   Sin aplicar ningún límite acá (el límite es un concepto
+//   exclusivo de Registro — spec: "los fijados no se eliminan ni
+//   cuentan para el límite", y un Simple puro ni siquiera tiene uno
+//   configurado con sentido).
+// • Si no hay ni Registro ni ventana abierta, no se toca el pool —
+//   no debería llegar a pasar (el listener no estaría corriendo),
+//   pero queda como red de seguridad.
+//
+// En cualquiera de los dos primeros casos, termina notificando a
+// todas las ventanas de Portapapeles abiertas con sus datos ya
+// recalculados (ver notificar_ventanas_abiertas() más abajo) — así
+// una ventana Registro ve aparecer el elemento nuevo arriba de su
+// lista, y una ventana Simple abierta mientras OTRO id está en
+// Registro ve el último rotativo sin haber generado nada ella misma.
 // ======================================================
 
 pub fn en_cambio_del_sistema(contenido: &ContenidoPortapapeles) {
@@ -791,12 +844,62 @@ pub fn en_cambio_del_sistema(contenido: &ContenidoPortapapeles) {
         return;
     }
 
-    if !hay_algun_activo() {
+    if hay_algun_activo() {
+        if guardar_rotativo(contenido).is_ok() {
+            let _ = aplicar_limite(limite_efectivo());
+        }
+    } else if hay_alguna_ventana_abierta() {
+        guardar_si_distinto_del_mas_reciente(contenido);
+    } else {
         return;
     }
 
-    if guardar_rotativo(contenido).is_ok() {
-        let _ = aplicar_limite(limite_efectivo());
+    notificar_ventanas_abiertas();
+}
+
+/// Guarda `contenido` como rotativo nuevo solo si es distinto al
+/// rotativo más reciente que ya hay en el pool (mismo criterio de
+/// comparación que resolver_elemento_simple(), vía mismo_contenido())
+/// — evita duplicar el mismo contenido si el aviso de Windows llega
+/// más de una vez, o si ya estaba reflejado.
+fn guardar_si_distinto_del_mas_reciente(contenido: &ContenidoPortapapeles) {
+    let mas_reciente = listar_rotativos()
+        .ok()
+        .and_then(|lista| lista.into_iter().next());
+
+    let ya_coincide = mas_reciente
+        .as_ref()
+        .map(|elemento| mismo_contenido(elemento, contenido))
+        .unwrap_or(false);
+
+    if !ya_coincide {
+        let _ = guardar_rotativo(contenido);
+    }
+}
+
+// ======================================================
+// 📣 NOTIFICAR VENTANAS ABIERTAS — ETAPA J.1
+// ------------------------------------------------------
+// Recalcula PortapapelesDatosUI para cada ventana de Portapapeles
+// abierta (mismo camino que refrescar_datos(), Etapa H, que ya usan
+// los comandos de mutación manual) y le emite un evento Tauri con
+// esos datos — la propia ventana (Etapa J.2) escucha ese evento y se
+// vuelve a pintar sola, sin que el usuario tenga que hacer nada.
+// emit_to() por label (no un emit() global) para no forzar a cada
+// ventana a filtrar eventos ajenos a su propio id.
+// ======================================================
+
+fn notificar_ventanas_abiertas() {
+    let Some(app) = app_handle() else {
+        return;
+    };
+
+    let ids: Vec<String> = con_ventanas(|mapa| mapa.keys().cloned().collect());
+
+    for id in ids {
+        if let Some(datos) = refrescar_datos(&id) {
+            let _ = app.emit_to(label_de(&id).as_str(), "portapapeles-actualizado", datos);
+        }
     }
 }
 
@@ -1566,6 +1669,12 @@ pub fn abrir_o_alternar(id: String, paquete: PortapapelesPaquete) {
         );
     });
 
+    // ETAPA J.1: esta ventana recién insertada ya hace que
+    // debe_existir_listener() sea true — asegurar_listener() es
+    // idempotente, así que no importa si ya estaba corriendo por
+    // algún Registro activo en otra fila.
+    back_portapapeles_captura::asegurar_listener();
+
     crear_ventana(app.clone(), id, paquete);
 }
 
@@ -1721,6 +1830,13 @@ fn crear_ventana(app: AppHandle, id: String, paquete: PortapapelesPaquete) {
                         con_ventanas(|mapa| {
                             mapa.remove(&id_cierre);
                         });
+
+                        // ETAPA J.1: cierre por [x]/Alt+F4 (no pasa
+                        // por back_portapapeles::cerrar()) — mismo
+                        // chequeo ahí, para no dejar el listener
+                        // corriendo de más si esta era la última
+                        // ventana y no hay ningún Registro activo.
+                        detener_listener_si_no_hace_falta();
                     }
                 });
             }
@@ -1762,6 +1878,12 @@ pub fn cerrar(id: &str) {
     con_ventanas(|mapa| {
         mapa.remove(id);
     });
+
+    // ETAPA J.1: el cierre real de la ventana (arriba, ventana.close())
+    // dispara CloseRequested/Destroyed de forma asíncrona — este
+    // remove() y el chequeo de acá ya dejan el estado correcto de
+    // inmediato, sin esperar a que ese evento llegue.
+    detener_listener_si_no_hace_falta();
 }
 
 pub fn cerrar_todas() {
@@ -1961,10 +2083,10 @@ mod tests {
     // --------------------------------------------------
     // ETAPA F — ACTIVOS / límite efectivo
     // --------------------------------------------------
-    // No prueban el arranque real del listener (eso exige un entorno
-    // Windows con mensajes de verdad) ni tocan LISTENER_ARRANCADO —
-    // solo la lógica pura de ACTIVOS, que es lo que puede quedar mal
-    // sin depender de Windows.
+    // No prueban el arranque/parada real del listener (eso exige un
+    // entorno Windows con mensajes de verdad, ver back_portapapeles_
+    // captura.rs) — solo la lógica pura de ACTIVOS, que es lo que
+    // puede quedar mal sin depender de Windows.
     // --------------------------------------------------
 
     #[test]
