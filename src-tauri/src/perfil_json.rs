@@ -151,6 +151,19 @@ pub struct RemapeoJson {
     pub menu_accion: MenuAccionJson,
     #[serde(default)]
     pub menu_extra: MenuExpressExtraJson,
+    // Solo relevantes cuando tipo == "portapapeles". El id de esta
+    // misma fila (RemapeoJson::id) ES el id del Portapapeles — mismo
+    // criterio que menu_accion/menu_extra. portapapeles_accion es
+    // solo el nombre de la ventana (la fila no es dueña de ningún
+    // contenido propio, ver PortapapelesAccionJson); portapapeles_extra
+    // es comportamiento/ubicación/tamaños/límite pedido. #[serde(default)]
+    // para que perfiles guardados antes de esta feature sigan cargando
+    // sin romper. Ver PortapapelesAccionJson / PortapapelesExtraJson
+    // más abajo.
+    #[serde(default)]
+    pub portapapeles_accion: PortapapelesAccionJson,
+    #[serde(default)]
+    pub portapapeles_extra: PortapapelesExtraJson,
     pub color: String,
     pub nota: String,
 }
@@ -346,6 +359,70 @@ impl Default for MenuExpressExtraJson {
             tamano_boton: "mediano".to_string(),
             tamano_texto: "mediano".to_string(),
             color_boton: Self::color_boton_default(),
+        }
+    }
+}
+
+// ======================================================
+// 📋 PORTAPAPELES — ACCIÓN / EXTRA
+// ------------------------------------------------------
+// Datos del tipo "portapapeles". El id del Portapapeles es el mismo
+// RemapeoJson::id de la fila (no hay id propio acá) — mismo criterio
+// que MenuExpress. A diferencia de MenuExpress, la fila NO es dueña
+// de ningún contenido propio: es solo un VISUALIZADOR de un pool de
+// elementos rotatorios compartido por todo RemapH (ver
+// back_portapapeles.rs, etapas E/F). Los fijados sí son exclusivos
+// de cada fila (prefijo {id}_ en el nombre de archivo), pero no
+// viajan acá — viven directamente en la carpeta del pool.
+//
+// PortapapelesAccionJson (columna Acción):
+//   nombre: título de la ventana Portapapeles, mostrado en el botón
+//     de la columna Acción ("📋 nombre") y en la barra superior de
+//     la ventana. Único campo — a diferencia de MenuAccionJson no
+//     hay lista de botones que armar acá.
+//
+// PortapapelesExtraJson (columna Extra):
+//   comportamiento: "toggle" | "efimero"
+//   ubicacion: "persistente" | "cursor"
+//   tamano_boton: "pequeno" | "mediano" | "grande" — tamaño propio
+//     (botones alargados, no cuadrados como MenuExpress).
+//   tamano_texto: "pequeno" | "mediano" | "grande" — mismo
+//     vocabulario/valores que ya usa MenuExpress (tamano_texto).
+//   limite: máximo de elementos ROTATORIOS que ESTA fila pide
+//     mantener en modo Registro (los fijados no cuentan). El límite
+//     REAL que aplica el pool compartido es el mayor límite
+//     configurado entre todos los Portapapeles actualmente en modo
+//     Registro (ver back_portapapeles.rs, etapa F) — este campo es
+//     solo lo que la fila "pide", no lo que termina rigiendo.
+// ======================================================
+
+#[derive(Clone, Debug, Default, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct PortapapelesAccionJson {
+    pub nombre: String,
+}
+
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PortapapelesExtraJson {
+    pub comportamiento: String,
+
+    pub ubicacion: String,
+
+    pub tamano_boton: String,
+
+    pub tamano_texto: String,
+
+    pub limite: u32,
+}
+
+impl Default for PortapapelesExtraJson {
+    fn default() -> Self {
+        Self {
+            comportamiento: "toggle".to_string(),
+            ubicacion: "persistente".to_string(),
+            tamano_boton: "mediano".to_string(),
+            tamano_texto: "mediano".to_string(),
+            limite: 10,
         }
     }
 }

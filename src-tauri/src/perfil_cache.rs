@@ -264,6 +264,40 @@ pub enum AccionCache {
         // reenviárselo a la ventana o no.
         color_boton: ColorBotonMenu,
     },
+
+    // Acción tipo Portapapeles. nombre/comportamiento/ubicacion/
+    // tamaños/limite vienen de la columna Extra + el nombre de la
+    // columna Acción de la fila (portapapeles_accion +
+    // portapapeles_extra) — igual que MenuExpress, compilador.rs los
+    // empaqueta juntos en un solo AccionCache (no hay ExtraCache
+    // aparte para este tipo). A diferencia de MenuExpress no hay
+    // "botones" propios: el contenido real (fijados/rotatorios) vive
+    // en el pool de archivos compartido (ver back_portapapeles.rs,
+    // etapas E/F) y no se compila acá — Runtime/back_portapapeles.rs
+    // lo leen directo de disco al abrir la ventana. El id de esta
+    // fila (RemapeoCache::id, no un campo propio acá) ES el id del
+    // Portapapeles, mismo criterio que MenuExpress.
+    Portapapeles {
+        nombre: String,
+        comportamiento: ComportamientoMenu,
+        ubicacion: UbicacionMenu,
+        tamano_boton: TamanoBotonPortapapeles,
+        tamano_texto: TamanoMenu,
+        // Límite que ESTA fila pide (no el límite real efectivo del
+        // pool compartido — ese lo calcula back_portapapeles.rs entre
+        // todos los Portapapeles activos en modo Registro, ver
+        // perfil_json.rs::PortapapelesExtraJson).
+        limite: u32,
+        // Color de la FILA Portapapeles (mismo vocabulario que la
+        // paleta de color de fila, "" si no tiene). Único campo
+        // "decorativo" que viaja hasta acá pese a la regla general
+        // de perfil_cache (ver header del archivo) — mismo criterio
+        // que AccionCache::MenuExpress::color: uso funcional real,
+        // back_portapapeles.rs lo usa como color base de la barra
+        // superior de la ventana (spec: "hereda el color de la fila
+        // en RemapH").
+        color: String,
+    },
 }
 
 // ======================================================
@@ -374,6 +408,37 @@ impl TamanoMenu {
             TamanoMenu::Pequeno => "pequeno",
             TamanoMenu::Mediano => "mediano",
             TamanoMenu::Grande => "grande",
+        }
+    }
+}
+
+// ======================================================
+// 📋 TAMAÑO BOTÓN PORTAPAPELES
+// ------------------------------------------------------
+// Espejo de TamanoBotonPortapapeles (TS, core_portapapeles.ts) /
+// tamano_boton (Rust, perfil_json.rs::PortapapelesExtraJson). Tipo
+// PROPIO (no reusa TamanoMenu) porque los botones de Portapapeles
+// son filas alargadas (ícono + nombre + acciones), no cuadrados como
+// los de MenuExpress — usan sus propios valores en px
+// (config.rs: portapapeles_boton_pequeno/mediano/grande, etapa C)
+// aunque comparten el mismo vocabulario Pequeño/Mediano/Grande.
+// tamano_texto de Portapapeles SÍ reusa TamanoMenu tal cual (ver
+// AccionCache::Portapapeles más arriba), sin tipo propio.
+// ======================================================
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum TamanoBotonPortapapeles {
+    Pequeno,
+    Mediano,
+    Grande,
+}
+
+impl TamanoBotonPortapapeles {
+    pub fn como_str(&self) -> &'static str {
+        match self {
+            TamanoBotonPortapapeles::Pequeno => "pequeno",
+            TamanoBotonPortapapeles::Mediano => "mediano",
+            TamanoBotonPortapapeles::Grande => "grande",
         }
     }
 }

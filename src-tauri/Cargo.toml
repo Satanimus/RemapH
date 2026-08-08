@@ -27,6 +27,16 @@ base64 = "0.22"
 # Acción Multimedia) — ver back_multimedia.rs.
 winmix = "0.1"
 
+# Lectura/escritura del portapapeles de Windows (texto e imagen) sin
+# manejar a mano los formatos crudos — usado por el tipo
+# "portapapeles" (etapas D/E en adelante, ver back_portapapeles_captura.rs
+# / back_portapapeles.rs). La DETECCIÓN de cambios sigue el mismo
+# camino que ya usa back_app.rs::iniciar_monitor() (hilo dedicado +
+# AddClipboardFormatListener vía windows-sys, ya es dependencia) —
+# arboard solo se usa para LEER/ESCRIBIR el contenido una vez avisado
+# el cambio, no para detectarlo.
+arboard = "3"
+
 # Acceso al HWND real de una ventana (raw_window_handle::HasWindowHandle,
 # que tauri::WebviewWindow ya implementa) — usado en back_menu_express.rs
 # para aplicarle WS_EX_NOACTIVATE y que clickear sus botones no le quite

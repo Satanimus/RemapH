@@ -444,6 +444,13 @@ fn ejecutar_accion(
                 },
             );
         }
+
+        // Placeholder (Etapa B del plan Portapapeles): el tipo ya
+        // compila a AccionCache::Portapapeles, pero todavía no existe
+        // back_portapapeles.rs ni la ventana — no hace nada. Se
+        // conecta de verdad en la Etapa I ("Conexión física"), mismo
+        // criterio que el brazo MenuExpress de acá arriba.
+        AccionCache::Portapapeles { .. } => {}
     }
 }
 

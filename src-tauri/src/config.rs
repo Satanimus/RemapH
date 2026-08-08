@@ -126,6 +126,15 @@
 // establecer_menu_texto_pequeno() / _mediano() / _grande()
 //     Tamaño de fuente en px de los 3 tamaños de texto de
 //     MenuExpress (menu_extra.tamanoTexto). Mismo criterio.
+//
+// portapapeles_boton_pequeno() / _mediano() / _grande()
+// establecer_portapapeles_boton_pequeno() / _mediano() / _grande()
+//     Ancho/alto en px de los 3 tamaños de botón de Portapapeles
+//     (portapapeles_extra.tamanoBoton). Valores propios (botones
+//     alargados, no cuadrados como MenuExpress) — mismo criterio de
+//     única fuente de verdad que menu_boton_*. El tamaño de TEXTO de
+//     Portapapeles reusa menu_texto_pequeno/mediano/grande tal cual,
+//     no tiene funciones propias.
 // ------------------------------------------------------
 // Transformación:
 //
@@ -487,4 +496,68 @@ pub fn menu_texto_grande() -> u64 {
 
 pub fn establecer_menu_texto_grande(valor: u64) {
     MENU_TEXTO_GRANDE.store(valor, Ordering::Relaxed);
+}
+
+// ======================================================
+// 📋 PORTAPAPELES — TAMAÑOS DE BOTÓN
+// ------------------------------------------------------
+// Ancho/alto en px para cada uno de los 3 tamaños de botón
+// (portapapeles_extra.tamanoBoton). Valores PROPIOS (no reusa
+// menu_boton_*): los botones de Portapapeles son filas alargadas
+// (ícono + nombre + acciones), no cuadrados como los de MenuExpress
+// — mismo criterio de "única fuente de verdad configurable" que ya
+// aplica ahí (ver comentario de MENU EXPRESS — TAMAÑOS DE BOTÓN más
+// arriba); portapapeles.css / portapapeles_main.ts /
+// back_portapapeles.rs (etapas D en adelante) los van a LEER por
+// comando/consulta en vez de tener su propia copia fija.
+//
+// El tamaño de TEXTO de Portapapeles no tiene su propia sección acá
+// — reusa menu_texto_pequeno/mediano/grande tal cual (ver
+// core_portapapeles.ts / AccionCache::Portapapeles en
+// perfil_cache.rs), así que no hace falta duplicar esos 3 valores.
+// ======================================================
+
+static PORTAPAPELES_BOTON_PEQUENO_ANCHO: AtomicU64 = AtomicU64::new(140);
+static PORTAPAPELES_BOTON_PEQUENO_ALTO: AtomicU64 = AtomicU64::new(26);
+
+static PORTAPAPELES_BOTON_MEDIANO_ANCHO: AtomicU64 = AtomicU64::new(180);
+static PORTAPAPELES_BOTON_MEDIANO_ALTO: AtomicU64 = AtomicU64::new(32);
+
+static PORTAPAPELES_BOTON_GRANDE_ANCHO: AtomicU64 = AtomicU64::new(220);
+static PORTAPAPELES_BOTON_GRANDE_ALTO: AtomicU64 = AtomicU64::new(40);
+
+pub fn portapapeles_boton_pequeno() -> (u64, u64) {
+    (
+        PORTAPAPELES_BOTON_PEQUENO_ANCHO.load(Ordering::Relaxed),
+        PORTAPAPELES_BOTON_PEQUENO_ALTO.load(Ordering::Relaxed),
+    )
+}
+
+pub fn establecer_portapapeles_boton_pequeno(ancho: u64, alto: u64) {
+    PORTAPAPELES_BOTON_PEQUENO_ANCHO.store(ancho, Ordering::Relaxed);
+    PORTAPAPELES_BOTON_PEQUENO_ALTO.store(alto, Ordering::Relaxed);
+}
+
+pub fn portapapeles_boton_mediano() -> (u64, u64) {
+    (
+        PORTAPAPELES_BOTON_MEDIANO_ANCHO.load(Ordering::Relaxed),
+        PORTAPAPELES_BOTON_MEDIANO_ALTO.load(Ordering::Relaxed),
+    )
+}
+
+pub fn establecer_portapapeles_boton_mediano(ancho: u64, alto: u64) {
+    PORTAPAPELES_BOTON_MEDIANO_ANCHO.store(ancho, Ordering::Relaxed);
+    PORTAPAPELES_BOTON_MEDIANO_ALTO.store(alto, Ordering::Relaxed);
+}
+
+pub fn portapapeles_boton_grande() -> (u64, u64) {
+    (
+        PORTAPAPELES_BOTON_GRANDE_ANCHO.load(Ordering::Relaxed),
+        PORTAPAPELES_BOTON_GRANDE_ALTO.load(Ordering::Relaxed),
+    )
+}
+
+pub fn establecer_portapapeles_boton_grande(ancho: u64, alto: u64) {
+    PORTAPAPELES_BOTON_GRANDE_ANCHO.store(ancho, Ordering::Relaxed);
+    PORTAPAPELES_BOTON_GRANDE_ALTO.store(alto, Ordering::Relaxed);
 }

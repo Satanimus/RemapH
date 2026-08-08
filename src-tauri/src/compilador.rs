@@ -128,6 +128,12 @@
 //     en silencio los botones cuyo fila_id ya no exista en el
 //     perfil, y los reordena por posición de la fila referenciada
 //     en la tabla. None si el menú queda sin botones.
+//
+// convertir_portapapeles()
+//     Resuelve tipo == "portapapeles" → AccionCache::Portapapeles
+//     (nunca None). Empaqueta portapapeles_accion + portapapeles_extra
+//     en un solo AccionCache, mismo criterio que MenuExpress — sin
+//     referencias a otras filas, así que nunca hay datos faltantes.
 // ------------------------------------------------------
 
 use crate::cache;
@@ -137,7 +143,8 @@ use crate::eventos::InputId;
 use crate::perfil_cache::{
     AccionCache, AlcanceMultimedia, AppCache, ColorBotonMenu, ComandoMultimedia,
     ComportamientoMenu, CoordenadaCache, ExtraCache, FormaMenu, MenuBotonCache, PostAccionCache,
-    PuntoReferenciaCache, RemapeoCache, TamanoMenu, TriggerCache, UbicacionCache, UbicacionMenu,
+    PuntoReferenciaCache, RemapeoCache, TamanoBotonPortapapeles, TamanoMenu, TriggerCache,
+    UbicacionCache, UbicacionMenu,
 };
 
 use crate::perfil_json::{perfil_json, AppJson, CoordenadaJson, RemapeoJson};
@@ -315,10 +322,12 @@ fn convertir_accion(remapeo: &RemapeoJson, perfil: &perfil_json) -> Option<Accio
 
         "menu_express" => convertir_menu_express(remapeo, perfil),
 
-        // Tipos todavía decorativos en la UI (Portapapeles, etc.): no
-        // producen ninguna acción real todavía. La fila entera se
-        // descarta al compilar (ver compilar_remapeo), igual que una
-        // fila en OFF.
+        "portapapeles" => Some(convertir_portapapeles(remapeo)),
+
+        // Tipos todavía decorativos en la UI (sin implementar del
+        // lado Rust): no producen ninguna acción real todavía. La
+        // fila entera se descarta al compilar (ver compilar_remapeo),
+        // igual que una fila en OFF.
         _ => None,
     }
 }
@@ -426,6 +435,38 @@ fn convertir_tamano_menu(valor: &str) -> TamanoMenu {
         "pequeno" => TamanoMenu::Pequeno,
         "grande" => TamanoMenu::Grande,
         _ => TamanoMenu::Mediano,
+    }
+}
+
+// ======================================================
+// 📋 CONVERTIR PORTAPAPELES
+// ------------------------------------------------------
+// A diferencia de convertir_menu_express, nunca descarta la fila
+// (siempre Some): no depende de ninguna referencia a otra fila del
+// perfil (no hay "botones" que puedan quedar huérfanos), así que no
+// hay ningún dato requerido que pueda faltar. nombre vacío es un
+// estado válido — significa que la ventana usa su título por
+// defecto (decisión de back_portapapeles.rs, etapa G), no que la
+// fila esté incompleta.
+// ======================================================
+
+fn convertir_portapapeles(remapeo: &RemapeoJson) -> AccionCache {
+    AccionCache::Portapapeles {
+        nombre: remapeo.portapapeles_accion.nombre.clone(),
+        comportamiento: convertir_comportamiento_menu(&remapeo.portapapeles_extra.comportamiento),
+        ubicacion: convertir_ubicacion_menu(&remapeo.portapapeles_extra.ubicacion),
+        tamano_boton: convertir_tamano_boton_portapapeles(&remapeo.portapapeles_extra.tamano_boton),
+        tamano_texto: convertir_tamano_menu(&remapeo.portapapeles_extra.tamano_texto),
+        limite: remapeo.portapapeles_extra.limite,
+        color: remapeo.color.clone(),
+    }
+}
+
+fn convertir_tamano_boton_portapapeles(valor: &str) -> TamanoBotonPortapapeles {
+    match valor {
+        "pequeno" => TamanoBotonPortapapeles::Pequeno,
+        "grande" => TamanoBotonPortapapeles::Grande,
+        _ => TamanoBotonPortapapeles::Mediano,
     }
 }
 
