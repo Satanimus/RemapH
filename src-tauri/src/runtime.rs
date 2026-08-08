@@ -62,19 +62,27 @@
 //    fila (sustituir_accion()) y lo corre como una macro
 //    más. Con un combo como Acción, cada placeholder puede
 //    expandirse a VARIAS líneas (no es un simple reemplazo
-//    de texto): [ACCION] → DOWN de cada mod (en orden) → DOWN
-//    gatillo → UP gatillo → UP de cada mod (orden inverso).
-//    [ACCION_DOWN] → solo la mitad de abajo (DOWN mods + DOWN
-//    gatillo); [ACCION_UP] → solo la mitad de arriba (UP
-//    gatillo + UP mods en reversa). Así Turbo repite el combo
-//    completo en cada vuelta, y Mantener no suelta nada hasta
-//    el final. La sustitución SOLO tiene efecto si la Acción
-//    es Emitir — para Macro/AbrirArchivo/Ui no hay down/up
-//    físico que poner ahí, los placeholders quedan sin
-//    reemplazar (línea inofensiva, no rompe nada, pero
-//    tampoco hace lo que probablemente se esperaba: esa
-//    combinación no está pensada para usarse — la UI es
-//    quien debe evitar ofrecerla).
+//    de texto), y la CONDICIÓN de la Acción (Simple/Doble/
+//    Triple/Mantenido) decide cuántas: [ACCION] → todos los
+//    toques completos (DOWN mods → DOWN gatillo → UP gatillo
+//    → UP mods en reversa, repetido 1/2/3 veces según Simple/
+//    Doble/Triple, o DOWN+espera+UP si es Mantenido).
+//    [ACCION_DOWN] → todos los toques salvo el último
+//    completos, y el último solo con su DOWN (sostenido);
+//    [ACCION_UP] → siempre solo la mitad de arriba (UP
+//    gatillo + UP mods en reversa), sin importar la condición
+//    — lo único pendiente cuando llega el Up físico real es
+//    soltar ese último DOWN. Así Turbo repite el combo
+//    (con sus N toques) completo en cada vuelta, y Mantener
+//    no suelta nada hasta el final — ver
+//    lineas_accion_completa/lineas_accion_down/lineas_accion_up.
+//    La sustitución SOLO tiene efecto si la Acción es Emitir —
+//    para Macro/AbrirArchivo/Ui no hay down/up físico que
+//    poner ahí, los placeholders quedan sin reemplazar (línea
+//    inofensiva, no rompe nada, pero tampoco hace lo que
+//    probablemente se esperaba: esa combinación no está
+//    pensada para usarse — la UI es quien debe evitar
+//    ofrecerla).
 //
 // D) Un trigger Simple no puede tener Turbo — Turbo exige
 //    mantener presionado. El equivalente para un Simple es
@@ -143,9 +151,10 @@
 //     hilo nuevo.
 // sustituir_accion(lineas, accion)
 //     Expande [ACCION]/[ACCION_DOWN]/[ACCION_UP] a los pasos
-//     DOWN/UP reales del combo (mods + gatillo), solo si
-//     accion es Emitir. Una línea con placeholder puede
-//     convertirse en varias líneas.
+//     DOWN/UP reales del combo (mods + gatillo) según la
+//     condición de la Acción (Simple/Doble/Triple/Mantenido),
+//     solo si accion es Emitir. Una línea con placeholder
+//     puede convertirse en varias líneas.
 // ejecutar_emitir(inputs, condicion)
 //     Despacha un Emitir directo (sin Extra) según su
 //     condición: Simple → emitir_combo() una vez. Doble →
@@ -701,26 +710,28 @@ fn ejecutar_extra_en_hilo(id: String, extra: ExtraCache, accion: AccionCache) {
 // rompe nada).
 //
 // Con un combo, un placeholder que ocupa toda la línea se
-// expande a VARIAS líneas (no un simple reemplazo de texto):
-// • [ACCION_DOWN] → DOWN de cada mod (orden) + DOWN gatillo
-// • [ACCION_UP]   → UP gatillo + UP de cada mod (orden inverso)
-// • [ACCION]      → la secuencia [ACCION_DOWN] + [ACCION_UP]
-//   seguida, para que un solo pulso incluya el combo entero
-//   (así Turbo repite mod+gatillo completos en cada vuelta).
+// expande a VARIAS líneas (no un simple reemplazo de texto)
+// según la condición de la Acción — ver el bloque de
+// comentario sobre lineas_accion_completa/lineas_accion_down/
+// lineas_accion_up, más abajo, para el detalle completo.
 //
 // Un placeholder que viene mezclado con más texto en la
 // misma línea (ej. "TOGGLE [ACCION]") no se puede expandir a
 // varias líneas sin romper esa línea, así que ahí se sustituye
 // solo por el control del gatillo — igual que antes de este
-// cambio. Toggle hoy no distingue combos con modificador.
+// cambio. Toggle hoy no distingue combos con modificador ni
+// condición (queda igual que antes; no está en uso desde la
+// UI hoy — ver EXTRA_OPCIONES/EXTRA_TECLA_MOUSE_OPCIONES en
+// el frontend, ninguna ofrece "toggle").
 // ======================================================
 
 fn sustituir_accion(lineas: Vec<String>, accion: &AccionCache) -> Vec<String> {
-    // La condición (Simple/Doble/Mantenido) de la Acción no aplica
-    // acá — un Extra (Turbo/Mantener/Toggle) ya define su propio
-    // ritmo de repetición/sostenido, así que el placeholder siempre
-    // se expande a un combo simple down/up.
-    let AccionCache::Emitir(inputs, _condicion) = accion else {
+    // La condición (Simple/Doble/Triple/Mantenido) de la Acción SÍ
+    // aplica acá — cada placeholder se expande según ella (ver
+    // lineas_accion_completa/lineas_accion_down/lineas_accion_up),
+    // así que un Extra (Turbo/Mantener/etc.) combinado con Doble o
+    // Triple dispara los N toques completos, no un down/up simple.
+    let AccionCache::Emitir(inputs, condicion) = accion else {
         return lineas;
     };
 
@@ -734,29 +745,129 @@ fn sustituir_accion(lineas: Vec<String>, accion: &AccionCache) -> Vec<String> {
 
     lineas
         .into_iter()
-        .flat_map(|linea| expandir_placeholder(linea, mods, gatillo))
+        .flat_map(|linea| expandir_placeholder(linea, mods, gatillo, condicion))
         .collect()
 }
 
-fn expandir_placeholder(linea: String, mods: &[&str], gatillo: &str) -> Vec<String> {
+fn expandir_placeholder(
+    linea: String,
+    mods: &[&str],
+    gatillo: &str,
+    condicion: &CondicionTrigger,
+) -> Vec<String> {
     match linea.as_str() {
-        "[ACCION_DOWN]" => lineas_abajo(mods, gatillo),
+        "[ACCION_DOWN]" => lineas_accion_down(mods, gatillo, condicion),
 
-        "[ACCION_UP]" => lineas_arriba(mods, gatillo),
+        "[ACCION_UP]" => lineas_accion_up(mods, gatillo),
 
-        "[ACCION]" => {
-            let mut pasos = lineas_abajo(mods, gatillo);
-
-            pasos.extend(lineas_arriba(mods, gatillo));
-
-            pasos
-        }
+        "[ACCION]" => lineas_accion_completa(mods, gatillo, condicion),
 
         _ => vec![linea
             .replace("[ACCION_DOWN]", &format!("DOWN {gatillo}"))
             .replace("[ACCION_UP]", &format!("UP {gatillo}"))
             .replace("[ACCION]", gatillo)],
     }
+}
+
+// ======================================================
+// 🔁 [ACCION] / [ACCION_DOWN] / [ACCION_UP] — condición-aware
+// ------------------------------------------------------
+// Un "toque" es un DOWN+UP completo del combo. La condición decide
+// cuántos toques hacen falta antes de la mitad final:
+// • Simple           → 1 toque.
+// • Doble            → 2 toques.
+// • Triple           → 3 toques.
+// • Mantenido        → no tiene "toques": es DOWN, sostenido, UP.
+//
+// [ACCION] (unidad completa, la usan Normal/Turbo en su bucle):
+// todos los toques completos, separados por
+// delay_entre_salida_doble; para Mantenido, DOWN + espera
+// tiempo_salida_mantenido + UP (sostenido artificial, igual que
+// ejecutar_emitir sin Extra).
+//
+// [ACCION_DOWN]/[ACCION_UP] (mitades separadas, las usan Mantener/
+// Click Sostenido para sostener hasta el Up físico real):
+// [ACCION_DOWN] manda todos los toques salvo el último completos,
+// y deja el último solo con su DOWN (sostenido) — ej. Triple:
+// toque, espera, toque, espera, DOWN. [ACCION_UP] siempre es
+// solamente la mitad de arriba (UP gatillo + UP mods en reversa):
+// no importa la condición, lo único que queda pendiente cuando
+// llega el Up físico real es soltar ese último DOWN sostenido.
+// Para Mantenido, [ACCION_DOWN] es solo DOWN — su propio
+// tiempo_salida_mantenido no aplica acá: el sostenido real que
+// pide el Extra (ESPERAR DETENER) ya lo reemplaza.
+// ======================================================
+
+fn lineas_un_toque(mods: &[&str], gatillo: &str) -> Vec<String> {
+    let mut pasos = lineas_abajo(mods, gatillo);
+
+    pasos.extend(lineas_arriba(mods, gatillo));
+
+    pasos
+}
+
+fn lineas_accion_completa(
+    mods: &[&str],
+    gatillo: &str,
+    condicion: &CondicionTrigger,
+) -> Vec<String> {
+    match condicion {
+        CondicionTrigger::Simple => lineas_un_toque(mods, gatillo),
+
+        CondicionTrigger::Doble => lineas_n_toques(mods, gatillo, 2),
+
+        CondicionTrigger::Triple => lineas_n_toques(mods, gatillo, 3),
+
+        CondicionTrigger::Mantenido => {
+            let mut pasos = lineas_abajo(mods, gatillo);
+
+            pasos.push(format!("ESPERAR {}", config::tiempo_salida_mantenido()));
+
+            pasos.extend(lineas_arriba(mods, gatillo));
+
+            pasos
+        }
+    }
+}
+
+fn lineas_n_toques(mods: &[&str], gatillo: &str, n: u8) -> Vec<String> {
+    let mut pasos = Vec::new();
+
+    for indice in 0..n {
+        if indice > 0 {
+            pasos.push(format!("ESPERAR {}", config::delay_entre_salida_doble()));
+        }
+
+        pasos.extend(lineas_un_toque(mods, gatillo));
+    }
+
+    pasos
+}
+
+fn lineas_accion_down(mods: &[&str], gatillo: &str, condicion: &CondicionTrigger) -> Vec<String> {
+    let toques_previos = match condicion {
+        CondicionTrigger::Simple | CondicionTrigger::Mantenido => 0,
+
+        CondicionTrigger::Doble => 1,
+
+        CondicionTrigger::Triple => 2,
+    };
+
+    let mut pasos = Vec::new();
+
+    for _ in 0..toques_previos {
+        pasos.extend(lineas_un_toque(mods, gatillo));
+
+        pasos.push(format!("ESPERAR {}", config::delay_entre_salida_doble()));
+    }
+
+    pasos.extend(lineas_abajo(mods, gatillo));
+
+    pasos
+}
+
+fn lineas_accion_up(mods: &[&str], gatillo: &str) -> Vec<String> {
+    lineas_arriba(mods, gatillo)
 }
 
 fn lineas_abajo(mods: &[&str], gatillo: &str) -> Vec<String> {
