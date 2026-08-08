@@ -276,6 +276,7 @@
 
 use std::collections::HashMap;
 use std::fs;
+use std::io::BufReader;
 use std::io::BufWriter;
 use std::path::{Path, PathBuf};
 use std::sync::{Mutex, OnceLock};
@@ -702,6 +703,24 @@ pub fn editar_texto(ruta: &Path, contenido: &str) -> Result<(), String> {
 }
 
 // ======================================================
+// 🕒 MARCAR RECIENTE (silencioso) — ETAPA J.2
+// ------------------------------------------------------
+// spec: al entrar a editar un archivo de texto, antes de abrir el
+// popup se le actualiza la fecha de modificación a "ahora" para que
+// quede primero en el orden de rotativos — así, si en paralelo
+// aplicar_limite() recorta los más antiguos (modo Registro activo
+// en otra fila), el archivo que se está editando queda a salvo.
+// A propósito NO llama a refrescar_datos() ni notificar_ventanas_
+// abiertas(): no debe disparar ninguna actualización de UI, el
+// nuevo orden se ve solo, naturalmente, la próxima vez que algo
+// dispare un refresco (spec: "sin dar la orden de actualizar la ui").
+// ======================================================
+
+pub fn marcar_reciente(ruta: &Path) -> Result<(), String> {
+    tocar_ahora(ruta)
+}
+
+// ======================================================
 // 🗑️ ELIMINAR
 // ======================================================
 
@@ -1024,7 +1043,10 @@ fn contenido_desde_archivo(ruta: &Path) -> Result<ContenidoPortapapeles, String>
 
 fn dimensiones_png(ruta: &Path) -> Option<(u32, u32)> {
     let archivo = fs::File::open(ruta).ok()?;
-    let decodificador = png::Decoder::new(archivo);
+    // png::Decoder exige R: Read + BufRead — fs::File solo da Read,
+    // hace falta envolverlo en BufReader (mismo motivo en
+    // decodificar_png_rgba8() más abajo).
+    let decodificador = png::Decoder::new(BufReader::new(archivo));
     let lector = decodificador.read_info().ok()?;
     let info = lector.info();
 
@@ -1501,7 +1523,7 @@ fn mismo_contenido(elemento: &ElementoPortapapeles, contenido: &ContenidoPortapa
 
 fn decodificar_png_rgba8(ruta: &Path) -> Option<Vec<u8>> {
     let archivo = fs::File::open(ruta).ok()?;
-    let mut decodificador = png::Decoder::new(archivo);
+    let mut decodificador = png::Decoder::new(BufReader::new(archivo));
 
     // El .png del pool siempre se guardó como RGBA8 sin paleta (ver
     // guardar_png() más arriba) — se fuerza la misma transformación

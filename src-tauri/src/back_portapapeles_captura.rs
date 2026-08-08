@@ -207,9 +207,16 @@ pub fn escribir_portapapeles(contenido: &ContenidoPortapapeles) -> Result<(), St
 // ------------------------------------------------------
 // LISTENER_CORRIENDO: true mientras el hilo/ventana/listener están
 // activos ahora mismo. HWND_ACTUAL: handle de la ventana mensaje-
-// only viva (None si no hay ninguna) — HWND es `isize` en
-// windows-sys ≥0.52 (no un puntero crudo), así que guardarlo en un
-// Mutex normal es seguro entre hilos sin wrapper unsafe aparte.
+// only viva (None si no hay ninguna) — se guarda como `isize` (su
+// valor numérico), NO como HWND directamente: en windows-sys ≥0.52
+// (este proyecto fija ">=0.59, <=0.61") HWND es `*mut c_void`, un
+// puntero crudo que no implementa Send/Sync, así que un
+// `Mutex<Option<HWND>>` estático no compila ("shared static
+// variables must have a type that implements Sync"). `isize` es
+// Copy/Send/Sync sin wrapper unsafe aparte, y como acá el handle
+// nunca se dereferencia (solo se lo pasa de vuelta tal cual a las
+// funciones de la API de Windows), guardar su valor numérico es
+// seguro y no pierde nada.
 // CLASE_REGISTRADA: aparte de LISTENER_CORRIENDO — la clase de
 // ventana se registra una única vez por proceso y se reutiliza en
 // cada arranque siguiente (RegisterClassExW falla si se llama dos
@@ -218,7 +225,7 @@ pub fn escribir_portapapeles(contenido: &ContenidoPortapapeles) -> Result<(), St
 
 static LISTENER_CORRIENDO: AtomicBool = AtomicBool::new(false);
 static CLASE_REGISTRADA: AtomicBool = AtomicBool::new(false);
-static HWND_ACTUAL: Mutex<Option<HWND>> = Mutex::new(None);
+static HWND_ACTUAL: Mutex<Option<isize>> = Mutex::new(None);
 
 const NOMBRE_CLASE: &str = "RemapHPortapapelesListener";
 
@@ -303,7 +310,7 @@ pub fn asegurar_listener() {
             return;
         }
 
-        *HWND_ACTUAL.lock().unwrap() = Some(hwnd);
+        *HWND_ACTUAL.lock().unwrap() = Some(hwnd as isize);
 
         let mut mensaje: MSG = std::mem::zeroed();
 
@@ -331,6 +338,8 @@ pub fn detener_listener() {
     let hwnd = HWND_ACTUAL.lock().unwrap().take();
 
     if let Some(hwnd) = hwnd {
+        let hwnd = hwnd as HWND;
+
         unsafe {
             RemoveClipboardFormatListener(hwnd);
 

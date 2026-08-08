@@ -23,6 +23,7 @@
 // ======================================================
 
 import { invoke } from "@tauri-apps/api/core";
+import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 
 import "../styles/styl_variables.css";
 import "../styles/portapapeles.css";
@@ -85,17 +86,33 @@ let card: HTMLDivElement;
 let cuerpo: HTMLDivElement;
 let ultimosDatos: PortapapelesDatos | null = null;
 
+// Referencias a nodos que una actualización EN VIVO (evento
+// "portapapeles-actualizado", ver ETAPA J.2 más abajo) actualiza in-
+// place, sin pasar por construirEstructura() — así un popup abierto
+// (Renombrar/Editar/Opciones, todos hijos directos de `card`, nunca
+// de `cuerpo`) no se cierra solo porque llegó contenido nuevo desde
+// afuera (otra fila en modo Registro, u otra ventana).
+let tituloActual: HTMLSpanElement | null = null;
+let botonRegistroActual: HTMLButtonElement | null = null;
+
 // Bandera anti-duplicado del LADO CLIENTE (paralela al bloqueo
 // de back_portapapeles.rs::marcar_ignorar_proximo_cambio): mientras
 // una operación de pegar/mutación está en vuelo, un doble-click
 // accidental no debe disparar una segunda invocación en simultáneo.
 let operacionEnVuelo = false;
 
+// Desuscripción del listener de eventos (ETAPA J.2) — se guarda acá
+// para poder limpiarla al cerrar la ventana (ver cerrar()).
+let detenerEscucha: UnlistenFn | null = null;
+
 // ======================================================
 // 🚪 CERRAR
 // ======================================================
 
 function cerrar(): void {
+  detenerEscucha?.();
+  detenerEscucha = null;
+
   if (!id) return;
 
   invoke("cerrar_portapapeles", { id }).catch(() => {});
@@ -495,6 +512,21 @@ function abrirPopupRenombrar(datos: ElementoDatos): void {
 async function abrirPopupEditar(datos: ElementoDatos): Promise<void> {
   cerrarPopup();
 
+  // spec: "antes que se abra se actualiza su fecha para quedar de
+  // los primeros, pero que no se dé la orden de actualizar la ui" —
+  // congela este elemento en el tope del orden mientras el popup está
+  // abierto, para que aplicar_limite() (si en paralelo hay Registro
+  // activo en otra fila) no lo elimine por ser el rotativo más
+  // antiguo. portapapeles_marcar_reciente es silencioso a propósito:
+  // no dispara refrescar_datos ni notificar_ventanas_abiertas, así
+  // que no reordena nada visualmente hasta la próxima actualización
+  // real (al Guardar, o cuando llegue algo nuevo).
+  if (id) {
+    invoke("portapapeles_marcar_reciente", { ruta: datos.ruta }).catch(
+      () => {},
+    );
+  }
+
   const overlay = document.createElement("div");
   overlay.className = "portapapeles-popup-overlay";
 
@@ -661,21 +693,17 @@ async function limpiarTodo(): Promise<void> {
 }
 
 // ======================================================
-// 🖼️ RENDERIZAR
+// 🖼️ PINTAR LISTADO (fijados + separador + rotativos)
 // ------------------------------------------------------
-// Reconstruye el cuerpo entero cada vez que llegan datos nuevos
-// (después de cada mutación) — la lista de Portapapeles nunca es
-// tan larga como para que valga la pena un diff incremental, y
-// así se evita cualquier desincronización entre DOM y datos.
+// Solo toca `cuerpo` (fijados/rotativos) — nunca `card` completo,
+// para que una actualización EN VIVO (actualizarEnVivo, más abajo)
+// pueda llamar esto sin arrancar de encima un popup abierto, que
+// vive como hijo directo de `card`, no de `cuerpo`.
 // ======================================================
 
-function renderizar(datos: PortapapelesDatos): void {
-  ultimosDatos = datos;
-
-  const { titulo } = construirEstructura();
-
-  titulo.textContent = datos.nombre || "Portapapeles";
-  aplicarColorFondo(datos.color);
+function pintarListado(datos: PortapapelesDatos): void {
+  ocultarTooltip();
+  cuerpo.innerHTML = "";
 
   const alturaBoton = alturaBotonPx(datos.tamanoBoton);
   const tamanoTexto = tamanoTextoPx(datos.tamanoTexto);
@@ -685,31 +713,48 @@ function renderizar(datos: PortapapelesDatos): void {
     vacio.className = "portapapeles-vacio";
     vacio.textContent = "Portapapel vacío";
     cuerpo.append(vacio);
-  } else {
-    datos.fijados.forEach((elemento) => {
-      cuerpo.append(crearFila(elemento, alturaBoton, tamanoTexto));
-    });
-
-    if (datos.fijados.length > 0 && datos.rotativos.length > 0) {
-      const separador = document.createElement("div");
-      separador.className = "portapapeles-separador";
-      cuerpo.append(separador);
-    }
-
-    datos.rotativos.forEach((elemento) => {
-      cuerpo.append(crearFila(elemento, alturaBoton, tamanoTexto));
-    });
+    return;
   }
 
+  datos.fijados.forEach((elemento) => {
+    cuerpo.append(crearFila(elemento, alturaBoton, tamanoTexto));
+  });
+
+  if (datos.fijados.length > 0 && datos.rotativos.length > 0) {
+    const separador = document.createElement("div");
+    separador.className = "portapapeles-separador";
+    cuerpo.append(separador);
+  }
+
+  datos.rotativos.forEach((elemento) => {
+    cuerpo.append(crearFila(elemento, alturaBoton, tamanoTexto));
+  });
+}
+
+// ======================================================
+// 🔀 BARRA INFERIOR (Modo Registro / Limpiar todo)
+// ------------------------------------------------------
+// Se crea una sola vez por render completo (crearBarraInferior);
+// actualizarBotonRegistro solo cambia texto/clase del botón ya
+// existente — es lo que usa actualizarEnVivo para no duplicar la
+// barra en cada evento.
+// ======================================================
+
+function actualizarBotonRegistro(datos: PortapapelesDatos): void {
+  if (!botonRegistroActual) return;
+
+  botonRegistroActual.classList.toggle("activo", datos.registroActivo);
+  botonRegistroActual.textContent = datos.registroActivo
+    ? "Registro: ON"
+    : "Modo Registro";
+}
+
+function crearBarraInferior(datos: PortapapelesDatos): void {
   const barraInferior = document.createElement("div");
   barraInferior.className = "portapapeles-barra-inferior";
 
   const botonRegistro = document.createElement("button");
   botonRegistro.className = "portapapeles-boton-barra";
-  if (datos.registroActivo) botonRegistro.classList.add("activo");
-  botonRegistro.textContent = datos.registroActivo
-    ? "Registro: ON"
-    : "Modo Registro";
   botonRegistro.addEventListener("click", alternarRegistro);
 
   const botonLimpiar = document.createElement("button");
@@ -719,6 +764,52 @@ function renderizar(datos: PortapapelesDatos): void {
 
   barraInferior.append(botonRegistro, botonLimpiar);
   card.append(barraInferior);
+
+  botonRegistroActual = botonRegistro;
+  actualizarBotonRegistro(datos);
+}
+
+// ======================================================
+// 🖼️ RENDERIZAR (completo)
+// ------------------------------------------------------
+// Reconstruye la ventana entera (header + listado + barra inferior),
+// cerrando cualquier popup abierto de paso — se usa al iniciar y como
+// resultado directo de una acción propia del usuario en esta misma
+// ventana (fijar/renombrar/editar/eliminar/limpiar/toggle Registro),
+// donde ese cierre es esperable porque la acción es la que lo generó.
+// ======================================================
+
+function renderizar(datos: PortapapelesDatos): void {
+  ultimosDatos = datos;
+
+  const { titulo } = construirEstructura();
+  tituloActual = titulo;
+
+  titulo.textContent = datos.nombre || "Portapapeles";
+  aplicarColorFondo(datos.color);
+
+  pintarListado(datos);
+  crearBarraInferior(datos);
+}
+
+// ======================================================
+// 🔴 ACTUALIZAR EN VIVO (evento "portapapeles-actualizado") — J.2
+// ------------------------------------------------------
+// spec: "Cuando se llama a actualizar la ventana solo debe
+// actualizarse los listados de elementos Fijos y rotativos. Si llega
+// a haber abierto un popup de editar o renombrar no debe cerrarse."
+// A diferencia de renderizar(), NUNCA llama a construirEstructura()
+// — no toca el popup (hijo de `card`, no de `cuerpo`).
+// ======================================================
+
+function actualizarEnVivo(datos: PortapapelesDatos): void {
+  ultimosDatos = datos;
+
+  if (tituloActual) tituloActual.textContent = datos.nombre || "Portapapeles";
+  aplicarColorFondo(datos.color);
+
+  pintarListado(datos);
+  actualizarBotonRegistro(datos);
 }
 
 // ======================================================
@@ -765,6 +856,20 @@ async function iniciar(): Promise<void> {
   }
 
   renderizar(datos);
+
+  // El evento ya viene filtrado por ventana (back_portapapeles.rs usa
+  // emit_to() con el label de esta ventana, ver notificar_ventanas_
+  // abiertas()) — no hace falta comparar ids del lado del cliente.
+  try {
+    detenerEscucha = await listen<PortapapelesDatos>(
+      "portapapeles-actualizado",
+      (evento) => actualizarEnVivo(evento.payload),
+    );
+  } catch {
+    // Sin escucha en vivo — la ventana sigue funcionando igual con
+    // las actualizaciones que ya llegan como retorno directo de cada
+    // comando (fijar/renombrar/editar/eliminar/limpiar/toggle).
+  }
 }
 
 iniciar();

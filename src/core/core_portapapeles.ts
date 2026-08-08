@@ -31,6 +31,11 @@ export type UbicacionPortapapeles = "persistente" | "cursor";
 // ya usa MenuExpress (ver core_menu_express.ts / config.rs) — no se
 // declara un tipo nuevo, se reusa TamanoMenu tal cual desde ese
 // módulo en los archivos que lo necesiten.
+// (el `export type ... from` de abajo solo reexporta el nombre hacia
+// afuera — no lo trae al scope de ESTE archivo, por eso hace falta
+// también el `import type` para poder usarlo más abajo en este mismo
+// módulo, ver PortapapelesExtraPerfil).
+import type { TamanoMenu as TamanoTextoPortapapeles } from "./core_menu_express";
 export type { TamanoMenu as TamanoTextoPortapapeles } from "./core_menu_express";
 
 // Tamaño de BOTÓN: tipo propio. Los botones de Portapapeles son

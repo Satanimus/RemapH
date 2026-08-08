@@ -747,6 +747,11 @@ pub fn portapapeles_editar(
 }
 
 #[tauri::command]
+pub fn portapapeles_marcar_reciente(ruta: String) -> Result<(), String> {
+    crate::back_portapapeles::marcar_reciente(std::path::Path::new(&ruta))
+}
+
+#[tauri::command]
 pub fn portapapeles_eliminar(
     id: String,
     ruta: String,
