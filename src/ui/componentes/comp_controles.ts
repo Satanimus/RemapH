@@ -30,7 +30,13 @@ import { textoExtraMultimedia } from "../../core/core_multimedia";
 
 import { abrirPopupExtraMenuExpress } from "./comp_popup_menu_express_extra";
 
-import { textoMenuExtra } from "../../core/core_menu_express";
+import {
+  textoMenuExtra,
+  crearMenuAccion,
+  crearMenuExtra,
+} from "../../core/core_menu_express";
+
+import { crearCoordenada } from "../../core/core_coordenada";
 
 import { obtenerPerfilUi } from "../../core/core_perfil_ui";
 
@@ -108,6 +114,10 @@ export function crearTipo(
       abrirPopupTipo(
         evento,
         (valor) => {
+          if (valor === filaPerfil.tipo) {
+            return;
+          }
+
           // Si esta fila tenía Coordenada activa y deja de ser
           // tecla_mouse, ya no tiene sentido — no puede quedar una
           // ventana de captura calculando para una fila que ya no
@@ -115,6 +125,20 @@ export function crearTipo(
           if (filaPerfil.coordenada.activa && valor !== "tecla_mouse") {
             cerrarVentanaCapturaCoordenada();
           }
+
+          // Al cambiar de Tipo, Acción y Extra dejan de tener sentido
+          // para el Tipo anterior: se resetean TODOS los campos de
+          // ambas columnas (de todos los tipos) a su valor por
+          // defecto, para que no quede guardado ningún dato que ya
+          // no está vigente.
+          filaPerfil.accion = null;
+          filaPerfil.accionReferencia = null;
+          filaPerfil.menuAccion = crearMenuAccion();
+
+          filaPerfil.condicion = "Normal";
+          filaPerfil.coordenada = crearCoordenada();
+          filaPerfil.menuExtra = crearMenuExtra();
+          filaPerfil.extra = "normal";
 
           filaPerfil.tipo = valor;
 
