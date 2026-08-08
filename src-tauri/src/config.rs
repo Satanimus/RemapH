@@ -61,6 +61,11 @@
 // establecer_tiempo_repeticion()
 //     Intervalo entre repeticiones de Turbo.
 //
+// tiempo_espera_normal()
+// establecer_tiempo_espera_normal()
+//     Espera entre la primera salida y el inicio del
+//     bucle de repetición, para el Extra "Normal".
+//
 // sensibilidad_rueda()
 // establecer_sensibilidad_rueda()
 //     Cantidad de movimientos minimos necesarios para considerar una acción mantenida.
@@ -218,6 +223,35 @@ pub fn tiempo_repeticion() -> u64 {
 
 pub fn establecer_tiempo_repeticion(valor: u64) {
     TIEMPO_REPETICION.store(valor, Ordering::Relaxed);
+}
+
+// ======================================================
+// 🕐 TIEMPO ESPERA NORMAL
+// ------------------------------------------------------
+// Extra "Normal": al mantener presionado, la espera entre
+// la primera salida y el inicio del bucle de repetición
+// (que luego usa tiempo_repeticion() como cualquier Turbo).
+// Simula el comportamiento de una tecla física de Windows
+// (se dibuja una vez, y recién después de esta espera
+// empieza a repetirse en bucle).
+// ======================================================
+
+static TIEMPO_ESPERA_NORMAL: AtomicU64 = AtomicU64::new(500);
+
+// ======================================================
+// 📥 LEER TIEMPO ESPERA NORMAL
+// ======================================================
+
+pub fn tiempo_espera_normal() -> u64 {
+    TIEMPO_ESPERA_NORMAL.load(Ordering::Relaxed)
+}
+
+// ======================================================
+// 📤 ESCRIBIR TIEMPO ESPERA NORMAL
+// ======================================================
+
+pub fn establecer_tiempo_espera_normal(valor: u64) {
+    TIEMPO_ESPERA_NORMAL.store(valor, Ordering::Relaxed);
 }
 
 // ======================================================

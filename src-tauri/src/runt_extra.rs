@@ -1,5 +1,5 @@
 // ======================================================
-// 🧩 RUNT EXTRA  
+// 🧩 RUNT EXTRA
 // ======================================================
 // ETAPA 8 DEL FLUJO
 // ------------------------------------------------------
@@ -78,6 +78,25 @@ use crate::perfil_cache::ExtraCache;
 
 pub fn obtener(extra: &ExtraCache) -> Vec<String> {
     match extra {
+        // ==================================================
+        // 🕐 NORMAL
+        // ------------------------------------------------------
+        // Simula una tecla física de Windows: la primera salida
+        // se dibuja una sola vez, se espera
+        // config::tiempo_espera_normal(), y recién ahí arranca
+        // el bucle de repetición (mismo intervalo que Turbo,
+        // config::tiempo_repeticion()). INICIO_BUCLE marca dónde
+        // vuelve REPETIR — así la primera espera no se repite.
+        // ==================================================
+        ExtraCache::Normal => vec![
+            "[ACCION]".into(),
+            format!("ESPERAR {}", config::tiempo_espera_normal()),
+            "INICIO_BUCLE".into(),
+            "[ACCION]".into(),
+            format!("ESPERAR {}", config::tiempo_repeticion()),
+            "REPETIR".into(),
+        ],
+
         // ==================================================
         // ⚡ TURBO
         // ==================================================

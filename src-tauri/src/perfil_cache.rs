@@ -432,6 +432,8 @@ pub enum AlcanceMultimedia {
 #[derive(Clone, Debug, PartialEq)]
 pub enum ExtraCache {
     // Teclado / mouse / joystick
+    Normal,
+
     Turbo,
 
     Mantener,
@@ -451,17 +453,22 @@ pub enum ExtraCache {
 }
 
 impl ExtraCache {
-    /// true si la receta de runt_extra para este Extra termina en
-    /// "ESPERAR DETENER" — necesita que Cache espere el Up físico
-    /// real (vía Iniciar sin Finalizar) en vez de mandar Iniciar +
-    /// Detener juntos apenas se confirma el trigger. Independiente
-    /// de la Condición que lo disparó (Simple/Doble/Mantenido): lo
-    /// que decide si el final es diferido es el Extra, no el
-    /// trigger.
+    /// true si la receta de runt_extra para este Extra necesita
+    /// esperar el Up físico real (vía Iniciar sin Finalizar) en vez
+    /// de mandar Iniciar + Detener juntos apenas se confirma el
+    /// trigger — porque la receta termina en "ESPERAR DETENER"
+    /// (Mantener/ClickSostenido) o repite en bucle hasta que la
+    /// orden de detener lo corte en su REPETIR (Turbo/Normal).
+    /// Independiente de la Condición que lo disparó (Simple/Doble/
+    /// Mantenido): lo que decide si el final es diferido es el
+    /// Extra, no el trigger.
     pub fn requiere_up_real(&self) -> bool {
         matches!(
             self,
-            ExtraCache::Turbo | ExtraCache::Mantener | ExtraCache::ClickSostenido
+            ExtraCache::Normal
+                | ExtraCache::Turbo
+                | ExtraCache::Mantener
+                | ExtraCache::ClickSostenido
         )
     }
 }

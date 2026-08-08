@@ -35,11 +35,14 @@
 //
 // A) Idioma Runtime, en español, único vocabulario válido:
 //    ESPERAR <ms> · DOWN <control> · UP <control> ·
-//    REPETIR · DETENER · <control> (a secas = pulse).
-//    Los <control> son el nombre "interno" de
-//    pulsadores.tsv, sin prefijo de dispositivo — Runtime
-//    nunca deduce el dispositivo, pulsadores.tsv ya lo
-//    sabe.
+//    REPETIR · DETENER · INICIO_BUCLE · <control> (a
+//    secas = pulse). Los <control> son el nombre "interno"
+//    de pulsadores.tsv, sin prefijo de dispositivo —
+//    Runtime nunca deduce el dispositivo, pulsadores.tsv ya
+//    lo sabe. INICIO_BUCLE es solo una marca (no hace nada
+//    al ejecutarse): REPETIR salta ahí si la receta la
+//    tiene, o a la línea 0 si no la tiene — ver
+//    ejecutar_lineas().
 //
 // B) AccionCache — las 4 variantes son tupla, no struct
 //    (Emitir(Vec<InputId>), Macro(String), AbrirArchivo(String),
@@ -159,9 +162,10 @@
 //     Lee un archivo de macro de usuario, lo corre en un
 //     hilo nuevo (mismo intérprete que un Extra).
 // ejecutar_lineas(id, lineas)
-//     El loop real: recorre las líneas, vuelve al inicio
-//     en cada REPETIR salvo que debe_detenerse() diga que
-//     no siga. Registra y limpia la instancia en
+//     El loop real: recorre las líneas, en cada REPETIR
+//     vuelve a la línea INICIO_BUCLE si la receta la tiene
+//     (o a la línea 0 si no) salvo que debe_detenerse()
+//     diga que no siga. Registra y limpia la instancia en
 //     INSTANCIAS.
 // ejecutar_linea(id, linea)
 //     Interpreta una línea suelta (ESPERAR/DOWN/UP/
@@ -198,6 +202,8 @@
 // LeftButton          (sin DOWN/UP = pulse)
 // REPETIR
 // DETENER
+// INICIO_BUCLE        (marca; REPETIR salta acá si existe,
+//                      si no, salta a la línea 0)
 //
 // Los identificadores son el nombre "interno" de
 // pulsadores.tsv — Runtime nunca deduce el dispositivo.
@@ -814,29 +820,69 @@ fn ejecutar_macro_en_hilo(id: String, ruta: String) {
 // hilo propio de la instancia (lo arma quien la llama).
 // Antes de cada REPETIR, revisa si llegó orden de
 // detener — nunca entra a una vuelta sin chequear antes.
+//
+// REPETIR vuelve a la línea marcada con INICIO_BUCLE si
+// la receta la tiene (ej. Normal: primera salida + espera
+// distinta antes de arrancar el bucle propiamente dicho).
+// Si la receta no tiene esa marca, vuelve a la línea 0,
+// igual que siempre (Turbo, Mantener, etc. no cambian).
+// INICIO_BUCLE en sí misma no ejecuta ningún paso físico,
+// pero SÍ es un punto de chequeo de detener — igual que
+// REPETIR — para cortar antes de arrancar la primera vuelta
+// del bucle si la orden de detener ya llegó durante la
+// espera previa (sin este chequeo, una receta con dos
+// [ACCION] antes del primer REPETIR, como Normal, dispararía
+// esa segunda salida aunque ya se haya soltado la tecla).
 // ======================================================
 
 fn ejecutar_lineas(id: String, lineas: Vec<String>) {
     INSTANCIAS.lock().unwrap().insert(id.clone(), false);
 
-    'ciclo: loop {
-        for linea in &lineas {
-            if linea.is_empty() {
-                continue;
-            }
+    let inicio_bucle = lineas
+        .iter()
+        .position(|linea| linea == "INICIO_BUCLE")
+        .unwrap_or(0);
 
-            if linea == "REPETIR" {
-                if debe_detenerse(&id) {
-                    break 'ciclo;
-                }
+    let mut i = 0;
 
-                continue 'ciclo;
-            }
+    while i < lineas.len() {
+        let linea = &lineas[i];
 
-            ejecutar_linea(&id, linea);
+        if linea.is_empty() {
+            i += 1;
+
+            continue;
         }
 
-        break;
+        // INICIO_BUCLE es también un punto de chequeo: si ya llegó
+        // la orden de detener durante la espera previa (ej. la
+        // salida inicial de Normal, si soltaste antes de que
+        // arranque el bucle), corta ACÁ — antes de ejecutar la
+        // primera vuelta del bucle. Sin este chequeo, una tecla
+        // Normal tocada rápido igual dispara una segunda salida.
+        if linea == "INICIO_BUCLE" {
+            if debe_detenerse(&id) {
+                break;
+            }
+
+            i += 1;
+
+            continue;
+        }
+
+        if linea == "REPETIR" {
+            if debe_detenerse(&id) {
+                break;
+            }
+
+            i = inicio_bucle;
+
+            continue;
+        }
+
+        ejecutar_linea(&id, linea);
+
+        i += 1;
     }
 
     limpiar_instancia(id);

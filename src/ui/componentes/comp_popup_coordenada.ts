@@ -8,9 +8,10 @@
 // capa), en vez de cerrarlo. Todo vive en UN solo popup que
 // se extiende hacia abajo — no hay sub-popups laterales.
 //
-// NIVEL 1 — Simple / Mantenido / Turbo (sobre filaPerfil.extra,
-//          mismo vocabulario "" | "mantener" | "turbo" que usa
-//          compilador.rs vía convertir_extra())
+// NIVEL 1 — Normal / Simple / Mantenido / Turbo (sobre
+//          filaPerfil.extra, mismo vocabulario "normal" | "" |
+//          "mantener" | "turbo" que usa compilador.rs vía
+//          convertir_extra())
 // INTERRUPTOR — Coordenada (sobre filaPerfil.coordenada.activa).
 //          No excluyente con el nivel de arriba: se puede
 //          combinar cualquier repetición con Coordenada. Al
@@ -57,7 +58,7 @@ import {
 } from "./comp_popup_grupo";
 
 // ======================================================
-// 🧭 VOCABULARIO Simple / Mantenido / Turbo
+// 🧭 VOCABULARIO Normal / Simple / Mantenido / Turbo
 // ------------------------------------------------------
 // Mismos valores que EXTRA_OPCIONES de comp_popup_abrir.ts
 // (comparten filaPerfil.extra y convertir_extra() del lado
@@ -66,6 +67,7 @@ import {
 // ======================================================
 
 const EXTRA_TECLA_MOUSE_OPCIONES: { texto: string; valor: string }[] = [
+  { texto: "Normal", valor: "normal" },
   { texto: "Simple", valor: "" },
   { texto: "Mantenido", valor: "mantener" },
   { texto: "Turbo", valor: "turbo" },
@@ -270,7 +272,7 @@ export function abrirPopupExtraTeclaMouse(
     abrirPopupExtraTeclaMouse(evento, contexto, filaPerfil);
 
   // ----------------------------------
-  // NIVEL 1 — Simple / Mantenido / Turbo
+  // NIVEL 1 — Normal / Simple / Mantenido / Turbo
   // ----------------------------------
 
   popup.append(

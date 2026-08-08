@@ -496,6 +496,8 @@ fn convertir_extra(extra: &str) -> Option<ExtraCache> {
     match extra {
         "" => None,
 
+        "normal" => Some(ExtraCache::Normal),
+
         "turbo" => Some(ExtraCache::Turbo),
 
         "mantener" => Some(ExtraCache::Mantener),
