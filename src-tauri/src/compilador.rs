@@ -166,6 +166,12 @@ pub fn compilar(perfil: &perfil_json) {
     // todas al recompilar en vez de intentar sincronizarlas en
     // caliente (decisión del usuario, ver back_menu_express.rs).
     crate::back_menu_express::cerrar_todas();
+
+    // Mismo criterio para Portapapeles: cierra todas las ventanas
+    // abiertas Y vacía ACTIVOS (deteniendo cualquier Registro que
+    // hubiera quedado corriendo), tratando la recompilación como un
+    // reinicio — ver back_portapapeles.rs::cerrar_todas().
+    crate::back_portapapeles::cerrar_todas();
 }
 
 // ======================================================
@@ -191,7 +197,28 @@ fn compilar_remapeo(remapeo: &RemapeoJson, perfil: &perfil_json) -> Option<Remap
 
     let accion = convertir_accion(remapeo, perfil)?;
 
-    let extra = convertir_extra(&remapeo.extra);
+    // El Extra (Turbo/Mantener/Normal-con-repetición) es un molde de
+    // Idioma Runtime pensado para una Acción tipo Emitir (down/up de
+    // una tecla física) — ver runt_extra.rs::obtener() y
+    // runtime.rs::sustituir_accion(), que deja las líneas del molde
+    // intactas (sin sustituir nada) para cualquier Acción que no sea
+    // Emitir. Para menu_express y portapapeles esto es un problema
+    // real, no solo un desperdicio: ejecutar_accion() en runtime.rs
+    // desvía CUALQUIER fila con `extra: Some(_)` hacia ese molde
+    // ANTES de llegar al match que abre la ventana (abrir_o_alternar),
+    // así que una fila de cualquiera de estos dos tipos cuyo
+    // `filaPerfil.extra` haya quedado en "normal" (default de fila
+    // nueva, o el reset de crearTipo() en comp_controles.ts — ninguno
+    // de los dos popups Extra propios de estos tipos toca ese campo)
+    // terminaba ejecutando un molde de no-ops en vez de abrir la
+    // ventana. Mismo criterio que ya documenta el plan para estos dos
+    // tipos ("Detener no hace nada, sin Mantenido/Turbo"): acá se
+    // fuerza a None sin importar qué haya guardado remapeo.extra.
+    let extra = if remapeo.tipo == "menu_express" || remapeo.tipo == "portapapeles" {
+        None
+    } else {
+        convertir_extra(&remapeo.extra)
+    };
 
     // Coordenada ya no depende de un tipo aparte: es un extra
     // independiente de tecla_mouse. Si está activa pero todavía no se

@@ -38,7 +38,11 @@ import {
   crearMenuExtra,
 } from "../../core/core_menu_express";
 
-import { textoPortapapelesExtra } from "../../core/core_portapapeles";
+import {
+  textoPortapapelesExtra,
+  crearPortapapelesAccion,
+  crearPortapapelesExtra,
+} from "../../core/core_portapapeles";
 
 import { crearCoordenada } from "../../core/core_coordenada";
 
@@ -138,10 +142,12 @@ export function crearTipo(
           filaPerfil.accion = null;
           filaPerfil.accionReferencia = null;
           filaPerfil.menuAccion = crearMenuAccion();
+          filaPerfil.portapapelesAccion = crearPortapapelesAccion();
 
           filaPerfil.condicion = "Normal";
           filaPerfil.coordenada = crearCoordenada();
           filaPerfil.menuExtra = crearMenuExtra();
+          filaPerfil.portapapelesExtra = crearPortapapelesExtra();
           filaPerfil.extra = "normal";
 
           filaPerfil.tipo = valor;

@@ -1885,9 +1885,11 @@ fn crear_ventana(app: AppHandle, id: String, paquete: PortapapelesPaquete) {
 // ======================================================
 // 🚪 CERRAR / CERRAR TODAS
 // ------------------------------------------------------
-// Mismo criterio que back_menu_express.rs. cerrar_todas() la va a
-// llamar compilador.rs en cada recompilación (Etapa L) — acá ya
-// queda lista para eso, aunque todavía nadie la invoque.
+// Mismo criterio que back_menu_express.rs, con un agregado propio de
+// Portapapeles: cerrar_todas() no solo cierra ventanas, también vacía
+// ACTIVOS por completo (ver más abajo) — compilador.rs (Etapa L) la
+// llama en cada recompilación tratándola como un reinicio (spec: "Al
+// reiniciar el programa, vuelve a Simple").
 // ======================================================
 
 pub fn cerrar(id: &str) {
@@ -1914,6 +1916,21 @@ pub fn cerrar_todas() {
     for id in ids {
         cerrar(&id);
     }
+
+    // ETAPA L: recompilar/cambiar de perfil se trata como reinicio —
+    // ACTIVOS no persiste entre reinicios (spec: "Al reiniciar el
+    // programa, vuelve a Simple"), así que una recompilación tiene
+    // que vaciarlo igual, aunque no quede ninguna ventana abierta que
+    // lo dispare. Sin esto, un Registro que se activó y cuya ventana
+    // ya se cerró por su cuenta (la única forma normal de apagarlo es
+    // el toggle, ver desactivar_registro()) seguiría escribiendo
+    // rotativos "huérfanos" para un perfil que el usuario ya
+    // reemplazó.
+    con_activos(|activos| {
+        activos.clear();
+    });
+
+    detener_listener_si_no_hace_falta();
 }
 
 // ======================================================
