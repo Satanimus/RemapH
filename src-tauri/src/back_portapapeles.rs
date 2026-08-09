@@ -279,6 +279,7 @@ use std::fs;
 use std::io::BufReader;
 use std::io::BufWriter;
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::{Mutex, OnceLock};
 use std::time::SystemTime;
 
@@ -299,8 +300,10 @@ use crate::perfil_cache::{ComportamientoMenu, TamanoBotonPortapapeles, TamanoMen
 // 📏 CONSTANTES
 // ======================================================
 
-const LONGITUD_NOMBRE: usize = 20;
-const CARACTERES_INVALIDOS: [char; 9] = ['\\', '/', ':', '*', '?', '"', '<', '>', '|'];
+// Tope del nombre visible (vive en el ADS, ver más abajo) — sirve
+// tanto de default al capturar (primeros 50 caracteres del texto)
+// como de tope al renombrar a mano.
+const LONGITUD_NOMBRE: usize = 50;
 
 // ======================================================
 // 📦 ELEMENTO DEL POOL
@@ -360,11 +363,34 @@ fn es_id_portapapeles(segmento: &str) -> bool {
 }
 
 // ======================================================
+// 🆔 SEPARAR PREFIJO DE ID
+// ------------------------------------------------------
+// Dado el stem (nombre físico sin extensión) de un archivo del
+// pool, detecta si está fijado y separa el prefijo de id del resto
+// del nombre físico. Compartido por elemento_desde_ruta() y por
+// fijar()/desfijar(), que ya no pasan por elemento_desde_ruta()
+// porque no necesitan leer el ADS para renombrar el archivo.
+// ======================================================
+
+fn separar_prefijo_id(stem: &str) -> (bool, Option<String>, &str) {
+    let es_fijado =
+        stem.len() > 37 && stem.as_bytes()[36] == b'_' && es_id_portapapeles(&stem[..36]);
+
+    if es_fijado {
+        (true, Some(stem[..36].to_string()), &stem[37..])
+    } else {
+        (false, None, stem)
+    }
+}
+
+// ======================================================
 // 🔎 ELEMENTO DESDE RUTA
 // ------------------------------------------------------
 // Parsea un archivo del pool a partir de su ruta física. None si la
 // ruta no tiene extensión, no tiene nombre, o no se pudo leer su
-// fecha de modificación.
+// fecha de modificación. El nombre visible ya no sale del nombre
+// físico — el nombre físico es opaco (ver nombre_fisico_nuevo) — se
+// lee del ADS con leer_nombre_meta().
 // ======================================================
 
 fn elemento_desde_ruta(ruta: PathBuf) -> Option<ElementoPortapapeles> {
@@ -374,14 +400,8 @@ fn elemento_desde_ruta(ruta: PathBuf) -> Option<ElementoPortapapeles> {
     let metadata = fs::metadata(&ruta).ok()?;
     let modificado = metadata.modified().unwrap_or(SystemTime::UNIX_EPOCH);
 
-    let es_fijado =
-        stem.len() > 37 && stem.as_bytes()[36] == b'_' && es_id_portapapeles(&stem[..36]);
-
-    let (fijado, id_portapapeles, nombre) = if es_fijado {
-        (true, Some(stem[..36].to_string()), stem[37..].to_string())
-    } else {
-        (false, None, stem.to_string())
-    };
+    let (fijado, id_portapapeles, _) = separar_prefijo_id(stem);
+    let nombre = leer_nombre_meta(&ruta);
 
     Some(ElementoPortapapeles {
         ruta,
@@ -446,33 +466,17 @@ pub fn listar_fijados(id_portapapeles: &str) -> Result<Vec<ElementoPortapapeles>
 }
 
 // ======================================================
-// 🧼 SANEAR NOMBRE
-// ------------------------------------------------------
-// Recorta a 20 caracteres y reemplaza caracteres inválidos en un
-// nombre de archivo de Windows por espacio. "Sin título" si el
-// resultado queda vacío.
+// 🕒 HORA LOCAL (HH.MM.SS)
 // ======================================================
 
-fn sanear_nombre(texto: &str) -> String {
-    let limpio: String = texto
-        .chars()
-        .take(LONGITUD_NOMBRE)
-        .map(|caracter| {
-            if CARACTERES_INVALIDOS.contains(&caracter) || caracter.is_control() {
-                ' '
-            } else {
-                caracter
-            }
-        })
-        .collect();
+fn hora_actual() -> String {
+    let mut hora: SYSTEMTIME = unsafe { std::mem::zeroed() };
 
-    let limpio = limpio.trim().trim_end_matches('.').trim();
-
-    if limpio.is_empty() {
-        "Sin título".to_string()
-    } else {
-        limpio.to_string()
+    unsafe {
+        GetLocalTime(&mut hora);
     }
+
+    format!("{:02}.{:02}.{:02}", hora.wHour, hora.wMinute, hora.wSecond)
 }
 
 // ======================================================
@@ -480,38 +484,73 @@ fn sanear_nombre(texto: &str) -> String {
 // ======================================================
 
 fn nombre_hora_imagen() -> String {
-    let mut hora: SYSTEMTIME = unsafe { std::mem::zeroed() };
-
-    unsafe {
-        GetLocalTime(&mut hora);
-    }
-
-    format!(
-        "Imagen_{:02}.{:02}.{:02}",
-        hora.wHour, hora.wMinute, hora.wSecond
-    )
+    format!("Imagen_{}", hora_actual())
 }
 
 // ======================================================
-// 🔀 NOMBRE SIN CONFLICTO
+// 🏷️ NOMBRE VISIBLE (ADS) — leer / escribir
 // ------------------------------------------------------
-// Prueba "base.ext"; si ya existe, "base (1).ext", "base (2).ext",
-// etc. Devuelve el nombre (sin extensión) que quedó libre.
+// El nombre visible de un elemento ya no forma parte de su nombre
+// físico — vive aparte, en un Alternate Data Stream de NTFS
+// (stream "nombre") atado al archivo. Windows preserva los ADS al
+// hacer fs::rename, así que fijar()/desfijar() no necesitan
+// tocarlo — viaja solo con el rename.
+//
+// Ante cualquier error (stream inexistente, IO, contenido no
+// UTF-8) leer_nombre_meta() nunca falla: devuelve un nombre de
+// reemplazo "Sin título HH.MM.SS" con la hora del momento de la
+// lectura, para poder distinguir elementos sin nombre en la lista.
+// escribir_nombre_meta() es best-effort — si falla, el próximo
+// leer_nombre_meta() sobre ese archivo cae al mismo reemplazo.
 // ======================================================
 
-fn nombre_sin_conflicto(carpeta: &Path, base: &str, extension: &str) -> String {
-    let mut candidato = base.to_string();
-    let mut contador = 1;
+fn ruta_ads(ruta: &Path, stream: &str) -> PathBuf {
+    let mut nombre_stream = ruta.as_os_str().to_os_string();
+    nombre_stream.push(":");
+    nombre_stream.push(stream);
+    PathBuf::from(nombre_stream)
+}
 
-    while carpeta
-        .join(format!("{}.{}", candidato, extension))
-        .exists()
-    {
-        candidato = format!("{} ({})", base, contador);
-        contador += 1;
+fn nombre_sin_titulo() -> String {
+    format!("Sin título {}", hora_actual())
+}
+
+fn leer_nombre_meta(ruta: &Path) -> String {
+    match fs::read(ruta_ads(ruta, "nombre")) {
+        Ok(bytes) => match String::from_utf8(bytes) {
+            Ok(texto) if !texto.trim().is_empty() => texto,
+            _ => nombre_sin_titulo(),
+        },
+        Err(_) => nombre_sin_titulo(),
     }
+}
 
-    candidato
+fn escribir_nombre_meta(ruta: &Path, nombre: &str) {
+    let _ = fs::write(ruta_ads(ruta, "nombre"), nombre.as_bytes());
+}
+
+// ======================================================
+// 🎲 NOMBRE FÍSICO NUEVO
+// ------------------------------------------------------
+// Nombre de archivo opaco para el pool: milisegundos desde epoch +
+// un contador en memoria como sufijo (evita colisión sin agregar
+// una dependencia de números aleatorios). El nombre visible real
+// vive aparte, en el ADS — este nombre no se muestra en ningún
+// lado, ni ordena ni purga nada (eso sigue siendo por mtime, ver
+// listar_rotativos()/aplicar_limite()).
+// ======================================================
+
+static CONTADOR_NOMBRE_FISICO: AtomicU32 = AtomicU32::new(0);
+
+fn nombre_fisico_nuevo() -> String {
+    let ms = SystemTime::now()
+        .duration_since(SystemTime::UNIX_EPOCH)
+        .map(|duracion| duracion.as_millis())
+        .unwrap_or(0);
+
+    let contador = CONTADOR_NOMBRE_FISICO.fetch_add(1, Ordering::Relaxed);
+
+    format!("{ms}_{contador:04x}")
 }
 
 // ======================================================
@@ -549,11 +588,18 @@ pub fn guardar_rotativo(contenido: &ContenidoPortapapeles) -> Result<PathBuf, St
 
     match contenido {
         ContenidoPortapapeles::Texto(texto) => {
-            let base = sanear_nombre(texto);
-            let nombre_final = nombre_sin_conflicto(&carpeta, &base, "txt");
-            let ruta = carpeta.join(format!("{}.txt", nombre_final));
+            let ruta = carpeta.join(format!("{}.txt", nombre_fisico_nuevo()));
 
             fs::write(&ruta, texto.as_bytes()).map_err(|error| error.to_string())?;
+
+            let nombre_por_defecto: String = texto.chars().take(LONGITUD_NOMBRE).collect();
+            let nombre_por_defecto = if nombre_por_defecto.trim().is_empty() {
+                nombre_sin_titulo()
+            } else {
+                nombre_por_defecto
+            };
+
+            escribir_nombre_meta(&ruta, &nombre_por_defecto);
 
             Ok(ruta)
         }
@@ -563,11 +609,10 @@ pub fn guardar_rotativo(contenido: &ContenidoPortapapeles) -> Result<PathBuf, St
             alto,
             pixeles,
         } => {
-            let base = nombre_hora_imagen();
-            let nombre_final = nombre_sin_conflicto(&carpeta, &base, "png");
-            let ruta = carpeta.join(format!("{}.png", nombre_final));
+            let ruta = carpeta.join(format!("{}.png", nombre_fisico_nuevo()));
 
             guardar_png(&ruta, *ancho, *alto, pixeles)?;
+            escribir_nombre_meta(&ruta, &nombre_hora_imagen());
 
             Ok(ruta)
         }
@@ -616,22 +661,34 @@ fn tocar_ahora(ruta: &Path) -> Result<(), String> {
 // ======================================================
 // 📌 FIJAR
 // ------------------------------------------------------
-// Le agrega (o reemplaza) el prefijo de id al elemento en `ruta`.
-// Sirve tanto para fijar un rotativo como para re-fijar un fijado
-// bajo otro id (spec: "se reemplaza el ID").
+// Le agrega (o reemplaza) el prefijo de id sobre el nombre físico
+// actual del elemento en `ruta`. Sirve tanto para fijar un rotativo
+// como para re-fijar un fijado bajo otro id (spec: "se reemplaza el
+// ID"). Ya no pasa por elemento_desde_ruta() — no necesita leer el
+// ADS para esto, y el nombre visible viaja solo con el rename.
+// Los nombres físicos son únicos por construcción (ver
+// nombre_fisico_nuevo), así que no hace falta resolver conflictos.
 // ======================================================
 
 pub fn fijar(ruta: &Path, id_portapapeles: &str) -> Result<PathBuf, String> {
-    let elemento = elemento_desde_ruta(ruta.to_path_buf())
-        .ok_or_else(|| "No se pudo leer el elemento".to_string())?;
+    let extension = ruta
+        .extension()
+        .and_then(|valor| valor.to_str())
+        .ok_or_else(|| "Ruta sin extensión".to_string())?;
+    let stem = ruta
+        .file_stem()
+        .and_then(|valor| valor.to_str())
+        .ok_or_else(|| "Ruta sin nombre".to_string())?;
+    let carpeta = ruta
+        .parent()
+        .ok_or_else(|| "Ruta sin carpeta".to_string())?;
 
-    let carpeta = carpeta()?;
+    let (_, _, nombre_fisico_actual) = separar_prefijo_id(stem);
+    let nueva_ruta = carpeta.join(format!(
+        "{id_portapapeles}_{nombre_fisico_actual}.{extension}"
+    ));
 
-    let base = format!("{}_{}", id_portapapeles, elemento.nombre);
-    let nombre_final = nombre_sin_conflicto(&carpeta, &base, &elemento.extension);
-    let nueva_ruta = carpeta.join(format!("{}.{}", nombre_final, elemento.extension));
-
-    fs::rename(&elemento.ruta, &nueva_ruta).map_err(|error| error.to_string())?;
+    fs::rename(ruta, &nueva_ruta).map_err(|error| error.to_string())?;
     tocar_ahora(&nueva_ruta)?;
 
     Ok(nueva_ruta)
@@ -641,18 +698,27 @@ pub fn fijar(ruta: &Path, id_portapapeles: &str) -> Result<PathBuf, String> {
 // 📌 DESFIJAR
 // ------------------------------------------------------
 // Le quita el prefijo de id al elemento en `ruta`, pasa a rotativo.
+// Mismo criterio que fijar(): trabaja directo sobre el nombre
+// físico, sin pasar por elemento_desde_ruta().
 // ======================================================
 
 pub fn desfijar(ruta: &Path) -> Result<PathBuf, String> {
-    let elemento = elemento_desde_ruta(ruta.to_path_buf())
-        .ok_or_else(|| "No se pudo leer el elemento".to_string())?;
+    let extension = ruta
+        .extension()
+        .and_then(|valor| valor.to_str())
+        .ok_or_else(|| "Ruta sin extensión".to_string())?;
+    let stem = ruta
+        .file_stem()
+        .and_then(|valor| valor.to_str())
+        .ok_or_else(|| "Ruta sin nombre".to_string())?;
+    let carpeta = ruta
+        .parent()
+        .ok_or_else(|| "Ruta sin carpeta".to_string())?;
 
-    let carpeta = carpeta()?;
+    let (_, _, nombre_fisico) = separar_prefijo_id(stem);
+    let nueva_ruta = carpeta.join(format!("{nombre_fisico}.{extension}"));
 
-    let nombre_final = nombre_sin_conflicto(&carpeta, &elemento.nombre, &elemento.extension);
-    let nueva_ruta = carpeta.join(format!("{}.{}", nombre_final, elemento.extension));
-
-    fs::rename(&elemento.ruta, &nueva_ruta).map_err(|error| error.to_string())?;
+    fs::rename(ruta, &nueva_ruta).map_err(|error| error.to_string())?;
     tocar_ahora(&nueva_ruta)?;
 
     Ok(nueva_ruta)
@@ -661,29 +727,25 @@ pub fn desfijar(ruta: &Path) -> Result<PathBuf, String> {
 // ======================================================
 // ✏️ RENOMBRAR
 // ------------------------------------------------------
-// Cambia el nombre visible de un elemento (máx 20 caracteres),
-// conservando su prefijo de id si estaba fijado.
+// Ya no renombra el archivo — el nombre físico es opaco y no
+// cambia. Solo sobreescribe el nombre visible en el ADS (recortado
+// a LONGITUD_NOMBRE, tal cual viene, sin sanear caracteres — el ADS
+// no es un nombre de archivo, no hace falta que sea filesystem-
+// safe). Sigue llamando a tocar_ahora() para que renombrar un
+// elemento lo suba al tope de la lista de rotativos, mismo efecto
+// que tenía el rename antes.
 // ======================================================
 
-pub fn renombrar(ruta: &Path, nuevo_nombre: &str) -> Result<PathBuf, String> {
-    let elemento = elemento_desde_ruta(ruta.to_path_buf())
-        .ok_or_else(|| "No se pudo leer el elemento".to_string())?;
-
-    let carpeta = carpeta()?;
-    let nombre_saneado = sanear_nombre(nuevo_nombre);
-
-    let base = match &elemento.id_portapapeles {
-        Some(id) => format!("{}_{}", id, nombre_saneado),
-        None => nombre_saneado,
+pub fn renombrar(ruta: &Path, nuevo_nombre: &str) -> Result<(), String> {
+    let nombre: String = nuevo_nombre.chars().take(LONGITUD_NOMBRE).collect();
+    let nombre = if nombre.trim().is_empty() {
+        nombre_sin_titulo()
+    } else {
+        nombre
     };
 
-    let nombre_final = nombre_sin_conflicto(&carpeta, &base, &elemento.extension);
-    let nueva_ruta = carpeta.join(format!("{}.{}", nombre_final, elemento.extension));
-
-    fs::rename(&elemento.ruta, &nueva_ruta).map_err(|error| error.to_string())?;
-    tocar_ahora(&nueva_ruta)?;
-
-    Ok(nueva_ruta)
+    escribir_nombre_meta(ruta, &nombre);
+    tocar_ahora(ruta)
 }
 
 // ======================================================
@@ -1164,9 +1226,11 @@ pub struct ElementoPortapapelesUI {
     // Ruta absoluta como String — identificador único y estable
     // frente a la ventana (fijar/renombrar/editar/eliminar la usan
     // para saber sobre qué archivo operar, ver Etapa H). Cambia si
-    // el archivo se renombra/fija/desfija (rename físico), momento
-    // en el que obtener_datos() ya sirve la ruta nueva de todos
-    // modos (Etapa H vuelve a pedir los datos tras cada operación).
+    // el archivo se fija/desfija (rename físico) — ya no cambia al
+    // renombrar (el nombre físico es opaco y no se toca, solo se
+    // sobreescribe el ADS). obtener_datos() sirve la ruta al día de
+    // todos modos (Etapa H vuelve a pedir los datos tras cada
+    // operación).
     pub ruta: String,
 
     pub nombre: String,
@@ -1808,15 +1872,12 @@ fn crear_ventana(app: AppHandle, id: String, paquete: PortapapelesPaquete) {
         )
         .title("RemapH — Portapapeles")
         .inner_size(ancho, alto)
-        // Ancho bloqueado (depende del tamaño de botón elegido, no
-        // es un ajuste manual del usuario); alto sí redimensionable
-        // — min/max de ancho iguales impiden el resize horizontal,
-        // dejando libre el vertical. calcular_tamano_ventana() solo
-        // corre una vez, al crear la ventana, así que un resize
-        // manual del usuario no se pisa después.
+        // Ambos ejes redimensionables, con mínimos/máximos acordes
+        // al mismo rango que ya usa calcular_tamano_ventana() para
+        // el tamaño inicial (ancho 220–600, alto 100–1600).
         .resizable(true)
-        .min_inner_size(ancho, 100.0)
-        .max_inner_size(ancho, 1600.0)
+        .min_inner_size(220.0, 100.0)
+        .max_inner_size(600.0, 1600.0)
         .decorations(false)
         .transparent(true)
         .shadow(false)
@@ -2004,21 +2065,47 @@ mod tests {
     use super::*;
 
     #[test]
-    fn sanea_y_recorta_a_20_caracteres() {
-        let resultado =
-            sanear_nombre("Esto es un texto bastante largo, mucho más de 20 caracteres");
-        assert_eq!(resultado.chars().count(), 20);
+    fn escribe_y_lee_nombre_meta() {
+        let carpeta = std::env::temp_dir().join("remaph_test_ads");
+        fs::create_dir_all(&carpeta).unwrap();
+        let ruta = carpeta.join("elemento.txt");
+        fs::write(&ruta, "hola").unwrap();
+
+        escribir_nombre_meta(&ruta, "Mi nombre");
+        assert_eq!(leer_nombre_meta(&ruta), "Mi nombre");
+
+        fs::remove_dir_all(&carpeta).unwrap();
     }
 
     #[test]
-    fn sanea_caracteres_invalidos() {
-        let resultado = sanear_nombre("a/b\\c:d");
-        assert!(!resultado.contains(['/', '\\', ':']));
+    fn nombre_meta_sin_stream_cae_a_sin_titulo() {
+        let carpeta = std::env::temp_dir().join("remaph_test_ads_vacio");
+        fs::create_dir_all(&carpeta).unwrap();
+        let ruta = carpeta.join("elemento.txt");
+        fs::write(&ruta, "hola").unwrap();
+
+        assert!(leer_nombre_meta(&ruta).starts_with("Sin título"));
+
+        fs::remove_dir_all(&carpeta).unwrap();
     }
 
     #[test]
-    fn nombre_vacio_cae_a_sin_titulo() {
-        assert_eq!(sanear_nombre("   "), "Sin título");
+    fn nombre_por_defecto_se_recorta_a_50_caracteres() {
+        let base = std::env::temp_dir().join("remaph_test_appdata_recorte");
+        fs::create_dir_all(&base).unwrap();
+        std::env::set_var("APPDATA", &base);
+
+        if let Ok(carpeta) = carpeta() {
+            let _ = fs::remove_dir_all(&carpeta);
+            fs::create_dir_all(&carpeta).unwrap();
+        }
+
+        let texto = "x".repeat(200);
+        let ruta = guardar_rotativo(&ContenidoPortapapeles::Texto(texto)).unwrap();
+
+        assert_eq!(leer_nombre_meta(&ruta).chars().count(), 50);
+
+        let _ = fs::remove_dir_all(&base);
     }
 
     #[test]
@@ -2036,8 +2123,11 @@ mod tests {
         let carpeta = std::env::temp_dir().join("remaph_test_fijado");
         fs::create_dir_all(&carpeta).unwrap();
 
-        let ruta = carpeta.join("3fa85f64-5717-4562-b3fc-2c963f66afa6_MiLink.txt");
+        // El nombre físico ya no es legible — puede tener guión
+        // bajo propio, no debe confundir la detección del prefijo.
+        let ruta = carpeta.join("3fa85f64-5717-4562-b3fc-2c963f66afa6_173abc_0001.txt");
         fs::write(&ruta, "hola").unwrap();
+        escribir_nombre_meta(&ruta, "MiLink");
 
         let elemento = elemento_desde_ruta(ruta.clone()).unwrap();
 
@@ -2056,27 +2146,15 @@ mod tests {
         let carpeta = std::env::temp_dir().join("remaph_test_rotativo");
         fs::create_dir_all(&carpeta).unwrap();
 
-        let ruta = carpeta.join("la ciudad es.txt");
+        let ruta = carpeta.join("173abc_0001.txt");
         fs::write(&ruta, "hola").unwrap();
+        escribir_nombre_meta(&ruta, "la ciudad es");
 
         let elemento = elemento_desde_ruta(ruta.clone()).unwrap();
 
         assert!(!elemento.fijado);
         assert_eq!(elemento.nombre, "la ciudad es");
         assert_eq!(elemento.id_portapapeles, None);
-
-        fs::remove_dir_all(&carpeta).unwrap();
-    }
-
-    #[test]
-    fn resuelve_conflicto_de_nombre() {
-        let carpeta = std::env::temp_dir().join("remaph_test_conflicto");
-        fs::create_dir_all(&carpeta).unwrap();
-        fs::write(carpeta.join("hola.txt"), "a").unwrap();
-        fs::write(carpeta.join("hola (1).txt"), "b").unwrap();
-
-        let resultado = nombre_sin_conflicto(&carpeta, "hola", "txt");
-        assert_eq!(resultado, "hola (2)");
 
         fs::remove_dir_all(&carpeta).unwrap();
     }
@@ -2096,14 +2174,17 @@ mod tests {
         let contenido = ContenidoPortapapeles::Texto("Hola mundo".to_string());
         let ruta = guardar_rotativo(&contenido).unwrap();
         assert!(ruta.exists());
+        assert_eq!(leer_nombre_meta(&ruta), "Hola mundo");
 
         let rotativos = listar_rotativos().unwrap();
         assert_eq!(rotativos.len(), 1);
+        assert_eq!(rotativos[0].nombre, "Hola mundo");
 
         let id = "3fa85f64-5717-4562-b3fc-2c963f66afa6";
         let ruta_fijada = fijar(&ruta, id).unwrap();
         assert!(ruta_fijada.exists());
         assert!(!ruta.exists());
+        assert_eq!(leer_nombre_meta(&ruta_fijada), "Hola mundo");
 
         let fijados = listar_fijados(id).unwrap();
         assert_eq!(fijados.len(), 1);
@@ -2111,18 +2192,21 @@ mod tests {
 
         let ruta_desfijada = desfijar(&ruta_fijada).unwrap();
         assert!(ruta_desfijada.exists());
+        assert_eq!(leer_nombre_meta(&ruta_desfijada), "Hola mundo");
 
-        let ruta_renombrada = renombrar(&ruta_desfijada, "Otro nombre").unwrap();
-        assert!(ruta_renombrada.exists());
+        // Ya no cambia la ruta: renombrar solo pisa el ADS.
+        renombrar(&ruta_desfijada, "Otro nombre").unwrap();
+        assert!(ruta_desfijada.exists());
+        assert_eq!(leer_nombre_meta(&ruta_desfijada), "Otro nombre");
 
-        editar_texto(&ruta_renombrada, "Contenido nuevo").unwrap();
+        editar_texto(&ruta_desfijada, "Contenido nuevo").unwrap();
         assert_eq!(
-            fs::read_to_string(&ruta_renombrada).unwrap(),
+            fs::read_to_string(&ruta_desfijada).unwrap(),
             "Contenido nuevo"
         );
 
-        eliminar(&ruta_renombrada).unwrap();
-        assert!(!ruta_renombrada.exists());
+        eliminar(&ruta_desfijada).unwrap();
+        assert!(!ruta_desfijada.exists());
 
         let _ = fs::remove_dir_all(&base);
     }

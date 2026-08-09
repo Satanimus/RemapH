@@ -483,7 +483,7 @@ function abrirPopupRenombrar(datos: ElementoDatos): void {
   const input = document.createElement("input");
   input.className = "portapapeles-popup-input";
   input.type = "text";
-  input.maxLength = 20;
+  input.maxLength = 50;
   input.value = datos.nombre;
   popup.append(input);
 
@@ -648,10 +648,24 @@ function crearFila(
   botonNombre.textContent = datos.nombre || "(sin nombre)";
   botonNombre.style.fontSize = `${tamanoTexto}px`;
   botonNombre.addEventListener("click", () => pegar(datos));
+
+  // Debounce de 500ms: si el mouse sale antes de que se cumpla, se
+  // cancela sin llegar a mostrar el tooltip.
+  let temporizadorTooltip: ReturnType<typeof setTimeout> | null = null;
+
   botonNombre.addEventListener("mouseenter", () => {
-    void mostrarTooltip(botonNombre, datos);
+    temporizadorTooltip = setTimeout(() => {
+      temporizadorTooltip = null;
+      void mostrarTooltip(botonNombre, datos);
+    }, 500);
   });
-  botonNombre.addEventListener("mouseleave", ocultarTooltip);
+  botonNombre.addEventListener("mouseleave", () => {
+    if (temporizadorTooltip !== null) {
+      clearTimeout(temporizadorTooltip);
+      temporizadorTooltip = null;
+    }
+    ocultarTooltip();
+  });
 
   const botonOpciones = document.createElement("button");
   botonOpciones.className = "portapapeles-boton-opciones";
