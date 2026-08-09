@@ -298,10 +298,78 @@ body {
     background: rgba(255, 255, 255, 0.12);
 }
 
-.portapapeles-boton-barra.activo {
-    background: color-mix(in srgb, var(--highlight) 30%, rgba(20, 20, 30, 0.85));
-    border-color: var(--highlight);
-    color: var(--highlight);
+/* ==========================
+   Switch Registro — mismo estilo que .popup-switch/Coordenada
+   (comp_popup_grupo.ts::crearInterruptor, ver styl_layout.css).
+   Se reimplementa acá porque esta ventana no importa
+   styl_general.css (rompería la transparencia, ver nota arriba).
+   Apagado: pista y bolita gris, texto "Registro Off" en gris oscuro.
+   Prendido: pista cyan tenue, bolita cyan sólida desplazada al
+   costado derecho, texto "Registro ON" en blanco.
+   ========================== */
+
+.portapapeles-switch-registro {
+    justify-content: flex-start;
+    gap: 6px;
+}
+
+.portapapeles-switch-pista {
+    position: relative;
+    width: 28px;
+    height: 16px;
+    min-width: 28px;
+    border-radius: 8px;
+    background: var(--button-bg);
+    border: 1px solid var(--border-light);
+    transition: background var(--speed), border-color var(--speed);
+}
+
+.portapapeles-switch-bolita {
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--text-disabled);
+    transition: transform var(--speed), background var(--speed);
+}
+
+.portapapeles-switch-registro[data-activo="true"] .portapapeles-switch-pista {
+    background: rgba(3, 169, 244, .18);
+    border-color: var(--tag-cyan);
+}
+
+.portapapeles-switch-registro[data-activo="true"] .portapapeles-switch-bolita {
+    background: var(--tag-cyan);
+    transform: translateX(12px);
+}
+
+.portapapeles-switch-registro[data-activo="false"] {
+    color: var(--text-disabled);
+}
+
+.portapapeles-switch-registro[data-activo="true"] {
+    color: #ffffff;
+}
+
+/* ==========================
+   Limpiar todo — doble confirmación.
+   Hover: letras y borde rojo (sin confirmar todavía). Click:
+   "⚠️ Confirmar limpieza" en rojo — recién el SIGUIENTE click limpia
+   los rotativos (ver el manejo de estado en portapapeles_main.ts).
+   ========================== */
+
+.portapapeles-boton-limpiar:hover {
+    color: var(--highlight-red);
+    border-color: var(--highlight-red);
+}
+
+.portapapeles-boton-limpiar.confirmando,
+.portapapeles-boton-limpiar.confirmando:hover {
+    color: var(--highlight-red);
+    border-color: var(--highlight-red);
+    background: color-mix(in srgb, var(--highlight-red) 18%, rgba(20, 20, 30, 0.85));
 }
 
 /* ==========================
@@ -336,6 +404,43 @@ body {
 .portapapeles-popup-titulo {
     font-size: var(--fs12);
     opacity: 0.85;
+}
+
+/* ==========================
+   Popup Editar — expandido a toda la ventana.
+   A diferencia del resto (Opciones/Renombrar), que quedan chicos y
+   centrados, Editar ocupa el 100% del overlay (que ya es inset:0
+   sobre `card`) — así que sigue llenando la ventana si el usuario la
+   redimensiona con el popup abierto. El textarea flexible ocupa todo
+   el alto que sobra debajo del título y de los botones.
+   ========================== */
+
+.portapapeles-popup--editar {
+    width: 100%;
+    height: 100%;
+    max-width: none;
+    border-radius: 0;
+}
+
+.portapapeles-popup--editar .portapapeles-popup-titulo {
+    flex-shrink: 0;
+    font-size: var(--fs13);
+    opacity: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.portapapeles-popup--editar .portapapeles-popup-textarea {
+    flex: 1;
+    min-height: 0;
+    /* Ya ocupa toda la ventana — un resize manual del textarea acá
+       adentro solo generaría scroll raro dentro del popup. */
+    resize: none;
+}
+
+.portapapeles-popup--editar .portapapeles-popup-acciones {
+    flex-shrink: 0;
 }
 
 .portapapeles-popup-opcion {

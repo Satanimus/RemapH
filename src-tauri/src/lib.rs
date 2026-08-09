@@ -116,6 +116,8 @@ pub fn run() {
             comandos::portapapeles_renombrar,
             comandos::portapapeles_editar,
             comandos::portapapeles_marcar_reciente,
+            comandos::portapapeles_enfocar_ventana,
+            comandos::portapapeles_desenfocar_ventana,
             comandos::portapapeles_eliminar,
             comandos::portapapeles_limpiar_todo,
             comandos::portapapeles_pegar,

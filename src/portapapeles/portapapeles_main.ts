@@ -94,6 +94,10 @@ let ultimosDatos: PortapapelesDatos | null = null;
 // afuera (otra fila en modo Registro, u otra ventana).
 let tituloActual: HTMLSpanElement | null = null;
 let botonRegistroActual: HTMLButtonElement | null = null;
+// Nodo de texto del switch Registro (pista+bolita+texto, ver
+// crearBarraInferior) — separado de botonRegistroActual porque el
+// botón también carga la pista/bolita del switch.
+let textoRegistroActual: HTMLSpanElement | null = null;
 
 // Bandera anti-duplicado del LADO CLIENTE (paralela al bloqueo
 // de back_portapapeles.rs::marcar_ignorar_proximo_cambio): mientras
@@ -423,6 +427,33 @@ async function pegar(datos: ElementoDatos): Promise<void> {
 
 function cerrarPopup(): void {
   document.querySelector(".portapapeles-popup-overlay")?.remove();
+
+  // Espejo de enfocarVentanaParaEdicion() — la ventana vuelve a
+  // WS_EX_NOACTIVATE (no roba foco a la app activa del usuario) al
+  // cerrar cualquier popup, sea o no uno de los que lo había pedido.
+  // Sin costo llamarlo de más: restaurar_no_activacion es un no-op si
+  // la ventana ya estaba así.
+  if (id) {
+    invoke("portapapeles_desenfocar_ventana", { id }).catch(() => {});
+  }
+}
+
+// spec: "Popup editar y renombrar deben tomar el foco al ser creados
+// para poder escribir en ellos." La ventana se crea con
+// WS_EX_NOACTIVATE (ver crear_ventana en back_portapapeles.rs) para
+// no robarle el foco a la app activa — eso también bloquea el tecleo
+// real en cualquier input/textarea de acá, así que antes de enfocar
+// el campo del popup hay que pedirle al backend que habilite la
+// activación real de la ventana (y le dé el foco).
+async function enfocarVentanaParaEdicion(): Promise<void> {
+  if (!id) return;
+
+  try {
+    await invoke("portapapeles_enfocar_ventana", { id });
+  } catch {
+    // Sin foco real del SO — el input.focus() de todos modos se
+    // intenta más abajo, por si acaso.
+  }
 }
 
 function abrirPopupOpciones(datos: ElementoDatos): void {
@@ -466,7 +497,7 @@ function abrirPopupOpciones(datos: ElementoDatos): void {
   card.append(overlay);
 }
 
-function abrirPopupRenombrar(datos: ElementoDatos): void {
+async function abrirPopupRenombrar(datos: ElementoDatos): Promise<void> {
   cerrarPopup();
 
   const overlay = document.createElement("div");
@@ -523,6 +554,7 @@ function abrirPopupRenombrar(datos: ElementoDatos): void {
   overlay.append(popup);
   card.append(overlay);
 
+  await enfocarVentanaParaEdicion();
   input.focus();
   input.select();
 }
@@ -548,12 +580,20 @@ async function abrirPopupEditar(datos: ElementoDatos): Promise<void> {
   const overlay = document.createElement("div");
   overlay.className = "portapapeles-popup-overlay";
 
+  // spec: "Debe generarse expandido dentro de toda la ventana y
+  // cambiar de tamaño con ella" — a diferencia del resto de popups
+  // (Opciones/Renombrar), que quedan chicos y centrados, Editar usa
+  // el ancho/alto completo del overlay (--popup--editar en
+  // portapapeles.css), así que sigue ocupando toda la ventana si el
+  // usuario la redimensiona mientras el popup está abierto.
   const popup = document.createElement("div");
-  popup.className = "portapapeles-popup";
+  popup.className = "portapapeles-popup portapapeles-popup--editar";
 
   const titulo = document.createElement("div");
   titulo.className = "portapapeles-popup-titulo";
-  titulo.textContent = "Editar";
+  // spec: "Al lado del texto Editar debe decir el nombre del
+  // elemento que está editando."
+  titulo.textContent = `Editar — ${datos.nombre || "(sin nombre)"}`;
   popup.append(titulo);
 
   const textarea = document.createElement("textarea");
@@ -603,6 +643,7 @@ async function abrirPopupEditar(datos: ElementoDatos): Promise<void> {
     textarea.value = "";
   }
 
+  await enfocarVentanaParaEdicion();
   textarea.focus();
 }
 
@@ -772,32 +813,88 @@ function pintarListado(datos: PortapapelesDatos): void {
 // barra en cada evento.
 // ======================================================
 
+// Texto del switch Registro — nodo de texto propio (no
+// botonRegistro.textContent a secas) porque el botón también carga
+// la pista+bolita del switch (ver más abajo); pisar todo el
+// textContent se las llevaría puestas.
 function actualizarBotonRegistro(datos: PortapapelesDatos): void {
-  if (!botonRegistroActual) return;
+  if (!botonRegistroActual || !textoRegistroActual) return;
 
-  botonRegistroActual.classList.toggle("activo", datos.registroActivo);
-  botonRegistroActual.textContent = datos.registroActivo
-    ? "Registro: ON"
-    : "Modo Registro";
+  // Mismo vocabulario data-activo que .popup-switch (ver
+  // comp_popup_grupo.ts::crearInterruptor / styl_layout.css) — acá se
+  // reimplementa en portapapeles.css porque esta ventana no importa
+  // styl_general.css (rompería la transparencia, ver nota al inicio
+  // del archivo de estilos).
+  botonRegistroActual.dataset.activo = datos.registroActivo ? "true" : "false";
+  textoRegistroActual.textContent = datos.registroActivo
+    ? "Registro ON"
+    : "Registro Off";
 }
 
 function crearBarraInferior(datos: PortapapelesDatos): void {
   const barraInferior = document.createElement("div");
   barraInferior.className = "portapapeles-barra-inferior";
 
+  // spec: "Debe tener el estilo del switch 'Coordenada' del popup
+  // extra (Ese boton deslizante gris que pasa a Cyan)" — misma
+  // estructura pista+bolita que crearInterruptor() en
+  // comp_popup_grupo.ts (ver estilos espejados en portapapeles.css).
   const botonRegistro = document.createElement("button");
-  botonRegistro.className = "portapapeles-boton-barra";
+  botonRegistro.className =
+    "portapapeles-boton-barra portapapeles-switch-registro";
+
+  const pista = document.createElement("span");
+  pista.className = "portapapeles-switch-pista";
+
+  const bolita = document.createElement("span");
+  bolita.className = "portapapeles-switch-bolita";
+  pista.append(bolita);
+
+  const textoRegistro = document.createElement("span");
+
+  botonRegistro.append(pista, textoRegistro);
   botonRegistro.addEventListener("click", alternarRegistro);
 
+  // spec: "Boton Limpiar todo debe tener doble confirmación: Al pasar
+  // el mouse sobre él cambia letras y borde rojo (CSS puro, ver
+  // .portapapeles-boton-limpiar:hover), al hacer click dice
+  // '⚠️ Confirmar limpieza' con letras rojas, siguiente click limpia
+  // rotatorios."
   const botonLimpiar = document.createElement("button");
-  botonLimpiar.className = "portapapeles-boton-barra";
+  botonLimpiar.className =
+    "portapapeles-boton-barra portapapeles-boton-limpiar";
   botonLimpiar.textContent = "Limpiar todo";
-  botonLimpiar.addEventListener("click", limpiarTodo);
+
+  let confirmando = false;
+
+  const salirDeConfirmacion = () => {
+    if (!confirmando) return;
+    confirmando = false;
+    botonLimpiar.classList.remove("confirmando");
+    botonLimpiar.textContent = "Limpiar todo";
+  };
+
+  botonLimpiar.addEventListener("click", () => {
+    if (!confirmando) {
+      confirmando = true;
+      botonLimpiar.classList.add("confirmando");
+      botonLimpiar.textContent = "⚠️ Confirmar limpieza";
+      return;
+    }
+
+    salirDeConfirmacion();
+    limpiarTodo();
+  });
+
+  // Si el usuario se va sin confirmar, el segundo click no debe
+  // quedar "armado" para la próxima vez que pase el mouse por acá.
+  botonLimpiar.addEventListener("mouseleave", salirDeConfirmacion);
 
   barraInferior.append(botonRegistro, botonLimpiar);
   card.append(barraInferior);
 
   botonRegistroActual = botonRegistro;
+  textoRegistroActual = textoRegistro;
   actualizarBotonRegistro(datos);
 }
 

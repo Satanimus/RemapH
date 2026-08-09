@@ -894,26 +894,38 @@ fn detener_listener_si_no_hace_falta() {
 // 🔔 EN CAMBIO DEL SISTEMA — ETAPA F, reescrita en ETAPA J.1
 // ------------------------------------------------------
 // Llamado por back_portapapeles_captura::en_cambio_portapapeles()
-// en cada aviso real de Windows (WM_CLIPBOARDUPDATE). Dos ramas:
+// en cada aviso real de Windows (WM_CLIPBOARDUPDATE).
 //
-// • Si hay algún Registro activo (de cualquier id): comportamiento
-//   original, sin cambios — guarda el contenido como rotativo nuevo
-//   y recién DESPUÉS aplica el límite efectivo (para no borrar por
-//   error el elemento que se acaba de crear).
-// • Si no hay Registro pero sí alguna ventana Simple abierta: mismo
-//   criterio que resolver_elemento_simple() al abrir una ventana —
-//   si el contenido nuevo es igual al rotativo más reciente, no
-//   hace nada (ya está reflejado); si es distinto, guarda uno nuevo.
-//   Sin aplicar ningún límite acá (el límite es un concepto
-//   exclusivo de Registro — spec: "los fijados no se eliminan ni
-//   cuentan para el límite", y un Simple puro ni siquiera tiene uno
-//   configurado con sentido).
+// BUG conocido que esto corrige: Windows puede mandar más de un
+// WM_CLIPBOARDUPDATE para una sola acción lógica del usuario —
+// algunas apps (ej. Firefox) escriben el portapapeles en más de un
+// formato en pasos separados, y la Herramienta de recortes / Impr
+// Pant a veces genera un segundo aviso ~1s después del primero
+// (thumbnail/registro tardío). Antes de este fix, la rama de
+// Registro activo guardaba CIEGAMENTE cada aviso sin comparar contra
+// lo último guardado — de ahí el duplicado. Ahora se compara el HASH
+// del contenido nuevo contra el hash del rotativo más reciente ANTES
+// de decidir qué rama tomar, así que ningún aviso repetido del mismo
+// contenido genera un rotativo de más, esté o no Registro activo.
+//
+// • Si es igual al rotativo más reciente (mismo hash) → no se guarda
+//   nada, se corta acá (ni Registro ni Simple generan un duplicado).
+// • Si hay algún Registro activo (de cualquier id): guarda el
+//   contenido como rotativo nuevo y recién DESPUÉS aplica el límite
+//   efectivo (para no borrar por error el elemento que se acaba de
+//   crear).
+// • Si no hay Registro pero sí alguna ventana Simple abierta: guarda
+//   un rotativo nuevo (ya se sabe que es distinto al más reciente,
+//   por el chequeo de hash de arriba). Sin aplicar ningún límite acá
+//   (el límite es un concepto exclusivo de Registro — spec: "los
+//   fijados no se eliminan ni cuentan para el límite", y un Simple
+//   puro ni siquiera tiene uno configurado con sentido).
 // • Si no hay ni Registro ni ventana abierta, no se toca el pool —
 //   no debería llegar a pasar (el listener no estaría corriendo),
 //   pero queda como red de seguridad.
 //
-// En cualquiera de los dos primeros casos, termina notificando a
-// todas las ventanas de Portapapeles abiertas con sus datos ya
+// En cualquiera de los dos casos que sí guardan, termina notificando
+// a todas las ventanas de Portapapeles abiertas con sus datos ya
 // recalculados (ver notificar_ventanas_abiertas() más abajo) — así
 // una ventana Registro ve aparecer el elemento nuevo arriba de su
 // lista, y una ventana Simple abierta mientras OTRO id está en
@@ -925,12 +937,28 @@ pub fn en_cambio_del_sistema(contenido: &ContenidoPortapapeles) {
         return;
     }
 
+    if es_duplicado_del_mas_reciente(contenido) {
+        println!("📋 Portapapeles: aviso repetido con el mismo contenido — ignorado (hash).");
+        return;
+    }
+
+    if es_eco_de_imagen_reciente(contenido) {
+        println!(
+            "📋 Portapapeles: segundo aviso de imagen a los <{}ms del anterior — ignorado (eco de captura, ver VENTANA_ECO_IMAGEN_MS).",
+            VENTANA_ECO_IMAGEN_MS
+        );
+        return;
+    }
+
     if hay_algun_activo() {
         if guardar_rotativo(contenido).is_ok() {
+            marcar_imagen_guardada_ahora(contenido);
             let _ = aplicar_limite(limite_efectivo());
         }
     } else if hay_alguna_ventana_abierta() {
-        guardar_si_distinto_del_mas_reciente(contenido);
+        if guardar_rotativo(contenido).is_ok() {
+            marcar_imagen_guardada_ahora(contenido);
+        }
     } else {
         return;
     }
@@ -938,24 +966,151 @@ pub fn en_cambio_del_sistema(contenido: &ContenidoPortapapeles) {
     notificar_ventanas_abiertas();
 }
 
-/// Guarda `contenido` como rotativo nuevo solo si es distinto al
-/// rotativo más reciente que ya hay en el pool (mismo criterio de
-/// comparación que resolver_elemento_simple(), vía mismo_contenido())
-/// — evita duplicar el mismo contenido si el aviso de Windows llega
-/// más de una vez, o si ya estaba reflejado.
-fn guardar_si_distinto_del_mas_reciente(contenido: &ContenidoPortapapeles) {
-    let mas_reciente = listar_rotativos()
-        .ok()
-        .and_then(|lista| lista.into_iter().next());
+// ======================================================
+// #️⃣ HASH DE CONTENIDO — detección de duplicados
+// ------------------------------------------------------
+// Un hash (std::hash, sin dependencias nuevas) en vez de comparar
+// struct por struct en cada aviso — mismo criterio de "qué cuenta
+// como igual" que ya usaba mismo_contenido() (texto: bytes UTF-8
+// tal cual; imagen: ancho + alto + píxeles RGBA8), resumido acá en
+// un u64 para poder compararlo con una sola igualdad. El byte 0u8/1u8
+// al principio de cada hash discrimina texto vs. imagen — sin eso, un
+// texto y una imagen que hasheen "parecido" por casualidad podrían
+// chocar.
+// ======================================================
 
-    let ya_coincide = mas_reciente
-        .as_ref()
-        .map(|elemento| mismo_contenido(elemento, contenido))
-        .unwrap_or(false);
+fn hash_contenido(contenido: &ContenidoPortapapeles) -> u64 {
+    use std::collections::hash_map::DefaultHasher;
+    use std::hash::{Hash, Hasher};
 
-    if !ya_coincide {
-        let _ = guardar_rotativo(contenido);
+    let mut hasher = DefaultHasher::new();
+
+    match contenido {
+        ContenidoPortapapeles::Texto(texto) => {
+            0u8.hash(&mut hasher);
+            texto.hash(&mut hasher);
+        }
+
+        ContenidoPortapapeles::Imagen {
+            ancho,
+            alto,
+            pixeles,
+        } => {
+            1u8.hash(&mut hasher);
+            ancho.hash(&mut hasher);
+            alto.hash(&mut hasher);
+            pixeles.hash(&mut hasher);
+        }
     }
+
+    hasher.finish()
+}
+
+/// Hash del contenido YA GUARDADO de `elemento`, leyendo/decodificando
+/// el archivo del pool (mismo dato de fondo que mismo_contenido() ya
+/// leía) — None si la extensión no es ni txt ni png, o si el archivo
+/// no se pudo leer/decodificar.
+fn hash_elemento(elemento: &ElementoPortapapeles) -> Option<u64> {
+    use std::collections::hash_map::DefaultHasher;
+    use std::hash::{Hash, Hasher};
+
+    match elemento.extension.as_str() {
+        "txt" => {
+            let texto = fs::read_to_string(&elemento.ruta).ok()?;
+
+            let mut hasher = DefaultHasher::new();
+            0u8.hash(&mut hasher);
+            texto.hash(&mut hasher);
+
+            Some(hasher.finish())
+        }
+
+        "png" => {
+            let pixeles = decodificar_png_rgba8(&elemento.ruta)?;
+
+            let mut hasher = DefaultHasher::new();
+            1u8.hash(&mut hasher);
+            pixeles.hash(&mut hasher);
+
+            Some(hasher.finish())
+        }
+
+        _ => None,
+    }
+}
+
+/// ¿`contenido` es exactamente lo mismo que el rotativo más reciente
+/// del pool? Se llama UNA sola vez por aviso de Windows, antes de
+/// decidir Registro/Simple — ver en_cambio_del_sistema() arriba.
+fn es_duplicado_del_mas_reciente(contenido: &ContenidoPortapapeles) -> bool {
+    let Some(mas_reciente) = listar_rotativos()
+        .ok()
+        .and_then(|lista| lista.into_iter().next())
+    else {
+        return false;
+    };
+
+    let Some(hash_anterior) = hash_elemento(&mas_reciente) else {
+        return false;
+    };
+
+    hash_anterior == hash_contenido(contenido)
+}
+
+// ======================================================
+// 🖼️⏱️ ECO DE IMAGEN RECIENTE (Impr Pant / captura de pantalla)
+// ------------------------------------------------------
+// El chequeo de hash de arriba resuelve el caso de Firefox (dos
+// avisos con el MISMO contenido byte a byte). Pero una captura de
+// pantalla (Impr Pant, Herramienta de recortes, etc.) puede llegar
+// dos veces con contenido que NO calza byte a byte aunque sea
+// "la misma captura" para el usuario — Windows, sobre todo con el
+// Historial del portapapeles (Win+V) activo, puede re-escribir el
+// portapapeles con la imagen reprocesada/recodificada un instante
+// después del SetClipboardData original (de ahí el patrón "una copia
+// un segundo después de la primera" — no es al azar, es ese
+// reprocesamiento). Contra eso el hash solo no alcanza.
+//
+// Por eso, además del hash, se ignora cualquier aviso de tipo IMAGEN
+// que llegue dentro de una ventana corta después de haber guardado
+// la última imagen — sin importar si el hash coincide o no. Se
+// limita a imágenes (el caso de texto de Firefox ya quedó resuelto
+// solo con el hash, y ahí no hace falta una ventana de tiempo que
+// podría comerse un Ctrl+C real hecho rápido dos veces seguidas).
+//
+// Trade-off consciente: si el usuario saca dos capturas DISTINTAS a
+// menos de VENTANA_ECO_IMAGEN_MS una de la otra, la segunda se
+// pierde. Se prioriza no duplicar (el caso mucho más común) sobre
+// ese caso límite. Si hiciera falta, VENTANA_ECO_IMAGEN_MS es el
+// único número para ajustar.
+// ======================================================
+
+const VENTANA_ECO_IMAGEN_MS: u128 = 500;
+
+static ULTIMA_IMAGEN_GUARDADA_EN: Mutex<Option<std::time::Instant>> = Mutex::new(None);
+
+fn es_eco_de_imagen_reciente(contenido: &ContenidoPortapapeles) -> bool {
+    if !matches!(contenido, ContenidoPortapapeles::Imagen { .. }) {
+        return false;
+    }
+
+    let guardia = ULTIMA_IMAGEN_GUARDADA_EN.lock().unwrap();
+
+    match *guardia {
+        Some(instante) => instante.elapsed().as_millis() < VENTANA_ECO_IMAGEN_MS,
+        None => false,
+    }
+}
+
+/// Se llama después de guardar_rotativo() cuando `contenido` es una
+/// imagen — arranca (o reinicia) la ventana de eco de arriba. No
+/// hace nada para texto (esa rama no usa VENTANA_ECO_IMAGEN_MS).
+fn marcar_imagen_guardada_ahora(contenido: &ContenidoPortapapeles) {
+    if !matches!(contenido, ContenidoPortapapeles::Imagen { .. }) {
+        return;
+    }
+
+    *ULTIMA_IMAGEN_GUARDADA_EN.lock().unwrap() = Some(std::time::Instant::now());
 }
 
 // ======================================================
@@ -1539,6 +1694,84 @@ fn desactivar_activacion(ventana: &tauri::WebviewWindow) {
 }
 
 // ======================================================
+// ✅ PERMITIR ACTIVACIÓN (inverso de desactivar_activacion)
+// ------------------------------------------------------
+// Saca el bit WS_EX_NOACTIVATE del HWND — mientras está puesto, la
+// ventana JAMÁS recibe foco de teclado real (con WS_EX_NOACTIVATE, un
+// input.focus() del lado JS no alcanza: el HWND ni figura como
+// candidato a foco para Windows). Se usa SOLO mientras hay un popup
+// de Editar/Renombrar abierto (los únicos con campo de texto — spec:
+// "Popup editar y renombrar deben tomar el foco al ser creados para
+// poder escribir en ellos"). enfocar_para_edicion() la llama y
+// después pide el foco real; restaurar_no_activacion() la vuelve a
+// poner al cerrar ese popup, para no romper el criterio general de
+// la ventana (no robarle el foco a la app activa del usuario).
+// ======================================================
+
+fn permitir_activacion(ventana: &tauri::WebviewWindow) {
+    use raw_window_handle::{HasWindowHandle, RawWindowHandle};
+    use windows_sys::Win32::Foundation::HWND;
+    use windows_sys::Win32::UI::WindowsAndMessaging::{
+        GetWindowLongPtrW, SetWindowLongPtrW, GWL_EXSTYLE, WS_EX_NOACTIVATE,
+    };
+
+    let Ok(handle) = ventana.window_handle() else {
+        return;
+    };
+
+    let RawWindowHandle::Win32(win32) = handle.as_raw() else {
+        return;
+    };
+
+    let hwnd: HWND = win32.hwnd.get() as *mut core::ffi::c_void;
+
+    unsafe {
+        let estilo_actual = GetWindowLongPtrW(hwnd, GWL_EXSTYLE);
+
+        SetWindowLongPtrW(
+            hwnd,
+            GWL_EXSTYLE,
+            estilo_actual & !(WS_EX_NOACTIVATE as isize),
+        );
+    }
+}
+
+/// Habilita momentáneamente la activación real de la ventana y le
+/// pide el foco — llamado justo al abrir un popup de Editar/
+/// Renombrar (ver comandos::portapapeles_enfocar_ventana). Sin esto,
+/// el input/textarea del popup nunca recibe tecleo real: la ventana
+/// se crea con WS_EX_NOACTIVATE (ver crear_ventana) y ese estilo
+/// bloquea la activación a nivel de Windows, no solo el foco de DOM.
+pub fn enfocar_para_edicion(id: &str) {
+    let Some(app) = app_handle() else {
+        return;
+    };
+
+    let Some(ventana) = app.get_webview_window(&label_de(id)) else {
+        return;
+    };
+
+    permitir_activacion(&ventana);
+    let _ = ventana.set_focus();
+}
+
+/// Inverso — se llama al cerrar el popup de Editar/Renombrar (o al
+/// abrir cualquier otro popup que no necesite tecleo), para volver al
+/// comportamiento normal de la ventana (no le roba el foco a la app
+/// activa, spec del resto de la ventana).
+pub fn restaurar_no_activacion(id: &str) {
+    let Some(app) = app_handle() else {
+        return;
+    };
+
+    let Some(ventana) = app.get_webview_window(&label_de(id)) else {
+        return;
+    };
+
+    desactivar_activacion(&ventana);
+}
+
+// ======================================================
 // 🔍 ¿ESTE ARCHIVO YA TIENE ESTE CONTENIDO?
 // ------------------------------------------------------
 // Usado por resolver_elemento_simple() para decidir si el rotativo
@@ -1654,7 +1887,10 @@ fn resolver_elemento_simple() -> Option<ElementoPortapapeles> {
 
     guardar_rotativo(&contenido)
         .ok()
-        .and_then(|ruta| elemento_desde_ruta(ruta))
+        .and_then(|ruta| {
+            marcar_imagen_guardada_ahora(&contenido);
+            elemento_desde_ruta(ruta)
+        })
         .or(mas_reciente)
 }
 
@@ -1872,12 +2108,15 @@ fn crear_ventana(app: AppHandle, id: String, paquete: PortapapelesPaquete) {
         )
         .title("RemapH — Portapapeles")
         .inner_size(ancho, alto)
-        // Ambos ejes redimensionables, con mínimos/máximos acordes
-        // al mismo rango que ya usa calcular_tamano_ventana() para
-        // el tamaño inicial (ancho 220–600, alto 100–1600).
+        // Redimensionable en ambos ejes. Solo se fija un mínimo (para
+        // que no se pueda achicar hasta volverla inusable) — sin
+        // máximo: el usuario tiene que poder agrandarla tanto como
+        // quiera. El tamaño POR DEFECTO al abrirse sigue saliendo de
+        // calcular_tamano_ventana() (ancho 220–600, alto 100–1600),
+        // eso no cambia — solo se levanta el techo del redimensionado
+        // manual posterior.
         .resizable(true)
         .min_inner_size(220.0, 100.0)
-        .max_inner_size(600.0, 1600.0)
         .decorations(false)
         .transparent(true)
         .shadow(false)

@@ -751,6 +751,22 @@ pub fn portapapeles_marcar_reciente(ruta: String) -> Result<(), String> {
     crate::back_portapapeles::marcar_reciente(std::path::Path::new(&ruta))
 }
 
+// La ventana se crea con WS_EX_NOACTIVATE (no le roba el foco a la
+// app activa del usuario) — pero eso también bloquea el tecleo real
+// en los popups de Editar/Renombrar (los únicos con campo de texto).
+// enfocar_ventana se llama al abrirlos, desenfocar_ventana al
+// cerrarlos (ver portapapeles_main.ts::abrirPopupRenombrar/
+// abrirPopupEditar/cerrarPopup).
+#[tauri::command]
+pub fn portapapeles_enfocar_ventana(id: String) {
+    crate::back_portapapeles::enfocar_para_edicion(&id);
+}
+
+#[tauri::command]
+pub fn portapapeles_desenfocar_ventana(id: String) {
+    crate::back_portapapeles::restaurar_no_activacion(&id);
+}
+
 #[tauri::command]
 pub fn portapapeles_eliminar(
     id: String,
