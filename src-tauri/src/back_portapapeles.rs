@@ -1808,7 +1808,15 @@ fn crear_ventana(app: AppHandle, id: String, paquete: PortapapelesPaquete) {
         )
         .title("RemapH — Portapapeles")
         .inner_size(ancho, alto)
-        .resizable(false)
+        // Ancho bloqueado (depende del tamaño de botón elegido, no
+        // es un ajuste manual del usuario); alto sí redimensionable
+        // — min/max de ancho iguales impiden el resize horizontal,
+        // dejando libre el vertical. calcular_tamano_ventana() solo
+        // corre una vez, al crear la ventana, así que un resize
+        // manual del usuario no se pisa después.
+        .resizable(true)
+        .min_inner_size(ancho, 100.0)
+        .max_inner_size(ancho, 1600.0)
         .decorations(false)
         .transparent(true)
         .shadow(false)

@@ -114,6 +114,26 @@ body {
     overflow-x: hidden;
 }
 
+/* Scrollbar propia: toma el color de la ventana (misma variable
+   que .portapapeles-card) en vez de la barra blanca del sistema.
+   No se hereda de styl_general.css a propósito (ver nota arriba). */
+.portapapeles-cuerpo::-webkit-scrollbar {
+    width: 8px;
+}
+
+.portapapeles-cuerpo::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.portapapeles-cuerpo::-webkit-scrollbar-thumb {
+    background: var(--portapapeles-gradient, var(--portapapeles-color, rgba(255, 255, 255, 0.3)));
+    border-radius: 4px;
+}
+
+.portapapeles-cuerpo::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.4);
+}
+
 .portapapeles-separador {
     height: 1px;
     margin: 2px 4px;

@@ -258,7 +258,10 @@ function construirEstructura(): {
 
   const cuerpoNuevo = document.createElement("div");
   cuerpoNuevo.className = "portapapeles-cuerpo";
-  cuerpoNuevo.setAttribute("data-tauri-drag-region", "");
+  // Sin data-tauri-drag-region: es el contenedor con scroll, y
+  // tenerlo acá hacía que arrastrar la barra de desplazamiento
+  // arrastrara la ventana en vez de scrollear. La ventana ya se
+  // puede arrastrar desde header/card.
 
   nuevaCard.append(header, cuerpoNuevo);
   raiz.append(nuevaCard);
@@ -289,7 +292,16 @@ import { convertFileSrc } from "@tauri-apps/api/core";
 
 let tooltipActual: HTMLDivElement | null = null;
 
+// Se incrementa en cada mouseenter/ocultarTooltip para que una
+// llamada de mostrarTooltip() que sigue esperando el fetch del
+// texto (mouse ya afuera) pueda notar que quedó obsoleta y no
+// inserte nada — sin esto, el tooltip quedaba pegado en pantalla
+// porque el mouseleave ya había disparado ocultarTooltip() antes
+// de que el fetch terminara y el tooltip recién se agregara al DOM.
+let tooltipVigencia = 0;
+
 function ocultarTooltip(): void {
+  tooltipVigencia++;
   tooltipActual?.remove();
   tooltipActual = null;
 }
@@ -299,6 +311,7 @@ async function mostrarTooltip(
   datos: ElementoDatos,
 ): Promise<void> {
   ocultarTooltip();
+  const vigenciaPropia = tooltipVigencia;
 
   const tooltip = document.createElement("div");
   tooltip.className = "portapapeles-tooltip";
@@ -315,15 +328,20 @@ async function mostrarTooltip(
         respuesta.text(),
       );
 
+      if (vigenciaPropia !== tooltipVigencia) return;
+
       // Recorte defensivo: un .txt del pool puede en teoría crecer
       // más allá de lo esperable si se editó a mano fuera de la
       // app — el tooltip no debe volverse gigante por eso.
       tooltip.textContent =
         texto.length > 600 ? `${texto.slice(0, 600)}…` : texto;
     } catch {
+      if (vigenciaPropia !== tooltipVigencia) return;
       tooltip.textContent = datos.nombre;
     }
   }
+
+  if (vigenciaPropia !== tooltipVigencia) return;
 
   document.body.append(tooltip);
 
