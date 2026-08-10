@@ -550,17 +550,15 @@ pub fn recibir_condicion(condicion: CondicionTrigger) {
                 .as_ref()
                 .is_some_and(|extra| extra.requiere_up_real());
 
-            if diferido {
-                iniciar_solamente(remapeo, entrada_actual);
-            } else {
-                iniciar_y_finalizar(remapeo);
-            }
-            limpiar_lista(id);
-            reiniciar_desde_presionados();
-            // 🔥 CAMBIO CLAVE: usar pasar() en lugar de consumir()
-            // para asegurar que el RETENIDO se cierre siempre.
-            entrada::pasar();
-            return;
+                if diferido {
+                    iniciar_solamente(remapeo, entrada_actual);
+                } else {
+                    iniciar_y_finalizar(remapeo);
+                }
+                limpiar_lista(id);
+                reiniciar_desde_presionados();
+                entrada::consumir();   // <-- CAMBIO CLAVE: usar consumir() en lugar de pasar()
+                return;
         }
     }
 

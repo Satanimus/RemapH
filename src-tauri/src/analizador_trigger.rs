@@ -670,18 +670,22 @@ impl AnalizadorTrigger {
                         }
 
                         let modo = self.modo;
-                        // 🔥 NUEVO: si estamos en modo Runtime, el Up también debe
-                        // llegar a Cache para que sepa que la tecla se soltó.
-                        // Sin esto, Cache queda esperando un Up que nunca llega,
-                        // y la tecla queda "presionada" para siempre → auto-repetición.
-                        if self.modo == ModoAnalizador::Runtime {
-                            drop(grupos);
-                            cache::recibir_up(evento.input.clone());
-                            grupos = self.grupos.lock().unwrap();
-                        } else {
-                            drop(grupos);
-                        }
-
+                        // NOTA: cache::recibir_up() para este Up ya se llamó más
+                        // arriba (bloque genérico "if self.modo == Runtime", justo
+                        // después de sacar la tecla de presionados) — cubre el
+                        // mismo caso que se buscaba resolver acá (Cache se entera
+                        // de que la tecla se soltó, evita el bug de
+                        // auto-repetición). Llamarlo de nuevo acá era redundante
+                        // (de ahí los dos "No se encontró lista" seguidos en los
+                        // logs) y, más grave, dejaba `grupos` vuelto a tomar justo
+                        // antes de enviar_condicion() → cache::recibir_condicion(),
+                        // que en su camino de match (vía reiniciar_desde_presionados
+                        // → obtener_presionados()) necesita volver a tomar este
+                        // mismo Mutex: como std::sync::Mutex no es reentrante, el
+                        // hilo se autobloqueaba ahí, el match se ejecutaba pero
+                        // entrada::pasar() nunca se alcanzaba a llamar, y el
+                        // RETENIDO quedaba abierto hasta la red de seguridad (5s).
+                        drop(grupos);
                         Self::enviar_condicion(modo, CondicionTrigger::Simple);
                         return Some(());
                     }
