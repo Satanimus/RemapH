@@ -131,11 +131,23 @@
 // - Si formaba parte de la entrada de un Mantenido activo
 //   esperando finalizar → se perdió el match. Se manda
 //   Finalizar a Runtime, se ordena limpiar() al analizador,
-//   y se reinicia la lista con obtener_presionados().
-// - Si no, y esa tecla está en alguna lista en reposo (no
-//   esperando_condicion) → se saca de esa lista (y si queda
-//   vacía, se descarta). Evita listas fantasma con teclas ya
-//   sueltas (ver recibir_up).
+//   y se reinicia la lista (fantasma) con obtener_presionados().
+// - Si no, y esa tecla está en una lista FANTASMA (sembrada por
+//   reiniciar_desde_presionados(), sin nadie esperando en
+//   entrada.rs) → se descarta la lista ENTERA, no solo la
+//   tecla. Un resto recortado no representa ninguna decisión
+//   real (ver Lista::fantasma).
+// - Si no, y esa tecla está en una lista EN CONSTRUCCIÓN (no
+//   fantasma, no esperando_condicion; entrada.rs tiene un
+//   RETENIDO abierto sobre ella) → se resuelve SIEMPRE algo:
+//     - Si la entrada de antes de soltar esta tecla ya matcheaba
+//       exacto una candidata Simple → se resuelve retroactivamente
+//       como ese match (Iniciar+Finalizar), aunque el Extra pida
+//       up real (ese Up ya pasó).
+//     - Si no, se aborta todo (Pasar) y lo que siga físicamente
+//       presionado se resiembra como lista fantasma nueva.
+// - Las listas esperando_condicion nunca se tocan acá — se
+//   resuelven solas por recibir_condicion().
 // ------------------------------------------------------
 // 8. Funciones del archivo
 //
@@ -197,6 +209,29 @@ struct Lista {
     entrada: Vec<InputId>,
 
     esperando_condicion: bool,
+
+    // true = "fantasma": sembrada por reiniciar_desde_presionados()
+    // después de que un match (o un Pasar) YA se resolvió, puramente
+    // especulativa (soporta encadenar modificadores, ej. Ctrl+C ->
+    // Ctrl+V). entrada.rs NO tiene ningún RETENIDO abierto por esta
+    // lista — ya recibió su pasar()/consumir() antes de que esta
+    // lista naciera.
+    //
+    // false = "en construcción": nació (o fue extendida) por un Down
+    // real llegando ahora mismo vía recibir_down(), y entrada.rs SÍ
+    // tiene un RETENIDO abierto esperando que esta lista se resuelva
+    // (ver recibir_down(), siempre termina en entrada::retener() para
+    // este caso).
+    //
+    // Una fantasma pasa a false en cuanto un Down real la extiende
+    // (recibir_down encuentra que puede continuarla) — a partir de
+    // ahí entrada.rs vuelve a tener un RETENIDO sobre ella. Ver
+    // recibir_up() para por qué esta distinción es necesaria (bugs 1
+    // y 3): a una lista en construcción hay que avisarle SIEMPRE algo
+    // a entrada.rs cuando se suelta una de sus teclas (o resuelve, o
+    // pasa); a una fantasma no hay que avisarle nada (nadie espera),
+    // pero tampoco hay que dejarle un resto recortado dando vueltas.
+    fantasma: bool,
 }
 
 struct InstanciaActiva {
@@ -384,6 +419,12 @@ pub fn recibir_down(input: InputId) {
         Some(id) => {
             if let Some(lista) = listas.iter_mut().find(|l| l.id == id) {
                 lista.entrada.push(input.clone());
+                // Un Down real la extiende: si era fantasma, deja de
+                // serlo — a partir de acá entrada.rs vuelve a tener
+                // (o abre) un RETENIDO sobre esta lista (ver
+                // recibir_down más abajo, siempre termina en
+                // entrada::retener() para este camino).
+                lista.fantasma = false;
             }
             id
         }
@@ -393,6 +434,7 @@ pub fn recibir_down(input: InputId) {
                 id,
                 entrada: vec![input.clone()],
                 esperando_condicion: false,
+                fantasma: false,
             });
             id
         }
@@ -507,20 +549,51 @@ pub fn recibir_condicion(condicion: CondicionTrigger) {
 }
 
 /// Llega con CADA Up real (el analizador ya no filtra por ventana de
-/// Mantenido, ver analizador_trigger.rs). Dos casos:
+/// Mantenido, ver analizador_trigger.rs). Tres casos:
 ///
 /// 1. Hay una instancia Mantenido activa esperando justo este Up ->
 ///    se perdió el match: finalizar esa instancia (como antes).
-/// 2. Si no, es un Up "normal": sacar esta tecla de cualquier lista de
-///    comparación en reposo (esperando_condicion == false) que la
-///    tenga. Las listas esperando_condicion NO se tocan acá — todavía
-///    necesitan ver esa tecla en su entrada para que recibir_condicion()
-///    las compare bien; se resuelven solas por su propio camino.
-///    Sin este paso 2, una lista recién sembrada por
-///    reiniciar_desde_presionados() con una tecla que en ese instante
-///    todavía estaba físicamente abajo (el propio gatillo que acababa
-///    de hacer match) quedaba con esa tecla fantasma para siempre,
-///    bloqueando el próximo match real de esa misma tecla.
+///
+/// 2. Si no, y la tecla está en una lista FANTASMA (ver
+///    Lista::fantasma) -> se descarta la lista ENTERA, no solo la
+///    tecla. Una fantasma no tiene a nadie esperando en entrada.rs
+///    (ya recibió su pasar()/consumir()), así que no hace falta
+///    avisarle nada — pero el resto que quedaría recortando tecla por
+///    tecla tampoco representa ninguna decisión real, es solo un
+///    accidente de qué tecla se soltó primero, y dejarlo dando vueltas
+///    es lo que causaba el huérfano del bug 3 (ej. [Ctrl] solo,
+///    dispuesto a "completarse" con una Q físicamente ajena). El caso
+///    de uso real (Ctrl+C -> Ctrl+V) sigue cubierto: en cuanto la
+///    instancia activa se finalice de verdad, se vuelve a sembrar una
+///    fantasma nueva y precisa (ver reiniciar_desde_presionados()).
+///
+/// 3. Si no, y la tecla está en una lista EN CONSTRUCCIÓN (no
+///    fantasma, no esperando_condicion) -> entrada.rs tiene un
+///    RETENIDO abierto esperando que esto se resuelva, así que hay
+///    que avisarle SIEMPRE algo (bug 1: antes no se avisaba nada y
+///    quedaba colgado hasta la red de seguridad). Se resuelve así
+///    (ver conversación con el usuario sobre Tipo A):
+///      a) Si la entrada tal cual estaba ANTES de sacar esta tecla
+///         (o sea, incluyéndola) matchea EXACTO una única candidata
+///         Simple -> ya no hay forma de que la tecla vuelva a
+///         "bajar" sola para completar un prefijo más largo, así que
+///         se resuelve ahí mismo como si esa hubiese sido la entrada
+///         final desde el principio (ej. bug 1: 3>A con [3]+1>B,
+///         soltás "3" sin tocar "1" -> genera A).
+///      b) Si no, no hubo match posible: se aborta TODO lo retenido
+///         (Opción "Abortar", no "Reintentar con lo que queda" — más
+///         simple y predecible, y evita reabrir la puerta a otro
+///         huérfano tipo bug 3). entrada::pasar() reinyecta el buffer
+///         retenido tal cual a Windows. Lo que siga físicamente
+///         presionado (ej. el "1" de un [1,2] sin match, soltando
+///         "2") no se pierde: se resiembra como lista fantasma nueva
+///         vía reiniciar_desde_presionados(), para que un trigger
+///         futuro que lo use (ej. 1+5) lo siga reconociendo.
+///
+/// Las listas esperando_condicion NO se tocan acá en ningún caso —
+/// todavía necesitan ver esa tecla en su entrada para que
+/// recibir_condicion() las compare bien; se resuelven solas por su
+/// propio camino.
 pub fn recibir_up(input: InputId) {
     let mut activas = ACTIVAS.lock().unwrap();
     if let Some(pos) = activas.iter().position(|a| a.entrada.contains(&input)) {
@@ -535,19 +608,62 @@ pub fn recibir_up(input: InputId) {
     drop(activas);
 
     let mut listas = LISTAS.lock().unwrap();
-    let mut vaciadas = Vec::new();
 
-    for lista in listas.iter_mut() {
-        if lista.esperando_condicion || !lista.entrada.contains(&input) {
-            continue;
-        }
-        lista.entrada.retain(|i| i != &input);
-        if lista.entrada.is_empty() {
-            vaciadas.push(lista.id);
-        }
+    let Some(idx) = listas
+        .iter()
+        .position(|l| !l.esperando_condicion && l.entrada.contains(&input))
+    else {
+        return;
+    };
+
+    if listas[idx].fantasma {
+        // Caso 2: fantasma — se descarta entera, nadie la espera.
+        listas.remove(idx);
+        return;
     }
 
-    listas.retain(|l| !vaciadas.contains(&l.id));
+    // Caso 3: en construcción — entrada.rs SIEMPRE recibe algo abajo.
+    let id = listas[idx].id;
+    let entrada_antes = listas[idx].entrada.clone();
+
+    let (posibles, exactas, candidatas) = contar(&entrada_antes);
+    let match_simple = (posibles == exactas && exactas == 1)
+        .then(|| {
+            candidatas
+                .into_iter()
+                .find(|c| c.trigger.condicion == CondicionTrigger::Simple)
+        })
+        .flatten();
+
+    if let Some(remapeo) = match_simple {
+        // 3a) La entrada, tal cual estaba con la tecla recién soltada
+        // adentro, ya era un match Simple exacto — se resuelve ahora,
+        // retroactivamente (la tecla soltada ya no puede completar
+        // ningún prefijo más largo).
+        //
+        // Siempre Iniciar+Finalizar juntos acá, aunque el Extra de la
+        // fila requiera_up_real() (Turbo/Mantener/Click Sostenido): el
+        // Up real que ese Extra necesita para saber cuándo soltar YA
+        // pasó (es justo el que estamos procesando) — dejarlo
+        // "diferido" esperando un Up que no va a volver a llegar sin
+        // que la tecla se presione de nuevo lo dejaría colgado.
+        drop(listas);
+        iniciar_y_finalizar(remapeo);
+        limpiar_lista(id);
+        reiniciar_desde_presionados();
+        entrada::consumir();
+        return;
+    }
+
+    // 3b) No hubo match posible: se aborta todo lo retenido.
+    listas.remove(idx);
+    drop(listas);
+    limpiar_lista(id);
+    analizador_trigger::limpiar();
+    entrada::pasar();
+    // Lo que siga físicamente presionado no se pierde — se resiembra
+    // como fantasma nueva (mismo camino que tras un match real).
+    reiniciar_desde_presionados();
 }
 
 fn iniciar_y_finalizar(remapeo: RemapeoCache) {
@@ -590,6 +706,8 @@ fn limpiar_lista(id: u64) {
 }
 
 /// Hereda lo que sigue físicamente presionado (soporta Ctrl+C -> Ctrl+V).
+/// Siembra una lista FANTASMA (ver Lista::fantasma) — puramente
+/// especulativa, nadie en entrada.rs está esperando su resolución.
 fn reiniciar_desde_presionados() {
     let presionados = analizador_trigger::obtener_presionados();
     if !presionados.is_empty() {
@@ -598,6 +716,7 @@ fn reiniciar_desde_presionados() {
             id,
             entrada: presionados,
             esperando_condicion: false,
+            fantasma: true,
         });
     }
 }

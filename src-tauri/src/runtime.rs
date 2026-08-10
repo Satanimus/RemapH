@@ -188,8 +188,20 @@
 //     llegue la orden de detener. Usado por Mantener/Click
 //     Sostenido para no soltar la acción hasta que Cache
 //     avise que el físico se soltó.
-// detener(id) / debe_detenerse(id) / limpiar_instancia(id)
-//     Manejo de la bandera compartida en INSTANCIAS.
+// detener(id) / detener_ejecucion(id) / debe_detenerse(id) /
+// limpiar_instancia(id) / nueva_id_ejecucion(id)
+//     Manejo de la bandera compartida en INSTANCIAS. La
+//     clave real ahí adentro es siempre un id ÚNICO POR
+//     EJECUCIÓN ("idFila#generación", ver
+//     nueva_id_ejecucion()/GENERACIONES) — nunca el id de
+//     fila solo, para que dos ejecuciones superpuestas de la
+//     misma fila (ej. dos toques rápidos de una tecla Normal)
+//     nunca compartan bandera. detener(id) recibe el id de
+//     FILA (es lo único que Cache conoce) y lo traduce a la
+//     ejecución real más vieja todavía pendiente para esa
+//     fila; detener_ejecucion(id) recibe directo el id de
+//     ejecución (lo usa el comando "DETENER" de una receta,
+//     que se refiere a sí mismo).
 // resolver_input(interno) / ejecutar_down() /
 // ejecutar_up() / ejecutar_pulse() / emitir() / esperar()
 //     Los pasos físicos individuales del Idioma Runtime.
@@ -257,6 +269,8 @@ use crate::runt_extra;
 
 use std::collections::HashMap;
 
+use std::collections::VecDeque;
+
 use std::fs::File;
 
 use std::io::{BufRead, BufReader};
@@ -274,10 +288,71 @@ use std::time::Duration;
 // ------------------------------------------------------
 // Un id -> true si le llegó orden de detener. Cada hilo
 // de ejecución consulta esto antes de cada REPETIR.
+//
+// OJO: la clave de este mapa NUNCA es el id de fila
+// (RemapeoCache.id) solo — es un id ÚNICO POR EJECUCIÓN
+// (ver nueva_id_ejecucion()/GENERACIONES más abajo). Antes
+// se usaba directo el id de fila, fijo, siempre el mismo
+// para "3>A" sin importar cuántas veces se dispare: si una
+// segunda pulsación de la misma fila arrancaba su hilo
+// (INSTANCIAS.insert(id, false)) mientras el hilo de la
+// pulsación anterior todavía estaba dormido esperando su
+// checkpoint (INICIO_BUCLE/REPETIR) sin haber leído todavía
+// el `true` que su propio Detener ya había puesto, ese
+// insert nuevo pisaba la bandera vieja — el hilo viejo
+// despertaba, encontraba `false` (puesto por el hilo nuevo)
+// y entraba igual al bucle de repetición. Con id único por
+// ejecución, dos hilos de la misma fila nunca comparten
+// entrada en este mapa.
 // ======================================================
 
 static INSTANCIAS: std::sync::LazyLock<Mutex<HashMap<String, bool>>> =
     std::sync::LazyLock::new(|| Mutex::new(HashMap::new()));
+
+// ======================================================
+// 🧬 GENERACIONES — id de fila -> ids de ejecución en curso
+// ------------------------------------------------------
+// Cache solo conoce el id de fila (fijo) — nunca vio, ni
+// puede ver, el id único de ejecución que vive acá adentro.
+// Cuando manda OrdenRuntime::Detener{id} (id de fila), hay
+// que traducirlo a QUÉ ejecución real corresponde detener.
+//
+// Como el físico no puede tener la misma tecla presionada
+// dos veces a la vez, Cache siempre empareja sus Iniciar/
+// Detener de una misma fila en el mismo orden en que
+// ocurrieron (ACTIVAS los busca con position(), que respeta
+// orden de inserción) — así que alcanza con una cola FIFO
+// por fila: cada nueva ejecución se encola al final: cada
+// Detener saca la más vieja todavía sin resolver.
+// ======================================================
+
+static GENERACIONES: std::sync::LazyLock<Mutex<HashMap<String, VecDeque<u64>>>> =
+    std::sync::LazyLock::new(|| Mutex::new(HashMap::new()));
+
+static SIGUIENTE_GENERACION: std::sync::LazyLock<Mutex<u64>> =
+    std::sync::LazyLock::new(|| Mutex::new(0));
+
+/// Da de alta una ejecución nueva para `id_fila` y devuelve el id
+/// combinado ("idFila#generación") que hay que usar como clave real
+/// en INSTANCIAS durante toda esa ejecución (ejecutar_lineas y todo lo
+/// que cuelga de ahí). Encola la generación en GENERACIONES para que
+/// detener(id_fila) sepa, más adelante, a cuál apuntar.
+fn nueva_id_ejecucion(id_fila: &str) -> String {
+    let generacion = {
+        let mut siguiente = SIGUIENTE_GENERACION.lock().unwrap();
+        *siguiente += 1;
+        *siguiente
+    };
+
+    GENERACIONES
+        .lock()
+        .unwrap()
+        .entry(id_fila.to_string())
+        .or_default()
+        .push_back(generacion);
+
+    format!("{id_fila}#{generacion}")
+}
 
 // ======================================================
 // 📤 COLA DE SALIDA (Emitir, sin Extra)
@@ -723,12 +798,18 @@ fn esperar_detener(id: &str) {
 // ======================================================
 
 fn ejecutar_extra_en_hilo(id: String, extra: ExtraCache, accion: AccionCache) {
+    // Generado ACÁ, síncrono, antes de spawnear — así, si Cache manda
+    // Iniciar+Detener juntos (extras que no requiere_up_real), la
+    // generación ya está encolada en GENERACIONES cuando el Detener
+    // llega, sin importar cuándo el hilo nuevo alcance a arrancar.
+    let id_ejecucion = nueva_id_ejecucion(&id);
+
     thread::spawn(move || {
         let lineas = runt_extra::obtener(&extra);
 
         let lineas = sustituir_accion(lineas, &accion);
 
-        ejecutar_lineas(id, lineas);
+        ejecutar_lineas(id_ejecucion, lineas);
     });
 }
 
@@ -923,8 +1004,39 @@ fn lineas_arriba(mods: &[&str], gatillo: &str) -> Vec<String> {
 // ⏹️ DETENER
 // ======================================================
 
+// ------------------------------------------------------
+// `id` acá SIEMPRE es el id de fila (fijo) — el único que
+// Cache conoce (ver OrdenRuntime::Detener). Se traduce a la
+// ejecución real vía GENERACIONES (ver comentario ahí
+// arriba): saca la generación más vieja todavía en cola para
+// esta fila y marca esa ejecución puntual como detenida. Si
+// no hay ninguna en cola (fila sin Extra/Macro corriendo,
+// ej. MenuExpress/Portapapeles, o llegó un Detener de más),
+// no hace nada — igual que antes.
+// ------------------------------------------------------
 fn detener(id: String) {
-    if let Some(detenido) = INSTANCIAS.lock().unwrap().get_mut(&id) {
+    let generacion = GENERACIONES
+        .lock()
+        .unwrap()
+        .get_mut(&id)
+        .and_then(|cola| cola.pop_front());
+
+    let Some(generacion) = generacion else {
+        return;
+    };
+
+    detener_ejecucion(&format!("{id}#{generacion}"));
+}
+
+/// Marca como detenida una ejecución puntual, ya identificada por su
+/// id combinado ("idFila#generación"). A diferencia de detener(id) de
+/// arriba (que recibe el id de FILA y necesita traducirlo vía
+/// GENERACIONES), esto lo usa quien YA tiene el id de ejecución en la
+/// mano — hoy, el propio comando "DETENER" dentro de una receta (ver
+/// ejecutar_linea) corre dentro de su propia ejecución y se refiere a
+/// sí mismo, no a la fila en general.
+fn detener_ejecucion(id_ejecucion: &str) {
+    if let Some(detenido) = INSTANCIAS.lock().unwrap().get_mut(id_ejecucion) {
         *detenido = true;
     }
 }
@@ -946,6 +1058,10 @@ fn debe_detenerse(id: &str) -> bool {
 // ======================================================
 
 fn ejecutar_macro_en_hilo(id: String, ruta: String) {
+    // Mismo motivo que en ejecutar_extra_en_hilo: id único por
+    // ejecución, generado antes de spawnear.
+    let id_ejecucion = nueva_id_ejecucion(&id);
+
     thread::spawn(move || {
         let archivo = match File::open(&ruta) {
             Ok(valor) => valor,
@@ -954,7 +1070,7 @@ fn ejecutar_macro_en_hilo(id: String, ruta: String) {
                 // FALTA CREAR:
                 // sistema global de notificaciones y registro.
 
-                limpiar_instancia(id);
+                limpiar_instancia(id_ejecucion);
 
                 return;
             }
@@ -969,7 +1085,7 @@ fn ejecutar_macro_en_hilo(id: String, ruta: String) {
             .filter(|linea| !linea.is_empty())
             .collect();
 
-        ejecutar_lineas(id, lineas);
+        ejecutar_lineas(id_ejecucion, lineas);
     });
 }
 
@@ -1095,7 +1211,11 @@ fn ejecutar_linea(id: &str, linea: &str) {
         // ⏹️ DETENER
         // ==============================================
         "DETENER" => {
-            detener(id.to_string());
+            // `id` acá ya es el id de ejecución (no el de fila) — se
+            // marca directo, sin pasar por la traducción de
+            // GENERACIONES (esa es solo para cuando el llamador
+            // conoce el id de fila, ej. Cache).
+            detener_ejecucion(id);
         }
 
         // ==============================================
