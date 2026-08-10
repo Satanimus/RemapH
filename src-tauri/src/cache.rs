@@ -1,23 +1,28 @@
 // ======================================================
-// 🗃️ Cache — ETAPAS 1 y 2 / 6 (ver DISENO_CACHE_V2.md)
+// 🗃️ Cache — ETAPAS 1, 2 y 3 / 6 (ver DISENO_CACHE_V2.md)
 // ======================================================
-// Este archivo acumula lo entregado hasta ahora. Reemplaza
-// por completo al "cache_etapa1.rs" anterior (mismo contenido
-// de la Etapa 1, sin cambios, más la Etapa 2 agregada abajo).
+// Este archivo acumula lo entregado hasta ahora: Etapa 1 (datos
+// compilados) y Etapa 2 (motor de sesiones Runtime) sin cambios de
+// lógica respecto a la entrega anterior — Sesion gana un campo
+// (`pendiente`) que Runtime no usa, ver nota en su definición — más
+// la Etapa 3 (motor de Captura) agregada al final.
 //
 // ⚠️ Sigue sin compilar el proyecto completo — analizador_trigger.rs
 // todavía existe y sigue pidiendo funciones viejas de cache.rs que
 // ya no están (recibir_down, recibir_up, recibir_condicion,
 // hay_candidata_para). Eso se resuelve recién en la Etapa 5. Hasta
 // entonces este archivo se revisa por lectura, no se pisa el
-// cache.rs real del proyecto.
+// cache.rs real del proyecto. Es normal que compile con warnings de
+// "dead code" — recibir_down_rt/recibir_up_rt (Etapa 2) y
+// recibir_down_captura/recibir_up_captura (Etapa 3) todavía no las
+// llama nadie: eso lo cablea la Etapa 4.
 // ======================================================
 
 use crate::eventos::InputId;
 use crate::perfil_cache::{
     AccionCache, AppCache, CondicionTrigger, CoordenadaCache, ExtraCache, RemapeoCache,
 };
-use crate::{config, entrada, runtime};
+use crate::{config, entrada, perfil_ui, runtime};
 use std::sync::Mutex;
 
 // ======================================================
@@ -202,10 +207,16 @@ struct Sesion {
     fase: FaseSesion,
     /// Invalida timers viejos que ya no aplican.
     generacion: u64,
-    /// true = sembrada especulativamente tras resolver algo (ver
-    /// resembrar_fantasma). Nadie en entrada.rs tiene un RETENIDO
-    /// esperándola.
+    /// Solo Runtime. true = sembrada especulativamente tras resolver
+    /// algo (ver resembrar_fantasma). Nadie en entrada.rs tiene un
+    /// RETENIDO esperándola. Las sesiones de Captura NUNCA son
+    /// fantasma (siempre queda en false).
     fantasma: bool,
+    /// Solo Captura (ver Etapa 3, más abajo). Una condición ya
+    /// resuelta pero que no se manda todavía porque sigue quedando
+    /// algo físicamente presionado. Runtime nunca la toca — sus
+    /// resoluciones siempre se mandan en el acto.
+    pendiente: Option<CondicionTrigger>,
 }
 
 impl Sesion {
@@ -216,6 +227,7 @@ impl Sesion {
             fase: FaseSesion::Construyendo,
             generacion: 0,
             fantasma,
+            pendiente: None,
         }
     }
 
@@ -712,5 +724,335 @@ fn iniciar_timer_generico(
         };
 
         resolver_condicion_por_id(&mut runtime, idx, condicion);
+    });
+}
+
+// ======================================================
+// ============ ETAPA 3 — MOTOR DE CAPTURA ==============
+// ======================================================
+// 1. ¿Qué hace esta parte?
+//
+// La sesión única de Captura: mientras el usuario define un gatillo
+// nuevo desde la UI, esto recibe cada Down/Up real (ya filtrado de
+// repeats — ver Etapa 4) y arma, con el mismo mecanismo de fases y
+// timers de la Etapa 2 (Mantenido → Doble/Triple/Simple), la
+// condición final. A diferencia de Runtime, acá no hay candidatas
+// compiladas que consultar: todo Down es válido, y necesita_doble /
+// necesita_triple llegan SIEMPRE en true (no se sabe todavía qué
+// condición va a terminar siendo — eso es justo lo que se está
+// grabando). Por eso, en la transición Mantenido→(Doble|Triple) que
+// decide el Up-handler, necesita_triple manda siempre (mismo orden
+// de prioridad que Runtime) y la fase EsperandoDoble nunca se
+// alcanza en la práctica — se deja el camino igual, por si algún día
+// deja de estar hardcodeado.
+// ------------------------------------------------------
+// 2. ¿Quién llama esta parte?
+// La Etapa 4 (filtro de repeats + ruteo, se agrega después a este
+//     mismo archivo) — único punto de entrada real:
+//     recibir_down_captura() / recibir_up_captura(). Hasta que esa
+//     etapa no esté, nadie llama estas funciones todavía (mismo
+//     estado que recibir_down_rt/recibir_up_rt en la Etapa 2).
+// perfil_ui.rs — recibe recibir_down() con cada Down nuevo (ya
+//     filtrado, uno por tecla) y recibir_condicion() con el
+//     resultado final. Ambas firmas SIN cambios respecto a hoy —
+//     perfil_ui ya arma el TriggerCapturaUI completo con su propia
+//     secuencia acumulada (via recibir_down), no hace falta
+//     mandarle nada más.
+// ------------------------------------------------------
+// 3. Decisiones de diseño que se apartaron del documento original
+// (marcarlas para que quede asentado, ver regla "no improvisar"):
+//
+// a) `EstadoCaptura` NO guarda fila_id/columna. El documento los
+//    incluía en el modelo de datos, pero la propia nota de la Etapa
+//    4 (sección "Cambio de firma a marcar") ya adelantaba que
+//    convenía dejarlos únicamente en perfil_ui.rs (que ya los
+//    guarda en su propio CapturaEnCurso) y que `cache::activar_
+//    captura()` quedara sin argumentos — evita datos duplicados sin
+//    ningún uso real del lado de Cache. Por eso `activar_captura_
+//    interna()` tampoco los recibe.
+//
+// b) `Sesion` gana un campo nuevo (`pendiente`, ver arriba en la
+//    Etapa 2) que la entrega anterior no incluía — el documento ya
+//    lo preveía en el modelo de datos unificado ("Solo Captura"),
+//    simplemente no hacía falta hasta esta etapa.
+//
+// c) `EstadoCaptura` agrega `presionadas: Vec<InputId>`, aparte de
+//    `Sesion.entrada`. Esto NO es la misma duplicación que motivó la
+//    reescritura (dos estructuras representando LO MISMO): acá son
+//    dos cosas genuinamente distintas.
+//    - `entrada` es la secuencia acumulada del gesto, creciente,
+//      nunca se achica — la usa `objetivo()` para saber sobre qué
+//      tecla sigue corriendo el timer de Doble/Triple, incluso
+//      después de que esa tecla se soltó (igual que en Runtime,
+//      donde `entrada` tampoco se achica cuando el Up interrumpe
+//      Mantenido).
+//    - `presionadas` es el estado físico real (qué sigue abajo
+//      AHORA), se achica en cada Up — la usa `resolver_condicion_
+//      captura` para decidir si ya puede mandar el resultado o si
+//      tiene que posponerlo (`pendiente`), y `flush_si_vacio` para
+//      saber cuándo, al fin, mandarlo.
+//    Si `entrada` hiciera las dos cosas a la vez (como insinuaba el
+//    documento con "Saca input de entrada" en el Up-handler), se
+//    perdería el objetivo del timer apenas se soltara la tecla que
+//    se está disambiguando — exactamente el tipo de bug de estado
+//    cruzado que esta reescritura busca evitar.
+// ======================================================
+
+struct EstadoCaptura {
+    activa: bool,
+    /// Solo existe (Some) mientras `activa`. Reusa el mismo struct
+    /// Sesion y la misma máquina de fases/timers de Runtime, aunque
+    /// Captura solo tenga una a la vez y nunca sea fantasma.
+    sesion: Option<Sesion>,
+    /// Lo que sigue físicamente presionado del gesto en curso — ver
+    /// nota de diseño (c) más arriba.
+    presionadas: Vec<InputId>,
+}
+
+static CAPTURA: Mutex<EstadoCaptura> = Mutex::new(EstadoCaptura {
+    activa: false,
+    sesion: None,
+    presionadas: Vec::new(),
+});
+
+/// Abre una captura nueva: limpia cualquier resto de una captura
+/// anterior y arranca en blanco. Sin argumentos — ver nota de diseño
+/// (a) más arriba (fila_id/columna se quedan en perfil_ui.rs).
+fn activar_captura_interna() {
+    let mut captura = CAPTURA.lock().unwrap();
+    captura.activa = true;
+    captura.sesion = None;
+    captura.presionadas.clear();
+}
+
+/// Cierra la captura por completo: ya no hay `desactivar_captura()`
+/// como llamada externa aparte (decisión ya confirmada, ver cabecera
+/// del documento) — esto queda inline, se llama solo desde donde se
+/// termina de resolver y mandar el resultado final.
+fn desactivar_captura_interna(captura: &mut EstadoCaptura) {
+    captura.activa = false;
+    captura.sesion = None;
+    captura.presionadas.clear();
+}
+
+fn vigente_captura(captura: &EstadoCaptura, generacion: u64) -> bool {
+    captura
+        .sesion
+        .as_ref()
+        .map(|s| s.generacion == generacion)
+        .unwrap_or(false)
+}
+
+// ------------------------------------------------------
+// 🔽 DOWN
+// ------------------------------------------------------
+
+/// Punto de entrada para cada Down REAL de una captura en curso (ya
+/// filtrado de repeats — ver Etapa 4).
+pub(crate) fn recibir_down_captura(input: InputId) {
+    let mut captura = CAPTURA.lock().unwrap();
+    if !captura.activa {
+        return; // defensivo — en uso normal Etapa 4 no llega hasta acá si no hay captura activa
+    }
+
+    // --- Down interrumpe timer: ¿la sesión de Captura está
+    // esperando Doble/Triple sobre esta MISMA tecla? (mismo
+    // mecanismo que recibir_down_rt en Runtime — acá solo hay una
+    // sesión, así que no hace falta buscarla). ---
+    let interrupcion = captura.sesion.as_ref().and_then(|s| {
+        if s.objetivo() != Some(&input) {
+            return None;
+        }
+        match s.fase {
+            FaseSesion::EsperandoDoble => Some(FaseSesion::EsperandoDoble),
+            FaseSesion::EsperandoTriple { toques } => Some(FaseSesion::EsperandoTriple { toques }),
+            _ => None,
+        }
+    });
+
+    if let Some(fase_previa) = interrupcion {
+        // Segundo/tercer toque físico de la misma tecla: cuenta,
+        // pero NO se reenvía de nuevo a perfil_ui (ya la recibió con
+        // el primer Down — ver header, punto 1).
+        captura.presionadas.push(input);
+
+        let resultado = match fase_previa {
+            FaseSesion::EsperandoDoble => {
+                resolver_condicion_captura(&mut captura, CondicionTrigger::Doble)
+            }
+            FaseSesion::EsperandoTriple { toques: 1 } => {
+                if let Some(s) = captura.sesion.as_mut() {
+                    s.fase = FaseSesion::EsperandoTriple { toques: 2 };
+                }
+                None
+            }
+            FaseSesion::EsperandoTriple { .. } => {
+                resolver_condicion_captura(&mut captura, CondicionTrigger::Triple)
+            }
+            _ => unreachable!(),
+        };
+
+        drop(captura);
+        if let Some(condicion) = resultado {
+            perfil_ui::recibir_condicion(condicion);
+        }
+        return;
+    }
+
+    // --- Down realmente nuevo: se agrega a la sesión (creándola si
+    // hace falta), se reenvía a perfil_ui, y se reinicia el timer de
+    // Mantenido sobre ESTA tecla — la anterior, si había una a
+    // mitad de camino, queda invalidada por generación y pasa a ser
+    // modificador implícito (ver header, decisión ya confirmada). ---
+    captura.presionadas.push(input.clone());
+    let sesion = captura
+        .sesion
+        .get_or_insert_with(|| Sesion::nueva(0, Vec::new(), false));
+    sesion.entrada.push(input.clone());
+    sesion.generacion += 1;
+    sesion.fase = FaseSesion::EsperandoMantenido {
+        necesita_doble: true,
+        necesita_triple: true,
+    };
+    let generacion = sesion.generacion;
+    drop(captura);
+
+    perfil_ui::recibir_down(input);
+    iniciar_timer_mantenido_captura(generacion);
+}
+
+// ------------------------------------------------------
+// 🔼 UP
+// ------------------------------------------------------
+
+/// Punto de entrada para cada Up REAL de una captura en curso.
+pub(crate) fn recibir_up_captura(input: InputId) {
+    let mut captura = CAPTURA.lock().unwrap();
+    if !captura.activa {
+        return;
+    }
+
+    captura.presionadas.retain(|i| i != &input);
+
+    // ¿Esta tecla es el objetivo de un timer en EsperandoMantenido?
+    // Si es así, este Up lo interrumpe — decide a qué fase pasar.
+    let interrumpe_mantenido = captura.sesion.as_ref().is_some_and(|s| {
+        s.objetivo() == Some(&input) && matches!(s.fase, FaseSesion::EsperandoMantenido { .. })
+    });
+
+    if interrumpe_mantenido {
+        // necesita_doble y necesita_triple llegaron siempre en true
+        // desde recibir_down_captura → necesita_triple manda siempre
+        // (mismo orden de prioridad que Runtime): acá SIEMPRE se pasa
+        // a EsperandoTriple, nunca a Doble ni a Simple inmediato (ver
+        // nota 1 de la cabecera de esta etapa).
+        let sesion = captura.sesion.as_mut().unwrap();
+        sesion.generacion += 1;
+        sesion.fase = FaseSesion::EsperandoTriple { toques: 1 };
+        let generacion = sesion.generacion;
+        drop(captura);
+        iniciar_timer_triple_captura(generacion);
+        return;
+    }
+
+    // No interrumpe ningún timer en curso: si esta tecla era la
+    // última que seguía físicamente presionada y hay una condición
+    // ya resuelta esperando (`pendiente`), este es el momento de
+    // mandarla. Si sigue habiendo algo presionado, o si no hay
+    // pendiente todavía (el timer en curso sigue su ciclo solo), no
+    // hay nada más que hacer por ahora.
+    if let Some(condicion) = flush_si_vacio(&mut captura) {
+        drop(captura);
+        perfil_ui::recibir_condicion(condicion);
+    }
+}
+
+// ------------------------------------------------------
+// ⏱️ RESOLUCIÓN DE CONDICIÓN Y POSPOSICIÓN
+// ------------------------------------------------------
+
+/// Resuelve `condicion` para la sesión de Captura en curso. Si
+/// todavía queda algo físicamente presionado, la guarda en
+/// `pendiente` (pisando cualquier pendiente anterior — la última
+/// resolución manda, igual que el diseño viejo) y NO cierra la
+/// captura. Si no queda nada presionado, cierra la captura ya mismo
+/// y devuelve la condición para que el llamador la mande (siempre
+/// con el lock de CAPTURA ya liberado — ver regla de oro
+/// anti-deadlock).
+fn resolver_condicion_captura(
+    captura: &mut EstadoCaptura,
+    condicion: CondicionTrigger,
+) -> Option<CondicionTrigger> {
+    if !captura.presionadas.is_empty() {
+        if let Some(sesion) = captura.sesion.as_mut() {
+            sesion.pendiente = Some(condicion);
+            sesion.fase = FaseSesion::Construyendo;
+        }
+        return None;
+    }
+
+    desactivar_captura_interna(captura);
+    Some(condicion)
+}
+
+/// Si ya no queda nada físicamente presionado y hay una condición
+/// pendiente guardada, la retira y cierra la captura. Devuelve la
+/// condición a mandar (con el lock todavía tomado — el llamador debe
+/// soltarlo antes de reenviarla a perfil_ui).
+fn flush_si_vacio(captura: &mut EstadoCaptura) -> Option<CondicionTrigger> {
+    if !captura.presionadas.is_empty() {
+        return None;
+    }
+
+    let pendiente = captura.sesion.as_mut().and_then(|s| s.pendiente.take());
+    if pendiente.is_some() {
+        desactivar_captura_interna(captura);
+    }
+    pendiente
+}
+
+// ------------------------------------------------------
+// ⏱️ TIMERS (un hilo por timer, igual que en Runtime)
+// ------------------------------------------------------
+// Solo hacen falta Mantenido y Triple: la fase Doble nunca se
+// alcanza en Captura (ver nota 1 de la cabecera de esta etapa), así
+// que no tiene sentido un timer propio para ella todavía.
+
+fn iniciar_timer_mantenido_captura(generacion: u64) {
+    std::thread::spawn(move || {
+        std::thread::sleep(std::time::Duration::from_millis(config::tiempo_mantenido()));
+        let mut captura = CAPTURA.lock().unwrap();
+        if !vigente_captura(&captura, generacion) {
+            return; // se interrumpió por Up/Down antes de expirar
+        }
+        let resultado = resolver_condicion_captura(&mut captura, CondicionTrigger::Mantenido);
+        drop(captura);
+        if let Some(condicion) = resultado {
+            perfil_ui::recibir_condicion(condicion);
+        }
+    });
+}
+
+fn iniciar_timer_triple_captura(generacion: u64) {
+    std::thread::spawn(move || {
+        std::thread::sleep(std::time::Duration::from_millis(config::tiempo_triple()));
+        let mut captura = CAPTURA.lock().unwrap();
+        if !vigente_captura(&captura, generacion) {
+            return; // llegó el tercer Down -> ya se resolvió en recibir_down_captura
+        }
+        let toques = match captura.sesion.as_ref().map(|s| s.fase) {
+            Some(FaseSesion::EsperandoTriple { toques }) => toques,
+            _ => 1,
+        };
+        let condicion = if toques >= 2 {
+            CondicionTrigger::Doble
+        } else {
+            CondicionTrigger::Simple
+        };
+        let resultado = resolver_condicion_captura(&mut captura, condicion);
+        drop(captura);
+        if let Some(condicion) = resultado {
+            perfil_ui::recibir_condicion(condicion);
+        }
     });
 }
