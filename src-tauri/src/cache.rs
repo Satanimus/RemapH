@@ -1,257 +1,29 @@
 // ======================================================
-// 🗃️ Cache
+// 🗃️ Cache — ETAPAS 1 y 2 / 6 (ver DISENO_CACHE_V2.md)
 // ======================================================
-// 1. ¿Qué hace este archivo?
+// Este archivo acumula lo entregado hasta ahora. Reemplaza
+// por completo al "cache_etapa1.rs" anterior (mismo contenido
+// de la Etapa 1, sin cambios, más la Etapa 2 agregada abajo).
 //
-// Mantiene en memoria los remapeos compilados y el estado
-// de aplicaciones. Su trabajo central es recibir Downs
-// desde AnalizadorTrigger (modo Runtime), decidir si eso
-// coincide con algún remapeo, y avisarle a entrada.rs qué
-// hacer con el input físico (dejarlo pasar, retenerlo, o
-// darlo por consumido).
-//
-// Mantiene DOS memorias separadas y de vida distinta:
-//
-// a) Lista de comparación — se arma con los Down que le
-//    llegan del analizador. Se vacía POR COMPLETO cada vez
-//    que Cache resuelve algo (Pasar, Consumir, o al
-//    confirmar un match vía condición). Cada lista tiene un
-//    ID propio (contador incremental, no su posición en el
-//    Vec) — importante: si se identificara por posición y
-//    otra lista (de otro grupo físico) se eliminara del medio
-//    mientras esta seguía esperando su timer, la posición de
-//    ESTA cambiaría por debajo suyo sin que nadie se entere,
-//    y el timer terminaría resolviendo (o no encontrando) la
-//    lista equivocada — dejando el RETENIDO de entrada.rs
-//    abierto para siempre (ver su red de seguridad). Con ID
-//    fijo, ninguna remoción ajena puede afectar a esta lista.
-//
-// b) Ninguna memoria propia de "qué sigue presionado" —
-//    en vez de eso, la CONSULTA puntualmente al analizador
-//    (obtener_presionados()) justo cuando necesita
-//    reiniciar su lista de comparación tras resolver. Así
-//    hereda lo que sigue físicamente abajo (soporta
-//    Ctrl+C → Ctrl+V: al resolver Ctrl+C, la nueva lista
-//    arranca ya sabiendo que Ctrl sigue presionado).
-//
-// Debe soportar más de una lista de comparación en
-// simultáneo, una por cada "grupo" físico independiente
-// que el analizador le esté reportando a la vez (ver
-// analizador_trigger.rs).
-//
-// Cache NO conoce Runtime más allá de mandarle órdenes. No
-// conoce Captura ni perfil_ui.
-// ------------------------------------------------------
-// 2. ¿Quién llama este archivo?
-// entrada.rs — le entrega cada Down (a través del
-//     analizador) y actúa según la ResolucionEntrada que
-//     Cache le devuelve.
-// AnalizadorTrigger — le entrega el resultado del timer
-//     (CondicionTrigger) cuando lo pidió.
-// Compilador — le entrega los remapeos al compilar.
-// back_app — le avisa cambios de foco de ventana.
-// ------------------------------------------------------
-// 3. ¿Qué información recibe?
-// recibir_down(input: InputId) — un Down nuevo (no
-//     repeat) del analizador.
-// recibir_condicion(condicion: CondicionTrigger) —
-//     resultado del timer que Cache había pedido.
-// recibir_up(input: InputId) — llega con CADA Up real (el
-//     analizador ya no filtra por ventana de Mantenido). Si
-//     hay una instancia Mantenido esperando ese Up, se usa
-//     para detectar "se perdió el match"; si no, para
-//     mantener sincronizadas las listas de comparación en
-//     reposo (sacar una tecla que ya se soltó, ver la
-//     función).
-// escribir_cache() / escribir_fila() / borrar_* — desde
-//     Compilador.
-// actualizar_estado_app() — desde back_app.
-// ------------------------------------------------------
-// 4. ¿Qué información entrega?
-// ResolucionEntrada, a entrada.rs, con cada Down:
-//   Pasar — no hay ningún match posible con esto. Se
-//     vacía la lista de comparación y se le ordena
-//     limpiar() al analizador.
-//   Retener — todavía puede llegar a ser un match (sigue
-//     habiendo posibles, o se está esperando la
-//     condición). No se avisa nada a Runtime todavía.
-//   Consumir — ya hubo match confirmado y se le avisó a
-//     Runtime (Iniciar, y si corresponde, Finalizar).
-//
-// A Runtime: OrdenRuntime::Iniciar{id, accion, extra} y
-//     OrdenRuntime::Detener{id}.
-// ------------------------------------------------------
-// 5. Reglas de resolución, por cada Down nuevo
-//
-// 1. Se agrega a la lista de comparación de su grupo.
-// 2. Se calculan posibles/exactas contra las filas
-//    habilitadas (filtradas por app activa).
-// 3. posibles == 0
-//        → Pasar. Vaciar lista. limpiar() al analizador.
-// 4. posibles == exactas == 1, y la fila candidata es
-//    Simple
-//        → Resuelve sin pedir condición (no hace falta
-//          desambiguar). Igual que en recibir_condicion: si
-//          el Extra de la fila requiere_up_real() (Turbo,
-//          Mantener, Click Sostenido) → Iniciar sin
-//          Finalizar, queda esperando recibir_up(); si no →
-//          Iniciar + Finalizar juntos. Vaciar lista y
-//          reiniciarla con obtener_presionados().
-// 5. posibles == exactas (≥1), y la(s) candidata(s) no
-//    son trivialmente Simple (una sola candidata que no es
-//    Simple, o varias con distinta condición)
-//        → Retener. Pedirle iniciar_timer() al analizador
-//          sobre la tecla candidata a gatillo, si no se
-//          le pidió ya para esta misma situación.
-// 6. posibles > exactas (sigue habiendo prefijos posibles
-//    sin match exacto todavía)
-//        → Retener. Seguir esperando más Downs.
-// ------------------------------------------------------
-// 6. Al recibir la condición del timer (recibir_condicion)
-//
-// - Si la condición recibida coincide con una fila
-//   candidata exacta:
-//     - Si el Extra de esa fila requiere Up real
-//       (ExtraCache::requiere_up_real — Turbo, Mantener,
-//       Click Sostenido) → Iniciar (sin Finalizar) a
-//       Runtime. Queda "esperando finalizar" para ese id —
-//       a partir de acá empieza a recibir recibir_up() del
-//       analizador. Esto NO depende de qué Condición lo
-//       disparó (Simple/Doble/Mantenido): un Mantenido sin
-//       Extra de este tipo igual se Finaliza de una — lo que
-//       importa es si el Extra necesita que alguien le avise
-//       cuándo soltar, no cómo se armó el trigger.
-//     - Si no, Iniciar + Finalizar juntos a Runtime. Vaciar
-//       lista, reiniciar con obtener_presionados().
-// - Si no coincide con ninguna candidata → Pasar. Vaciar
-//   lista. limpiar() al analizador.
-// ------------------------------------------------------
-// 7. Cada Up real que llega (recibir_up)
-//
-// - Si formaba parte de la entrada de un Mantenido activo
-//   esperando finalizar → se perdió el match. Se manda
-//   Finalizar a Runtime, se ordena limpiar() al analizador,
-//   y se reinicia la lista (fantasma) con obtener_presionados().
-// - Si no, y esa tecla está en una lista FANTASMA (sembrada por
-//   reiniciar_desde_presionados(), sin nadie esperando en
-//   entrada.rs) → se descarta la lista ENTERA, no solo la
-//   tecla. Un resto recortado no representa ninguna decisión
-//   real (ver Lista::fantasma).
-// - Si no, y esa tecla está en una lista EN CONSTRUCCIÓN (no
-//   fantasma, no esperando_condicion; entrada.rs tiene un
-//   RETENIDO abierto sobre ella) → se resuelve SIEMPRE algo:
-//     - Si la entrada de antes de soltar esta tecla ya matcheaba
-//       exacto una candidata Simple → se resuelve retroactivamente
-//       como ese match (Iniciar+Finalizar), aunque el Extra pida
-//       up real (ese Up ya pasó).
-//     - Si no, se aborta todo (Pasar) y lo que siga físicamente
-//       presionado se resiembra como lista fantasma nueva.
-// - Las listas esperando_condicion nunca se tocan acá — se
-//   resuelven solas por recibir_condicion().
-// ------------------------------------------------------
-// 8. Funciones del archivo
-//
-// recibir_down(input: InputId) -> ResolucionEntrada
-//     Punto de entrada principal, ver reglas 1 a 6.
-// recibir_condicion(condicion: CondicionTrigger)
-//     -> ResolucionEntrada
-//     Ver regla 6.
-// recibir_up(input: InputId)
-//     Ver regla 7. No devuelve ResolucionEntrada — actúa
-//     directo sobre Runtime si corresponde.
-// escribir_cache() / escribir_fila() / borrar_cache() /
-// borrar_fila()
-//     Igual que antes, sin cambios de diseño.
-// obtener_remapeo(id) -> Option<RemapeoCache>
-//     Busca una fila ya compilada por id (clon, de solo
-//     lectura). Etapa 7 de MenuExpress: back_menu_express.rs
-//     la usa para resolver qué Acción/Extra ejecutar cuando
-//     se hace clic en un botón de un menú.
-// esta_vacia()
-//     true si no quedó ningún remapeo compilado (perfil
-//     vacío o todo OFF). La consulta perfil.rs para
-//     informar cache_activo a la UI.
-// hay_candidata_para()
-//     true si un InputId podría continuar ahora mismo algún
-//     trigger posible (de solo lectura, no toca LISTAS). La
-//     consulta AnalizadorTrigger para la rueda del mouse:
-//     solo agrupa sus pulsos en ráfagas cuando hace falta
-//     resolver Simple/Mantenido para un candidato real.
-// actualizar_estado_app() / app_habilitada()
-//     Igual que antes, sin cambios de diseño.
-// ------------------------------------------------------
-// Transformación:
-//
-// Down (AnalizadorTrigger)
-//     ↓
-// Lista de comparación del grupo
-//     ↓
-// posibles / exactas contra filas habilitadas
-//     ↓
-// Pasar | Retener (+ timer si hace falta) | Consumir
-//     ↓
-// Runtime (Iniciar / Finalizar)
+// ⚠️ Sigue sin compilar el proyecto completo — analizador_trigger.rs
+// todavía existe y sigue pidiendo funciones viejas de cache.rs que
+// ya no están (recibir_down, recibir_up, recibir_condicion,
+// hay_candidata_para). Eso se resuelve recién en la Etapa 5. Hasta
+// entonces este archivo se revisa por lectura, no se pisa el
+// cache.rs real del proyecto.
 // ======================================================
 
 use crate::eventos::InputId;
 use crate::perfil_cache::{
     AccionCache, AppCache, CondicionTrigger, CoordenadaCache, ExtraCache, RemapeoCache,
 };
-use crate::{analizador_trigger, entrada, runtime};
+use crate::{config, entrada, runtime};
 use std::sync::Mutex;
 
-#[derive(Clone)]
-struct Lista {
-    // Identidad estable de esta lista — nunca cambia con el tiempo,
-    // a diferencia de su posición en LISTAS (ver header, punto 1a).
-    id: u64,
-
-    entrada: Vec<InputId>,
-
-    esperando_condicion: bool,
-
-    // true = "fantasma": sembrada por reiniciar_desde_presionados()
-    // después de que un match (o un Pasar) YA se resolvió, puramente
-    // especulativa (soporta encadenar modificadores, ej. Ctrl+C ->
-    // Ctrl+V). entrada.rs NO tiene ningún RETENIDO abierto por esta
-    // lista — ya recibió su pasar()/consumir() antes de que esta
-    // lista naciera.
-    //
-    // false = "en construcción": nació (o fue extendida) por un Down
-    // real llegando ahora mismo vía recibir_down(), y entrada.rs SÍ
-    // tiene un RETENIDO abierto esperando que esta lista se resuelva
-    // (ver recibir_down(), siempre termina en entrada::retener() para
-    // este caso).
-    //
-    // Una fantasma pasa a false en cuanto un Down real la extiende
-    // (recibir_down encuentra que puede continuarla) — a partir de
-    // ahí entrada.rs vuelve a tener un RETENIDO sobre ella. Ver
-    // recibir_up() para por qué esta distinción es necesaria (bugs 1
-    // y 3): a una lista en construcción hay que avisarle SIEMPRE algo
-    // a entrada.rs cuando se suelta una de sus teclas (o resuelve, o
-    // pasa); a una fantasma no hay que avisarle nada (nadie espera),
-    // pero tampoco hay que dejarle un resto recortado dando vueltas.
-    fantasma: bool,
-}
-
-struct InstanciaActiva {
-    id: String,
-    entrada: Vec<InputId>,
-}
-
-/// Orden que Cache le manda a Runtime para iniciar o detener la
-/// ejecución de una acción.
-pub enum OrdenRuntime {
-    Iniciar {
-        id: String,
-        accion: AccionCache,
-        extra: Option<ExtraCache>,
-        coordenada: Option<CoordenadaCache>,
-    },
-    Detener {
-        id: String,
-    },
-}
+// ======================================================
+// ============ ETAPA 1 — DATOS COMPILADOS ==============
+// ======================================================
+// (sin cambios respecto a la entrega anterior)
 
 #[derive(Clone, PartialEq)]
 pub struct AppEstadoCache {
@@ -259,109 +31,43 @@ pub struct AppEstadoCache {
     pub activa: bool,
 }
 
-static CACHE: Mutex<Vec<RemapeoCache>> = Mutex::new(Vec::new());
-static APPS: Mutex<Vec<AppEstadoCache>> = Mutex::new(Vec::new());
-static LISTAS: Mutex<Vec<Lista>> = Mutex::new(Vec::new());
-static SIGUIENTE_ID_LISTA: Mutex<u64> = Mutex::new(0);
-static ACTIVAS: Mutex<Vec<InstanciaActiva>> = Mutex::new(Vec::new());
-static PREGUNTA_PENDIENTE: Mutex<Option<u64>> = Mutex::new(None);
-
-/// Da de alta un ID nuevo, único y estable, para una lista. Nunca se
-/// reutiliza ni se reordena — es lo que reemplaza a la posición en el
-/// Vec como identidad (ver header, punto 1a).
-fn nuevo_id_lista() -> u64 {
-    let mut id = SIGUIENTE_ID_LISTA.lock().unwrap();
-    *id += 1;
-    *id
+struct EstadoCompilado {
+    remapeos: Vec<RemapeoCache>,
+    apps: Vec<AppEstadoCache>,
 }
+
+static COMPILADO: Mutex<EstadoCompilado> = Mutex::new(EstadoCompilado {
+    remapeos: Vec::new(),
+    apps: Vec::new(),
+});
 
 pub fn escribir_cache(remapeos: Vec<RemapeoCache>) {
-    *CACHE.lock().unwrap() = remapeos;
-}
-
-pub fn escribir_fila(remapeo: RemapeoCache) {
-    CACHE.lock().unwrap().push(remapeo);
+    COMPILADO.lock().unwrap().remapeos = remapeos;
 }
 
 pub fn borrar_cache() {
-    CACHE.lock().unwrap().clear();
+    COMPILADO.lock().unwrap().remapeos.clear();
 }
 
-/// true si el perfil compilado no dejó ningún remapeo activo (perfil
-/// vacío, o todas sus filas en estado != "ON"). Lo consulta perfil.rs
-/// justo después de compilar, para informarle a la UI si el perfil
-/// actual tiene algo funcionando o no (cache_activo).
 pub fn esta_vacia() -> bool {
-    CACHE.lock().unwrap().is_empty()
+    COMPILADO.lock().unwrap().remapeos.is_empty()
 }
 
-pub fn borrar_fila(id: &str) {
-    CACHE.lock().unwrap().retain(|r| r.id != id);
-}
-
-/// Busca una fila ya compilada por su id — usado por
-/// back_menu_express.rs (etapa 7) para resolver qué Acción/Extra
-/// ejecutar cuando se hace clic en un botón DE ADENTRO de un menú
-/// (el fila_id guardado en cada MenuBotonCache, ver perfil_cache.rs).
-/// Clone porque OrdenRuntime::Iniciar necesita quedarse con su propia
-/// copia de accion/extra/coordenada — el lock no puede quedar tomado
-/// mientras Runtime hace su trabajo.
 pub fn obtener_remapeo(id: &str) -> Option<RemapeoCache> {
-    CACHE.lock().unwrap().iter().find(|r| r.id == id).cloned()
+    COMPILADO
+        .lock()
+        .unwrap()
+        .remapeos
+        .iter()
+        .find(|r| r.id == id)
+        .cloned()
 }
 
-/// true si `input` podría continuar AHORA MISMO algún trigger posible
-/// — considerando las listas en curso (modificadores ya presionados en
-/// una secuencia sin resolver todavía) igual que recibir_down(), pero
-/// de solo lectura: no crea ni modifica ninguna lista, no llama a
-/// entrada.rs. Lo usa AnalizadorTrigger para la rueda del mouse (ver
-/// analizador_trigger.rs, procesar() rama Pulse): solo agrupa la rueda
-/// en ráfagas (para poder resolver Simple/Mantenido) cuando existe un
-/// candidato real cuyo PRÓXIMO input sea esta rueda — no simplemente
-/// porque la rueda aparezca en algún remapeo sin relación con lo que
-/// está pasando ahora.
-pub fn hay_candidata_para(input: &InputId) -> bool {
-    let listas = LISTAS.lock().unwrap();
-
-    for lista in listas.iter() {
-        let mut probable = lista.entrada.clone();
-        probable.push(input.clone());
-        let (posibles, _, _) = contar(&probable);
-        if posibles > 0 {
-            return true;
-        }
-    }
-
-    drop(listas);
-
-    let (posibles, _, _) = contar(std::slice::from_ref(input));
-    posibles > 0
-}
-
-pub fn actualizar_estado_app(app: AppCache, activa: bool) {
-    let mut apps = APPS.lock().unwrap();
-    if let Some(e) = apps.iter_mut().find(|e| e.app == app) {
-        e.activa = activa;
-    } else {
-        apps.push(AppEstadoCache { app, activa });
-    }
-}
-
-fn app_habilitada(app: &AppCache, apps: &[AppEstadoCache]) -> bool {
-    apps.iter()
-        .find(|e| &e.app == app)
-        .map(|e| e.activa)
-        .unwrap_or(true)
-}
-
-/// Apps distintas (sin contar Global) que aparecen en algún remapeo
-/// cargado — es lo que back_app::revisar_apps() necesita para saber
-/// qué vigilar.
 pub fn apps_a_vigilar() -> Vec<AppCache> {
-    let cache = CACHE.lock().unwrap();
+    let compilado = COMPILADO.lock().unwrap();
     let mut vistas = Vec::new();
 
-    for fila in cache.iter() {
+    for fila in compilado.remapeos.iter() {
         if fila.trigger.app == AppCache::Global {
             continue;
         }
@@ -373,17 +79,31 @@ pub fn apps_a_vigilar() -> Vec<AppCache> {
     vistas
 }
 
-/// Cuenta posibles/exactas de `entrada` contra la cache. exactas ignora
-/// la condición de la fila (eso se filtra aparte, según necesite).
-fn contar(entrada: &[InputId]) -> (usize, usize, Vec<RemapeoCache>) {
-    let cache = CACHE.lock().unwrap();
-    let apps = APPS.lock().unwrap();
+pub fn actualizar_estado_app(app: AppCache, activa: bool) {
+    let mut compilado = COMPILADO.lock().unwrap();
+    if let Some(e) = compilado.apps.iter_mut().find(|e| e.app == app) {
+        e.activa = activa;
+    } else {
+        compilado.apps.push(AppEstadoCache { app, activa });
+    }
+}
 
+fn app_habilitada(app: &AppCache, apps: &[AppEstadoCache]) -> bool {
+    apps.iter()
+        .find(|e| &e.app == app)
+        .map(|e| e.activa)
+        .unwrap_or(true)
+}
+
+/// Cuenta posibles/exactas de `entrada` contra los remapeos
+/// compilados, filtrando por app habilitada. Recibe el guard de
+/// COMPILADO ya abierto — nunca vuelve a pedir el lock.
+fn contar(compilado: &EstadoCompilado, entrada: &[InputId]) -> (usize, usize, Vec<RemapeoCache>) {
     let mut posibles = 0;
     let mut candidatas = Vec::new();
 
-    for fila in cache.iter() {
-        if !app_habilitada(&fila.trigger.app, &apps) {
+    for fila in compilado.remapeos.iter() {
+        if !app_habilitada(&fila.trigger.app, &compilado.apps) {
             continue;
         }
         if fila.trigger.entrada.starts_with(entrada) {
@@ -397,61 +117,242 @@ fn contar(entrada: &[InputId]) -> (usize, usize, Vec<RemapeoCache>) {
     (posibles, candidatas.len(), candidatas)
 }
 
-/// Nunca devuelve nada — avisa directo a entrada.rs (pasar / retener /
-/// consumir), igual que recibir_condicion(). Ningún componente pregunta,
-/// quien tiene la respuesta avisa.
-pub fn recibir_down(input: InputId) {
-    let mut listas = LISTAS.lock().unwrap();
+/// Snapshot clonado de COMPILADO — lo usa recibir_down_rt/recibir_up_rt
+/// para poder llamar contar() varias veces sin mantener el lock de
+/// COMPILADO tomado mientras trabajan con RUNTIME (regla de oro:
+/// nunca dos Mutex tomados a la vez).
+fn compilado_actual() -> EstadoCompilado {
+    let g = COMPILADO.lock().unwrap();
+    EstadoCompilado {
+        remapeos: g.remapeos.clone(),
+        apps: g.apps.clone(),
+    }
+}
 
-    // ¿Alguna lista existente acepta esto como continuación válida?
-    let mut id_encontrado = None;
-    for lista in listas.iter() {
-        let mut probable = lista.entrada.clone();
-        probable.push(input.clone());
-        let (posibles, _, _) = contar(&probable);
-        if posibles > 0 {
-            id_encontrado = Some(lista.id);
-            break;
+// ======================================================
+// ======= ETAPA 2 — MOTOR DE SESIONES RUNTIME ==========
+// ======================================================
+// 1. ¿Qué hace esta parte?
+//
+// Matching de cada Down/Up real contra los remapeos
+// compilados (Etapa 1), con timers de 3 fases + rueda, e
+// instancias activas esperando su Up real (Turbo/Mantener/
+// Click Sostenido/Normal).
+//
+// Reemplaza a Lista (cache.rs viejo) + Grupo (analizador_trigger.rs
+// viejo) por un único concepto: Sesion. Su `entrada` es la ÚNICA
+// fuente de "qué hay en este grupo" — ya no hay una copia acá y
+// otra en un archivo aparte (esa duplicación era la sospechosa
+// número uno del bug que motivó esta reescritura).
+// ------------------------------------------------------
+// 2. ¿Quién llama esta parte?
+// La Etapa 4 (filtro de repeats + ruteo, se agrega después a
+//     este mismo archivo) — único punto de entrada real:
+//     recibir_down_rt() / recibir_up_rt(). Hasta que esa etapa
+//     no esté, estas dos funciones no las llama nadie más.
+// runtime.rs — recibe OrdenRuntime::Iniciar / Detener.
+// entrada.rs — recibe retener() / pasar() / consumir(), SIN
+//     cambios de contrato respecto a hoy.
+// ------------------------------------------------------
+// 3. Decisión de diseño que se apartó del documento original
+// (marcarlo para que quede asentado, ver regla "no improvisar"):
+//
+// El documento DISENO_CACHE_V2.md describía reiniciar_desde_
+// presionados() como una consulta global (heredada del viejo
+// obtener_presionados() del analizador). Al implementar, esa
+// consulta global ya no hace falta: como Sesion.entrada es la
+// ÚNICA fuente de verdad (ya no hay un tracker físico aparte),
+// "lo que sigue presionado" después de resolver un match SIEMPRE
+// es un subconjunto de la ENTRADA de la sesión que se acaba de
+// resolver — nunca de otra sesión (las demás sesiones siguen su
+// vida aparte, sin tocarse). Por eso reembrar_fantasma() recibe
+// directo la lista de lo que quedó sin soltar, calculada en el
+// mismo lugar donde se resuelve el match, en vez de recorrer
+// todo el estado de nuevo. Mismo resultado, menos código y sin
+// la dependencia cruzada que causaba el bug original.
+// ======================================================
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum FaseSesion {
+    /// Acumulando Downs, sin timer corriendo.
+    Construyendo,
+    /// Timer con tiempo_mantenido corriendo sobre el último Down
+    /// agregado (el "objetivo" es siempre entrada.last()).
+    EsperandoMantenido {
+        necesita_doble: bool,
+        necesita_triple: bool,
+    },
+    /// Timer con tiempo_doble corriendo, desde el Up del primer toque.
+    EsperandoDoble,
+    /// Timer con tiempo_triple corriendo. `toques` arranca en 1
+    /// (representa el primer toque, ya ocurrido).
+    EsperandoTriple { toques: u8 },
+    /// Exclusivo de la rueda del mouse — se completa en la Etapa 4
+    /// (ahí es donde llegan los InputState::Pulse). Queda declarado
+    /// acá porque es parte del mismo enum de fases y del mismo
+    /// mecanismo de timers.
+    CerrandoRueda { pulsos: u64 },
+}
+
+struct Sesion {
+    /// Identidad estable — nunca cambia, no depende de la posición
+    /// en el Vec.
+    id: u64,
+    entrada: Vec<InputId>,
+    fase: FaseSesion,
+    /// Invalida timers viejos que ya no aplican.
+    generacion: u64,
+    /// true = sembrada especulativamente tras resolver algo (ver
+    /// resembrar_fantasma). Nadie en entrada.rs tiene un RETENIDO
+    /// esperándola.
+    fantasma: bool,
+}
+
+impl Sesion {
+    fn nueva(id: u64, entrada: Vec<InputId>, fantasma: bool) -> Self {
+        Self {
+            id,
+            entrada,
+            fase: FaseSesion::Construyendo,
+            generacion: 0,
+            fantasma,
         }
     }
 
-    let id = match id_encontrado {
-        Some(id) => {
-            if let Some(lista) = listas.iter_mut().find(|l| l.id == id) {
-                lista.entrada.push(input.clone());
-                // Un Down real la extiende: si era fantasma, deja de
-                // serlo — a partir de acá entrada.rs vuelve a tener
-                // (o abre) un RETENIDO sobre esta lista (ver
-                // recibir_down más abajo, siempre termina en
-                // entrada::retener() para este camino).
-                lista.fantasma = false;
+    /// El "objetivo" de un timer siempre es el último elemento
+    /// agregado a la entrada — la tecla que se está disambiguando.
+    fn objetivo(&self) -> Option<&InputId> {
+        self.entrada.last()
+    }
+}
+
+struct InstanciaActiva {
+    id: String,
+    entrada: Vec<InputId>,
+}
+
+/// Orden que Cache le manda a Runtime para iniciar o detener la
+/// ejecución de una acción. Sin cambios respecto al diseño viejo —
+/// runtime.rs no se toca.
+pub enum OrdenRuntime {
+    Iniciar {
+        id: String,
+        accion: AccionCache,
+        extra: Option<ExtraCache>,
+        coordenada: Option<CoordenadaCache>,
+    },
+    Detener {
+        id: String,
+    },
+}
+
+struct EstadoRuntime {
+    sesiones: Vec<Sesion>,
+    siguiente_id: u64,
+    activas: Vec<InstanciaActiva>,
+}
+
+static RUNTIME: Mutex<EstadoRuntime> = Mutex::new(EstadoRuntime {
+    sesiones: Vec::new(),
+    siguiente_id: 0,
+    activas: Vec::new(),
+});
+
+fn nuevo_id_sesion(runtime: &mut EstadoRuntime) -> u64 {
+    runtime.siguiente_id += 1;
+    runtime.siguiente_id
+}
+
+// ------------------------------------------------------
+// 🔽 DOWN
+// ------------------------------------------------------
+
+/// Punto de entrada para cada Down REAL (ya filtrado de repeats —
+/// ver Etapa 4). Nunca devuelve nada: avisa directo a entrada.rs
+/// (pasar/retener/consumir), igual que el diseño viejo.
+pub(crate) fn recibir_down_rt(input: InputId) {
+    let mut runtime = RUNTIME.lock().unwrap();
+
+    // --- Down interrumpe timer: ¿es un segundo/tercer toque de la
+    // MISMA tecla que ya está en fase Doble o Triple? (ver
+    // DISENO_CACHE_V2.md, "Down interrumpe timer"). No se confunde
+    // con un repeat (Etapa 4 ya lo dejó pasar como Down real: hubo
+    // un Up de por medio entre toques). ---
+    if let Some(idx) = runtime.sesiones.iter().position(|s| {
+        matches!(
+            s.fase,
+            FaseSesion::EsperandoDoble | FaseSesion::EsperandoTriple { .. }
+        ) && s.objetivo() == Some(&input)
+    }) {
+        match runtime.sesiones[idx].fase {
+            FaseSesion::EsperandoTriple { toques: 1 } => {
+                // Segundo Down físico: solo cuenta, sigue esperando
+                // (el timer esperar_triple sigue corriendo, va a leer
+                // `toques` al despertar — NO se toca la generación).
+                runtime.sesiones[idx].fase = FaseSesion::EsperandoTriple { toques: 2 };
+                return;
             }
-            id
+            FaseSesion::EsperandoDoble => {
+                resolver_condicion_por_id(&mut runtime, idx, CondicionTrigger::Doble);
+                return;
+            }
+            FaseSesion::EsperandoTriple { toques: 2 } => {
+                resolver_condicion_por_id(&mut runtime, idx, CondicionTrigger::Triple);
+                return;
+            }
+            _ => unreachable!(),
         }
-        None => {
-            let id = nuevo_id_lista();
-            listas.push(Lista {
-                id,
-                entrada: vec![input.clone()],
-                esperando_condicion: false,
-                fantasma: false,
-            });
-            id
+    }
+
+    // --- ¿Alguna sesión existente acepta esto como continuación
+    // válida? (extiende una en construcción, o "despierta" una
+    // fantasma — deja de serlo). ---
+    let compilado = compilado_actual();
+
+    let id = {
+        let existente = runtime.sesiones.iter().position(|s| {
+            let mut probable = s.entrada.clone();
+            probable.push(input.clone());
+            contar(&compilado, &probable).0 > 0
+        });
+
+        match existente {
+            Some(idx) => {
+                let s = &mut runtime.sesiones[idx];
+                s.entrada.push(input.clone());
+                s.fantasma = false;
+                // Si estaba a mitad de un timer de otra tecla del
+                // mismo grupo (caso raro: tercera tecla ajena
+                // mientras se disambigua una Doble/Triple previa),
+                // ese timer queda invalidado por generación y la
+                // sesión vuelve a Construyendo — se recalcula todo
+                // de cero más abajo.
+                s.fase = FaseSesion::Construyendo;
+                s.generacion += 1;
+                s.id
+            }
+            None => {
+                let id = nuevo_id_sesion(&mut runtime);
+                runtime
+                    .sesiones
+                    .push(Sesion::nueva(id, vec![input.clone()], false));
+                id
+            }
         }
     };
 
-    let entrada_actual = listas
+    let entrada_actual = runtime
+        .sesiones
         .iter()
-        .find(|l| l.id == id)
-        .map(|l| l.entrada.clone())
+        .find(|s| s.id == id)
+        .map(|s| s.entrada.clone())
         .unwrap_or_default();
-    drop(listas);
 
-    let (posibles, exactas, candidatas) = contar(&entrada_actual);
+    let (posibles, exactas, candidatas) = contar(&compilado, &entrada_actual);
 
     if posibles == 0 {
-        limpiar_lista(id);
-        analizador_trigger::limpiar();
+        eliminar_sesion(&mut runtime, id);
+        drop(runtime);
         entrada::pasar();
         return;
     }
@@ -461,315 +362,355 @@ pub fn recibir_down(input: InputId) {
         && candidatas[0].trigger.condicion == CondicionTrigger::Simple
     {
         let remapeo = candidatas[0].clone();
-        let diferido = remapeo
-            .extra
-            .as_ref()
-            .is_some_and(|extra| extra.requiere_up_real());
-
-        if diferido {
-            iniciar_solamente(remapeo, entrada_actual);
-        } else {
-            iniciar_y_finalizar(remapeo);
-        }
-        limpiar_lista(id);
-        reiniciar_desde_presionados();
-        entrada::consumir();
+        drop(runtime);
+        resolver_match(remapeo, entrada_actual, id, Vec::new());
         return;
     }
 
     if posibles == exactas && exactas >= 1 {
-        marcar_esperando_condicion(id);
-        let gatillo = entrada_actual.last().cloned().unwrap();
         let necesita_doble = candidatas
             .iter()
             .any(|c| c.trigger.condicion == CondicionTrigger::Doble);
         let necesita_triple = candidatas
             .iter()
             .any(|c| c.trigger.condicion == CondicionTrigger::Triple);
-        analizador_trigger::iniciar_timer(gatillo, necesita_doble, necesita_triple);
+        iniciar_espera_mantenido(&mut runtime, id, necesita_doble, necesita_triple);
+        drop(runtime);
         entrada::retener();
         return;
     }
 
-    // Si hay prefijos más largos (posibles > exactas) y al menos un trigger Simple
-    // que coincida con la entrada actual, iniciar timer para desambiguar.
-    if posibles > exactas {
-        let hay_simple = candidatas.iter().any(|c| c.trigger.condicion == CondicionTrigger::Simple);
-        if hay_simple {
-            println!("🔍 [recibir_down] Iniciando timer Simple para entrada {:?}, id={}", entrada_actual, id);
-            marcar_esperando_condicion(id);
-            let gatillo = entrada_actual.last().cloned().unwrap();
-            analizador_trigger::iniciar_timer(gatillo, false, false);
-            entrada::retener();
-            return;
-        }
+    // posibles > exactas: sigue habiendo prefijos más largos. Si hay
+    // un Simple candidato en el medio, igual conviene arrancar el
+    // timer de Mantenido (sin exigir doble/triple) para poder
+    // resolverlo si el Up llega antes de que se complete un prefijo
+    // más largo (ver DISENO_CACHE_V2.md, punto 6 de recibir_down_rt).
+    let hay_simple = candidatas
+        .iter()
+        .any(|c| c.trigger.condicion == CondicionTrigger::Simple);
+    if hay_simple {
+        iniciar_espera_mantenido(&mut runtime, id, false, false);
     }
-
+    drop(runtime);
     entrada::retener();
 }
 
-/// Llamada por el timer del analizador (hilo aparte). No hay nadie
-/// esperando un valor de retorno: avisa directo a quien corresponda.
+fn iniciar_espera_mantenido(
+    runtime: &mut EstadoRuntime,
+    id: u64,
+    necesita_doble: bool,
+    necesita_triple: bool,
+) {
+    let Some(s) = runtime.sesiones.iter_mut().find(|s| s.id == id) else {
+        return;
+    };
+    s.generacion += 1;
+    s.fase = FaseSesion::EsperandoMantenido {
+        necesita_doble,
+        necesita_triple,
+    };
+    let generacion = s.generacion;
 
-pub fn recibir_condicion(condicion: CondicionTrigger) {
-    let id = match *PREGUNTA_PENDIENTE.lock().unwrap() {
-        Some(id) => id,
-        None => {
-            println!("⏳ [recibir_condicion] No hay pregunta pendiente");
+    std::thread::spawn(move || {
+        std::thread::sleep(std::time::Duration::from_millis(config::tiempo_mantenido()));
+        let mut runtime = RUNTIME.lock().unwrap();
+        if !vigente(&runtime, id, generacion) {
             return;
         }
-    };
-    println!("⏳ [recibir_condicion] Procesando condición {:?} para id={}", condicion, id);
+        let idx = runtime.sesiones.iter().position(|s| s.id == id).unwrap();
+        resolver_condicion_por_id(&mut runtime, idx, CondicionTrigger::Mantenido);
+    });
+}
 
-    let entrada_actual = {
-        let listas = LISTAS.lock().unwrap();
-        match listas.iter().find(|l| l.id == id) {
-            Some(l) => l.entrada.clone(),
-            None => {
-                println!("⏳ [recibir_condicion] No se encontró lista para id={}", id);
-                return;
-            }
-        }
-    };
+fn vigente(runtime: &EstadoRuntime, id: u64, generacion: u64) -> bool {
+    runtime
+        .sesiones
+        .iter()
+        .find(|s| s.id == id)
+        .map(|s| s.generacion == generacion)
+        .unwrap_or(false)
+}
 
-    let (posibles, exactas, candidatas) = contar(&entrada_actual);
+fn eliminar_sesion(runtime: &mut EstadoRuntime, id: u64) {
+    runtime.sesiones.retain(|s| s.id != id);
+}
 
-    // Buscar un match que coincida exactamente con la entrada actual y la condición recibida
+// ------------------------------------------------------
+// ⏱️ RESOLUCIÓN DE CONDICIÓN (llamada por Down interrumpe timer,
+// por los timers al expirar, y por el Up-handler)
+// ------------------------------------------------------
+
+/// Resuelve la condición `condicion` para la sesión en `runtime.sesiones[idx]`.
+/// Si hay match exacto contra los remapeos compilados, ejecuta. Si no,
+/// aborta (Pasar). Consume el índice — después de llamar esto, `idx`
+/// puede ya no ser válido (la sesión pudo haberse eliminado).
+fn resolver_condicion_por_id(runtime: &mut EstadoRuntime, idx: usize, condicion: CondicionTrigger) {
+    let id = runtime.sesiones[idx].id;
+    let entrada_actual = runtime.sesiones[idx].entrada.clone();
+
+    let compilado = compilado_actual();
+    let (posibles, exactas, candidatas) = contar(&compilado, &entrada_actual);
+
     let match_final = candidatas
         .iter()
         .find(|c| c.trigger.condicion == condicion && c.trigger.entrada == entrada_actual)
         .cloned();
 
+    // Para Simple, se permite ejecutar aunque haya prefijos más
+    // largos sin completar (ver DISENO_CACHE_V2.md / comentario
+    // histórico "3>A" en cache.rs viejo).
     if let Some(remapeo) = match_final {
-        println!("✅ [recibir_condicion] Match encontrado! Ejecutando...");
-        // Para Simple, permitir ejecución aunque haya prefijos más largos.
-        // Esto resuelve el caso 3>A cuando se suelta 3 sin llegar a 1.
         if condicion == CondicionTrigger::Simple || posibles == exactas {
-            let diferido = remapeo
-                .extra
-                .as_ref()
-                .is_some_and(|extra| extra.requiere_up_real());
-
-                if diferido {
-                    iniciar_solamente(remapeo, entrada_actual);
-                } else {
-                    iniciar_y_finalizar(remapeo);
-                }
-                limpiar_lista(id);
-                reiniciar_desde_presionados();
-                entrada::consumir();   // <-- CAMBIO CLAVE: usar consumir() en lugar de pasar()
-                return;
+            eliminar_sesion(runtime, id);
+            drop(candidatas);
+            resolver_match(remapeo, entrada_actual, id, Vec::new());
+            return;
         }
     }
 
-    // Si no hubo match, limpiar y pasar
-    println!("❌ [recibir_condicion] No se encontró match o no se cumplió condición, limpiando");
-    limpiar_lista(id);
-    analizador_trigger::limpiar();
+    eliminar_sesion(runtime, id);
+    // (drop implícito de runtime al salir de la función — la llamada
+    // real toma el lock afuera; ver timers e Up-handler más abajo,
+    // todos sueltan el lock ANTES de esta parte final.)
     entrada::pasar();
 }
 
-/// Llega con CADA Up real (el analizador ya no filtra por ventana de
-/// Mantenido, ver analizador_trigger.rs). Tres casos:
+/// Ejecuta el match: decide Iniciar-solo vs Iniciar+Finalizar según
+/// `ExtraCache::requiere_up_real()`, avisa a Runtime, resiembra lo
+/// que haya quedado físicamente presionado como sesión fantasma, y
+/// cierra el RETENIDO de entrada.rs con consumir(). Se llama SIEMPRE
+/// con el lock de RUNTIME ya liberado (evita el deadlock del diseño
+/// viejo: runtime::ejecutar()/entrada::consumir() nunca deben
+/// llamarse con RUNTIME tomado).
 ///
-/// 1. Hay una instancia Mantenido activa esperando justo este Up ->
-///    se perdió el match: finalizar esa instancia (como antes).
-///
-/// 2. Si no, y la tecla está en una lista FANTASMA (ver
-///    Lista::fantasma) -> se descarta la lista ENTERA, no solo la
-///    tecla. Una fantasma no tiene a nadie esperando en entrada.rs
-///    (ya recibió su pasar()/consumir()), así que no hace falta
-///    avisarle nada — pero el resto que quedaría recortando tecla por
-///    tecla tampoco representa ninguna decisión real, es solo un
-///    accidente de qué tecla se soltó primero, y dejarlo dando vueltas
-///    es lo que causaba el huérfano del bug 3 (ej. [Ctrl] solo,
-///    dispuesto a "completarse" con una Q físicamente ajena). El caso
-///    de uso real (Ctrl+C -> Ctrl+V) sigue cubierto: en cuanto la
-///    instancia activa se finalice de verdad, se vuelve a sembrar una
-///    fantasma nueva y precisa (ver reiniciar_desde_presionados()).
-///
-/// 3. Si no, y la tecla está en una lista EN CONSTRUCCIÓN (no
-///    fantasma, no esperando_condicion) -> entrada.rs tiene un
-///    RETENIDO abierto esperando que esto se resuelva, así que hay
-///    que avisarle SIEMPRE algo (bug 1: antes no se avisaba nada y
-///    quedaba colgado hasta la red de seguridad). Se resuelve así
-///    (ver conversación con el usuario sobre Tipo A):
-///      a) Si la entrada tal cual estaba ANTES de sacar esta tecla
-///         (o sea, incluyéndola) matchea EXACTO una única candidata
-///         Simple -> ya no hay forma de que la tecla vuelva a
-///         "bajar" sola para completar un prefijo más largo, así que
-///         se resuelve ahí mismo como si esa hubiese sido la entrada
-///         final desde el principio (ej. bug 1: 3>A con [3]+1>B,
-///         soltás "3" sin tocar "1" -> genera A).
-///      b) Si no, no hubo match posible: se aborta TODO lo retenido
-///         (Opción "Abortar", no "Reintentar con lo que queda" — más
-///         simple y predecible, y evita reabrir la puerta a otro
-///         huérfano tipo bug 3). entrada::pasar() reinyecta el buffer
-///         retenido tal cual a Windows. Lo que siga físicamente
-///         presionado (ej. el "1" de un [1,2] sin match, soltando
-///         "2") no se pierde: se resiembra como lista fantasma nueva
-///         vía reiniciar_desde_presionados(), para que un trigger
-///         futuro que lo use (ej. 1+5) lo siga reconociendo.
-///
-/// Las listas esperando_condicion NO se tocan acá en ningún caso —
-/// todavía necesitan ver esa tecla en su entrada para que
-/// recibir_condicion() las compare bien; se resuelven solas por su
-/// propio camino.
+/// `restantes`: lo que sigue físicamente presionado de ESTA sesión
+/// después del match (ver nota de diseño más arriba, punto 3) — para
+/// un match resuelto por Down, es la entrada completa salvo que se
+/// indique lo contrario; para un match retroactivo por Up, es
+/// `entrada_antes` menos la tecla que se soltó.
+fn resolver_match(remapeo: RemapeoCache, entrada: Vec<InputId>, _id: u64, restantes: Vec<InputId>) {
+    let diferido = remapeo
+        .extra
+        .as_ref()
+        .is_some_and(|extra| extra.requiere_up_real());
 
-pub fn recibir_up(input: InputId) {
-    // Caso 1: instancia Mantenido activa esperando este Up
-    let mut activas = ACTIVAS.lock().unwrap();
-    if let Some(pos) = activas.iter().position(|a| a.entrada.contains(&input)) {
-        let instancia = activas.remove(pos);
-        drop(activas);
+    if diferido {
+        let mut runtime = RUNTIME.lock().unwrap();
+        runtime.activas.push(InstanciaActiva {
+            id: remapeo.id.clone(),
+            entrada,
+        });
+        drop(runtime);
+        runtime::ejecutar(OrdenRuntime::Iniciar {
+            id: remapeo.id,
+            accion: remapeo.accion,
+            extra: remapeo.extra,
+            coordenada: remapeo.coordenada,
+        });
+    } else {
+        runtime::ejecutar(OrdenRuntime::Iniciar {
+            id: remapeo.id.clone(),
+            accion: remapeo.accion,
+            extra: remapeo.extra,
+            coordenada: remapeo.coordenada,
+        });
+        runtime::ejecutar(OrdenRuntime::Detener { id: remapeo.id });
+    }
 
-        runtime::ejecutar(runtime::OrdenRuntime::Detener { id: instancia.id });
-        analizador_trigger::limpiar();
-        reiniciar_desde_presionados();
+    resembrar_fantasma(restantes);
+    entrada::consumir();
+}
+
+/// Reemplaza cualquier sesión fantasma existente por una nueva con
+/// `restantes` (o por ninguna, si `restantes` está vacío). Ver nota
+/// de diseño al principio de la Etapa 2: ya no consulta un tracker
+/// físico global, recibe directo lo que quedó sin soltar de la
+/// sesión que se acaba de resolver.
+fn resembrar_fantasma(restantes: Vec<InputId>) {
+    let mut runtime = RUNTIME.lock().unwrap();
+    runtime.sesiones.retain(|s| !s.fantasma);
+
+    if !restantes.is_empty() {
+        let id = nuevo_id_sesion(&mut runtime);
+        runtime.sesiones.push(Sesion::nueva(id, restantes, true));
+    }
+}
+
+// ------------------------------------------------------
+// 🔼 UP
+// ------------------------------------------------------
+
+/// Punto de entrada para cada Up REAL. Tres casos, en este orden
+/// (ver DISENO_CACHE_V2.md, recibir_up_rt):
+/// 1. Instancia activa (Mantenido/Turbo/etc.) esperando este Up ->
+///    se perdió el match, Finalizar.
+/// 2. Sesión con timer corriendo (fase != Construyendo):
+///    - Si `input` es el objetivo Y la fase es EsperandoMantenido ->
+///      este Up interrumpe Mantenido, decide a qué fase pasar.
+///    - Cualquier otro caso (Up de un modificador, o Up intermedio
+///      durante Doble/Triple) -> no-op, se ignora por completo.
+/// 3. Sesión en Construyendo:
+///    - Fantasma -> se descarta la sesión ENTERA.
+///    - No fantasma -> resolución retroactiva a Simple, o abortar
+///      todo lo retenido.
+pub(crate) fn recibir_up_rt(input: InputId) {
+    let mut runtime = RUNTIME.lock().unwrap();
+
+    if let Some(pos) = runtime
+        .activas
+        .iter()
+        .position(|a| a.entrada.contains(&input))
+    {
+        let instancia = runtime.activas.remove(pos);
+        drop(runtime);
+        runtime::ejecutar(OrdenRuntime::Detener { id: instancia.id });
+        resembrar_fantasma(Vec::new());
         return;
     }
-    drop(activas);
 
-    let mut listas = LISTAS.lock().unwrap();
-
-    let Some(idx) = listas
-    .iter()
-    .position(|l| !l.esperando_condicion && l.entrada.contains(&input))
+    let Some(idx) = runtime
+        .sesiones
+        .iter()
+        .position(|s| s.entrada.contains(&input))
     else {
-        println!("📤 [recibir_up] No se encontró lista para {:?} (quizás esperando condición)", input);
-        drop(listas);
-        let presionados = analizador_trigger::obtener_presionados();
-        if !presionados.contains(&input) {
-            reiniciar_desde_presionados();
+        return; // no pertenece a ninguna sesión (ya se sacó antes, o nunca estuvo)
+    };
+
+    if runtime.sesiones[idx].fase != FaseSesion::Construyendo {
+        let es_objetivo_mantenido = matches!(
+            runtime.sesiones[idx].fase,
+            FaseSesion::EsperandoMantenido { .. }
+        ) && runtime.sesiones[idx].objetivo() == Some(&input);
+
+        if !es_objetivo_mantenido {
+            return; // no-op: Up de modificador, o toque intermedio de Doble/Triple
+        }
+
+        let (necesita_doble, necesita_triple) = match runtime.sesiones[idx].fase {
+            FaseSesion::EsperandoMantenido {
+                necesita_doble,
+                necesita_triple,
+            } => (necesita_doble, necesita_triple),
+            _ => unreachable!(),
+        };
+
+        if necesita_triple {
+            runtime.sesiones[idx].generacion += 1;
+            runtime.sesiones[idx].fase = FaseSesion::EsperandoTriple { toques: 1 };
+            iniciar_timer_generico(
+                &mut runtime,
+                idx,
+                config::tiempo_triple(),
+                CondicionTrigger::Doble, // fallback si expira con 2 toques (ver timer)
+            );
+        } else if necesita_doble {
+            runtime.sesiones[idx].generacion += 1;
+            runtime.sesiones[idx].fase = FaseSesion::EsperandoDoble;
+            iniciar_timer_generico(
+                &mut runtime,
+                idx,
+                config::tiempo_doble(),
+                CondicionTrigger::Simple,
+            );
+        } else {
+            resolver_condicion_por_id(&mut runtime, idx, CondicionTrigger::Simple);
         }
         return;
-    };
-    println!("📤 [recibir_up] Lista encontrada para {:?}, id={}, esperando_condicion={}", input, listas[idx].id, listas[idx].esperando_condicion);
+    }
 
-    // 🔥 NUEVO: Si esta lista está esperando una condición (timer pendiente),
-    // no la toques, déjala para que recibir_condicion la procese.
-    let id_lista = listas[idx].id;
-    if *PREGUNTA_PENDIENTE.lock().unwrap() == Some(id_lista) {
-        drop(listas);
+    // Fase Construyendo:
+    if runtime.sesiones[idx].fantasma {
+        let id = runtime.sesiones[idx].id;
+        eliminar_sesion(&mut runtime, id);
         return;
     }
 
-    if listas[idx].fantasma {
-        listas.remove(idx);
-        return;
-    }
-
-    let id = listas[idx].id;
-    let entrada_antes = listas[idx].entrada.clone();
-
-    // --- Verificar si la entrada SIN la tecla soltada es match Simple ---
+    let id = runtime.sesiones[idx].id;
+    let entrada_antes = runtime.sesiones[idx].entrada.clone();
     let mut entrada_sin_tecla = entrada_antes.clone();
     entrada_sin_tecla.retain(|i| i != &input);
 
-    let (posibles_sin, exactas_sin, candidatas_sin) = contar(&entrada_sin_tecla);
-    let match_simple_sin = (posibles_sin == exactas_sin && exactas_sin == 1)
-        .then(|| {
-            candidatas_sin
-                .into_iter()
-                .find(|c| c.trigger.condicion == CondicionTrigger::Simple)
-        })
-        .flatten();
+    let compilado = compilado_actual();
 
-    if let Some(remapeo) = match_simple_sin {
-        *PREGUNTA_PENDIENTE.lock().unwrap() = None;
-        drop(listas);
-        iniciar_y_finalizar(remapeo);
-        limpiar_lista(id);
-        reiniciar_desde_presionados();
-        entrada::consumir();
-        return;
-    }
-
-    // --- Verificar si la entrada CON la tecla es match Simple ---
-    let (posibles, exactas, candidatas) = contar(&entrada_antes);
-    let match_simple = (posibles == exactas && exactas == 1)
-        .then(|| {
+    let buscar_simple = |entrada: &[InputId]| -> Option<RemapeoCache> {
+        let (posibles, exactas, candidatas) = contar(&compilado, entrada);
+        if posibles == exactas && exactas == 1 {
             candidatas
                 .into_iter()
                 .find(|c| c.trigger.condicion == CondicionTrigger::Simple)
-        })
-        .flatten();
+        } else {
+            None
+        }
+    };
 
-    if let Some(remapeo) = match_simple {
-        *PREGUNTA_PENDIENTE.lock().unwrap() = None;
-        drop(listas);
-        iniciar_y_finalizar(remapeo);
-        limpiar_lista(id);
-        reiniciar_desde_presionados();
-        entrada::consumir();
+    if let Some(remapeo) = buscar_simple(&entrada_sin_tecla) {
+        eliminar_sesion(&mut runtime, id);
+        drop(runtime);
+        resolver_match(remapeo, entrada_sin_tecla, id, Vec::new());
         return;
     }
 
-    // 3b) No hubo match posible: se aborta todo lo retenido.
-    listas.remove(idx);
-    drop(listas);
-    limpiar_lista(id);
-    analizador_trigger::limpiar();
+    if let Some(remapeo) = buscar_simple(&entrada_antes) {
+        eliminar_sesion(&mut runtime, id);
+        drop(runtime);
+        // El Up ya pasó — nada de esta sesión sigue físicamente
+        // presionado salvo lo que no sea `input` (que fue lo que
+        // recién se soltó y disparó esta resolución retroactiva).
+        resolver_match(remapeo, entrada_antes.clone(), id, entrada_sin_tecla);
+        return;
+    }
+
+    // No hubo match posible: abortar todo lo retenido. Lo que siga
+    // presionado de esta sesión (entrada_sin_tecla) se resiembra
+    // como fantasma nueva.
+    eliminar_sesion(&mut runtime, id);
+    drop(runtime);
     entrada::pasar();
-    reiniciar_desde_presionados();
+    resembrar_fantasma(entrada_sin_tecla);
 }
 
-fn iniciar_y_finalizar(remapeo: RemapeoCache) {
-    runtime::ejecutar(runtime::OrdenRuntime::Iniciar {
-        id: remapeo.id.clone(),
-        accion: remapeo.accion,
-        extra: remapeo.extra,
-        coordenada: remapeo.coordenada,
+// ------------------------------------------------------
+// ⏱️ TIMERS (un hilo por timer)
+// ------------------------------------------------------
+
+/// Timer genérico para las fases Doble/Triple: duerme `espera_ms`, y
+/// si sigue vigente al despertar, resuelve `condicion_si_expira` —
+/// EXCEPTO en fase Triple, donde la condición real depende de
+/// `toques` (se recalcula al despertar, `condicion_si_expira` ahí
+/// solo es un valor de referencia sin uso, ver más abajo).
+fn iniciar_timer_generico(
+    runtime: &mut EstadoRuntime,
+    idx: usize,
+    espera_ms: u64,
+    condicion_si_expira: CondicionTrigger,
+) {
+    let id = runtime.sesiones[idx].id;
+    let generacion = runtime.sesiones[idx].generacion;
+    let fase_iniciada = runtime.sesiones[idx].fase;
+
+    std::thread::spawn(move || {
+        std::thread::sleep(std::time::Duration::from_millis(espera_ms));
+        let mut runtime = RUNTIME.lock().unwrap();
+        if !vigente(&runtime, id, generacion) {
+            return; // se resolvió por Down antes de expirar
+        }
+        let idx = runtime.sesiones.iter().position(|s| s.id == id).unwrap();
+
+        let condicion = match fase_iniciada {
+            FaseSesion::EsperandoTriple { .. } => {
+                let toques = match runtime.sesiones[idx].fase {
+                    FaseSesion::EsperandoTriple { toques } => toques,
+                    _ => 1,
+                };
+                if toques >= 2 {
+                    CondicionTrigger::Doble
+                } else {
+                    CondicionTrigger::Simple
+                }
+            }
+            _ => condicion_si_expira,
+        };
+
+        resolver_condicion_por_id(&mut runtime, idx, condicion);
     });
-    runtime::ejecutar(runtime::OrdenRuntime::Detener { id: remapeo.id });
-}
-
-fn iniciar_solamente(remapeo: RemapeoCache, entrada: Vec<InputId>) {
-    ACTIVAS.lock().unwrap().push(InstanciaActiva {
-        id: remapeo.id.clone(),
-        entrada,
-    });
-    runtime::ejecutar(runtime::OrdenRuntime::Iniciar {
-        id: remapeo.id,
-        accion: remapeo.accion,
-        extra: remapeo.extra,
-        coordenada: remapeo.coordenada,
-    });
-}
-
-fn marcar_esperando_condicion(id: u64) {
-    if let Some(l) = LISTAS.lock().unwrap().iter_mut().find(|l| l.id == id) {
-        l.esperando_condicion = true;
-    }
-    *PREGUNTA_PENDIENTE.lock().unwrap() = Some(id);
-}
-
-fn limpiar_lista(id: u64) {
-    LISTAS.lock().unwrap().retain(|l| l.id != id);
-
-    let mut pregunta = PREGUNTA_PENDIENTE.lock().unwrap();
-    if *pregunta == Some(id) {
-        *pregunta = None;
-    }
-}
-
-/// Hereda lo que sigue físicamente presionado (soporta Ctrl+C -> Ctrl+V).
-/// Siembra una lista FANTASMA (ver Lista::fantasma) — puramente
-/// especulativa, nadie en entrada.rs está esperando su resolución.
-fn reiniciar_desde_presionados() {
-    // Limpiar todas las listas fantasmas existentes (bug 2)
-    let mut listas = LISTAS.lock().unwrap();
-    listas.retain(|l| !l.fantasma);
-    drop(listas);
-
-    let presionados = analizador_trigger::obtener_presionados();
-    if !presionados.is_empty() {
-        let id = nuevo_id_lista();
-        LISTAS.lock().unwrap().push(Lista {
-            id,
-            entrada: presionados,
-            esperando_condicion: false,
-            fantasma: true,
-        });
-    }
 }
