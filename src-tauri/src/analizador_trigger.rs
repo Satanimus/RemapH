@@ -670,7 +670,18 @@ impl AnalizadorTrigger {
                         }
 
                         let modo = self.modo;
-                        drop(grupos);
+                        // 🔥 NUEVO: si estamos en modo Runtime, el Up también debe
+                        // llegar a Cache para que sepa que la tecla se soltó.
+                        // Sin esto, Cache queda esperando un Up que nunca llega,
+                        // y la tecla queda "presionada" para siempre → auto-repetición.
+                        if self.modo == ModoAnalizador::Runtime {
+                            drop(grupos);
+                            cache::recibir_up(evento.input.clone());
+                            grupos = self.grupos.lock().unwrap();
+                        } else {
+                            drop(grupos);
+                        }
+
                         Self::enviar_condicion(modo, CondicionTrigger::Simple);
                         return Some(());
                     }

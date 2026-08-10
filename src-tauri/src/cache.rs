@@ -480,18 +480,9 @@ pub fn recibir_down(input: InputId) {
     if posibles == exactas && exactas >= 1 {
         marcar_esperando_condicion(id);
         let gatillo = entrada_actual.last().cloned().unwrap();
-        // Solo hace falta salir de la Fase Mantenido hacia una espera
-        // de ambigüedad (Doble o Triple) si entre las candidatas reales
-        // de esta entrada hay al menos un binding que lo pida — si no,
-        // esperar ese tiempo no descarta nada real, es demora pura (ver
-        // analizador_trigger::procesar, Up-handler).
         let necesita_doble = candidatas
             .iter()
             .any(|c| c.trigger.condicion == CondicionTrigger::Doble);
-        // Triple manda sobre Doble: si hay al menos un binding Triple
-        // candidato, la espera post-Up1 usa la ventana tiempo_triple
-        // completa (ver analizador_trigger.rs, fase Triple) en vez de
-        // resolver Doble apenas llega el segundo Down.
         let necesita_triple = candidatas
             .iter()
             .any(|c| c.trigger.condicion == CondicionTrigger::Triple);
@@ -500,32 +491,60 @@ pub fn recibir_down(input: InputId) {
         return;
     }
 
+    // Si hay prefijos más largos (posibles > exactas) y al menos un trigger Simple
+    // que coincida con la entrada actual, iniciar timer para desambiguar.
+    if posibles > exactas {
+        let hay_simple = candidatas.iter().any(|c| c.trigger.condicion == CondicionTrigger::Simple);
+        if hay_simple {
+            println!("🔍 [recibir_down] Iniciando timer Simple para entrada {:?}, id={}", entrada_actual, id);
+            marcar_esperando_condicion(id);
+            let gatillo = entrada_actual.last().cloned().unwrap();
+            analizador_trigger::iniciar_timer(gatillo, false, false);
+            entrada::retener();
+            return;
+        }
+    }
+
     entrada::retener();
 }
 
 /// Llamada por el timer del analizador (hilo aparte). No hay nadie
 /// esperando un valor de retorno: avisa directo a quien corresponda.
+
 pub fn recibir_condicion(condicion: CondicionTrigger) {
     let id = match *PREGUNTA_PENDIENTE.lock().unwrap() {
         Some(id) => id,
-        None => return,
+        None => {
+            println!("⏳ [recibir_condicion] No hay pregunta pendiente");
+            return;
+        }
     };
+    println!("⏳ [recibir_condicion] Procesando condición {:?} para id={}", condicion, id);
 
     let entrada_actual = {
         let listas = LISTAS.lock().unwrap();
         match listas.iter().find(|l| l.id == id) {
             Some(l) => l.entrada.clone(),
-            None => return,
+            None => {
+                println!("⏳ [recibir_condicion] No se encontró lista para id={}", id);
+                return;
+            }
         }
     };
 
     let (posibles, exactas, candidatas) = contar(&entrada_actual);
-    let match_final = candidatas
-        .into_iter()
-        .find(|c| c.trigger.condicion == condicion);
 
-    match match_final {
-        Some(remapeo) if posibles == exactas => {
+    // Buscar un match que coincida exactamente con la entrada actual y la condición recibida
+    let match_final = candidatas
+        .iter()
+        .find(|c| c.trigger.condicion == condicion && c.trigger.entrada == entrada_actual)
+        .cloned();
+
+    if let Some(remapeo) = match_final {
+        println!("✅ [recibir_condicion] Match encontrado! Ejecutando...");
+        // Para Simple, permitir ejecución aunque haya prefijos más largos.
+        // Esto resuelve el caso 3>A cuando se suelta 3 sin llegar a 1.
+        if condicion == CondicionTrigger::Simple || posibles == exactas {
             let diferido = remapeo
                 .extra
                 .as_ref()
@@ -538,14 +557,18 @@ pub fn recibir_condicion(condicion: CondicionTrigger) {
             }
             limpiar_lista(id);
             reiniciar_desde_presionados();
-            entrada::consumir();
-        }
-        _ => {
-            limpiar_lista(id);
-            analizador_trigger::limpiar();
+            // 🔥 CAMBIO CLAVE: usar pasar() en lugar de consumir()
+            // para asegurar que el RETENIDO se cierre siempre.
             entrada::pasar();
+            return;
         }
     }
+
+    // Si no hubo match, limpiar y pasar
+    println!("❌ [recibir_condicion] No se encontró match o no se cumplió condición, limpiando");
+    limpiar_lista(id);
+    analizador_trigger::limpiar();
+    entrada::pasar();
 }
 
 /// Llega con CADA Up real (el analizador ya no filtra por ventana de
@@ -612,23 +635,36 @@ pub fn recibir_up(input: InputId) {
     let mut listas = LISTAS.lock().unwrap();
 
     let Some(idx) = listas
-        .iter()
-        .position(|l| !l.esperando_condicion && l.entrada.contains(&input))
+    .iter()
+    .position(|l| !l.esperando_condicion && l.entrada.contains(&input))
     else {
+        println!("📤 [recibir_up] No se encontró lista para {:?} (quizás esperando condición)", input);
+        drop(listas);
+        let presionados = analizador_trigger::obtener_presionados();
+        if !presionados.contains(&input) {
+            reiniciar_desde_presionados();
+        }
         return;
     };
+    println!("📤 [recibir_up] Lista encontrada para {:?}, id={}, esperando_condicion={}", input, listas[idx].id, listas[idx].esperando_condicion);
+
+    // 🔥 NUEVO: Si esta lista está esperando una condición (timer pendiente),
+    // no la toques, déjala para que recibir_condicion la procese.
+    let id_lista = listas[idx].id;
+    if *PREGUNTA_PENDIENTE.lock().unwrap() == Some(id_lista) {
+        drop(listas);
+        return;
+    }
 
     if listas[idx].fantasma {
-        // Caso 2: fantasma — se descarta entera, nadie la espera.
         listas.remove(idx);
         return;
     }
 
-    // Caso 3: en construcción
     let id = listas[idx].id;
     let entrada_antes = listas[idx].entrada.clone();
 
-    // --- NUEVO: verificar si la entrada SIN la tecla soltada es match Simple ---
+    // --- Verificar si la entrada SIN la tecla soltada es match Simple ---
     let mut entrada_sin_tecla = entrada_antes.clone();
     entrada_sin_tecla.retain(|i| i != &input);
 
@@ -642,7 +678,7 @@ pub fn recibir_up(input: InputId) {
         .flatten();
 
     if let Some(remapeo) = match_simple_sin {
-        // La entrada sin la tecla soltada es un match Simple (bug 1)
+        *PREGUNTA_PENDIENTE.lock().unwrap() = None;
         drop(listas);
         iniciar_y_finalizar(remapeo);
         limpiar_lista(id);
@@ -651,9 +687,7 @@ pub fn recibir_up(input: InputId) {
         return;
     }
 
-    // --- Fin del nuevo bloque ---
-
-    // Si no, se verifica si la entrada con la tecla era match Simple
+    // --- Verificar si la entrada CON la tecla es match Simple ---
     let (posibles, exactas, candidatas) = contar(&entrada_antes);
     let match_simple = (posibles == exactas && exactas == 1)
         .then(|| {
@@ -664,8 +698,7 @@ pub fn recibir_up(input: InputId) {
         .flatten();
 
     if let Some(remapeo) = match_simple {
-        // 3a) La entrada, tal cual estaba con la tecla recién soltada
-        // adentro, ya era un match Simple exacto — se resuelve ahora.
+        *PREGUNTA_PENDIENTE.lock().unwrap() = None;
         drop(listas);
         iniciar_y_finalizar(remapeo);
         limpiar_lista(id);
