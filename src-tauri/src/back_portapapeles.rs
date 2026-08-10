@@ -1147,10 +1147,13 @@ fn notificar_ventanas_abiertas() {
 // esto debe bloquear el modo automático de crear archivo por
 // modificación de portapapeles, para no generar un duplicado."
 //
-// pegar() (más abajo) escribe al portapapeles del sistema con
-// arboard antes de simular Ctrl+V — eso por sí solo ya dispara
-// WM_CLIPBOARDUPDATE en el listener de back_portapapeles_captura.rs,
-// como cualquier otro cambio real. Sin este bloqueo, en_cambio_del_
+// pegar() (más abajo) escribe al portapapeles del sistema (texto vía
+// arboard, imagen vía escribir_imagen_multiformato() — ver
+// back_portapapeles_captura.rs) antes de simular Ctrl+V — eso por sí
+// solo ya dispara WM_CLIPBOARDUPDATE en el listener de
+// back_portapapeles_captura.rs, como cualquier otro cambio real (una
+// sola vez: para imagen sigue siendo una única transacción Open/
+// Empty/Set×2/Close, no dos avisos). Sin este bloqueo, en_cambio_del_
 // sistema() (si hay algún Registro activo) o resolver_elemento_
 // simple() (si no hay ninguno) tratarían ese aviso como un cambio
 // nuevo del usuario y generarían un rotativo duplicado del mismo
@@ -1216,13 +1219,25 @@ fn ignorar_proximo_cambio() -> bool {
 // ======================================================
 
 pub fn pegar(ruta: &Path) -> Result<(), String> {
+    println!("📋 [diag] pegar() llamado con ruta={:?}", ruta);
+
     let contenido = contenido_desde_archivo(ruta)?;
+
+    println!("📋 [diag] contenido_desde_archivo: OK");
 
     marcar_ignorar_proximo_cambio();
 
-    back_portapapeles_captura::escribir_portapapeles(&contenido)?;
+    match back_portapapeles_captura::escribir_portapapeles(&contenido) {
+        Ok(()) => println!("📋 [diag] escribir_portapapeles: OK"),
+        Err(error) => {
+            println!("📋 [diag] escribir_portapapeles: ERROR: {}", error);
+            return Err(error);
+        }
+    }
 
     simular_ctrl_v();
+
+    println!("📋 [diag] simular_ctrl_v() disparado — pegar() termina OK");
 
     Ok(())
 }

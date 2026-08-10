@@ -413,9 +413,12 @@ async function pegar(datos: ElementoDatos): Promise<void> {
 
   try {
     await invoke("portapapeles_pegar", { ruta: datos.ruta });
-  } catch {
-    // No hay nada coherente que mostrar si falla — el usuario ve
-    // que no se pegó nada y puede reintentar.
+  } catch (error) {
+    // DIAGNÓSTICO TEMPORAL: antes esto se tragaba en silencio.
+    // Logueado para ver la causa real en la consola de
+    // `npm run tauri dev` mientras se investiga el problema de
+    // pegado en Paint — sacar una vez resuelto.
+    console.error("portapapeles_pegar falló:", error);
   } finally {
     operacionEnVuelo = false;
   }
