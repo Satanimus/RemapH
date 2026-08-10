@@ -594,7 +594,9 @@ pub fn recibir_condicion(condicion: CondicionTrigger) {
 /// todavía necesitan ver esa tecla en su entrada para que
 /// recibir_condicion() las compare bien; se resuelven solas por su
 /// propio camino.
+
 pub fn recibir_up(input: InputId) {
+    // Caso 1: instancia Mantenido activa esperando este Up
     let mut activas = ACTIVAS.lock().unwrap();
     if let Some(pos) = activas.iter().position(|a| a.entrada.contains(&input)) {
         let instancia = activas.remove(pos);
@@ -622,10 +624,36 @@ pub fn recibir_up(input: InputId) {
         return;
     }
 
-    // Caso 3: en construcción — entrada.rs SIEMPRE recibe algo abajo.
+    // Caso 3: en construcción
     let id = listas[idx].id;
     let entrada_antes = listas[idx].entrada.clone();
 
+    // --- NUEVO: verificar si la entrada SIN la tecla soltada es match Simple ---
+    let mut entrada_sin_tecla = entrada_antes.clone();
+    entrada_sin_tecla.retain(|i| i != &input);
+
+    let (posibles_sin, exactas_sin, candidatas_sin) = contar(&entrada_sin_tecla);
+    let match_simple_sin = (posibles_sin == exactas_sin && exactas_sin == 1)
+        .then(|| {
+            candidatas_sin
+                .into_iter()
+                .find(|c| c.trigger.condicion == CondicionTrigger::Simple)
+        })
+        .flatten();
+
+    if let Some(remapeo) = match_simple_sin {
+        // La entrada sin la tecla soltada es un match Simple (bug 1)
+        drop(listas);
+        iniciar_y_finalizar(remapeo);
+        limpiar_lista(id);
+        reiniciar_desde_presionados();
+        entrada::consumir();
+        return;
+    }
+
+    // --- Fin del nuevo bloque ---
+
+    // Si no, se verifica si la entrada con la tecla era match Simple
     let (posibles, exactas, candidatas) = contar(&entrada_antes);
     let match_simple = (posibles == exactas && exactas == 1)
         .then(|| {
@@ -637,16 +665,7 @@ pub fn recibir_up(input: InputId) {
 
     if let Some(remapeo) = match_simple {
         // 3a) La entrada, tal cual estaba con la tecla recién soltada
-        // adentro, ya era un match Simple exacto — se resuelve ahora,
-        // retroactivamente (la tecla soltada ya no puede completar
-        // ningún prefijo más largo).
-        //
-        // Siempre Iniciar+Finalizar juntos acá, aunque el Extra de la
-        // fila requiera_up_real() (Turbo/Mantener/Click Sostenido): el
-        // Up real que ese Extra necesita para saber cuándo soltar YA
-        // pasó (es justo el que estamos procesando) — dejarlo
-        // "diferido" esperando un Up que no va a volver a llegar sin
-        // que la tecla se presione de nuevo lo dejaría colgado.
+        // adentro, ya era un match Simple exacto — se resuelve ahora.
         drop(listas);
         iniciar_y_finalizar(remapeo);
         limpiar_lista(id);
@@ -661,8 +680,6 @@ pub fn recibir_up(input: InputId) {
     limpiar_lista(id);
     analizador_trigger::limpiar();
     entrada::pasar();
-    // Lo que siga físicamente presionado no se pierde — se resiembra
-    // como fantasma nueva (mismo camino que tras un match real).
     reiniciar_desde_presionados();
 }
 
@@ -709,6 +726,11 @@ fn limpiar_lista(id: u64) {
 /// Siembra una lista FANTASMA (ver Lista::fantasma) — puramente
 /// especulativa, nadie en entrada.rs está esperando su resolución.
 fn reiniciar_desde_presionados() {
+    // Limpiar todas las listas fantasmas existentes (bug 2)
+    let mut listas = LISTAS.lock().unwrap();
+    listas.retain(|l| !l.fantasma);
+    drop(listas);
+
     let presionados = analizador_trigger::obtener_presionados();
     if !presionados.is_empty() {
         let id = nuevo_id_lista();
