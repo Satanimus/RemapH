@@ -453,7 +453,50 @@ fn iniciar_espera_mantenido(
             return;
         }
         let idx = runtime.sesiones.iter().position(|s| s.id == id).unwrap();
-        resolver_condicion_por_id(runtime, idx, CondicionTrigger::Mantenido);
+
+        // [FIX] Antes esto siempre intentaba resolver como
+        // CondicionTrigger::Mantenido al vencer, sin importar si la
+        // entrada exacta en este punto tenía o no compilado un
+        // trigger con esa condición. Cuando la única candidata
+        // exacta era Simple (caso típico: "Q"=1 con Extra Normal/
+        // Turbo/Mantenido/Simple, ambiguo con un prefijo más largo
+        // como "Q+W", que impide la resolución rápida en
+        // recibir_down_rt), resolver_condicion_por_id(Mantenido) no
+        // encontraba match_final (ningún trigger Mantenido compilado
+        // para esta entrada) y terminaba abortando todo con
+        // entrada::pasar() — eso volcaba a Windows el buffer crudo
+        // de Down repetidos acumulados mientras la tecla seguía
+        // abajo (la "q" repetida del bug reportado), y la acción
+        // remapeada ("1") nunca llegaba a dispararse, ni en modo
+        // diferido ni instantáneo. Mismo bug, mismo síntoma, que ya
+        // se había resuelto una vez en la versión vieja de
+        // analizador_trigger.rs (timer de desambiguación
+        // Simple+prefijos-largos vencía como Mantenido y nunca
+        // matcheaba) — se reintrodujo en esta reescritura.
+        //
+        // Ahora se decide primero si existe una candidata exacta
+        // Mantenido para la entrada actual (cubre triggers realmente
+        // definidos como Mantenido, sin cambios ahí); si no existe,
+        // se cae a Simple: la tecla sigue físicamente abajo en este
+        // punto (todavía no llegó ningún Up), así que commitear a
+        // Simple acá adentro es lo correcto — resolver_match() de
+        // ahí en más decide solo, con teclas_vivas()/
+        // requiere_up_real(), si corresponde modo diferido (Normal/
+        // Turbo/Mantenido: repite u ocupa hasta el Up real) o
+        // instantáneo (Extra Simple: dispara una vez y listo).
+        let entrada_actual = runtime.sesiones[idx].entrada.clone();
+        let compilado = compilado_actual();
+        let (_posibles, _exactas, candidatas) = contar(&compilado, &entrada_actual);
+        let condicion = if candidatas
+            .iter()
+            .any(|c| c.trigger.condicion == CondicionTrigger::Mantenido)
+        {
+            CondicionTrigger::Mantenido
+        } else {
+            CondicionTrigger::Simple
+        };
+
+        resolver_condicion_por_id(runtime, idx, condicion);
     });
 }
 
@@ -570,11 +613,12 @@ fn resolver_match(remapeo: RemapeoCache, entrada: Vec<InputId>, _id: u64, restan
     // de `entrada` sigue físicamente abajo AHORA MISMO — si ninguna
     // lo está, no hay Up futuro posible, así que hay que ejecutar
     // Iniciar+Detener ya mismo sin importar el Extra.
+    let vivas = teclas_vivas(&entrada);
     let diferido = remapeo
         .extra
         .as_ref()
         .is_some_and(|extra| extra.requiere_up_real())
-        && algo_sigue_presionado(&entrada);
+        && !vivas.is_empty();
 
     if diferido {
         let mut runtime = RUNTIME.lock().unwrap();
@@ -589,29 +633,55 @@ fn resolver_match(remapeo: RemapeoCache, entrada: Vec<InputId>, _id: u64, restan
             extra: remapeo.extra,
             coordenada: remapeo.coordenada,
         });
-    } else {
-        runtime::ejecutar(OrdenRuntime::Iniciar {
-            id: remapeo.id.clone(),
-            accion: remapeo.accion,
-            extra: remapeo.extra,
-            coordenada: remapeo.coordenada,
-        });
-        runtime::ejecutar(OrdenRuntime::Detener { id: remapeo.id });
+
+        // [FIX] Antes se llamaba entrada::consumir() sin argumentos,
+        // que solo vaciaba RETENIDO y nunca abría un grupo
+        // DEVOLVIENDO. Como acá la tecla física sigue abajo (es
+        // justo la condición de `diferido`) y va a seguir mandando
+        // Down repetidos + su Up real, esos eventos necesitan un
+        // grupo DEVOLVIENDO (modo bloquear) que los intercepte en
+        // entrada.rs — si no, entrada.rs los trataba como eventos
+        // "nuevos" sin ninguna decisión tomada para ellos, dejándolos
+        // pasar a Windows sin bloquear (la tecla remapeada se colaba
+        // en cada repeat) y el ciclo Iniciar/Detener quedaba a merced
+        // de que algún futuro Up ajeno cerrara la InstanciaActiva.
+        resembrar_fantasma(restantes);
+        entrada::consumir(&vivas);
+        return;
     }
 
+    runtime::ejecutar(OrdenRuntime::Iniciar {
+        id: remapeo.id.clone(),
+        accion: remapeo.accion,
+        extra: remapeo.extra,
+        coordenada: remapeo.coordenada,
+    });
+    runtime::ejecutar(OrdenRuntime::Detener { id: remapeo.id });
+
     resembrar_fantasma(restantes);
-    entrada::consumir();
+    entrada::consumir(&[]);
 }
 
-/// ¿Sigue físicamente presionada AHORA alguna de las teclas de
-/// `entrada`? Se apoya en `RUNTIME.presionadas` (Etapa 4) — nunca en
+/// Subconjunto de `entrada` que sigue físicamente presionado AHORA.
+/// Se apoya en `RUNTIME.presionadas` (Etapa 4) — nunca en
 /// `Sesion.entrada` (que, como está documentado en la struct, es
 /// historial y a propósito no se achica). Se llama con el lock de
 /// RUNTIME siempre ya liberado por el caller (resolver_match), así
 /// que acá lo vuelve a pedir un instante, sin anidar.
-fn algo_sigue_presionado(entrada: &[InputId]) -> bool {
+///
+/// [FIX] Antes esto era `algo_sigue_presionado() -> bool` — solo
+/// decía SI había alguna tecla viva, pero resolver_match() nunca
+/// llegaba a saber CUÁLES eran para pasárselas a entrada::consumir()
+/// (que antes tampoco las pedía). Ahora devuelve la lista completa,
+/// que es lo que entrada.rs necesita para abrir su propio grupo
+/// DEVOLVIENDO y vigilar esos repeats/Up reales correctamente.
+fn teclas_vivas(entrada: &[InputId]) -> Vec<InputId> {
     let runtime = RUNTIME.lock().unwrap();
-    entrada.iter().any(|i| runtime.presionadas.contains(i))
+    entrada
+        .iter()
+        .filter(|i| runtime.presionadas.contains(i))
+        .cloned()
+        .collect()
 }
 
 /// Reemplaza cualquier sesión fantasma existente por una nueva con
@@ -1138,6 +1208,40 @@ pub fn soltar_fisico(input: InputId) {
         .find(|s| s.entrada.contains(&input))
     {
         s.entrada.retain(|i| i != &input);
+    }
+
+    // [FIX] Antes esta función solo actualizaba `presionadas` y el
+    // historial de la sesión — nunca miraba `runtime.activas`. Pero
+    // este es exactamente el único lugar al que llega el Up real de
+    // una tecla cuyo match fue diferido (Normal/Turbo/Mantenido/
+    // ClickSostenido): entrada.rs, al ver que la tecla ya está en un
+    // grupo DEVOLVIENDO con bloquear=true (abierto por consumir()),
+    // resuelve el Up ahí mismo (rama a) y llama a soltar_fisico() en
+    // vez de reenviar el evento a cache::procesar_evento_runtime() —
+    // por diseño, para no volver a analizar un Up que ya sabemos que
+    // solo debe cerrar el grupo. Eso significa que recibir_up_rt()
+    // (que sí revisa `activas` al principio) NUNCA se entera de este
+    // Up. Sin este chequeo acá, la InstanciaActiva quedaba viva para
+    // siempre: el bucle de Normal/Turbo nunca recibía su Detener al
+    // soltar la tecla (bug reportado como "genera 1 en bucle y no se
+    // detiene"), y Mantenido nunca emitía el Up de la acción
+    // simulada (bug reportado como "genera 1 down pero no el up").
+    // Mismo bug de fondo, mismo síntoma, que ya se había resuelto
+    // una vez en la versión vieja (analizador_trigger.rs: "entrada
+    // ::pasar() en vez de consumir() cuando SÍ había match, repeat
+    // quedaba huérfano") — ahí el fix fue evitar abrir el grupo
+    // DEVOLVIENDO; acá no es opción (sí lo necesitamos, para no
+    // filtrar los repeats crudos), así que el fix correcto es que
+    // soltar_fisico() cierre la instancia activa correspondiente.
+    if let Some(pos) = runtime
+        .activas
+        .iter()
+        .position(|a| a.entrada.contains(&input))
+    {
+        let instancia = runtime.activas.remove(pos);
+        drop(runtime);
+        runtime::ejecutar(OrdenRuntime::Detener { id: instancia.id });
+        resembrar_fantasma(Vec::new());
     }
 }
 

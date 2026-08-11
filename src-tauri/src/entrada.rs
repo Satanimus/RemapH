@@ -41,6 +41,29 @@
 //     qué Down ya emitido. SIN esto, un Up nunca vuelve a
 //     pasar por acá y la tecla queda "pegada" en Windows.
 //
+//     [FIX] También se abre un grupo DEVOLVIENDO cuando
+//     consumir() resuelve un match DIFERIDO (Extra Normal/
+//     Turbo/Mantener/ClickSostenido, ver requiere_up_real()
+//     en perfil_cache.rs): ahí NO se emitió nada a Windows
+//     (el "1" que ve el usuario es enteramente simulado por
+//     runtime::ejecutar), pero la tecla física remapeada
+//     (ej. "q") sigue abajo y sus repeats/Up real TODAVÍA
+//     van a llegar acá. Sin un grupo DEVOLVIENDO que los
+//     intercepte, esos eventos volvían a caer en la rama (c)
+//     como si fueran "nuevos" — con nadie en cache.rs
+//     llamando retener()/pasar()/consumir() para ellos (se
+//     filtraban en silencio por el propio chequeo de
+//     `presionadas` de cache.rs) — y entrada.rs los dejaba
+//     pasar tal cual a Windows sin bloquear ni decidir nada.
+//     Ahora, para ese caso, `faltan_soltar` se siembra con
+//     las teclas indicadas por Cache en vez de quedar vacío,
+//     así que sus repeats se bloquean acá (nunca se emiten,
+//     ver el "pasa derecho" de la rama (a) — que emite
+//     siempre; para bloquear un repeat sin emitirlo hace
+//     falta el chequeo explícito de abajo) y su Up real cae
+//     en la rama (a), avisa a cache::soltar_fisico() y cierra
+//     el grupo normalmente.
+//
 // Una tecla físicamente nueva, sin relación con nada de lo
 // anterior, no espera a que nada termine: se manda derecho
 // al analizador (comportamiento normal).
@@ -68,7 +91,10 @@
 // back_interception::iniciar() — le entrega cada
 //     InputEvent físico capturado.
 // cache.rs — le avisa retener() / pasar() / consumir() sin
-//     pasarle ningún dato (ver EVENTO_EN_CURSO más abajo).
+//     pasarle ningún dato salvo, en el caso de consumir(),
+//     la lista de teclas que siguen físicamente vivas tras
+//     un match diferido (ver EVENTO_EN_CURSO más abajo, y el
+//     FIX de arriba).
 // ------------------------------------------------------
 // 3. ¿Qué información recibe?
 // Cada InputEvent (Down/Up/Pulse) tal como lo entrega el
@@ -84,9 +110,17 @@
 // Al llegar un evento, en este orden:
 //
 // a) ¿La tecla del evento está en algún grupo DEVOLVIENDO?
-//    Pasa derecho a Windows, sin análisis. Si es Up, se saca
-//    del faltan_soltar de ese grupo; si el grupo queda
-//    vacío, se descarta (esa tecla vuelve a estar "libre").
+//    Si el grupo nació de pasar() (o del reinyectado de un
+//    RETENIDO), pasa derecho a Windows, sin análisis. Si el
+//    grupo nació de un match diferido vía consumir() (ver
+//    FIX arriba), el evento se BLOQUEA en vez de emitirse
+//    (nunca se emitió el Down original a Windows, así que
+//    tampoco corresponde emitir sus repeats ni su Up) — pero
+//    igual se usa para llevar la cuenta de qué falta soltar,
+//    y el Up real avisa a cache::soltar_fisico() igual que
+//    siempre. Si es Up, se saca del faltan_soltar de ese
+//    grupo; si el grupo queda vacío, se descarta (esa tecla
+//    vuelve a estar "libre").
 //
 // b) Si no, ¿hay un RETENIDO en curso? Se agrega el evento a
 //    su buffer (en orden, tal cual llegó) y además se manda
@@ -99,28 +133,33 @@
 //    sin pasarle el evento explícitamente) y se manda al
 //    analizador.
 //
-// Lo que responde Cache (siempre sin argumentos, avisando
-// sobre "lo que está pasando ahora"):
+// Lo que responde Cache (siempre sobre "lo que está pasando
+// ahora"):
 //
 // - retener() → si no había RETENIDO, se crea uno, sembrado
 //     con el EVENTO_EN_CURSO del hilo que llama (la llamada
 //     es síncrona, dentro de la misma pila que
 //     procesar_evento, así que el thread_local es válido).
-// - consumir() → hubo match real. Se DESCARTA el RETENIDO
-//     entero (si había) sin reinyectar nada — esos eventos
-//     ya fueron el match. No se crea ningún DEVOLVIENDO
-//     (nunca se emitió nada de esto a Windows).
+// - consumir(vivas: &[InputId]) → hubo match real. Se
+//     DESCARTA el RETENIDO entero (si había) sin reinyectar
+//     nada — esos eventos ya fueron el match, nunca se
+//     emitieron a Windows. Si `vivas` no está vacío (match
+//     diferido con la tecla todavía físicamente abajo — ver
+//     FIX arriba), se abre un grupo DEVOLVIENDO con esas
+//     teclas, marcado para BLOQUEAR en vez de emitir, así sus
+//     repeats no se cuelan y su Up real cierra el grupo
+//     normalmente.
 // - pasar() → no hubo match.
 //     - Si había RETENIDO: se reinyecta su buffer completo,
 //       en el mismo orden, sin delay artificial. Lo que
 //       quede sin soltar pasa a un grupo nuevo en
-//       DEVOLVIENDO.
+//       DEVOLVIENDO (modo emitir).
 //     - Si NO había RETENIDO (caso más común: el evento
 //       actual se resolvió "Pasar" de una): se emite el
 //       EVENTO_EN_CURSO tal cual, y si era un Down, se abre
-//       igual un grupo DEVOLVIENDO para esa tecla — así su
-//       Up, cuando llegue, cae en el paso (a) de arriba en
-//       vez de perderse.
+//       igual un grupo DEVOLVIENDO para esa tecla (modo
+//       emitir) — así su Up, cuando llegue, cae en el paso
+//       (a) de arriba en vez de perderse.
 // ------------------------------------------------------
 // 6. Funciones del archivo
 //
@@ -130,20 +169,22 @@
 //     Ver comportamiento (5).
 // pasar()
 //     Ver comportamiento (5).
-// consumir()
-//     Ver comportamiento (5).
+// consumir(vivas: &[InputId])
+//     Ver comportamiento (5). El parámetro es nuevo (ver FIX):
+//     antes no tomaba argumentos.
 // ------------------------------------------------------
 // Transformación:
 //
 // InputEvent físico
 //     ↓
-// ¿pertenece a un grupo DEVOLVIENDO? → pasa derecho
+// ¿pertenece a un grupo DEVOLVIENDO? → pasa derecho (o se
+//     bloquea, si el grupo es de tipo "consumido")
 //     ↓ no
 // ¿hay un RETENIDO? → se suma a su buffer + se analiza
 //     ↓ no
 // se guarda como EVENTO_EN_CURSO + se analiza
 //     ↓ (implícito, vía Cache)
-// retener() | pasar() | consumir()
+// retener() | pasar() | consumir(vivas)
 // ======================================================
 
 use crate::back_interception;
@@ -167,6 +208,16 @@ struct GrupoRetenido {
 
 struct GrupoDevolviendo {
     faltan_soltar: Vec<InputId>,
+
+    // [FIX] false (comportamiento de siempre) = los eventos que
+    // pertenecen a este grupo se emiten a Windows tal cual (grupo
+    // nacido de pasar()). true = se BLOQUEAN, nunca se emiten (grupo
+    // nacido de consumir() con un match diferido — ver header,
+    // punto 5a): el Down original de esta tecla nunca llegó a
+    // Windows, así que sus repeats y su Up tampoco deben llegar.
+    // Sigue usándose igual para saber qué falta soltar y para
+    // avisar a cache::soltar_fisico() en el Up.
+    bloquear: bool,
 }
 
 static RETENIDO: Mutex<Option<GrupoRetenido>> = Mutex::new(None);
@@ -210,8 +261,10 @@ pub fn procesar_evento(evento: InputEvent) {
         return;
     }
 
-    // a) ¿Pertenece a algún grupo que ya se dejó pasar y todavía no
-    //    soltó todas sus teclas? Pasa derecho, sin análisis.
+    // a) ¿Pertenece a algún grupo que ya se dejó pasar (o consumir) y
+    //    todavía no soltó todas sus teclas? Se resuelve sin análisis:
+    //    se emite o se bloquea según el tipo de grupo (ver
+    //    GrupoDevolviendo::bloquear).
     {
         let mut devolviendo = DEVOLVIENDO.lock().unwrap();
 
@@ -219,7 +272,9 @@ pub fn procesar_evento(evento: InputEvent) {
             .iter()
             .position(|grupo| grupo.faltan_soltar.contains(&evento.input))
         {
-            back_interception::emitir_evento(evento.clone());
+            if !devolviendo[indice].bloquear {
+                back_interception::emitir_evento(evento.clone());
+            }
 
             if evento.state == InputState::Up {
                 devolviendo[indice]
@@ -266,10 +321,11 @@ pub fn procesar_evento(evento: InputEvent) {
 
 /// Llamada por Cache (síncrona o desde el timer): no hay match posible.
 /// Si había un RETENIDO, se reinyecta su buffer completo en orden, sin
-/// delay, y lo que quede sin soltar pasa a un grupo DEVOLVIENDO. Si no
-/// había nada retenido, es el evento en curso ahora mismo en este hilo:
-/// se emite tal cual y, si era un Down, abre igual su propio grupo
-/// DEVOLVIENDO (para que su Up no se pierda).
+/// delay, y lo que quede sin soltar pasa a un grupo DEVOLVIENDO (modo
+/// emitir). Si no había nada retenido, es el evento en curso ahora
+/// mismo en este hilo: se emite tal cual y, si era un Down, abre igual
+/// su propio grupo DEVOLVIENDO (modo emitir) para que su Up no se
+/// pierda.
 pub fn pasar() {
     let mut retenido = RETENIDO.lock().unwrap();
 
@@ -284,6 +340,7 @@ pub fn pasar() {
             if evento.state == InputState::Down {
                 DEVOLVIENDO.lock().unwrap().push(GrupoDevolviendo {
                     faltan_soltar: vec![evento.input],
+                    bloquear: false,
                 });
             }
         }
@@ -309,10 +366,10 @@ pub fn pasar() {
     }
 
     if !faltan_soltar.is_empty() {
-        DEVOLVIENDO
-            .lock()
-            .unwrap()
-            .push(GrupoDevolviendo { faltan_soltar });
+        DEVOLVIENDO.lock().unwrap().push(GrupoDevolviendo {
+            faltan_soltar,
+            bloquear: false,
+        });
     }
 }
 
@@ -373,9 +430,34 @@ fn vigilar_retenido(generacion: u64) {
 
 /// Llamada por Cache: hubo match real y ya se avisó a Runtime. Lo
 /// retenido (si algo había) YA fue el match — se descarta sin
-/// reinyectar nada, y no se abre ningún grupo DEVOLVIENDO (nunca se
-/// emitió nada de esto a Windows, así que tampoco hace falta rastrear
-/// su Up).
-pub fn consumir() {
+/// reinyectar nada (nunca se emitió nada de esto a Windows).
+///
+/// [FIX] `vivas` son las teclas de ese match que Cache determinó que
+/// siguen físicamente presionadas AHORA MISMO (ver
+/// cache::algo_sigue_presionado — típicamente, un match diferido de
+/// Extra Normal/Turbo/Mantener/ClickSostenido, donde la instancia
+/// activa recién se va a cerrar con el Up real de esa tecla). Antes
+/// esta función no recibía nada y jamás abría un grupo DEVOLVIENDO,
+/// así que esas teclas quedaban sin ningún rastro en entrada.rs: sus
+/// repeats de Down y su Up real volvían a caer en la rama (c) como
+/// "eventos nuevos", cache.rs los descartaba en silencio por su
+/// propio chequeo de `presionadas` (sin llamar nunca a retener/pasar/
+/// consumir), y entrada.rs — al no tener ninguna decisión explícita
+/// para ellos — terminaba dejándolos pasar sin bloquear (la tecla
+/// remapeada se colaba a Windows en cada repeat) y el Up real nunca
+/// cerraba el ciclo acá (aunque sí cerraba la InstanciaActiva del
+/// lado de cache.rs, vía runtime.activas).
+///
+/// Si `vivas` está vacío (caso más común: match no diferido, o
+/// diferido pero la tecla ya se soltó antes de resolverse), el
+/// comportamiento es exactamente el de antes: no se abre nada.
+pub fn consumir(vivas: &[InputId]) {
     *RETENIDO.lock().unwrap() = None;
+
+    if !vivas.is_empty() {
+        DEVOLVIENDO.lock().unwrap().push(GrupoDevolviendo {
+            faltan_soltar: vivas.to_vec(),
+            bloquear: true,
+        });
+    }
 }
