@@ -6,7 +6,6 @@
 // Inicializa el motor principal.
 // ======================================================
 
-mod analizador_trigger;
 mod back_app;
 mod back_coordenada;
 mod back_interception;
@@ -41,7 +40,7 @@ mod usuario;
 
 pub fn run() {
     std::thread::spawn(|| {
-        back_interception::iniciar(entrada::procesar_evento, analizador_trigger::captura_activa);
+        back_interception::iniciar(entrada::procesar_evento, cache::captura_activa);
     });
     back_app::iniciar_monitor();
     tauri::Builder::default()

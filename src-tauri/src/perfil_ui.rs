@@ -93,16 +93,16 @@
 //
 // iniciar_captura()
 //     Abre una captura nueva: fila/columna destino, secuencia vacía.
-//     Activa el modo Captura en analizador_trigger (a partir de acá,
-//     entrada.rs empieza a consumir todo hacia este archivo).
+//     Activa el modo Captura en cache.rs (a partir de acá, entrada.rs
+//     empieza a consumir todo hacia este archivo).
 //
 // recibir_down()
 //     Agrega un Down a la secuencia en curso (llamada por
-//     AnalizadorTrigger, modo Captura).
+//     cache.rs, modo Captura).
 //
 // recibir_condicion()
 //     Arma el TriggerCapturaUI final con la condición recibida y
-//     cierra la captura (llamada por AnalizadorTrigger). Si columna
+//     cierra la captura (llamada por cache.rs). Si columna
 //     es "Trigger" y el resultado es únicamente Click izquierdo sin
 //     ningún modificador (remapearía TODO clic izquierdo de
 //     Windows), se descarta: el resultado queda con el trigger en
@@ -500,7 +500,7 @@ static RESULTADO_CAPTURA: std::sync::Mutex<Option<(String, String, Option<Trigge
     std::sync::Mutex::new(None);
 
 /// Llamada por el botón de captura. Arma el estado transitorio y
-/// activa el modo Captura en analizador_trigger — desde ese momento,
+/// activa el modo Captura en cache.rs — desde ese momento,
 /// entrada.rs empieza a consumir todo lo que llegue y reenviarlo acá.
 pub fn iniciar_captura(fila_id: String, columna: String) {
     *CAPTURA.lock().unwrap() = Some(CapturaEnCurso {
@@ -510,7 +510,7 @@ pub fn iniciar_captura(fila_id: String, columna: String) {
     });
     *RESULTADO_CAPTURA.lock().unwrap() = None;
 
-    crate::analizador_trigger::activar_captura();
+    crate::cache::activar_captura();
 }
 
 /// Llamada por AnalizadorTrigger (modo Captura) con cada Down nuevo.

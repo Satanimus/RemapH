@@ -46,10 +46,10 @@
 // al analizador (comportamiento normal).
 //
 // EXCEPCIÓN — Modo Captura: mientras haya una captura activa
-// (analizador_trigger::captura_activa()), este archivo no
+// (cache::captura_activa()), este archivo no
 // aplica NADA de lo anterior. Ni RETENIDO, ni DEVOLVIENDO, ni
 // el corte por cache::esta_vacia(). Todo evento se reenvía
-// directo a analizador_trigger::procesar_evento_captura() y
+// directo a cache::procesar_evento_captura() y
 // NUNCA se emite a Windows — la captura consume físicamente
 // todo lo que llega (así un clic derecho capturado no abre
 // menú contextual, ni un atajo ya guardado se dispara durante
@@ -146,7 +146,6 @@
 // retener() | pasar() | consumir()
 // ======================================================
 
-use crate::analizador_trigger;
 use crate::back_interception;
 use crate::cache;
 use crate::captura_coordenada;
@@ -196,8 +195,8 @@ pub fn procesar_evento(evento: InputEvent) {
     // EXCEPCIÓN — Modo Captura: se consume TODO, incondicionalmente, y
     // ni se mira RETENIDO/DEVOLVIENDO ni el estado de la cache. Esto va
     // primero que cualquier otra cosa (ver header, punto 5).
-    if analizador_trigger::captura_activa() {
-        analizador_trigger::procesar_evento_captura(evento);
+    if cache::captura_activa() {
+        cache::procesar_evento_captura(evento);
         return;
     }
 
@@ -233,13 +232,13 @@ pub fn procesar_evento(evento: InputEvent) {
 
                 drop(devolviendo);
 
-                // Este Up nunca llega a analizador_trigger::procesar()
+                // Este Up nunca llega a cache::procesar_evento_runtime()
                 // (cortamos acá con el return de abajo) — sin este
                 // aviso, su conjunto interno de "presionados ahora"
                 // queda pensando que la tecla sigue abajo para
                 // siempre, y la próxima Down de esa tecla se descarta
                 // como si fuera un repeat.
-                analizador_trigger::soltar_fisico(evento.input.clone());
+                cache::soltar_fisico(evento.input.clone());
             }
             return;
         }
@@ -254,14 +253,14 @@ pub fn procesar_evento(evento: InputEvent) {
         if let Some(grupo) = retenido.as_mut() {
             grupo.buffer.push(evento.clone());
             drop(retenido);
-            analizador_trigger::procesar_evento_runtime(evento);
+            cache::procesar_evento_runtime(evento);
             return;
         }
     }
 
     // c) Evento nuevo, sin nada pendiente.
     EVENTO_EN_CURSO.with(|c| *c.borrow_mut() = Some(evento.clone()));
-    analizador_trigger::procesar_evento_runtime(evento);
+    cache::procesar_evento_runtime(evento);
     EVENTO_EN_CURSO.with(|c| *c.borrow_mut() = None);
 }
 
@@ -365,7 +364,7 @@ fn vigilar_retenido(generacion: u64) {
     }
 
     eprintln!(
-        "⚠️ Red de seguridad: un RETENIDO llevaba más de {} ms sin resolverse — se fuerza a soltar. Esto NO debería pasar; revisar cache.rs/analizador_trigger.rs.",
+        "⚠️ Red de seguridad: un RETENIDO llevaba más de {} ms sin resolverse — se fuerza a soltar. Esto NO debería pasar; revisar cache.rs.",
         config::tiempo_maximo_retenido()
     );
 

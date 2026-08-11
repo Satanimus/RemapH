@@ -1,24 +1,17 @@
 // ======================================================
-// 🗃️ Cache — ETAPAS 1, 2 y 3 / 6 (ver DISENO_CACHE_V2.md)
+// 🗃️ Cache — ETAPAS 1 a 5 / 6 (ver DISENO_CACHE_V2.md)
 // ======================================================
-// Este archivo acumula lo entregado hasta ahora: Etapa 1 (datos
-// compilados) y Etapa 2 (motor de sesiones Runtime) sin cambios de
-// lógica respecto a la entrega anterior — Sesion gana un campo
-// (`pendiente`) que Runtime no usa, ver nota en su definición — más
-// la Etapa 3 (motor de Captura) agregada al final.
-//
-// ⚠️ Sigue sin compilar el proyecto completo — analizador_trigger.rs
-// todavía existe y sigue pidiendo funciones viejas de cache.rs que
-// ya no están (recibir_down, recibir_up, recibir_condicion,
-// hay_candidata_para). Eso se resuelve recién en la Etapa 5. Hasta
-// entonces este archivo se revisa por lectura, no se pisa el
-// cache.rs real del proyecto. Es normal que compile con warnings de
-// "dead code" — recibir_down_rt/recibir_up_rt (Etapa 2) y
-// recibir_down_captura/recibir_up_captura (Etapa 3) todavía no las
-// llama nadie: eso lo cablea la Etapa 4.
+// Este archivo fusiona lo que antes eran cache.rs + analizador_
+// trigger.rs (BORRADO, ver Etapa 5): Etapa 1 (datos compilados),
+// Etapa 2 (motor de sesiones Runtime), Etapa 3 (motor de Captura) y
+// Etapa 4 (filtro de repeats + ruteo). Desde la Etapa 5,
+// lib.rs/entrada.rs/perfil_ui.rs ya apuntan acá (cache::) en vez de
+// al archivo viejo — el proyecto compila de punta a punta.
+// Queda pendiente la Etapa 6 (verificación funcional en la app real,
+// checklist maestro).
 // ======================================================
 
-use crate::eventos::InputId;
+use crate::eventos::{InputEvent, InputId, InputState};
 use crate::perfil_cache::{
     AccionCache, AppCache, CondicionTrigger, CoordenadaCache, ExtraCache, RemapeoCache,
 };
@@ -144,8 +137,8 @@ fn compilado_actual() -> EstadoCompilado {
 // instancias activas esperando su Up real (Turbo/Mantener/
 // Click Sostenido/Normal).
 //
-// Reemplaza a Lista (cache.rs viejo) + Grupo (analizador_trigger.rs
-// viejo) por un único concepto: Sesion. Su `entrada` es la ÚNICA
+// Reemplaza a Lista (cache.rs viejo) + Grupo (archivo aparte viejo,
+// ya borrado) por un único concepto: Sesion. Su `entrada` es la ÚNICA
 // fuente de "qué hay en este grupo" — ya no hay una copia acá y
 // otra en un archivo aparte (esa duplicación era la sospechosa
 // número uno del bug que motivó esta reescritura).
@@ -262,12 +255,26 @@ struct EstadoRuntime {
     sesiones: Vec<Sesion>,
     siguiente_id: u64,
     activas: Vec<InstanciaActiva>,
+    /// Lo que está físicamente presionado ahora mismo (Runtime). NO es
+    /// lo mismo que la unión de Sesion.entrada: entrada es historial
+    /// acumulado de una sesión y a propósito NO se achica al pasar de
+    /// EsperandoMantenido a EsperandoDoble/EsperandoTriple (ver
+    /// objetivo()), porque el timer necesita seguir sabiendo cuál fue
+    /// el último Down agregado incluso después de soltarlo. Usar
+    /// `entrada` como filtro de repeats (Etapa 4) confundía un
+    /// segundo/tercer toque real (Doble/Triple, con Up de por medio)
+    /// con un auto-repeat de Windows — el bug quedó documentado en la
+    /// nota (b) de la Etapa 4, que resultó incorrecta al confrontarla
+    /// con la implementación real. Este campo es la única fuente de
+    /// verdad para "¿está la tecla abajo ahora mismo?".
+    presionadas: Vec<InputId>,
 }
 
 static RUNTIME: Mutex<EstadoRuntime> = Mutex::new(EstadoRuntime {
     sesiones: Vec::new(),
     siguiente_id: 0,
     activas: Vec::new(),
+    presionadas: Vec::new(),
 });
 
 fn nuevo_id_sesion(runtime: &mut EstadoRuntime) -> u64 {
@@ -305,11 +312,11 @@ pub(crate) fn recibir_down_rt(input: InputId) {
                 return;
             }
             FaseSesion::EsperandoDoble => {
-                resolver_condicion_por_id(&mut runtime, idx, CondicionTrigger::Doble);
+                resolver_condicion_por_id(runtime, idx, CondicionTrigger::Doble);
                 return;
             }
             FaseSesion::EsperandoTriple { toques: 2 } => {
-                resolver_condicion_por_id(&mut runtime, idx, CondicionTrigger::Triple);
+                resolver_condicion_por_id(runtime, idx, CondicionTrigger::Triple);
                 return;
             }
             _ => unreachable!(),
@@ -374,6 +381,7 @@ pub(crate) fn recibir_down_rt(input: InputId) {
         && candidatas[0].trigger.condicion == CondicionTrigger::Simple
     {
         let remapeo = candidatas[0].clone();
+        eliminar_sesion(&mut runtime, id);
         drop(runtime);
         resolver_match(remapeo, entrada_actual, id, Vec::new());
         return;
@@ -430,7 +438,7 @@ fn iniciar_espera_mantenido(
             return;
         }
         let idx = runtime.sesiones.iter().position(|s| s.id == id).unwrap();
-        resolver_condicion_por_id(&mut runtime, idx, CondicionTrigger::Mantenido);
+        resolver_condicion_por_id(runtime, idx, CondicionTrigger::Mantenido);
     });
 }
 
@@ -454,9 +462,22 @@ fn eliminar_sesion(runtime: &mut EstadoRuntime, id: u64) {
 
 /// Resuelve la condición `condicion` para la sesión en `runtime.sesiones[idx]`.
 /// Si hay match exacto contra los remapeos compilados, ejecuta. Si no,
-/// aborta (Pasar). Consume el índice — después de llamar esto, `idx`
-/// puede ya no ser válido (la sesión pudo haberse eliminado).
-fn resolver_condicion_por_id(runtime: &mut EstadoRuntime, idx: usize, condicion: CondicionTrigger) {
+/// aborta (Pasar). Toma posesión del MutexGuard (en vez de un `&mut`
+/// prestado) para poder soltarlo explícitamente ANTES de llamar a
+/// resolver_match()/entrada::pasar() — llamarlas con el lock de RUNTIME
+/// todavía tomado es exactamente el deadlock que la "regla de oro"
+/// del diseño prohíbe (resolver_match, para un Extra diferido como
+/// Normal/Turbo/Mantener/ClickSostenido, vuelve a pedir RUNTIME.lock()
+/// para registrar la InstanciaActiva). Todos los llamadores actuales
+/// ya tratan esta llamada como el último uso de `runtime` en su scope
+/// (return inmediato después, o fin del closure del timer), así que
+/// mover el `drop` para acá no les cambia el comportamiento.
+fn resolver_condicion_por_id(
+    runtime: std::sync::MutexGuard<'static, EstadoRuntime>,
+    idx: usize,
+    condicion: CondicionTrigger,
+) {
+    let mut runtime = runtime;
     let id = runtime.sesiones[idx].id;
     let entrada_actual = runtime.sesiones[idx].entrada.clone();
 
@@ -473,17 +494,16 @@ fn resolver_condicion_por_id(runtime: &mut EstadoRuntime, idx: usize, condicion:
     // histórico "3>A" en cache.rs viejo).
     if let Some(remapeo) = match_final {
         if condicion == CondicionTrigger::Simple || posibles == exactas {
-            eliminar_sesion(runtime, id);
+            eliminar_sesion(&mut runtime, id);
             drop(candidatas);
+            drop(runtime); // ⚠️ soltar ANTES de resolver_match — ver doc de arriba
             resolver_match(remapeo, entrada_actual, id, Vec::new());
             return;
         }
     }
 
-    eliminar_sesion(runtime, id);
-    // (drop implícito de runtime al salir de la función — la llamada
-    // real toma el lock afuera; ver timers e Up-handler más abajo,
-    // todos sueltan el lock ANTES de esta parte final.)
+    eliminar_sesion(&mut runtime, id);
+    drop(runtime); // ⚠️ soltar ANTES de entrada::pasar()
     entrada::pasar();
 }
 
@@ -625,7 +645,7 @@ pub(crate) fn recibir_up_rt(input: InputId) {
                 CondicionTrigger::Simple,
             );
         } else {
-            resolver_condicion_por_id(&mut runtime, idx, CondicionTrigger::Simple);
+            resolver_condicion_por_id(runtime, idx, CondicionTrigger::Simple);
         }
         return;
     }
@@ -723,7 +743,7 @@ fn iniciar_timer_generico(
             _ => condicion_si_expira,
         };
 
-        resolver_condicion_por_id(&mut runtime, idx, condicion);
+        resolver_condicion_por_id(runtime, idx, condicion);
     });
 }
 
@@ -1055,4 +1075,303 @@ fn iniciar_timer_triple_captura(generacion: u64) {
             perfil_ui::recibir_condicion(condicion);
         }
     });
+}
+
+// ======================================================
+// ===== ETAPA 4 — PUNTO DE ENTRADA ÚNICO (FILTRO DE ====
+// ===== REPEATS + RUTEO)                             ===
+// ======================================================
+// 1. ¿Qué hace esta parte?
+//
+// La capa que hoy hace AnalizadorTrigger::procesar(): recibe CADA
+// InputEvent físico (Down/Up/Pulse), filtra el auto-repeat de
+// Windows, y decide si el evento va al motor de Runtime (Etapa 2) o
+// al de Captura (Etapa 3). Es la ÚNICA parte de este archivo que
+// sabe de InputEvent completo — las etapas 2 y 3 solo trabajan con
+// InputId puro (ya filtrado, ya "es un Down/Up real").
+//
+// El filtro de repeats ya NO necesita "alimentar" ningún timer con
+// cada repeat (a diferencia del diseño viejo, que usaba el repeat
+// como tick para revisar tiempo_mantenido): acá los timers son
+// autónomos por sleep, se resuelven solos al despertar. Un repeat
+// simplemente no reenvía nada y no toca nada más.
+// ------------------------------------------------------
+// 2. ¿Quién llama esta parte?
+// entrada.rs — le entrega cada InputEvent físico vía
+//     procesar_evento_runtime() (modo normal) o
+//     procesar_evento_captura() (mientras hay captura activa, ver
+//     captura_activa()). También llama soltar_fisico() en el atajo
+//     DEVOLVIENDO (Up que nunca pasa por el pipeline normal).
+// lib.rs — usa captura_activa() como el `Fn() -> bool` que le pasa a
+//     back_interception::iniciar().
+// perfil_ui.rs — llama activar_captura() al arrancar una captura
+//     nueva (sin argumentos — ver nota (a) de la Etapa 3: fila_id/
+//     columna se quedan en perfil_ui.rs, no hace falta duplicarlos
+//     acá).
+// ------------------------------------------------------
+// 3. Decisiones de diseño que se apartaron del documento original
+// (marcarlas para que quede asentado, ver regla "no improvisar"):
+//
+// a) [CORREGIDO tras pruebas — ver historial] El filtro de repeats
+//    para Runtime originalmente consultaba RUNTIME.sesiones (¿`input`
+//    está en la `entrada` de alguna sesión?) en vez de un tracker de
+//    "presionadas ahora" aparte, razonando que Sesion.entrada era la
+//    única fuente de verdad necesaria. Eso estaba MAL: entrada es el
+//    historial acumulado de una sesión y a propósito NO se achica al
+//    pasar de EsperandoMantenido a EsperandoDoble/EsperandoTriple
+//    (ver objetivo()) — así que después de soltar el primer toque de
+//    un Doble/Triple, `entrada` seguía conteniendo esa tecla aunque
+//    ya no estuviera físicamente presionada. El filtro la trataba
+//    como repeat y descartaba el segundo/tercer toque real sin que
+//    llegara nunca a "Down interrumpe timer" (bloque (b) más abajo) —
+//    la sesión quedaba esperando hasta que el timer expiraba solo, y
+//    como no había match para la condición de fallback, terminaba en
+//    entrada::pasar() (reenvía los eventos crudos retenidos a
+//    Windows). Solución: EstadoRuntime.presionadas, un Vec<InputId>
+//    aparte que solo refleja qué está físicamente abajo ahora mismo
+//    (se agrega en cada Down real, se saca en cada Up) — mismo patrón
+//    que ya usa EstadoCaptura.presionadas desde la Etapa 3. El filtro
+//    de repeats consulta ESTO, nunca Sesion.entrada.
+//
+// b) Down interrumpe timer (Doble/Triple) para Runtime NO se repite
+//    acá: ya vive en recibir_down_rt (Etapa 2, primer bloque de la
+//    función), porque ese caso necesita revisar el estado completo de
+//    las sesiones (fase, objetivo) para decidir a qué condición
+//    resolver — el filtro de repeats de más arriba ya garantiza que,
+//    para cuando este Down llega hasta acá, es un Down real (hubo Up
+//    de por medio), así que este bloque no necesita, ni debe, volver
+//    a preguntarse si es repeat.
+// ======================================================
+
+/// Consultada por entrada.rs antes que cualquier otra cosa: mientras
+/// esté en true, TODO evento físico se consume y se reenvía acá vía
+/// procesar_evento_captura(), nunca a Windows ni a Runtime.
+pub fn captura_activa() -> bool {
+    CAPTURA.lock().unwrap().activa
+}
+
+/// Llamada por perfil_ui.rs al arrancar una captura nueva. Sin
+/// argumentos — ver nota (a) de la Etapa 3.
+pub fn activar_captura() {
+    activar_captura_interna();
+}
+
+// ------------------------------------------------------
+// 🔁 MOTOR RUNTIME — filtro de repeats + ruteo
+// ------------------------------------------------------
+
+/// Punto de entrada único para cada InputEvent físico en modo
+/// Runtime (ya filtrado de repeats acá mismo). Reemplaza a
+/// AnalizadorTrigger::procesar() en modo Runtime.
+pub fn procesar_evento_runtime(evento: InputEvent) {
+    match evento.state {
+        InputState::Down => procesar_down_runtime(evento.input),
+        InputState::Up => procesar_up_runtime(evento.input),
+        InputState::Pulse => procesar_pulse_runtime(evento.input),
+    }
+}
+
+fn procesar_down_runtime(input: InputId) {
+    let mut runtime = RUNTIME.lock().unwrap();
+    if runtime.presionadas.contains(&input) {
+        // Repeat: ya estaba físicamente presionada, sin Up de por
+        // medio. No se reenvía.
+        return;
+    }
+    runtime.presionadas.push(input.clone());
+    drop(runtime);
+    recibir_down_rt(input);
+}
+
+fn procesar_up_runtime(input: InputId) {
+    {
+        let mut runtime = RUNTIME.lock().unwrap();
+        runtime.presionadas.retain(|i| i != &input);
+    }
+    // A diferencia del Down, el Up siempre se reenvía — no hay
+    // "repeat" de Up (Windows no los genera) y recibir_up_rt ya sabe
+    // no-opear si `input` no pertenece a ninguna sesión ni instancia
+    // activa (ver Etapa 2).
+    recibir_up_rt(input);
+}
+
+/// Rueda del mouse: solo aplica a Runtime (ver hay_candidata_para).
+/// Si ningún candidato posible espera este pulso ahora mismo, se
+/// trata como evento suelto — un Down real por cada pulso, sin
+/// agrupar (mismo camino que ya usa el teclado para un input sin
+/// ninguna candidata, vía posibles == 0 -> pasar() dentro de
+/// recibir_down_rt). Si hay candidata, se agrupa en la sesión
+/// (fase CerrandoRueda, ver más abajo) — ahí SÍ hace falta distinguir
+/// "primer pulso de la ráfaga" (se reenvía) de "pulso siguiente de la
+/// misma ráfaga" (solo suma al conteo), a diferencia del filtro de
+/// repeats de Down/Up de más arriba.
+fn procesar_pulse_runtime(input: InputId) {
+    if !hay_candidata_para(&input) {
+        recibir_down_rt(input);
+        return;
+    }
+    recibir_pulse_rt(input);
+}
+
+/// ¿Existe alguna sesión de Runtime que, extendida con `input`,
+/// siga teniendo `posibles > 0`? Si ninguna sirve, prueba `input`
+/// solo (caso "rueda como primer paso de un gesto nuevo"). Ya no es
+/// pub — solo la usa procesar_pulse_runtime, dentro de este mismo
+/// archivo (reemplaza a la vieja hay_candidata_para, que el
+/// el archivo viejo original llamaba desde afuera).
+fn hay_candidata_para(input: &InputId) -> bool {
+    let runtime = RUNTIME.lock().unwrap();
+    let compilado = compilado_actual();
+
+    let alguna_sesion_sirve = runtime.sesiones.iter().any(|s| {
+        let mut probable = s.entrada.clone();
+        probable.push(input.clone());
+        contar(&compilado, &probable).0 > 0
+    });
+
+    if alguna_sesion_sirve {
+        return true;
+    }
+
+    contar(&compilado, std::slice::from_ref(input)).0 > 0
+}
+
+/// Punto de entrada para cada Pulse REAL de rueda ya decidido como
+/// "hay candidata" (ver procesar_pulse_runtime). Agrupa en ráfagas:
+/// solo el primer pulso de la ráfaga se reenvía a recibir_down_rt
+/// (Runtime ya se entera de la rueda con ese); los pulsos siguientes
+/// de la MISMA ráfaga solo suman al conteo, hasta que
+/// iniciar_timer_rueda decide Mantenido o Simple al expirar.
+fn recibir_pulse_rt(input: InputId) {
+    let mut runtime = RUNTIME.lock().unwrap();
+
+    let existente = runtime.sesiones.iter().position(|s| {
+        s.objetivo() == Some(&input) && matches!(s.fase, FaseSesion::CerrandoRueda { .. })
+    });
+
+    let (id, es_primero) = match existente {
+        Some(idx) => {
+            let s = &mut runtime.sesiones[idx];
+            s.generacion += 1;
+            match s.fase {
+                FaseSesion::CerrandoRueda { pulsos } => {
+                    s.fase = FaseSesion::CerrandoRueda { pulsos: pulsos + 1 };
+                }
+                _ => unreachable!(),
+            }
+            (s.id, false)
+        }
+        None => {
+            let id = nuevo_id_sesion(&mut runtime);
+            let mut s = Sesion::nueva(id, vec![input.clone()], false);
+            s.fase = FaseSesion::CerrandoRueda { pulsos: 1 };
+            runtime.sesiones.push(s);
+            (id, true)
+        }
+    };
+
+    let generacion = runtime
+        .sesiones
+        .iter()
+        .find(|s| s.id == id)
+        .map(|s| s.generacion)
+        .unwrap_or(0);
+    drop(runtime);
+
+    if es_primero {
+        // Nunca pasa por recibir_down_rt (a propósito, igual que el
+        // diseño viejo): no se agrega a ninguna sesión "normal" de
+        // matching, ya se creó explícitamente arriba en fase
+        // CerrandoRueda — recibir_down_rt duplicaría la sesión.
+        entrada::retener();
+    }
+
+    iniciar_timer_rueda(id, generacion);
+}
+
+/// Timer de cierre de una ráfaga de rueda. Si pasa tiempo_doble() sin
+/// que llegue un pulso nuevo, decide: `pulsos >= sensibilidad_rueda()`
+/// -> Mantenido, si no -> Simple. La rueda no tiene fase Doble/Triple
+/// propia — no hay forma física de "soltarla y volver a apretarla"
+/// como una tecla.
+fn iniciar_timer_rueda(id: u64, generacion: u64) {
+    std::thread::spawn(move || {
+        std::thread::sleep(std::time::Duration::from_millis(config::tiempo_doble()));
+        let mut runtime = RUNTIME.lock().unwrap();
+        if !vigente(&runtime, id, generacion) {
+            return; // llegó un pulso nuevo antes de terminar de esperar
+        }
+        let idx = runtime.sesiones.iter().position(|s| s.id == id).unwrap();
+        let pulsos = match runtime.sesiones[idx].fase {
+            FaseSesion::CerrandoRueda { pulsos } => pulsos,
+            _ => 1,
+        };
+        let condicion = if pulsos >= config::sensibilidad_rueda() {
+            CondicionTrigger::Mantenido
+        } else {
+            CondicionTrigger::Simple
+        };
+        resolver_condicion_por_id(runtime, idx, condicion);
+    });
+}
+
+/// Reemplaza al soltar() de hoy: saca `input` de la sesión de
+/// Runtime que lo contenga, sin pasar por el resto del pipeline de Up
+/// — no avisa a entrada.rs/runtime.rs/perfil_ui.rs, solo mantiene
+/// `entrada` sincronizada con la realidad física. Usado por
+/// entrada.rs en el atajo DEVOLVIENDO (evento que nunca llega hasta
+/// procesar_evento_runtime por el camino normal).
+pub fn soltar_fisico(input: InputId) {
+    let mut runtime = RUNTIME.lock().unwrap();
+    runtime.presionadas.retain(|i| i != &input);
+    if let Some(s) = runtime
+        .sesiones
+        .iter_mut()
+        .find(|s| s.entrada.contains(&input))
+    {
+        s.entrada.retain(|i| i != &input);
+    }
+}
+
+// ------------------------------------------------------
+// 🎬 MOTOR CAPTURA — filtro de repeats + ruteo
+// ------------------------------------------------------
+
+/// Punto de entrada único para cada InputEvent físico en modo
+/// Captura (ya filtrado de repeats acá mismo). Reemplaza a
+/// AnalizadorTrigger::procesar() en modo Captura. Llamada por
+/// entrada.rs mientras captura_activa().
+pub fn procesar_evento_captura(evento: InputEvent) {
+    match evento.state {
+        InputState::Down => procesar_down_captura(evento.input),
+        InputState::Up => procesar_up_captura(evento.input),
+        // La rueda del mouse no se agrupa en Captura: cada pulso es
+        // simplemente un Down más de la secuencia que se está
+        // grabando (Captura no filtra por candidatas — ver Etapa 3,
+        // "acá todo Down es válido"). Se reenvía tal cual a
+        // recibir_down_captura, que ya sabe filtrar repeats con
+        // `presionadas` igual que cualquier otro input.
+        InputState::Pulse => procesar_down_captura(evento.input),
+    }
+}
+
+fn presionada_en_captura(captura: &EstadoCaptura, input: &InputId) -> bool {
+    captura.presionadas.contains(input)
+}
+
+fn procesar_down_captura(input: InputId) {
+    {
+        let captura = CAPTURA.lock().unwrap();
+        if !captura.activa {
+            return; // defensivo — entrada.rs no debería llegar hasta acá sin captura activa
+        }
+        if presionada_en_captura(&captura, &input) {
+            return; // repeat, no se reenvía
+        }
+    }
+    recibir_down_captura(input);
+}
+
+fn procesar_up_captura(input: InputId) {
+    recibir_up_captura(input);
 }
