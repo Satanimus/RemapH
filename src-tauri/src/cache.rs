@@ -1114,6 +1114,93 @@ fn iniciar_timer_triple_captura(generacion: u64) {
 }
 
 // ======================================================
+// 🖱️ RUEDA EN CAPTURA
+// ------------------------------------------------------
+// [FIX] La rueda llega SIEMPRE como InputState::Pulse — nunca tiene
+// Down/Up propios (cada muesca es un pulso suelto, no un
+// "sostener"). Antes, procesar_evento_captura() la enrutaba igual
+// que una tecla (procesar_down_captura/recibir_down_captura), que
+// la empuja a `captura.presionadas` esperando un Up que la saque de
+// ahí más adelante — ese Up nunca llega, así que la rueda quedaba
+// en `presionadas` PARA SIEMPRE. Como flush_si_vacio() exige
+// `presionadas` vacío para poder cerrar CUALQUIER captura (no solo
+// la de la rueda), un solo giro dejaba la ventana de Captura
+// trabada para siempre — y como Modo Captura consume todo
+// incondicionalmente, el teclado quedaba mudo.
+//
+// Ahora la rueda arma su propia ráfaga, mismo criterio que
+// recibir_pulse_rt en Runtime (ver FaseSesion::CerrandoRueda):
+// cuenta pulsos consecutivos SIN tocar `presionadas`, y al pasar
+// config::tiempo_doble() sin un pulso nuevo, resuelve Simple (menos
+// de sensibilidad_rueda() pulsos) o Mantenido (esa cantidad o más)
+// a través del mismo resolver_condicion_captura() que ya usa
+// Doble/Triple/Mantenido de teclado — así una combinación como
+// Ctrl+Rueda también funciona: Ctrl sí queda en `presionadas` (tiene
+// Down/Up reales), así que la condición de la rueda queda
+// "pendiente" hasta que Ctrl se suelte, igual que ya pasa hoy con
+// cualquier otra combinación modificador+condición.
+// ======================================================
+
+fn recibir_pulse_captura(input: InputId) {
+    let mut captura = CAPTURA.lock().unwrap();
+    if !captura.activa {
+        return;
+    }
+
+    let continua_rueda = captura.sesion.as_ref().is_some_and(|s| {
+        s.objetivo() == Some(&input) && matches!(s.fase, FaseSesion::CerrandoRueda { .. })
+    });
+
+    if continua_rueda {
+        let sesion = captura.sesion.as_mut().unwrap();
+        sesion.generacion += 1;
+        if let FaseSesion::CerrandoRueda { pulsos } = sesion.fase {
+            sesion.fase = FaseSesion::CerrandoRueda { pulsos: pulsos + 1 };
+        }
+        let generacion = sesion.generacion;
+        drop(captura);
+        iniciar_timer_rueda_captura(generacion);
+        return;
+    }
+
+    let sesion = captura
+        .sesion
+        .get_or_insert_with(|| Sesion::nueva(0, Vec::new(), false));
+    sesion.entrada.push(input.clone());
+    sesion.generacion += 1;
+    sesion.fase = FaseSesion::CerrandoRueda { pulsos: 1 };
+    let generacion = sesion.generacion;
+    drop(captura);
+
+    perfil_ui::recibir_down(input);
+    iniciar_timer_rueda_captura(generacion);
+}
+
+fn iniciar_timer_rueda_captura(generacion: u64) {
+    std::thread::spawn(move || {
+        std::thread::sleep(std::time::Duration::from_millis(config::tiempo_doble()));
+        let mut captura = CAPTURA.lock().unwrap();
+        if !vigente_captura(&captura, generacion) {
+            return;
+        }
+        let pulsos = match captura.sesion.as_ref().map(|s| s.fase) {
+            Some(FaseSesion::CerrandoRueda { pulsos }) => pulsos,
+            _ => 1,
+        };
+        let condicion = if pulsos >= config::sensibilidad_rueda() {
+            CondicionTrigger::Mantenido
+        } else {
+            CondicionTrigger::Simple
+        };
+        let resultado = resolver_condicion_captura(&mut captura, condicion);
+        drop(captura);
+        if let Some(condicion) = resultado {
+            perfil_ui::recibir_condicion(condicion);
+        }
+    });
+}
+
+// ======================================================
 // ===== ETAPA 4 — PUNTO DE ENTRADA ÚNICO ===============
 // ======================================================
 
@@ -1290,7 +1377,7 @@ pub fn procesar_evento_captura(evento: InputEvent) {
     match evento.state {
         InputState::Down => procesar_down_captura(evento.input),
         InputState::Up => procesar_up_captura(evento.input),
-        InputState::Pulse => procesar_down_captura(evento.input),
+        InputState::Pulse => recibir_pulse_captura(evento.input),
     }
 }
 
