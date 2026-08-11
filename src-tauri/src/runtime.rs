@@ -130,6 +130,26 @@
 //    caminos distintos para lo mismo. Emitir no usa esto —
 //    ver COLA_SALIDA en E).
 //
+//    [FIX] Carrera Iniciar+Detener "pegados" (sin demora real
+//    entre uno y otro — típico de un tap rápido sobre un
+//    trigger diferido por ambigüedad, ver cache.rs): Cache
+//    encola la generación en GENERACIONES de forma síncrona
+//    (nueva_id_ejecucion(), ANTES de spawnear el hilo), pero
+//    la entrada real en INSTANCIAS recién se crea DENTRO del
+//    hilo spawneado, al llegar a ejecutar_lineas(). Si
+//    detener_ejecucion() corría con get_mut() (no hace nada
+//    si la clave no existe todavía), un Detener que llegaba
+//    antes de que el hilo nuevo alcanzara a arrancar se
+//    perdía en silencio — el hilo, al arrancar después,
+//    insertaba `false` sin saber que ya le habían pedido
+//    pararse, y corría para siempre (bug: "1" en bucle
+//    infinito que no se detiene; o Mantenido que nunca manda
+//    el Up). Ahora detener_ejecucion() PRE-REGISTRA la orden
+//    con insert() (crea la entrada si no existía), y
+//    ejecutar_lineas() usa entry().or_insert(false) en vez de
+//    insert() a secas, para no pisar un `true` que ya haya
+//    llegado antes de que el hilo arrancara.
+//
 // G) Backend de salida: emitir_evento() usa
 //    back_interception exclusivamente. Ya no existe el
 //    modo dual con back_windows (descartado para la 1.0,
@@ -1035,10 +1055,33 @@ fn detener(id: String) {
 /// mano — hoy, el propio comando "DETENER" dentro de una receta (ver
 /// ejecutar_linea) corre dentro de su propia ejecución y se refiere a
 /// sí mismo, no a la fila en general.
+///
+/// [FIX] Antes usaba `get_mut()`, que no hace nada si la clave
+/// todavía no existe en INSTANCIAS. Pero para un trigger diferido
+/// (Normal/Turbo/Mantenido/ClickSostenido) cuyo Iniciar+Detener
+/// llegan pegados — sin demora real entre uno y otro, típicamente un
+/// tap rápido sobre un trigger ambiguo con uno más largo (ver
+/// cache.rs) resuelto retroactivamente por el Up — hay una carrera
+/// real: nueva_id_ejecucion() encola la generación en GENERACIONES
+/// de forma síncrona ANTES de spawnear el hilo, así que detener(id)
+/// SIEMPRE encuentra a qué ejecución apunta, pero el hilo recién
+/// spawneado puede no haber llegado todavía a ejecutar_lineas()
+/// (que es quien recién ahí inserta la entrada en INSTANCIAS) para
+/// cuando este Detener llega. Con get_mut(), esa orden se perdía en
+/// silencio: el hilo, al arrancar más tarde, insertaba `false` sin
+/// saber que ya le habían pedido pararse, y corría para siempre sin
+/// recibir nunca la señal (bug: "1" en bucle infinito que no se
+/// detiene al soltar; o Mantenido que nunca llega a mandar el Up).
+/// Ahora se PRE-REGISTRA la orden con insert() (crea la entrada si
+/// todavía no existía) — y ejecutar_lineas(), más abajo, usa
+/// entry().or_insert(false) en vez de insert() a secas, para no
+/// pisar un `true` que ya haya llegado antes de que el hilo
+/// arrancara.
 fn detener_ejecucion(id_ejecucion: &str) {
-    if let Some(detenido) = INSTANCIAS.lock().unwrap().get_mut(id_ejecucion) {
-        *detenido = true;
-    }
+    INSTANCIAS
+        .lock()
+        .unwrap()
+        .insert(id_ejecucion.to_string(), true);
 }
 
 // ======================================================
@@ -1112,7 +1155,19 @@ fn ejecutar_macro_en_hilo(id: String, ruta: String) {
 // ======================================================
 
 fn ejecutar_lineas(id: String, lineas: Vec<String>) {
-    INSTANCIAS.lock().unwrap().insert(id.clone(), false);
+    // [FIX] Antes: `insert(id.clone(), false)` a secas — pisaba
+    // siempre con `false`, incluso si detener_ejecucion() ya había
+    // pre-registrado un `true` para este id mientras el hilo todavía
+    // no había alcanzado a arrancar (carrera Iniciar+Detener
+    // pegados — ver el comentario largo en detener_ejecucion()).
+    // `entry().or_insert(false)` solo escribe `false` si la entrada
+    // TODAVÍA NO existía; si ya existía (pre-registrada en `true`
+    // por un Detener que llegó primero), la deja tal cual está.
+    INSTANCIAS
+        .lock()
+        .unwrap()
+        .entry(id.clone())
+        .or_insert(false);
 
     let inicio_bucle = lineas
         .iter()
