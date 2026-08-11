@@ -351,10 +351,51 @@ pub(crate) fn recibir_down_rt(input: InputId) {
                 s.id
             }
             None => {
+                // [FIX] Antes la sesión nueva arrancaba SOLO con `input`
+                // — sin importar qué otras teclas (Shift/Ctrl/Alt u
+                // otras) ya estuvieran físicamente abajo en este
+                // momento. Eso las trataba como invisibles para el
+                // matching: una tecla como "Q" (compilada sola, ej.
+                // "Q"=1) hacía match aunque Shift estuviera físicamente
+                // presionado a la vez (bug: Shift+Q terminaba en "!" —
+                // Windows aplicaba su propio Shift al "1" simulado que
+                // Runtime tipeaba, porque el Shift físico real sí se
+                // había dejado pasar crudo a Windows, al no matchear
+                // nada él solo). Y del otro lado, "Ctrl+Q"=1 con Ctrl
+                // sostenido y Q tocada repetidas veces solo funcionaba
+                // la PRIMERA vez: al resolverse el match, la sesión
+                // [Ctrl,Q] se elimina entera (eliminar_sesion) — nadie
+                // recordaba que Ctrl seguía físicamente abajo — así que
+                // la siguiente vez que tocás Q, arrancaba una sesión
+                // nueva con solo [Q], sin Ctrl, y no matcheaba "Ctrl+Q"
+                // (bug: "1qqqqq" en vez de "111111").
+                //
+                // Ahora la sesión nueva arranca sembrada con TODO lo
+                // que está físicamente presionado ahora mismo
+                // (`runtime.presionadas`, que ya incluye a `input` — se
+                // agrega en procesar_down_runtime antes de llegar acá,
+                // y siempre queda último por orden de inserción, igual
+                // que el gatillo en un trigger compilado). Esto hace
+                // que Shift/Ctrl/Alt sean "teclas como cualquier otra"
+                // para el matching (si no hay ningún trigger compilado
+                // que empiece con la combinación real sostenida,
+                // posibles da 0 y se aborta/pasa crudo — sin disparar
+                // por error un trigger de una sola tecla), y que soltar
+                // y volver a tocar el gatillo de un combo con
+                // modificador sostenido (Ctrl+Q) vuelva a matchear sin
+                // necesidad de soltar el modificador.
                 let id = nuevo_id_sesion(&mut runtime);
+                // Clonado a una variable aparte ANTES del push: pedir
+                // `runtime.sesiones` (mutable) y `runtime.presionadas`
+                // (inmutable) en la misma expresión no compila —
+                // `runtime` es un MutexGuard, así que el acceso a sus
+                // campos pasa por Deref/DerefMut (llamadas a método,
+                // no proyección directa de campo), y el borrow checker
+                // no puede probar que son disjuntos a través de eso.
+                let presionadas_actuales = runtime.presionadas.clone();
                 runtime
                     .sesiones
-                    .push(Sesion::nueva(id, vec![input.clone()], false));
+                    .push(Sesion::nueva(id, presionadas_actuales, false));
                 id
             }
         }
@@ -448,7 +489,7 @@ fn iniciar_espera_mantenido(
 
     std::thread::spawn(move || {
         std::thread::sleep(std::time::Duration::from_millis(config::tiempo_mantenido()));
-        let mut runtime = RUNTIME.lock().unwrap();
+        let runtime = RUNTIME.lock().unwrap();
         if !vigente(&runtime, id, generacion) {
             return;
         }
@@ -853,7 +894,7 @@ fn iniciar_timer_generico(
 
     std::thread::spawn(move || {
         std::thread::sleep(std::time::Duration::from_millis(espera_ms));
-        let mut runtime = RUNTIME.lock().unwrap();
+        let runtime = RUNTIME.lock().unwrap();
         if !vigente(&runtime, id, generacion) {
             return; // se resolvió por Down antes de expirar
         }
@@ -1181,7 +1222,7 @@ fn recibir_pulse_rt(input: InputId) {
 fn iniciar_timer_rueda(id: u64, generacion: u64) {
     std::thread::spawn(move || {
         std::thread::sleep(std::time::Duration::from_millis(config::tiempo_doble()));
-        let mut runtime = RUNTIME.lock().unwrap();
+        let runtime = RUNTIME.lock().unwrap();
         if !vigente(&runtime, id, generacion) {
             return;
         }
