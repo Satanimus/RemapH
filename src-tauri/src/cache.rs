@@ -1239,6 +1239,15 @@ fn procesar_pulse_runtime(input: InputId) {
     // necesita buffer, solo hay que no reenviar el evento crudo.
     if let Some(remapeo) = candidata_repeticion_rueda(&input) {
         encolar_repeticion_rueda(remapeo);
+        // [FIX] Bug reportado: "Q+Rueda abajo"=1 Extra Repetición
+        // imprimía "qq" al soltar Q. Ver doc completo en
+        // silenciar_modificadores_repeticion_rueda() — en resumen,
+        // este camino nunca le avisaba a entrada.rs que el
+        // modificador sostenido (Q) ya había sido "usado" en un
+        // match, así que su RETENIDO quedaba huérfano y se volcaba
+        // crudo a Windows al soltar. Esta llamada cierra ese
+        // RETENIDO en silencio, sin generar ninguna salida.
+        silenciar_modificadores_repeticion_rueda();
         return;
     }
 
@@ -1508,6 +1517,58 @@ fn encolar_repeticion_rueda(remapeo: RemapeoCache) {
     }
 }
 
+/// [FIX] Bug reportado: "Q+Rueda abajo"=1 Extra Repetición imprimía
+/// "qq" al soltar Q. Causa: cuando Q baja sola (antes de que llegue
+/// ningún pulso de rueda), recibir_down_rt() no encuentra ningún
+/// trigger con entrada EXACTA `[Q]` (solo `[Q, Rueda]`), así que cae
+/// en la rama "exactas==0, seguir esperando sin timer" -> abre un
+/// RETENIDO en entrada.rs y deja una Sesion `[Q]` viva en
+/// Construyendo. El pulso de rueda que sí completa el trigger nunca
+/// pasa por recibir_down_rt()/recibir_pulse_rt() — candidata_
+/// repeticion_rueda() lo intercepta antes, en procesar_pulse_runtime
+/// — así que esa Sesion y ese RETENIDO quedaban huérfanos para
+/// siempre. Al soltar Q, recibir_up_rt() encontraba esa sesión, no
+/// hallaba match posible para la entrada `[Q]` sola (el único
+/// trigger compilado para Q es `[Q,Rueda]`, no `[Q]`) y abortaba con
+/// entrada::pasar() — volcando crudo a Windows el Down (y luego el
+/// Up) de Q que habían quedado retenidos. De ahí las "qq".
+///
+/// Fix: al confirmarse un match de Repetición de Rueda, se busca la
+/// sesión cuya entrada sea EXACTAMENTE lo que sigue físicamente
+/// presionado en este momento (los modificadores del combo, sin la
+/// rueda) y, si existe, se la elimina y se cierra su RETENIDO con
+/// entrada::consumir(vivas) — mismo patrón que resolver_match() usa
+/// en el camino normal. Esos modificadores quedan marcados "vivos"
+/// del lado de entrada.rs: de ahí en más sus repeats/Up reales se
+/// enrutan solos a cache::soltar_fisico() (ver su comentario más
+/// abajo) en vez de volver a pasar por acá, y no generan ninguna
+/// salida por sí solos — pero siguen en RUNTIME.presionadas, así que
+/// un próximo trigger que los necesite (otra tecla, u otro giro de
+/// rueda) los sigue viendo sostenidos.
+///
+/// Si no hay ninguna sesión así (ya se resolvió en un pulso anterior
+/// de la misma ráfaga, o el trigger no tiene modificador — solo
+/// "Rueda abajo"=X suelta), no hace nada: es idempotente, se puede
+/// llamar en cada pulso de la ráfaga sin costo ni efecto secundario.
+fn silenciar_modificadores_repeticion_rueda() {
+    let mut runtime = RUNTIME.lock().unwrap();
+    let vivas = runtime.presionadas.clone();
+    if vivas.is_empty() {
+        return;
+    }
+    let Some(idx) = runtime
+        .sesiones
+        .iter()
+        .position(|s| s.fase == FaseSesion::Construyendo && !s.fantasma && s.entrada == vivas)
+    else {
+        return;
+    };
+    let id = runtime.sesiones[idx].id;
+    eliminar_sesion(&mut runtime, id);
+    drop(runtime);
+    entrada::consumir(&vivas);
+}
+
 /// Hilo consumidor de la cola de una fila. Ejecuta una repetición,
 /// resta 1, y si todavía queda algo pendiente espera
 /// config::delay_rueda_repeticion() y vuelve a empezar — hasta
@@ -1604,6 +1665,15 @@ pub fn soltar_fisico(input: InputId) {
     // DEVOLVIENDO; acá no es opción (sí lo necesitamos, para no
     // filtrar los repeats crudos), así que el fix correcto es que
     // soltar_fisico() cierre la instancia activa correspondiente.
+    //
+    // Este mismo camino (routing directo a soltar_fisico, sin pasar
+    // por recibir_up_rt) es también el que cierra en silencio el Up
+    // real de un modificador que quedó "vivo" tras un match de
+    // Repetición de Rueda (ver silenciar_modificadores_repeticion_
+    // rueda()): como no hay InstanciaActiva ni Sesion asociada a ese
+    // modificador, el bloque de abajo simplemente no encuentra nada
+    // que detener — soltar_fisico() no genera ninguna salida por sí
+    // solo, solo actualiza presionadas.
     if let Some(pos) = runtime
         .activas
         .iter()
