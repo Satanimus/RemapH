@@ -1240,7 +1240,43 @@ fn procesar_up_runtime(input: InputId) {
 
 fn procesar_pulse_runtime(input: InputId) {
     if !hay_candidata_para(&input) {
-        recibir_down_rt(input);
+        // [FIX] Antes esto llamaba a recibir_down_rt(input) directo,
+        // salteando procesar_down_runtime() — que es el único lugar
+        // que agrega `input` a `runtime.presionadas` ANTES de llamar.
+        // Como recibir_down_rt() siembra toda sesión NUEVA con
+        // `runtime.presionadas.clone()` (ver su comentario "[FIX]"),
+        // la sesión nacía con entrada VACÍA (sin el propio pulso).
+        // contar() contra un slice vacío considera "posible" a
+        // CUALQUIER trigger compilado (el prefijo vacío matchea
+        // todo) pero "exacta" a ninguno — cae en la rama "seguir
+        // esperando sin timer", y entrada::retener() bloqueaba el
+        // pulso PARA SIEMPRE (nunca hay Up real ni timer que lo
+        // resuelva para un input que nunca vuelve a llegar tal
+        // cual). Como RETENIDO es un buffer único global, todo
+        // evento físico posterior (cualquier tecla, cualquier rueda)
+        // quedaba atrapado ahí también, hasta que la red de
+        // seguridad de config::tiempo_maximo_retenido() (5s) lo
+        // soltara de golpe — de ahí "ninguna rueda funciona en
+        // Windows" en cuanto había algún trigger compilado (con
+        // cache vacía esto ni se alcanzaba a ejecutar, ver
+        // cache::esta_vacia() en entrada.rs, que corta antes).
+        //
+        // Fix: agregar el pulso a `presionadas` antes de llamar,
+        // igual que procesar_down_runtime, y sacarlo enseguida
+        // después — a diferencia de una tecla real, la rueda no
+        // tiene un Up físico que lo haga por nosotros, así que no
+        // puede quedar marcada como "sostenida" para siempre.
+        {
+            let mut runtime = RUNTIME.lock().unwrap();
+            if !runtime.presionadas.contains(&input) {
+                runtime.presionadas.push(input.clone());
+            }
+        }
+        recibir_down_rt(input.clone());
+        {
+            let mut runtime = RUNTIME.lock().unwrap();
+            runtime.presionadas.retain(|i| i != &input);
+        }
         return;
     }
     recibir_pulse_rt(input);
@@ -1283,10 +1319,65 @@ fn recibir_pulse_rt(input: InputId) {
             (s.id, false)
         }
         None => {
-            let id = nuevo_id_sesion(&mut runtime);
-            let mut s = Sesion::nueva(id, vec![input.clone()], false);
-            s.fase = FaseSesion::CerrandoRueda { pulsos: 1 };
-            runtime.sesiones.push(s);
+            // [FIX] Antes la sesión nueva de rueda arrancaba SIEMPRE
+            // con `vec![input]` — solo la rueda, sin importar si ya
+            // había una sesión en curso con un modificador sostenido
+            // (ej. "Q", esperando en Construyendo porque "Q+Rueda
+            // abajo" es un prefijo válido) ni qué otras teclas
+            // estuvieran físicamente abajo. Eso hacía dos cosas mal
+            // a la vez: 1) un trigger compilado como "Q+Rueda
+            // abajo"=2 nunca podía matchear — la entrada evaluada
+            // siempre era `[Rueda]` sola, nunca `[Q, Rueda]` — así
+            // que si además existía "Rueda abajo"=1 sin modificador,
+            // esa ganaba siempre (bug: "en ambos casos solo genera
+            // 1"); y 2) si SOLO existía el trigger con modificador
+            // (sin el trigger de rueda sola), la entrada `[Rueda]`
+            // no matcheaba nada tampoco, y al no haber ninguna
+            // candidata exacta el timer resolvía a Simple contra una
+            // entrada que ya no le servía a nadie (bug: "no hace
+            // match").
+            //
+            // Mismo criterio que recibir_down_rt (ver su comentario
+            // "[FIX]" en el bloque None de más arriba): primero se
+            // busca si alguna sesión EXISTENTE acepta este pulso como
+            // continuación válida (mismo chequeo que hay_candidata_
+            // para) y, si la hay, se la extiende en vez de crear una
+            // nueva — así "Q" sigue siendo parte de la misma sesión
+            // que ahora también tiene la rueda. Si no hay ninguna
+            // sesión que extender, la sesión nueva se siembra con
+            // TODO lo que está físicamente presionado ahora mismo
+            // (`runtime.presionadas`) más el propio pulso, en vez de
+            // solo el pulso — cubre el caso de un modificador
+            // sostenido que él solo no alcanzó a crear una sesión
+            // (no es prefijo de nada por sí solo).
+            let compilado = compilado_actual();
+            let extendible = runtime.sesiones.iter().position(|s| {
+                let mut probable = s.entrada.clone();
+                probable.push(input.clone());
+                contar(&compilado, &probable).0 > 0
+            });
+
+            let id = match extendible {
+                Some(idx) => {
+                    let s = &mut runtime.sesiones[idx];
+                    s.entrada.push(input.clone());
+                    s.fantasma = false;
+                    s.fase = FaseSesion::CerrandoRueda { pulsos: 1 };
+                    s.generacion += 1;
+                    s.id
+                }
+                None => {
+                    let id = nuevo_id_sesion(&mut runtime);
+                    let mut entrada = runtime.presionadas.clone();
+                    if !entrada.contains(&input) {
+                        entrada.push(input.clone());
+                    }
+                    let mut s = Sesion::nueva(id, entrada, false);
+                    s.fase = FaseSesion::CerrandoRueda { pulsos: 1 };
+                    runtime.sesiones.push(s);
+                    id
+                }
+            };
             (id, true)
         }
     };
