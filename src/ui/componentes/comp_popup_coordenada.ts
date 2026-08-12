@@ -57,13 +57,18 @@ import {
   crearInterruptor,
 } from "./comp_popup_grupo";
 
+import { extrasPermitidosTeclaMouse } from "../../core/core_trigger";
+
 // ======================================================
-// 🧭 VOCABULARIO Normal / Simple / Mantenido / Turbo
+// 🧭 VOCABULARIO Normal / Simple / Mantenido / Turbo / Repetición
 // ------------------------------------------------------
 // Mismos valores que EXTRA_OPCIONES de comp_popup_abrir.ts
 // (comparten filaPerfil.extra y convertir_extra() del lado
 // Rust) — solo cambian los textos mostrados acá, específicos
-// del popup de Tecla/Mouse.
+// del popup de Tecla/Mouse. "Repetición" (repeticion_rueda) es
+// exclusiva de gatillo Rueda — ver filtrado en
+// extrasPermitidosTeclaMouse (core_trigger.ts) y
+// PLAN_RUEDA_REPETICION.md.
 // ======================================================
 
 const EXTRA_TECLA_MOUSE_OPCIONES: { texto: string; valor: string }[] = [
@@ -71,6 +76,7 @@ const EXTRA_TECLA_MOUSE_OPCIONES: { texto: string; valor: string }[] = [
   { texto: "Simple", valor: "" },
   { texto: "Mantenido", valor: "mantener" },
   { texto: "Turbo", valor: "turbo" },
+  { texto: "Repetición", valor: "repeticion_rueda" },
 ];
 
 // ======================================================
@@ -272,20 +278,36 @@ export function abrirPopupExtraTeclaMouse(
     abrirPopupExtraTeclaMouse(evento, contexto, filaPerfil);
 
   // ----------------------------------
-  // NIVEL 1 — Normal / Simple / Mantenido / Turbo
+  // NIVEL 1 — Normal / Simple / Mantenido / Turbo / Repetición
+  // ------------------------------------------------------
+  // La lista de opciones se filtra según gatillo/condición del
+  // Trigger (ver extrasPermitidosTeclaMouse en core_trigger.ts).
+  // Si el valor guardado quedó fuera del set permitido (p. ej. la
+  // fila tenía Turbo y se recapturó el gatillo como Rueda, o tenía
+  // Repetición y la Condición pasó a Mantenido), se corrige acá
+  // mismo a "normal" antes de dibujar — mismo criterio que "resetear
+  // Extra a Normal al recapturar el gatillo como rueda" del plan.
   // ----------------------------------
 
-  popup.append(
-    crearGrupoOpciones(
-      EXTRA_TECLA_MOUSE_OPCIONES,
-      filaPerfil.extra,
-      (valor) => {
-        filaPerfil.extra = valor;
+  const permitidos = extrasPermitidosTeclaMouse(filaPerfil.trigger);
 
-        reconstruirFila(contexto.id);
-        redibujar();
-      },
-    ),
+  if (!permitidos.includes(filaPerfil.extra)) {
+    filaPerfil.extra = "normal";
+
+    reconstruirFila(contexto.id);
+  }
+
+  const opcionesExtra = EXTRA_TECLA_MOUSE_OPCIONES.filter((opcion) =>
+    permitidos.includes(opcion.valor),
+  );
+
+  popup.append(
+    crearGrupoOpciones(opcionesExtra, filaPerfil.extra, (valor) => {
+      filaPerfil.extra = valor;
+
+      reconstruirFila(contexto.id);
+      redibujar();
+    }),
   );
 
   popup.append(crearSeparador());

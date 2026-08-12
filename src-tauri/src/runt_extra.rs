@@ -143,5 +143,29 @@ pub fn obtener(extra: &ExtraCache) -> Vec<String> {
         // 🪟 POPUP TOGGLE
         // ==================================================
         ExtraCache::PopupToggle => vec!["TOGGLE POPUP".into()],
+
+        // ==================================================
+        // 🔁 REPETICIÓN DE RUEDA
+        // ------------------------------------------------------
+        // Este brazo existe únicamente para que el `match` sea
+        // exhaustivo (Rust exige cubrir todas las variantes de
+        // ExtraCache, sin importar si son alcanzables en runtime).
+        // Bajo el diseño elegido (Opción B, ver
+        // PLAN_RUEDA_REPETICION.md), `cache::worker_repeticion_rueda`
+        // maneja la cola/orden/timing por su cuenta y manda
+        // `extra: None` a `runtime::ejecutar` — por lo tanto
+        // `runt_extra::obtener()` NUNCA debería recibir
+        // `ExtraCache::RepeticionRueda` en la práctica. Si esto
+        // llegara a dispararse, es un bug de otra parte del código
+        // (alguien volvió a mandar `Some(ExtraCache::RepeticionRueda)`
+        // a Runtime) — mejor un panic explícito acá que una receta
+        // silenciosa e incorrecta.
+        // ==================================================
+        ExtraCache::RepeticionRueda => {
+            unreachable!(
+                "runt_extra::obtener() no debería recibir RepeticionRueda: \
+                 la cola la maneja cache::worker_repeticion_rueda con extra: None (Opción B)"
+            )
+        }
     }
 }

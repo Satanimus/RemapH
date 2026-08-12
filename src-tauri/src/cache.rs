@@ -17,7 +17,7 @@ use crate::perfil_cache::{
 };
 use crate::{config, entrada, perfil_ui, runtime};
 use std::collections::HashMap;
-use std::sync::Mutex;
+use std::sync::{LazyLock, Mutex};
 
 // ======================================================
 // ============ ETAPA 1 — DATOS COMPILADOS ==============
@@ -1463,7 +1463,8 @@ struct EstadoRepeticion {
     corriendo: bool,
 }
 
-static REPETICION_RUEDA: Mutex<HashMap<String, EstadoRepeticion>> = Mutex::new(HashMap::new());
+static REPETICION_RUEDA: LazyLock<Mutex<HashMap<String, EstadoRepeticion>>> =
+    LazyLock::new(|| Mutex::new(HashMap::new()));
 
 /// Corta en seco cualquier bucle de Repetición de Rueda en curso.
 /// Llamada desde cache::borrar_cache() — cubre tanto "desactivar
@@ -1538,10 +1539,20 @@ fn worker_repeticion_rueda(remapeo: RemapeoCache) {
             }
         }
 
+        // Opción B (ver PLAN_RUEDA_REPETICION.md, sección de fix
+        // post-implementación): se manda `extra: None` a propósito.
+        // La cola/orden/timing de las repeticiones ya los maneja
+        // este worker por completo — Runtime no necesita saber que
+        // el Extra de esta fila es RepeticionRueda, y así cada
+        // pulso se resuelve por el camino simple de "Emitir"
+        // (COLA_SALIDA), sin pasar por runt_extra::obtener() ni por
+        // ejecutar_extra_en_hilo() (que registraría un hilo/entrada
+        // en INSTANCIAS innecesarios para algo que este worker ya
+        // resuelve solo).
         runtime::ejecutar(OrdenRuntime::Iniciar {
             id: remapeo.id.clone(),
             accion: remapeo.accion.clone(),
-            extra: remapeo.extra.clone(),
+            extra: None,
             coordenada: remapeo.coordenada.clone(),
         });
         runtime::ejecutar(OrdenRuntime::Detener {

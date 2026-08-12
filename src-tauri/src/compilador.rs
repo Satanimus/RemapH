@@ -572,6 +572,12 @@ fn convertir_extra(extra: &str) -> Option<ExtraCache> {
 
         "toggle" => Some(ExtraCache::Toggle),
 
+        // Exclusivo de gatillo Rueda — ver PLAN_RUEDA_REPETICION.md.
+        // El frontend solo ofrece este valor cuando el gatillo
+        // capturado es la Rueda (comp_popup_coordenada.ts /
+        // extrasPermitidosTeclaMouse en core_trigger.ts).
+        "repeticion_rueda" => Some(ExtraCache::RepeticionRueda),
+
         _ => None,
     }
 }

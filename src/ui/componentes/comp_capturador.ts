@@ -15,7 +15,11 @@ import { crearBoton } from "./comp_boton";
 
 import { reconstruirFila } from "../ui_tabla_control";
 
-import { triggerATexto, triggerAHTML } from "../../core/core_trigger";
+import {
+  triggerATexto,
+  triggerAHTML,
+  extrasPermitidosTeclaMouse,
+} from "../../core/core_trigger";
 
 import { abrirPopupModificador } from "./comp_popup_abrir";
 
@@ -126,6 +130,21 @@ export function crearCapturador(
 
           if (destino === "Trigger") {
             filaPerfil.trigger = trigger as FilaPerfil["trigger"];
+
+            // Al recapturar el gatillo, el Extra guardado puede
+            // dejar de tener sentido (ej: tenía Turbo y el nuevo
+            // gatillo es Rueda, o tenía Repetición y la nueva
+            // Condición es Mantenido) — se resetea a "normal" acá
+            // mismo, sin esperar a que se abra el popup de Extra.
+            // Ver PLAN_RUEDA_REPETICION.md, sección 5.
+            if (
+              filaPerfil.tipo === "tecla_mouse" &&
+              !extrasPermitidosTeclaMouse(filaPerfil.trigger).includes(
+                filaPerfil.extra,
+              )
+            ) {
+              filaPerfil.extra = "normal";
+            }
           } else {
             filaPerfil.accion = trigger as FilaPerfil["accion"];
           }

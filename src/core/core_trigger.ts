@@ -25,6 +25,55 @@ export function crearTrigger(): Trigger {
   };
 }
 
+// ======================================================
+// 🖱️ GATILLO RUEDA
+// ------------------------------------------------------
+// La Rueda usa los mismos códigos que back_mouse.rs /
+// pulsadores.tsv (WheelUp / WheelDown).
+// ======================================================
+
+export function esGatilloRueda(trigger: Trigger): boolean {
+  return (
+    trigger.gatillo?.codigo === "WheelUp" ||
+    trigger.gatillo?.codigo === "WheelDown"
+  );
+}
+
+// ======================================================
+// 🎚️ EXTRA PERMITIDO SEGÚN GATILLO/CONDICIÓN (Tecla/Mouse)
+// ------------------------------------------------------
+// Ver PLAN_RUEDA_REPETICION.md. Cuando el gatillo NO es
+// Rueda, las 4 opciones de siempre (Normal/Simple/Mantenido/
+// Turbo) siguen disponibles sin restricción.
+//
+// Cuando el gatillo SÍ es Rueda, la Condición decidida en
+// runtime por config::sensibilidad_rueda() (Simple/Mantenido)
+// limita el Extra disponible:
+//   - Simple:    Normal ("normal" — lo que coloquialmente se
+//                llama "Extra Simple") + Repetición
+//                ("repeticion_rueda").
+//   - Mantenido: solo Normal.
+// Cualquier otro valor de condicion (doble/triple no aplica a
+// Rueda) cae en el caso más restrictivo (solo Normal) por
+// seguridad.
+//
+// Coordenada es un interruptor aparte (filaPerfil.coordenada.
+// activa), no un valor de esta lista — no participa acá y
+// sigue disponible siempre, sin importar el gatillo.
+// ======================================================
+
+export function extrasPermitidosTeclaMouse(trigger: Trigger): string[] {
+  if (!esGatilloRueda(trigger)) {
+    return ["normal", "", "mantener", "turbo"];
+  }
+
+  if (trigger.condicion === "simple") {
+    return ["normal", "repeticion_rueda"];
+  }
+
+  return ["normal"];
+}
+
 // ------------------------------------------------------
 // Texto plano.
 // Usado para títulos, debug y lectura.
