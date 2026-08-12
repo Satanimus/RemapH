@@ -57,7 +57,10 @@ import {
   crearInterruptor,
 } from "./comp_popup_grupo";
 
-import { extrasPermitidosTeclaMouse } from "../../core/core_trigger";
+import {
+  extrasPermitidosTeclaMouse,
+  esGatilloRueda,
+} from "../../core/core_trigger";
 
 // ======================================================
 // 🧭 VOCABULARIO Normal / Simple / Mantenido / Turbo / Repetición
@@ -69,6 +72,14 @@ import { extrasPermitidosTeclaMouse } from "../../core/core_trigger";
 // exclusiva de gatillo Rueda — ver filtrado en
 // extrasPermitidosTeclaMouse (core_trigger.ts) y
 // PLAN_RUEDA_REPETICION.md.
+//
+// Nota Rueda: con gatillo Rueda, el valor "normal" se comporta
+// igual que Extra Simple (match dispara Iniciar+Finalizar de una,
+// sin depender de un Up real). Para que quede claro en pantalla,
+// esa opción se MUESTRA como "Simple" cuando el trigger es Rueda
+// — ver textoOpcionNivel1 más abajo. El valor interno sigue
+// siendo "normal" (mismo que compilador.rs / ExtraCache::Normal);
+// esto es solo un cambio de texto en la UI, no de código/valor.
 // ======================================================
 
 const EXTRA_TECLA_MOUSE_OPCIONES: { texto: string; valor: string }[] = [
@@ -79,6 +90,17 @@ const EXTRA_TECLA_MOUSE_OPCIONES: { texto: string; valor: string }[] = [
   { texto: "Repetición", valor: "repeticion_rueda" },
 ];
 
+function textoOpcionNivel1(
+  opcion: { texto: string; valor: string },
+  esRueda: boolean,
+): string {
+  if (esRueda && opcion.valor === "normal") {
+    return "Simple";
+  }
+
+  return opcion.texto;
+}
+
 // ======================================================
 // 📝 TEXTO DEL BOTÓN EXTRA (columna de la tabla)
 // ------------------------------------------------------
@@ -86,10 +108,13 @@ const EXTRA_TECLA_MOUSE_OPCIONES: { texto: string; valor: string }[] = [
 // ======================================================
 
 export function textoExtraTeclaMouse(filaPerfil: FilaPerfil): string {
-  const base =
-    EXTRA_TECLA_MOUSE_OPCIONES.find(
-      (opcion) => opcion.valor === filaPerfil.extra,
-    )?.texto ?? filaPerfil.extra;
+  const opcion = EXTRA_TECLA_MOUSE_OPCIONES.find(
+    (opcion) => opcion.valor === filaPerfil.extra,
+  );
+
+  const base = opcion
+    ? textoOpcionNivel1(opcion, esGatilloRueda(filaPerfil.trigger))
+    : filaPerfil.extra;
 
   return filaPerfil.coordenada.activa ? `📌 ${base}` : base;
 }
@@ -297,9 +322,14 @@ export function abrirPopupExtraTeclaMouse(
     reconstruirFila(contexto.id);
   }
 
+  const esRueda = esGatilloRueda(filaPerfil.trigger);
+
   const opcionesExtra = EXTRA_TECLA_MOUSE_OPCIONES.filter((opcion) =>
     permitidos.includes(opcion.valor),
-  );
+  ).map((opcion) => ({
+    ...opcion,
+    texto: textoOpcionNivel1(opcion, esRueda),
+  }));
 
   popup.append(
     crearGrupoOpciones(opcionesExtra, filaPerfil.extra, (valor) => {
