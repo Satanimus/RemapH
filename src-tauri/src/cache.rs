@@ -635,39 +635,24 @@ fn resolver_condicion_por_id(
 /// indique lo contrario; para un match retroactivo por Up, es
 /// `entrada_antes` menos la tecla que se soltó.
 fn resolver_match(remapeo: RemapeoCache, entrada: Vec<InputId>, _id: u64, restantes: Vec<InputId>) {
-    // [FIX] `extra.requiere_up_real()` sola no alcanza para decidir
-    // si conviene diferir (Iniciar ahora, Detener recién cuando
-    // llegue un Up real más adelante): esa lógica asume que la
-    // tecla todavía está físicamente abajo y que un Up real TODAVÍA
-    // va a llegar. Pero hay resoluciones que se disparan JUSTO A
-    // RAÍZ de un Up que ya pasó — por ejemplo, un Simple con prefijo
-    // más largo compilado en simultáneo (ej. "1"=A junto a "1+2"=B):
-    // al soltar "1" rápido, la sesión queda ambigua hasta ese mismo
-    // Up, que es quien la resuelve retroactivamente. En ese momento
-    // la tecla YA ESTÁ ARRIBA — no hay ningún Up real futuro que
-    // vaya a llegar para cerrar la InstanciaActiva. Si se registraba
-    // diferida igual, quedaba "prendida" para siempre (por eso el
-    // bug reportado: mantener "A" repitiendo sin soltar), hasta que
-    // por pura casualidad un futuro Up de la MISMA tecla en un gesto
-    // no relacionado la cerraba de golpe — de ahí el patrón
-    // alternado "match, no-match, match, no-match". La forma
-    // correcta de saber si todavía hay un Up real pendiente es
-    // preguntarle a `RUNTIME.presionadas` (Etapa 4) si alguna tecla
-    // de `entrada` sigue físicamente abajo AHORA MISMO — si ninguna
-    // lo está, no hay Up futuro posible, así que hay que ejecutar
-    // Iniciar+Detener ya mismo sin importar el Extra.
-    let vivas = teclas_vivas(&entrada);
+    // Determinar si el gatillo (último elemento de entrada) sigue presionado
+    let gatillo = entrada.last();
+    let gatillo_presionado = gatillo.map_or(false, |g| {
+        let runtime = RUNTIME.lock().unwrap();
+        runtime.presionadas.contains(g)
+    });
+
     let diferido = remapeo
         .extra
         .as_ref()
         .is_some_and(|extra| extra.requiere_up_real())
-        && !vivas.is_empty();
+        && gatillo_presionado;
 
     if diferido {
         let mut runtime = RUNTIME.lock().unwrap();
         runtime.activas.push(InstanciaActiva {
             id: remapeo.id.clone(),
-            entrada,
+            entrada: entrada.clone(),
         });
         drop(runtime);
         runtime::ejecutar(OrdenRuntime::Iniciar {
@@ -677,22 +662,24 @@ fn resolver_match(remapeo: RemapeoCache, entrada: Vec<InputId>, _id: u64, restan
             coordenada: remapeo.coordenada,
         });
 
-        // [FIX] Antes se llamaba entrada::consumir() sin argumentos,
-        // que solo vaciaba RETENIDO y nunca abría un grupo
-        // DEVOLVIENDO. Como acá la tecla física sigue abajo (es
-        // justo la condición de `diferido`) y va a seguir mandando
-        // Down repetidos + su Up real, esos eventos necesitan un
-        // grupo DEVOLVIENDO (modo bloquear) que los intercepte en
-        // entrada.rs — si no, entrada.rs los trataba como eventos
-        // "nuevos" sin ninguna decisión tomada para ellos, dejándolos
-        // pasar a Windows sin bloquear (la tecla remapeada se colaba
-        // en cada repeat) y el ciclo Iniciar/Detener quedaba a merced
-        // de que algún futuro Up ajeno cerrara la InstanciaActiva.
+        // Para el grupo DEVOLVIENDO, necesitamos pasar las teclas que están presionadas
+        // y que son parte de la entrada (para bloquear sus repeticiones). En este caso,
+        // solo el gatillo (si está presionado) debería ser bloqueado, porque los modificadores
+        // no deben ser bloqueados (ya que no son el gatillo y no deben afectar la ejecución).
+        // Sin embargo, para que el up del gatillo cierre la instancia, solo necesitamos que
+        // el gatillo esté en el grupo DEVOLVIENDO. Si además hay modificadores, no deben
+        // estar en el grupo porque no queremos que su up cierre la instancia.
+        let vivas = if gatillo_presionado {
+            vec![gatillo.unwrap().clone()]
+        } else {
+            Vec::new()
+        };
         resembrar_fantasma(restantes);
         entrada::consumir(&vivas);
         return;
     }
 
+    // No diferido: ejecutar Iniciar + Detener inmediato
     runtime::ejecutar(OrdenRuntime::Iniciar {
         id: remapeo.id.clone(),
         accion: remapeo.accion,
