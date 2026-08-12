@@ -224,6 +224,42 @@ static RETENIDO: Mutex<Option<GrupoRetenido>> = Mutex::new(None);
 static DEVOLVIENDO: Mutex<Vec<GrupoDevolviendo>> = Mutex::new(Vec::new());
 static SIGUIENTE_GENERACION_RETENIDO: Mutex<u64> = Mutex::new(0);
 
+/// [FIX] Bug "Ctrl+Q=1 esporádico entre 1 y q" (Extra diferido:
+/// Normal/Mantenido/Turbo — Extra Simple no lo sufre, ver más abajo
+/// por qué). Causa raíz: `consumir()`/`pasar()` empujaban SIEMPRE un
+/// grupo DEVOLVIENDO nuevo para sus teclas, sin revisar si alguna de
+/// ellas ya estaba viva en OTRO grupo existente. Con un modificador
+/// sostenido (Ctrl) y el gatillo tocado varias veces seguidas (Q),
+/// cada match nuevo abre su propio grupo [Ctrl, Q] mientras el grupo
+/// del toque anterior, que ya soltó su Q pero todavía no su Ctrl
+/// (Ctrl sigue físicamente abajo), sigue existiendo con [Ctrl] solo
+/// — Ctrl queda duplicado en dos grupos a la vez. El Up real de Ctrl
+/// (rama a, `position()`) solo cierra el PRIMERO que encuentra —
+/// siempre el más viejo — dejando el otro como zombie para siempre.
+/// Ese zombie bloquea en silencio el PRÓXIMO Down real de Ctrl (rama
+/// a, `bloquear:true`) antes de que llegue a cache.rs: `RUNTIME.
+/// presionadas` nunca se entera de que Ctrl está abajo, así que la
+/// próxima vez que se toca Q, la sesión nace sin Ctrl, no matchea
+/// ningún trigger compilado (todos piden Ctrl+Q), y Q se reenvía
+/// crudo a Windows sin remapear — el "q" suelto del reporte,
+/// alternando con "1" según cuántos grupos zombie se hayan
+/// acumulado. Extra Simple no lo sufre porque, al no ser diferido,
+/// `resolver_match()` llama a `consumir(&[])` (vivas vacío a
+/// propósito) y nunca abre ningún grupo DEVOLVIENDO para sus teclas
+/// — no hay grupo que pueda duplicarse.
+///
+/// Fix: antes de abrir un grupo nuevo para `inputs`, sacarlos de
+/// CUALQUIER otro grupo que ya los tuviera (y descartar ese grupo si
+/// queda vacío) — así una tecla nunca vive en dos grupos a la vez, y
+/// el más nuevo siempre "gana" la propiedad de esa tecla.
+fn purgar_de_devolviendo(inputs: &[InputId]) {
+    let mut devolviendo = DEVOLVIENDO.lock().unwrap();
+    for grupo in devolviendo.iter_mut() {
+        grupo.faltan_soltar.retain(|i| !inputs.contains(i));
+    }
+    devolviendo.retain(|grupo| !grupo.faltan_soltar.is_empty());
+}
+
 thread_local! {
     // El evento que está siendo procesado ahora mismo en este hilo.
     // Cache lo necesita indirectamente: cuando llama a retener() o
@@ -338,6 +374,7 @@ pub fn pasar() {
             back_interception::emitir_evento(evento.clone());
 
             if evento.state == InputState::Down {
+                purgar_de_devolviendo(std::slice::from_ref(&evento.input)); // ⚠️ ver FIX en la definición
                 DEVOLVIENDO.lock().unwrap().push(GrupoDevolviendo {
                     faltan_soltar: vec![evento.input],
                     bloquear: false,
@@ -366,6 +403,7 @@ pub fn pasar() {
     }
 
     if !faltan_soltar.is_empty() {
+        purgar_de_devolviendo(&faltan_soltar); // ⚠️ ver FIX en la definición
         DEVOLVIENDO.lock().unwrap().push(GrupoDevolviendo {
             faltan_soltar,
             bloquear: false,
@@ -455,6 +493,7 @@ pub fn consumir(vivas: &[InputId]) {
     *RETENIDO.lock().unwrap() = None;
 
     if !vivas.is_empty() {
+        purgar_de_devolviendo(vivas); // ⚠️ ver FIX en la definición — evita el modificador duplicado en dos grupos
         DEVOLVIENDO.lock().unwrap().push(GrupoDevolviendo {
             faltan_soltar: vivas.to_vec(),
             bloquear: true,
