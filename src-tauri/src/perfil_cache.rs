@@ -520,6 +520,14 @@ pub enum ExtraCache {
 
     // UI
     PopupToggle,
+
+    // Exclusivo de gatillo Rueda — ver PLAN_RUEDA_REPETICION.md.
+    // Cada pulso de rueda dispara su propia salida en cola (no
+    // espera ningún timer de silencio ni mira la Condición del
+    // trigger), separadas por config::delay_rueda_repeticion().
+    // No aplica el concepto de "esperar Up real": la rueda nunca
+    // manda uno, por eso requiere_up_real() da false.
+    RepeticionRueda,
 }
 
 impl ExtraCache {

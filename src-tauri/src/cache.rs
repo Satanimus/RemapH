@@ -16,6 +16,7 @@ use crate::perfil_cache::{
     AccionCache, AppCache, CondicionTrigger, CoordenadaCache, ExtraCache, RemapeoCache,
 };
 use crate::{config, entrada, perfil_ui, runtime};
+use std::collections::HashMap;
 use std::sync::Mutex;
 
 // ======================================================
@@ -45,6 +46,7 @@ pub fn escribir_cache(remapeos: Vec<RemapeoCache>) {
 
 pub fn borrar_cache() {
     COMPILADO.lock().unwrap().remapeos.clear();
+    detener_repeticiones_rueda();
 }
 
 pub fn esta_vacia() -> bool {
@@ -1239,6 +1241,20 @@ fn procesar_up_runtime(input: InputId) {
 }
 
 fn procesar_pulse_runtime(input: InputId) {
+    // Repetición de Rueda se resuelve por fuera del mecanismo de
+    // sesión/timer de más abajo: no espera ningún silencio, dispara
+    // (encola) con cada pulso. Si esta entrada tiene una fila así,
+    // el pulso físico queda descartado simplemente por no
+    // reenviarlo a Windows — no hace falta entrada::retener()/
+    // pasar()/consumir() para esto, mismo criterio que ya usa el
+    // match inmediato de teclado en recibir_down_rt (posibles ==
+    // exactas == 1 && Simple): un match sin ninguna ambigüedad no
+    // necesita buffer, solo hay que no reenviar el evento crudo.
+    if let Some(remapeo) = candidata_repeticion_rueda(&input) {
+        encolar_repeticion_rueda(remapeo);
+        return;
+    }
+
     if !hay_candidata_para(&input) {
         // [FIX] Antes esto llamaba a recibir_down_rt(input) directo,
         // salteando procesar_down_runtime() — que es el único lugar
@@ -1416,6 +1432,144 @@ fn iniciar_timer_rueda(id: u64, generacion: u64) {
         };
         resolver_condicion_por_id(runtime, idx, condicion);
     });
+}
+
+// ======================================================
+// 🔁 REPETICIÓN DE RUEDA (Extra RepeticionRueda)
+// ------------------------------------------------------
+// Cola-por-contador: cada pulso de rueda que matchea una fila con
+// Extra RepeticionRueda suma 1 a `pendientes` de esa fila. Un único
+// hilo por fila (`corriendo`) va ejecutando una repetición, resta 1,
+// espera config::delay_rueda_repeticion(), y repite hasta que
+// `pendientes` llegue a 0 — momento en que se apaga solo
+// (`corriendo = false`). Si llegan más pulsos mientras el hilo ya
+// está corriendo, no se arranca un segundo hilo: solo se suma al
+// contador que el hilo existente ya está leyendo.
+//
+// `detener_repeticiones_rueda()` (llamada desde borrar_cache(), ver
+// ahí) vacía el mapa entero — el hilo, la próxima vez que chequee
+// (antes de ejecutar la siguiente repetición o al despertar del
+// sleep), no encuentra su entrada y corta solo sin ejecutar nada
+// más. Es un corte best-effort: si el hilo ya estaba a mitad de
+// ejecutar runtime::ejecutar() cuando se vacía el mapa, esa
+// repetición puntual sí termina de salir — aceptable (mismo
+// criterio que la red de seguridad de tiempo_maximo_retenido en
+// entrada.rs: preferir un corte simple y best-effort a una
+// sincronización perfecta).
+// ======================================================
+
+struct EstadoRepeticion {
+    pendientes: u32,
+    corriendo: bool,
+}
+
+static REPETICION_RUEDA: Mutex<HashMap<String, EstadoRepeticion>> = Mutex::new(HashMap::new());
+
+/// Corta en seco cualquier bucle de Repetición de Rueda en curso.
+/// Llamada desde cache::borrar_cache() — cubre tanto "desactivar
+/// perfil" como cualquier recompilación (cambiar/guardar/clonar/
+/// renombrar/eliminar/crear/seleccionar perfil), porque TODOS esos
+/// caminos en perfil.rs pasan por borrar_cache() antes de compilar
+/// de nuevo (o directamente, en el caso de desactivar).
+fn detener_repeticiones_rueda() {
+    REPETICION_RUEDA.lock().unwrap().clear();
+}
+
+/// Busca una fila cuyo trigger sea EXACTAMENTE `presionadas + input`
+/// (mismo criterio de armado de entrada que el resto del archivo:
+/// modificadores físicamente sostenidos + el pulso actual) y cuyo
+/// Extra sea RepeticionRueda. Ignora la Condición del trigger a
+/// propósito (ver regla de negocio en sección 1 de este plan).
+fn candidata_repeticion_rueda(input: &InputId) -> Option<RemapeoCache> {
+    let runtime = RUNTIME.lock().unwrap();
+    let mut entrada = runtime.presionadas.clone();
+    drop(runtime);
+    if !entrada.contains(input) {
+        entrada.push(input.clone());
+    }
+
+    let compilado = compilado_actual();
+    compilado
+        .remapeos
+        .iter()
+        .find(|fila| {
+            app_habilitada(&fila.trigger.app, &compilado.apps)
+                && fila.trigger.entrada == entrada
+                && matches!(fila.extra, Some(ExtraCache::RepeticionRueda))
+        })
+        .cloned()
+}
+
+/// Suma 1 al contador de pendientes de `remapeo.id` y arranca un
+/// hilo consumidor si no había uno ya corriendo para esa fila.
+fn encolar_repeticion_rueda(remapeo: RemapeoCache) {
+    let mut mapa = REPETICION_RUEDA.lock().unwrap();
+    let estado = mapa.entry(remapeo.id.clone()).or_insert(EstadoRepeticion {
+        pendientes: 0,
+        corriendo: false,
+    });
+    estado.pendientes += 1;
+    let debo_arrancar = !estado.corriendo;
+    if debo_arrancar {
+        estado.corriendo = true;
+    }
+    drop(mapa);
+
+    if debo_arrancar {
+        std::thread::spawn(move || worker_repeticion_rueda(remapeo));
+    }
+}
+
+/// Hilo consumidor de la cola de una fila. Ejecuta una repetición,
+/// resta 1, y si todavía queda algo pendiente espera
+/// config::delay_rueda_repeticion() y vuelve a empezar — hasta
+/// vaciarse solo o hasta que detener_repeticiones_rueda() borre su
+/// entrada del mapa (ver chequeos `let Some(estado) = ... else {
+/// return; }` en cada vuelta).
+fn worker_repeticion_rueda(remapeo: RemapeoCache) {
+    loop {
+        // ¿Sigue existiendo esta fila en el mapa? (si
+        // detener_repeticiones_rueda() la borró, cortar ya, sin
+        // ejecutar ni una repetición más).
+        {
+            let mapa = REPETICION_RUEDA.lock().unwrap();
+            if !mapa.contains_key(&remapeo.id) {
+                return;
+            }
+        }
+
+        runtime::ejecutar(OrdenRuntime::Iniciar {
+            id: remapeo.id.clone(),
+            accion: remapeo.accion.clone(),
+            extra: remapeo.extra.clone(),
+            coordenada: remapeo.coordenada.clone(),
+        });
+        runtime::ejecutar(OrdenRuntime::Detener {
+            id: remapeo.id.clone(),
+        });
+
+        let debo_seguir = {
+            let mut mapa = REPETICION_RUEDA.lock().unwrap();
+            let Some(estado) = mapa.get_mut(&remapeo.id) else {
+                return; // se canceló mientras se ejecutaba esta repetición
+            };
+            estado.pendientes = estado.pendientes.saturating_sub(1);
+            if estado.pendientes == 0 {
+                estado.corriendo = false;
+                false
+            } else {
+                true
+            }
+        };
+
+        if !debo_seguir {
+            return;
+        }
+
+        std::thread::sleep(std::time::Duration::from_millis(
+            config::delay_rueda_repeticion(),
+        ));
+    }
 }
 
 pub fn soltar_fisico(input: InputId) {

@@ -105,6 +105,12 @@
 //     Pausa entre el 1º y 2º combo cuando la Acción capturada
 //     (accion_trigger, tipo tecla_mouse) tiene condición Doble.
 //
+// delay_rueda_repeticion()
+// establecer_delay_rueda_repeticion()
+//     Pausa entre cada salida en cola de una fila con Extra
+//     RepeticionRueda (un pulso de rueda = una salida encolada) —
+//     ver PLAN_RUEDA_REPETICION.md.
+//
 // tiempo_salida_mantenido()
 // establecer_tiempo_salida_mantenido()
 //     Cuánto queda abajo la tecla/botón de salida cuando la Acción
@@ -367,6 +373,20 @@ pub fn delay_entre_salida_doble() -> u64 {
 
 pub fn establecer_delay_entre_salida_doble(valor: u64) {
     DELAY_ENTRE_SALIDA_DOBLE.store(valor, Ordering::Relaxed);
+}
+
+// ======================================================
+// 🖱️ DELAY ENTRE REPETICIONES DE RUEDA (Extra RepeticionRueda)
+// ======================================================
+
+static DELAY_RUEDA_REPETICION: AtomicU64 = AtomicU64::new(30);
+
+pub fn delay_rueda_repeticion() -> u64 {
+    DELAY_RUEDA_REPETICION.load(Ordering::Relaxed)
+}
+
+pub fn establecer_delay_rueda_repeticion(valor: u64) {
+    DELAY_RUEDA_REPETICION.store(valor, Ordering::Relaxed);
 }
 
 // ======================================================
