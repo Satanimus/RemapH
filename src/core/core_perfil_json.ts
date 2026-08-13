@@ -40,6 +40,8 @@ import type {
   PortapapelesExtraPerfil,
 } from "./core_portapapeles";
 
+import type { AbrirAccionPerfil, AbrirExtraPerfil } from "./core_abrir";
+
 import { traducirLote } from "./core_traductor";
 
 // ======================================================
@@ -99,6 +101,14 @@ interface RemapeoJson {
   portapapeles_accion: PortapapelesAccionPerfil;
 
   portapapeles_extra: PortapapelesExtraPerfil;
+
+  // Snake_case a propósito, mismo criterio que portapapeles_accion/
+  // portapapeles_extra: el nombre viaja igual en el JSON sin
+  // traducción adicional. AbrirExtraJson en sí SÍ viaja en camelCase
+  // internamente (abrirCon) — ver core_abrir.ts / perfil_json.rs.
+  abrir_accion: AbrirAccionPerfil;
+
+  abrir_extra: AbrirExtraPerfil;
 
   color: string;
 
@@ -234,6 +244,10 @@ function convertirRemapeo(
     portapapelesAccion: remapeo.portapapeles_accion,
 
     portapapelesExtra: remapeo.portapapeles_extra,
+
+    abrirAccion: remapeo.abrir_accion,
+
+    abrirExtra: remapeo.abrir_extra,
 
     color: remapeo.color,
 

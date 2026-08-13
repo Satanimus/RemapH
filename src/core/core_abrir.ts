@@ -97,6 +97,33 @@ export function esRutaExe(ruta: string | null): boolean {
 }
 
 // ======================================================
+// 🔎 EXTENSIÓN DE UNA RUTA
+// ------------------------------------------------------
+// Usada por el popup "Abrir con..." (comp_popup_abrir_con.ts, Etapa
+// 11) para pedirle a obtener_programas_abrir_con() los recientes de
+// esa extensión puntual (ej. abrirAccion.ruta = "...\\foto.jpg" →
+// "jpg"). "" si no hay ruta o no tiene extensión (carpetas) — el
+// backend interpreta una extensión vacía devolviendo solo los
+// instalados, sin recientes.
+// ======================================================
+
+export function extensionDeRuta(ruta: string | null): string {
+  if (!ruta) {
+    return "";
+  }
+
+  const nombre = nombreDeRuta(ruta);
+
+  const punto = nombre.lastIndexOf(".");
+
+  if (punto <= 0) {
+    return "";
+  }
+
+  return nombre.slice(punto + 1).toLowerCase();
+}
+
+// ======================================================
 // 📝 TEXTO EXTRA (columna Extra de la tabla)
 // ------------------------------------------------------
 // Mismo criterio que textoPortapapelesExtra: una sola palabra que

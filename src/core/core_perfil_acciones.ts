@@ -111,6 +111,11 @@ export function moverFilaPorId(
 // cual, ver core_portapapeles.ts) — se considera "con acción"
 // siempre, para pedir la misma confirmación extra al eliminarla
 // que cualquier fila ya funcional.
+//
+// abrir tampoco usa accion.gatillo — usa abrirAccion.ruta (ver
+// core_abrir.ts): sin ruta elegida equivale a "Seleccionar..." en
+// la columna Acción, el mismo estado "vacío" que gatillo ausente
+// en el resto de los tipos.
 // ======================================================
 
 export function filaTieneAccion(filaPerfil: FilaPerfil): boolean {
@@ -120,6 +125,10 @@ export function filaTieneAccion(filaPerfil: FilaPerfil): boolean {
 
   if (filaPerfil.tipo === "portapapeles") {
     return true;
+  }
+
+  if (filaPerfil.tipo === "abrir") {
+    return !!filaPerfil.abrirAccion.ruta;
   }
 
   return !!filaPerfil.accion?.gatillo;
@@ -148,6 +157,9 @@ export function textoAccionFila(filaPerfil: FilaPerfil): string {
 
     case "portapapeles":
       return textoPortapapelesAccion(filaPerfil.portapapelesAccion);
+
+    case "abrir":
+      return textoAbrirAccion(filaPerfil.abrirAccion, filaPerfil.abrirExtra);
 
     default:
       return filaPerfil.accion?.gatillo

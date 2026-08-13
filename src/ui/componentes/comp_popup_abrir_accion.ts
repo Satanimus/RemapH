@@ -198,5 +198,18 @@ function aplicarRuta(
 
   filaPerfil.abrirAccion.ruta = ruta;
 
+  // abrirCon/argumento fueron elegidos para el archivo ANTERIOR —
+  // abrirCon puede no ser un programa válido para la nueva extensión
+  // (ej. se eligió Notepad++ para un .txt y ahora la Acción pasa a
+  // ser un .jpg) y argumento es específico del .exe anterior. Se
+  // limpian los dos al cambiar la ruta, igual que crearTipo() en
+  // comp_controles.ts resetea abrirAccion/abrirExtra completos al
+  // cambiar de Tipo — acá el criterio es más fino (solo lo que deja
+  // de tener sentido), porque cambiar la Acción no reinicia el resto
+  // de la fila (Iniciar/Instancias siguen siendo válidos).
+  filaPerfil.abrirExtra.abrirCon = null;
+
+  filaPerfil.abrirExtra.argumento = "";
+
   reconstruirFila(contexto.id);
 }

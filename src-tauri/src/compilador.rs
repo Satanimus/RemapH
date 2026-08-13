@@ -271,26 +271,26 @@ fn compilar_remapeo(
     // una tecla física) — ver runt_extra.rs::obtener() y
     // runtime.rs::sustituir_accion(), que deja las líneas del molde
     // intactas (sin sustituir nada) para cualquier Acción que no sea
-    // Emitir. Para menu_express, portapapeles y multimedia esto es un
-    // problema real, no solo un desperdicio: ejecutar_accion() en
-    // runtime.rs desvía CUALQUIER fila con `extra: Some(_)` hacia ese
-    // molde ANTES de llegar al match que ejecuta la acción real
-    // (abrir_o_alternar / back_multimedia::ejecutar), así que una
-    // fila de cualquiera de estos tres tipos cuyo `filaPerfil.extra`
-    // haya quedado en "normal" (default de fila nueva, o el reset de
-    // crearTipo() en comp_controles.ts — la UI de Multimedia no
-    // ofrece configurar Extra, así que ese default nunca se
-    // sobreescribe) terminaba ejecutando un molde de no-ops en vez
-    // del comando real: la tecla se consumía (el match sí ocurre) pero
-    // no salía ningún volumen/play-pausa/siguiente/etc. — [FIX] bug
-    // reportado "Multimedia consume la tecla pero no genera ninguna
-    // acción". Mismo criterio que ya documenta el plan para
-    // menu_express/portapapeles ("Detener no hace nada, sin
-    // Mantenido/Turbo"): acá se fuerza a None sin importar qué haya
-    // guardado remapeo.extra.
+    // Emitir. Para menu_express, portapapeles, multimedia y abrir esto
+    // es un problema real, no solo un desperdicio: ejecutar_accion()
+    // en runtime.rs desvía CUALQUIER fila con `extra: Some(_)` hacia
+    // ese molde ANTES de llegar al match que ejecuta la acción real
+    // (abrir_o_alternar / back_multimedia::ejecutar / abrir_archivo),
+    // así que una fila de cualquiera de estos cuatro tipos cuyo
+    // `filaPerfil.extra` haya quedado en "normal" (default de fila
+    // nueva, ver crearFila() en core_perfil.ts — ninguno de los
+    // cuatro ofrece configurar Extra genérico, así que ese default
+    // nunca se sobreescribe) terminaba ejecutando un molde de no-ops
+    // en vez del comando real: la tecla se consumía (el match sí
+    // ocurre) pero no salía nada — mismo bug reportado para
+    // Multimedia ("consume la tecla pero no genera ninguna acción"),
+    // reproducido acá para "abrir" (no abría carpeta/archivo/exe pese
+    // a estar bien configurado). Se fuerza a None sin importar qué
+    // haya guardado remapeo.extra.
     let extra = if remapeo.tipo == "menu_express"
         || remapeo.tipo == "portapapeles"
         || remapeo.tipo == "multimedia"
+        || remapeo.tipo == "abrir"
     {
         None
     } else {

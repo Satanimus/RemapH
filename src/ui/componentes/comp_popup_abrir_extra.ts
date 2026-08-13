@@ -15,16 +15,13 @@
 //     según esRutaExe(abrirAccion.ruta) — mutuamente excluyentes acá,
 //     ver core_abrir.ts.
 //
-// El selector de "Abrir con" que se ve acá TODAVÍA es el manual
-// (seleccionar_archivo filtrado a .exe, mismo comando que usa
-// "Seleccionar..." de la columna Acción). La Etapa 11 antepone un
-// popup con el listado de recientes/instalados del registro (ver
-// back_registro.rs) y deja este mismo botón como su opción
-// "Examinar..." al final — esta función no debería necesitar
-// cambios estructurales para eso.
+// El selector de "Abrir con" abre un popup con el listado de
+// recientes/instalados del registro (ver comp_popup_abrir_con.ts,
+// back_registro.rs) — la opción "Examinar..." al final de ese
+// listado es la que cae al selector manual (seleccionar_archivo
+// filtrado a .exe, mismo comando que usa "Seleccionar..." de la
+// columna Acción) para cuando el programa deseado no aparece.
 // ======================================================
-
-import { invoke } from "@tauri-apps/api/core";
 
 import { mostrarPopup } from "./comp_popup_contenedor";
 
@@ -38,6 +35,8 @@ import type { IniciarAbrir, InstanciasAbrir } from "../../core/core_abrir";
 import { esRutaExe, nombreDeRuta } from "../../core/core_abrir";
 
 import { crearGrupoOpciones, crearFilaPopup } from "./comp_popup_grupo";
+
+import { abrirPopupAbrirCon } from "./comp_popup_abrir_con";
 
 // ======================================================
 // ➖ SEPARADOR (mismo estilo que el resto de los popups)
@@ -153,19 +152,8 @@ export function abrirPopupExtraAbrir(
       boton.title = abrirExtra.abrirCon;
     }
 
-    boton.addEventListener("click", async () => {
-      const ruta = await invoke<string | null>("seleccionar_archivo", {
-        extensiones: ["exe"],
-      });
-
-      if (!ruta) {
-        return;
-      }
-
-      abrirExtra.abrirCon = ruta;
-
-      reconstruirFila(contexto.id);
-      redibujar();
+    boton.addEventListener("click", (eventoClick) => {
+      abrirPopupAbrirCon(eventoClick, contexto, filaPerfil, redibujar);
     });
 
     popup.append(crearFilaPopup("Abrir con", boton));

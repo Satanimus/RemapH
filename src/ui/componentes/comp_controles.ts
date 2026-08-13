@@ -58,6 +58,8 @@ import { obtenerPerfilUi } from "../../core/core_perfil_ui";
 
 import { filaTieneConflicto } from "../../core/core_conflictos";
 
+import { filaTieneAdvertencia } from "../../core/core_advertencias_compilacion";
+
 // ======================================================
 // 🟢🔴 ESTADO (interruptor ON/OFF)
 // ======================================================
@@ -71,27 +73,41 @@ export function crearEstado(
 
   boton.className = "ui-btn estado-toggle";
 
+  // Mismo aviso "OFF ⚠️" para dos motivos distintos: conflicto entre
+  // filas (recalculado en vivo, ver core_conflictos.ts) o advertencia
+  // de la última compilación (ej. ruta de "abrir" que ya no existe,
+  // ver core_advertencias_compilacion.ts) — al usuario le alcanza con
+  // saber que la fila no está funcionando; el motivo puntual se lee
+  // en el statusbar (ver ui_statusbar.ts).
   const conflicto = filaTieneConflicto(
     filaPerfil.id,
 
     obtenerPerfilUi().filas,
   );
 
-  boton.dataset.estado = conflicto
+  const advertencia = filaTieneAdvertencia(
+    filaPerfil.id,
+
+    obtenerPerfilUi().filas,
+  );
+
+  const apagadaPorAviso = conflicto || advertencia;
+
+  boton.dataset.estado = apagadaPorAviso
     ? "off"
     : filaPerfil.estado === "ON"
       ? "on"
       : "off";
 
-  boton.dataset.conflicto = conflicto ? "true" : "false";
+  boton.dataset.conflicto = apagadaPorAviso ? "true" : "false";
 
   const texto = document.createElement("span");
 
-  texto.textContent = conflicto ? "OFF" : filaPerfil.estado;
+  texto.textContent = apagadaPorAviso ? "OFF" : filaPerfil.estado;
 
   boton.append(texto);
 
-  if (conflicto) {
+  if (apagadaPorAviso) {
     const alerta = document.createElement("span");
 
     alerta.className = "estado-alerta";
@@ -105,7 +121,7 @@ export function crearEstado(
     "click",
 
     (evento) => {
-      if (conflicto) {
+      if (apagadaPorAviso) {
         evento.stopPropagation();
 
         return;

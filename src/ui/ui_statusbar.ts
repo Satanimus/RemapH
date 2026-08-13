@@ -6,9 +6,12 @@ import type { FilaPerfil } from "../core/core_perfil";
 
 import { obtenerConflictos } from "../core/core_conflictos";
 
+import { obtenerAdvertenciasCompilacion } from "../core/core_advertencias_compilacion";
+
 import {
   obtenerTextoEstadoNormal,
   obtenerTextoNotificacion,
+  obtenerTextoAdvertenciaCompilacion,
 } from "../core/core_notificaciones";
 
 let statusbarActual: HTMLElement | null = null;
@@ -40,29 +43,32 @@ export function actualizarStatusbar(filas: FilaPerfil[]): void {
 
   const conflictos = obtenerConflictos(filas);
 
-  if (conflictos.length === 0) {
+  const advertencias = obtenerAdvertenciasCompilacion();
+
+  if (conflictos.length === 0 && advertencias.length === 0) {
     statusbarActual.textContent = obtenerTextoEstadoNormal();
 
     return;
   }
 
-  statusbarActual.textContent = conflictos
+  const textosConflictos = conflictos.map((conflicto) =>
+    obtenerTextoNotificacion(conflicto.codigo, {
+      filaA: conflicto.numeroA,
 
-    .map((conflicto) =>
-      obtenerTextoNotificacion(
-        conflicto.codigo,
+      filaB: conflicto.numeroB,
 
-        {
-          filaA: conflicto.numeroA,
+      appA: conflicto.filaA.app,
 
-          filaB: conflicto.numeroB,
+      appB: conflicto.filaB.app,
+    }),
+  );
 
-          appA: conflicto.filaA.app,
+  const textosAdvertencias = advertencias.map((advertencia) =>
+    obtenerTextoAdvertenciaCompilacion(advertencia.fila, advertencia.mensaje),
+  );
 
-          appB: conflicto.filaB.app,
-        },
-      ),
-    )
-
-    .join("   •   ");
+  statusbarActual.textContent = [
+    ...textosConflictos,
+    ...textosAdvertencias,
+  ].join("   •   ");
 }

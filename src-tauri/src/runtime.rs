@@ -672,6 +672,19 @@ fn ejecutar_click_coordenada(
 // asociado por Windows (eso vive en back_registro.rs, Etapa 7B,
 // todavía no conectado acá) — en esos casos Única no tiene efecto
 // y siempre se lanza de nuevo.
+//
+// PRIMER PLANO: ShellExecuteW lanza la ventana con el SHOW_WINDOW_CMD
+// pedido, pero Windows no siempre le da foco a una ventana recién
+// creada (protección anti robo-de-foco del sistema) — con Ventana o
+// Maximizado se fuerza el foco con el mismo enfocar_proceso() que ya
+// usa el caso "Única" (SetForegroundWindow), reintentando un rato
+// corto porque el proceso puede tardar en crear su ventana. Con
+// Minimizado no se fuerza nada: forzar foco sobre una ventana que se
+// pidió minimizada no tendría sentido. Mismo límite que "Única": solo
+// puede apuntar por nombre de proceso cuando ese nombre se conoce de
+// antemano (.exe/.lnk/abrir_con) — carpeta o documento sin abrir_con
+// abren sin forzado de foco (se confía en el comportamiento default
+// de Windows).
 // ======================================================
 
 fn abrir_archivo(
@@ -690,6 +703,14 @@ fn abrir_archivo(
             }
         }
 
+        // Se resuelve ANTES de mover abrir_con dentro del match de
+        // abajo (que consume el String cuando hay programa
+        // alternativo) — nombre_proceso_objetivo() solo necesita una
+        // referencia, pero una vez movido abrir_con ya no se puede
+        // volver a pedir prestado, así que el resultado se guarda acá
+        // para reusarlo después de lanzar (ver FORZAR PRIMER PLANO).
+        let nombre_para_enfocar = nombre_proceso_objetivo(&ruta, &abrir_con);
+
         let extension = extension_de(&ruta);
 
         let (archivo, parametros) = if extension == "exe" {
@@ -707,7 +728,36 @@ fn abrir_archivo(
         };
 
         ejecutar_shell_execute(&archivo, &parametros, mostrar_para_iniciar(&iniciar));
+
+        if iniciar != IniciarVentana::Minimizado {
+            if let Some(nombre) = nombre_para_enfocar {
+                forzar_primer_plano(&nombre);
+            }
+        }
     });
+}
+
+// ======================================================
+// 🔝 FORZAR PRIMER PLANO (reintentos cortos)
+// ------------------------------------------------------
+// La ventana del proceso recién lanzado puede tardar unos instantes
+// en existir — se reintenta enfocar_proceso() cada 100ms hasta
+// encontrarla o agotar los intentos, en vez de un solo intento
+// inmediato que probablemente falle contra un proceso que todavía no
+// terminó de arrancar.
+// ======================================================
+
+fn forzar_primer_plano(nombre: &str) {
+    const INTENTOS: u32 = 20;
+    const ESPERA: Duration = Duration::from_millis(100);
+
+    for _ in 0..INTENTOS {
+        if back_app::enfocar_proceso(nombre) {
+            return;
+        }
+
+        thread::sleep(ESPERA);
+    }
 }
 
 fn nombre_proceso_objetivo(ruta: &str, abrir_con: &Option<String>) -> Option<String> {
