@@ -202,19 +202,27 @@ fn compilar_remapeo(remapeo: &RemapeoJson, perfil: &perfil_json) -> Option<Remap
     // una tecla física) — ver runt_extra.rs::obtener() y
     // runtime.rs::sustituir_accion(), que deja las líneas del molde
     // intactas (sin sustituir nada) para cualquier Acción que no sea
-    // Emitir. Para menu_express y portapapeles esto es un problema
-    // real, no solo un desperdicio: ejecutar_accion() en runtime.rs
-    // desvía CUALQUIER fila con `extra: Some(_)` hacia ese molde
-    // ANTES de llegar al match que abre la ventana (abrir_o_alternar),
-    // así que una fila de cualquiera de estos dos tipos cuyo
-    // `filaPerfil.extra` haya quedado en "normal" (default de fila
-    // nueva, o el reset de crearTipo() en comp_controles.ts — ninguno
-    // de los dos popups Extra propios de estos tipos toca ese campo)
-    // terminaba ejecutando un molde de no-ops en vez de abrir la
-    // ventana. Mismo criterio que ya documenta el plan para estos dos
-    // tipos ("Detener no hace nada, sin Mantenido/Turbo"): acá se
-    // fuerza a None sin importar qué haya guardado remapeo.extra.
-    let extra = if remapeo.tipo == "menu_express" || remapeo.tipo == "portapapeles" {
+    // Emitir. Para menu_express, portapapeles y multimedia esto es un
+    // problema real, no solo un desperdicio: ejecutar_accion() en
+    // runtime.rs desvía CUALQUIER fila con `extra: Some(_)` hacia ese
+    // molde ANTES de llegar al match que ejecuta la acción real
+    // (abrir_o_alternar / back_multimedia::ejecutar), así que una
+    // fila de cualquiera de estos tres tipos cuyo `filaPerfil.extra`
+    // haya quedado en "normal" (default de fila nueva, o el reset de
+    // crearTipo() en comp_controles.ts — la UI de Multimedia no
+    // ofrece configurar Extra, así que ese default nunca se
+    // sobreescribe) terminaba ejecutando un molde de no-ops en vez
+    // del comando real: la tecla se consumía (el match sí ocurre) pero
+    // no salía ningún volumen/play-pausa/siguiente/etc. — [FIX] bug
+    // reportado "Multimedia consume la tecla pero no genera ninguna
+    // acción". Mismo criterio que ya documenta el plan para
+    // menu_express/portapapeles ("Detener no hace nada, sin
+    // Mantenido/Turbo"): acá se fuerza a None sin importar qué haya
+    // guardado remapeo.extra.
+    let extra = if remapeo.tipo == "menu_express"
+        || remapeo.tipo == "portapapeles"
+        || remapeo.tipo == "multimedia"
+    {
         None
     } else {
         convertir_extra(&remapeo.extra)

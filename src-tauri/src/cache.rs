@@ -635,6 +635,43 @@ fn resolver_condicion_por_id(
 /// indique lo contrario; para un match retroactivo por Up, es
 /// `entrada_antes` menos la tecla que se soltó.
 fn resolver_match(remapeo: RemapeoCache, entrada: Vec<InputId>, _id: u64, restantes: Vec<InputId>) {
+    // [FIX] Bug: "Q"=1 (Turbo/Mantenido, en bucle) + "Shift+Q"=2
+    // compilados juntos. Al mantener Q presionado (bucle emitiendo
+    // "1"), tocar Shift generaba una sesión nueva sembrada con
+    // [Q, Shift] (ver nota en recibir_down_rt) que matcheaba
+    // "Shift+Q"=2 como un match SEPARADO — sin que nadie se
+    // enterara de que la InstanciaActiva de "Q"=1 seguía viva. El
+    // bucle de "1" no se detenía y encima arrancaba el de "2" en
+    // paralelo (la salida se veía como "111112222..." intercalado,
+    // según el error de arriba: "shift lo convierte a ! en bucle").
+    //
+    // Windows nunca dispara dos triggers de teclado a la vez sobre
+    // el mismo gatillo: si mantenés "1" y tocás "2", el bucle de
+    // "1" se corta y sale "2" — porque el sistema operativo entrega
+    // el evento a un único destinatario activo por vez. Acá el
+    // "destinatario activo" es la InstanciaActiva, así que hay que
+    // replicar ese corte manualmente: cualquier InstanciaActiva
+    // cuya `entrada` sea un subconjunto de la del match que se va a
+    // iniciar ahora (mismo gatillo, sin nada que el nuevo match no
+    // tenga) se detiene ANTES de arrancar el nuevo — igual que
+    // Windows corta el auto-repeat de "1" al recibir "2". El Down
+    // de Shift en sí ya fue "consumido" por haber completado este
+    // match nuevo, así que no hace falta devolverlo a Windows aparte.
+    {
+        let mut runtime = RUNTIME.lock().unwrap();
+        let a_detener: Vec<String> = runtime
+            .activas
+            .iter()
+            .filter(|a| a.entrada.iter().all(|i| entrada.contains(i)))
+            .map(|a| a.id.clone())
+            .collect();
+        runtime.activas.retain(|a| !a_detener.contains(&a.id));
+        drop(runtime);
+        for id_activa in a_detener {
+            runtime::ejecutar(OrdenRuntime::Detener { id: id_activa });
+        }
+    }
+
     // Determinar si el gatillo (último elemento de entrada) sigue presionado
     let gatillo = entrada.last();
     let gatillo_presionado = gatillo.map_or(false, |g| {
