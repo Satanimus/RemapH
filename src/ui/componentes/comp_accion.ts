@@ -14,6 +14,8 @@ import {
   crearAccionPortapapeles,
 } from "./comp_accion_contenido";
 
+import { crearAccionAbrir } from "./comp_popup_abrir_accion";
+
 import { crearCapturador } from "./comp_capturador";
 
 import { abrirPopupAccionMultimedia } from "./comp_popup_multimedia";
@@ -74,6 +76,13 @@ export function crearAccion(
 
       return boton;
     }
+
+    // El botón (ícono + nombre + tooltip) y el popup de selección
+    // Archivo/Carpeta viven juntos en comp_popup_abrir_accion.ts —
+    // a diferencia de los casos de arriba, acá alcanza con un solo
+    // llamado (mismo criterio que crearCapturador() en el default).
+    case "abrir":
+      return crearAccionAbrir(contexto, filaPerfil, alModificar);
 
     // El extra Coordenada (dentro de Tecla/Mouse) no tiene un botón
     // propio: reusa este mismo capturador — lo capturado es lo que se

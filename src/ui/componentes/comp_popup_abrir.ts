@@ -110,11 +110,7 @@ function abrirListaConValor(
 // 🧭 VOCABULARIO tipo / extra
 // ------------------------------------------------------
 // Única fuente de verdad para las opciones y sus valores
-// reales (los que espera Rust — ver compilador.rs). Los
-// tipos que no son "tecla_mouse" son decorativos por ahora:
-// el botón de Acción no hace nada, y compilador.rs descarta
-// la fila entera al compilar (no existe implementación real
-// todavía del lado Rust para esos tipos).
+// reales (los que espera Rust — ver compilador.rs).
 // ======================================================
 
 const TIPO_OPCIONES: { texto: string; valor: string }[] = [
@@ -123,6 +119,7 @@ const TIPO_OPCIONES: { texto: string; valor: string }[] = [
   { texto: "MenuExpress", valor: "menu_express" },
   { texto: "Macro", valor: "macro" },
   { texto: "Portapapeles", valor: "portapapeles" },
+  { texto: "Abrir Archivo/App", valor: "abrir" },
 ];
 
 const EXTRA_OPCIONES: { texto: string; valor: string }[] = [

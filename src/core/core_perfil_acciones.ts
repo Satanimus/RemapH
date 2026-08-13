@@ -16,6 +16,8 @@ import { textoMenuAccion } from "./core_menu_express";
 
 import { textoPortapapelesAccion } from "./core_portapapeles";
 
+import { textoAbrirAccion } from "./core_abrir";
+
 // ======================================================
 // 📋 CLONAR FILA POR ID
 // ======================================================

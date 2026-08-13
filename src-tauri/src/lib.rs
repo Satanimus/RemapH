@@ -14,6 +14,7 @@ mod back_mouse;
 mod back_multimedia;
 mod back_portapapeles;
 mod back_portapapeles_captura;
+mod back_registro;
 mod back_teclas;
 mod cache;
 mod captura_coordenada;
@@ -85,6 +86,7 @@ pub fn run() {
             comandos::obtener_icono_ruta,
             comandos::seleccionar_archivo,
             comandos::seleccionar_carpeta,
+            comandos::obtener_programas_abrir_con,
             comandos::obtener_tiempo_doble,
             comandos::establecer_tiempo_doble,
             comandos::abrir_selector_emoji,

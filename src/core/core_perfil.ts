@@ -25,6 +25,9 @@ import {
   crearPortapapelesExtra,
 } from "./core_portapapeles";
 
+import type { AbrirAccionPerfil, AbrirExtraPerfil } from "./core_abrir";
+import { crearAbrirAccion, crearAbrirExtra } from "./core_abrir";
+
 // ======================================================
 // 👤 PERFIL
 // ======================================================
@@ -94,6 +97,15 @@ export interface FilaPerfil {
 
   portapapelesExtra: PortapapelesExtraPerfil;
 
+  // Solo relevantes cuando tipo === "abrir". A diferencia de
+  // menuAccion/portapapelesAccion, el id de la fila NO representa
+  // nada propio acá (no hay ventana ni menú que abrir/cerrar) — son
+  // simplemente los datos de la Acción (ruta elegida) y el Extra
+  // (iniciar/instancias/abrirCon/argumento). Ver core_abrir.ts.
+  abrirAccion: AbrirAccionPerfil;
+
+  abrirExtra: AbrirExtraPerfil;
+
   app: AppPerfil;
 
   color: string;
@@ -134,6 +146,10 @@ export function crearFila(): FilaPerfil {
     portapapelesAccion: crearPortapapelesAccion(),
 
     portapapelesExtra: crearPortapapelesExtra(),
+
+    abrirAccion: crearAbrirAccion(),
+
+    abrirExtra: crearAbrirExtra(),
 
     app: {
       programa: null,
@@ -208,5 +224,13 @@ export function clonarFila(fila: FilaPerfil): FilaPerfil {
     portapapelesAccion: { ...fila.portapapelesAccion },
 
     portapapelesExtra: { ...fila.portapapelesExtra },
+
+    // Misma razón que portapapelesAccion/portapapelesExtra arriba:
+    // objetos nuevos para que editar la fila clonada no mute la
+    // original (ningún campo de abrirAccion/abrirExtra es array u
+    // objeto anidado, alcanza con copia superficial).
+    abrirAccion: { ...fila.abrirAccion },
+
+    abrirExtra: { ...fila.abrirExtra },
   };
 }

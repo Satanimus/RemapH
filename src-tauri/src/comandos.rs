@@ -450,6 +450,39 @@ pub fn seleccionar_carpeta() -> Option<String> {
 }
 
 // ======================================================
+// 🗂️ ABRIR CON — PROGRAMAS DEL REGISTRO
+// ------------------------------------------------------
+// Usado por el popup "Abrir con..." (Etapa 11): combina los
+// programas recientes de Windows para esa extensión (usados primero
+// desde el propio Explorador) con el listado general de programas
+// instalados, sin duplicar rutas — recientes primero. El ícono de
+// cada uno NO viaja acá: el frontend lo pide aparte por ítem con
+// obtener_icono_ruta(), mismo patrón que ya usa la columna App.
+// ======================================================
+
+#[derive(Serialize)]
+pub struct ProgramaJson {
+    pub nombre: String,
+
+    pub ruta: String,
+}
+
+#[tauri::command]
+pub fn obtener_programas_abrir_con(extension: String) -> Vec<ProgramaJson> {
+    let mut vistos = std::collections::HashSet::new();
+
+    crate::back_registro::obtener_recientes(&extension)
+        .into_iter()
+        .chain(crate::back_registro::obtener_instalados())
+        .filter(|programa| vistos.insert(programa.ruta.to_lowercase()))
+        .map(|programa| ProgramaJson {
+            nombre: programa.nombre,
+            ruta: programa.ruta,
+        })
+        .collect()
+}
+
+// ======================================================
 // 😎 SELECTOR EMOJI
 // ======================================================
 #[tauri::command]

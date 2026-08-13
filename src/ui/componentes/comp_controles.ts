@@ -44,6 +44,14 @@ import {
   crearPortapapelesExtra,
 } from "../../core/core_portapapeles";
 
+import {
+  textoAbrirExtra,
+  crearAbrirAccion,
+  crearAbrirExtra,
+} from "../../core/core_abrir";
+
+import { abrirPopupExtraAbrir } from "./comp_popup_abrir_extra";
+
 import { crearCoordenada } from "../../core/core_coordenada";
 
 import { obtenerPerfilUi } from "../../core/core_perfil_ui";
@@ -143,11 +151,13 @@ export function crearTipo(
           filaPerfil.accionReferencia = null;
           filaPerfil.menuAccion = crearMenuAccion();
           filaPerfil.portapapelesAccion = crearPortapapelesAccion();
+          filaPerfil.abrirAccion = crearAbrirAccion();
 
           filaPerfil.condicion = "Normal";
           filaPerfil.coordenada = crearCoordenada();
           filaPerfil.menuExtra = crearMenuExtra();
           filaPerfil.portapapelesExtra = crearPortapapelesExtra();
+          filaPerfil.abrirExtra = crearAbrirExtra();
           filaPerfil.extra = "normal";
 
           filaPerfil.tipo = valor;
@@ -207,6 +217,20 @@ export function crearExtra(
       texto: textoPortapapelesExtra(filaPerfil.portapapelesExtra),
       onClick: (evento) => {
         abrirPopupExtraPortapapeles(evento, contexto, filaPerfil);
+      },
+    });
+  }
+
+  // abrir tiene su propio popup Extra (Iniciar/Instancias/Abrir con
+  // o Argumento) — igual de persistente que los anteriores. El
+  // botón "Abrir con" que muestra hoy ese popup es el selector
+  // manual; la Etapa 11 le antepone el listado de recientes/
+  // instalados del registro, sin tocar este enganche.
+  if (filaPerfil.tipo === "abrir") {
+    return crearPopup({
+      texto: textoAbrirExtra(filaPerfil.abrirExtra),
+      onClick: (evento) => {
+        abrirPopupExtraAbrir(evento, contexto, filaPerfil);
       },
     });
   }

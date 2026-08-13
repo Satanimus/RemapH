@@ -43,6 +43,15 @@ arboard = "3"
 # / seleccionar_carpeta().
 rfd = "0.15"
 
+# Lectura del registro de Windows para el listado de "Abrir con" del
+# tipo "Abrir Archivo/App" (Etapa 7B) — programas recientes por
+# extensión (HKCU\...\FileExts\<ext>\OpenWithList) y programas
+# instalados con handler asociado (HKCR\Applications). Ver
+# back_registro.rs. Su propia versión de windows-sys (misma franja
+# ">=0.59, <=0.61" que ya usamos) trae las features de registro que
+# necesita — no hace falta agregarlas a nuestro bloque windows-sys.
+winreg = "0.56"
+
 # Acceso al HWND real de una ventana (raw_window_handle::HasWindowHandle,
 # que tauri::WebviewWindow ya implementa) — usado en back_menu_express.rs
 # para aplicarle WS_EX_NOACTIVATE y que clickear sus botones no le quite
