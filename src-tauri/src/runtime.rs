@@ -686,25 +686,36 @@ fn ejecutar_click_coordenada(
 // y siempre se lanza de nuevo. Esto SÍ sigue siendo por nombre (no
 // por PID): a diferencia del forzado de primer plano de abajo, acá
 // se está buscando un proceso que puede llevar rato corriendo, no
-// uno que se acaba de lanzar.
+// uno que se acaba de lanzar. Nota: aunque para carpeta el programa
+// SÍ se conoce de antemano (siempre "explorer.exe", ver más abajo),
+// deliberadamente no se usa acá — enfocar_proceso() trae al frente
+// la primera ventana de ese nombre que encuentre, y con Explorer eso
+// podría ser la ventana de OTRA carpeta ya abierta, no la que se
+// pidió.
 //
 // PRIMER PLANO: se lanza con ShellExecuteExW en vez de ShellExecuteW
 // para obtener el HANDLE del proceso creado (SEE_MASK_NOCLOSEPROCESS)
-// y de ahí su PID cuando lo hay. Ese PID NO siempre existe: al abrir
-// una CARPETA, Windows reusa el explorer.exe que ya está corriendo
-// (se lo pide por mensaje interno) en vez de lanzar uno nuevo, así
-// que hProcess llega nulo — lo mismo puede pasar con un documento
-// cuyo programa asociado ya estaba abierto (DDE). Por eso el forzado
-// de foco no depende solo del PID: se toma un snapshot de ventanas
-// visibles ANTES de lanzar (back_app::listar_ventanas_visibles) y
-// después se busca la ventana NUEVA que apareció
-// (back_app::buscar_ventana_nueva — prioriza el PID si lo hay, si no
-// cae a "la primera ventana nueva que sea"), forzándole el foco con
-// AttachThreadInput (back_app::forzar_foco), que sí tiene efecto
-// garantizado a diferencia de un SetForegroundWindow suelto (Windows
-// bloquea el robo de foco de ventanas recién creadas si el hilo que
-// lo pide no está "pegado" al hilo en foco actual). Esto cubre TODOS
-// los casos por igual — incluida carpeta y documento sin abrir_con.
+// y de ahí su PID cuando lo hay. Ese PID NO siempre existe: un
+// documento cuyo programa asociado ya estaba abierto puede recibir
+// la apertura por DDE (hProcess llega nulo, sin proceso nuevo). Por
+// eso el forzado de foco no depende solo del PID: se toma un
+// snapshot de ventanas visibles ANTES de lanzar
+// (back_app::listar_ventanas_visibles) y después se busca la ventana
+// NUEVA que apareció (back_app::buscar_ventana_nueva — prioriza el
+// PID si lo hay, si no cae a "la primera ventana nueva que sea"),
+// forzándole el foco con AttachThreadInput (back_app::forzar_foco),
+// que sí tiene efecto garantizado a diferencia de un
+// SetForegroundWindow suelto (Windows bloquea el robo de foco de
+// ventanas recién creadas si el hilo que lo pide no está "pegado" al
+// hilo en foco actual). CARPETA es un caso aparte (ver el `if
+// Path::new(&ruta).is_dir()` de abajo): ShellExecuteExW "open" sobre
+// una ruta de carpeta reusa la ventana de Explorer que ya esté
+// corriendo (misma negociación por DDE que un doble clic normal) en
+// vez de crear una nueva — ni PID ni ventana nueva garantizados, el
+// snapshot-diff de arriba no tiene nada que detectar. Por eso ahí se
+// lanza "explorer.exe" como programa con la ruta de parámetro en vez
+// del verbo "open" directo: fuerza proceso y ventana genuinamente
+// nuevos, mismo camino confiable que ya funciona para .exe/abrir_con.
 // Con Minimizado no se fuerza nada: no tendría sentido traer al
 // frente una ventana que se pidió minimizada.
 // ======================================================
@@ -733,11 +744,23 @@ fn abrir_archivo(
             (ruta.clone(), String::new())
         } else if let Some(programa) = abrir_con {
             (programa, format!("\"{}\"", ruta))
+        } else if Path::new(&ruta).is_dir() {
+            // Carpeta: NO se usa ShellExecuteExW "open" sobre la ruta
+            // sola — ese verbo le pide a Windows que reuse la ventana
+            // de Explorer que ya esté corriendo (la misma negociación
+            // por DDE que usa un doble clic normal), y en ese caso ni
+            // siquiera aparece una ventana nueva para detectar más
+            // abajo (a veces ni un PID nuevo). Lanzando "explorer.exe"
+            // como programa, con la ruta de parámetro, se evita esa
+            // reutilización: Windows crea una ventana (y proceso)
+            // nuevos siempre, igual que ejecutarlo así desde
+            // Ejecutar/cmd — mismo comportamiento confiable que ya
+            // funciona para .exe/abrir_con.
+            ("explorer.exe".to_string(), format!("\"{}\"", ruta))
         } else {
-            // Carpeta o documento sin abrir_con personalizado:
-            // ShellExecuteExW "open" sobre la ruta sola ya resuelve
-            // ambos casos (Explorer para carpetas, programa asociado
-            // por Windows para documentos).
+            // Documento sin abrir_con personalizado: ShellExecuteExW
+            // "open" sobre la ruta sola resuelve con el programa
+            // asociado por Windows.
             (ruta.clone(), String::new())
         };
 
