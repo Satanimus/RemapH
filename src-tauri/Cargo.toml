@@ -37,6 +37,12 @@ winmix = "0.1"
 # el cambio, no para detectarlo.
 arboard = "3"
 
+# Selector nativo de Windows (archivo/carpeta) para el tipo "Abrir
+# Archivo/App" — botón "Seleccionar..." y "Examinar..." dentro de
+# "Abrir con" (filtrado a .exe). Ver comandos.rs::seleccionar_archivo()
+# / seleccionar_carpeta().
+rfd = "0.15"
+
 # Acceso al HWND real de una ventana (raw_window_handle::HasWindowHandle,
 # que tauri::WebviewWindow ya implementa) — usado en back_menu_express.rs
 # para aplicarle WS_EX_NOACTIVATE y que clickear sus botones no le quite

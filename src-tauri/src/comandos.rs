@@ -133,6 +133,7 @@
 use crate::back_app;
 use crate::back_coordenada;
 use crate::captura_coordenada;
+use crate::compilador::ResultadoCompilacion;
 use crate::config;
 use crate::perfil;
 use crate::perfil_json::perfil_json;
@@ -229,7 +230,7 @@ pub fn eliminar_perfil_actual() -> Result<ResultadoPerfil, String> {
 }
 
 #[tauri::command]
-pub fn compilar_perfil(filas: Vec<FilaUI>) -> Result<bool, String> {
+pub fn compilar_perfil(filas: Vec<FilaUI>) -> Result<ResultadoCompilacion, String> {
     let perfil = convertir_perfil(filas);
 
     perfil::guardar_perfil(perfil)
@@ -397,6 +398,55 @@ pub fn obtener_icono_programa(nombre: String) -> Option<IconoJson> {
         .find(|proceso| proceso.nombre.eq_ignore_ascii_case(&nombre))?;
 
     back_app::extraer_icono(&proceso.ruta).map(convertir_icono)
+}
+
+// ======================================================
+// 🎨 OBTENER ICONO POR RUTA
+// ------------------------------------------------------
+// A diferencia de obtener_icono_programa (busca por nombre entre
+// los procesos corriendo), esta recibe una ruta directa — usada por
+// el tipo "Abrir Archivo/App" para mostrar el ícono de lo que se
+// eligió con "Seleccionar..." (archivo, carpeta o programa), sin
+// depender de que esté corriendo ahora mismo.
+// ======================================================
+
+#[tauri::command]
+pub fn obtener_icono_ruta(ruta: String) -> Option<IconoJson> {
+    back_app::extraer_icono_ruta(&ruta).map(convertir_icono)
+}
+
+// ======================================================
+// 📂 SELECTOR NATIVO DE ARCHIVO/CARPETA
+// ------------------------------------------------------
+// Usados por el tipo "Abrir Archivo/App": seleccionar_archivo() para
+// el botón "Seleccionar..." de la columna Acción (sin filtro) y para
+// la opción "Examinar..." del listado de "Abrir con" (filtrada a
+// .exe, ver Etapa 11); seleccionar_carpeta() para cuando el ítem
+// elegido es una carpeta. rfd no ofrece un diálogo nativo que
+// combine archivo+carpeta en una sola ventana — la UI (Etapa 10)
+// decide cómo ofrecer ambas opciones.
+// ======================================================
+
+#[tauri::command]
+pub fn seleccionar_archivo(extensiones: Option<Vec<String>>) -> Option<String> {
+    let mut dialogo = rfd::FileDialog::new();
+
+    if let Some(extensiones) = &extensiones {
+        let filtros: Vec<&str> = extensiones.iter().map(String::as_str).collect();
+
+        dialogo = dialogo.add_filter("Programas", &filtros);
+    }
+
+    dialogo
+        .pick_file()
+        .map(|ruta| ruta.to_string_lossy().to_string())
+}
+
+#[tauri::command]
+pub fn seleccionar_carpeta() -> Option<String> {
+    rfd::FileDialog::new()
+        .pick_folder()
+        .map(|ruta| ruta.to_string_lossy().to_string())
 }
 
 // ======================================================

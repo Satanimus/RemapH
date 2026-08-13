@@ -157,6 +157,10 @@ use crate::perfil_cache::{
 
 use crate::perfil_json::{perfil_json, AppJson, CoordenadaJson, RemapeoJson};
 
+use serde::Serialize;
+
+use std::path::Path;
+
 // ======================================================
 // ⚠️ ADVERTENCIA DE COMPILACIÓN
 // ------------------------------------------------------
@@ -168,7 +172,7 @@ use crate::perfil_json::{perfil_json, AppJson, CoordenadaJson, RemapeoJson};
 // puede sumar advertencias acá.
 // ======================================================
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Serialize)]
 pub struct AdvertenciaCompilacion {
     pub fila: usize,
 
@@ -176,10 +180,27 @@ pub struct AdvertenciaCompilacion {
 }
 
 // ======================================================
+// 📦 RESULTADO COMPILACIÓN
+// ------------------------------------------------------
+// Lo que compilar() devuelve hacia perfil.rs/comandos.rs: activo
+// espeja cache::esta_vacia() (mismo criterio de siempre, ver
+// guardar_perfil() en perfil.rs), advertencias es la lista de
+// AdvertenciaCompilacion generada durante esta compilación puntual
+// (no se acumula entre llamadas).
+// ======================================================
+
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct ResultadoCompilacion {
+    pub activo: bool,
+
+    pub advertencias: Vec<AdvertenciaCompilacion>,
+}
+
+// ======================================================
 // ⚙️ COMPILAR
 // ======================================================
 
-pub fn compilar(perfil: &perfil_json) -> Vec<AdvertenciaCompilacion> {
+pub fn compilar(perfil: &perfil_json) -> ResultadoCompilacion {
     let (remapeos, advertencias) = compilar_perfil(perfil);
 
     cache::borrar_cache();
@@ -199,7 +220,10 @@ pub fn compilar(perfil: &perfil_json) -> Vec<AdvertenciaCompilacion> {
     // reinicio — ver back_portapapeles.rs::cerrar_todas().
     crate::back_portapapeles::cerrar_todas();
 
-    advertencias
+    ResultadoCompilacion {
+        activo: !cache::esta_vacia(),
+        advertencias,
+    }
 }
 
 // ======================================================
@@ -369,7 +393,12 @@ fn convertir_entrada(trigger: &crate::perfil_json::TriggerJson) -> Vec<InputId> 
 // cualquier perfil que tuviera una fila así guardada.
 // ======================================================
 
-fn convertir_accion(remapeo: &RemapeoJson, perfil: &perfil_json) -> Option<AccionCache> {
+fn convertir_accion(
+    numero_fila: usize,
+    remapeo: &RemapeoJson,
+    perfil: &perfil_json,
+    advertencias: &mut Vec<AdvertenciaCompilacion>,
+) -> Option<AccionCache> {
     match remapeo.tipo.as_str() {
         "tecla_mouse" => {
             let trigger = remapeo.accion_trigger.as_ref()?;
@@ -388,8 +417,6 @@ fn convertir_accion(remapeo: &RemapeoJson, perfil: &perfil_json) -> Option<Accio
 
         "macro" => Some(AccionCache::Macro(referencia(remapeo)?)),
 
-        "archivo" => Some(AccionCache::AbrirArchivo(referencia(remapeo)?)),
-
         "ui" => Some(AccionCache::Ui(referencia(remapeo)?)),
 
         "multimedia" => {
@@ -403,6 +430,8 @@ fn convertir_accion(remapeo: &RemapeoJson, perfil: &perfil_json) -> Option<Accio
         "menu_express" => convertir_menu_express(remapeo, perfil),
 
         "portapapeles" => Some(convertir_portapapeles(remapeo)),
+
+        "abrir" => convertir_abrir(numero_fila, remapeo, advertencias),
 
         // Tipos todavía decorativos en la UI (sin implementar del
         // lado Rust): no producen ninguna acción real todavía. La
@@ -547,6 +576,61 @@ fn convertir_tamano_boton_portapapeles(valor: &str) -> TamanoBotonPortapapeles {
         "pequeno" => TamanoBotonPortapapeles::Pequeno,
         "grande" => TamanoBotonPortapapeles::Grande,
         _ => TamanoBotonPortapapeles::Mediano,
+    }
+}
+
+// ======================================================
+// 📂 CONVERTIR ABRIR
+// ------------------------------------------------------
+// None si todavía no se eligió ruta (dato faltante, descarte
+// silencioso de siempre, sin advertencia). Si ya hay ruta pero
+// Path::exists() da false, la fila también se descarta pero además
+// se registra una AdvertenciaCompilacion — el dato existe pero es
+// inválido (el archivo se movió/borró desde que se guardó), a
+// diferencia de "todavía no se capturó". La ruta ya validada acá
+// nunca se vuelve a comprobar en runtime.rs.
+// ======================================================
+
+fn convertir_abrir(
+    numero_fila: usize,
+    remapeo: &RemapeoJson,
+    advertencias: &mut Vec<AdvertenciaCompilacion>,
+) -> Option<AccionCache> {
+    let ruta = remapeo.abrir_accion.ruta.clone()?;
+
+    if !Path::new(&ruta).exists() {
+        advertencias.push(AdvertenciaCompilacion {
+            fila: numero_fila,
+            mensaje: "Archivo o programa no encontrado.".to_string(),
+        });
+
+        return None;
+    }
+
+    Some(AccionCache::AbrirArchivo {
+        ruta,
+        iniciar: convertir_iniciar_ventana(&remapeo.abrir_extra.iniciar),
+        instancias: convertir_instancias_abrir(&remapeo.abrir_extra.instancias),
+        abrir_con: remapeo.abrir_extra.abrir_con.clone(),
+        argumento: remapeo.abrir_extra.argumento.clone(),
+    })
+}
+
+fn convertir_iniciar_ventana(valor: &str) -> IniciarVentana {
+    match valor {
+        "minimizado" => IniciarVentana::Minimizado,
+
+        "maximizado" => IniciarVentana::Maximizado,
+
+        _ => IniciarVentana::Ventana,
+    }
+}
+
+fn convertir_instancias_abrir(valor: &str) -> InstanciasAbrir {
+    match valor {
+        "unica" => InstanciasAbrir::Unica,
+
+        _ => InstanciasAbrir::Multiple,
     }
 }
 

@@ -99,6 +99,7 @@ use crate::usuario;
 use std::fs;
 use std::path::Path;
 
+use crate::compilador::ResultadoCompilacion;
 use crate::perfil_ui::ResultadoPerfil;
 
 // ======================================================
@@ -151,14 +152,12 @@ pub fn obtener_perfil_actual() -> Result<perfil_json, String> {
 // 💾 GUARDAR PERFIL
 // ======================================================
 
-pub fn guardar_perfil(perfil: perfil_json) -> Result<bool, String> {
+pub fn guardar_perfil(perfil: perfil_json) -> Result<ResultadoCompilacion, String> {
     let ruta = usuario::perfil_actual()?;
 
     guardar_en_disco(&perfil, &ruta)?;
 
-    compilador::compilar(&perfil);
-
-    Ok(!cache::esta_vacia())
+    Ok(compilador::compilar(&perfil))
 }
 
 // ======================================================

@@ -44,11 +44,11 @@
 //    tiene, o a la línea 0 si no la tiene — ver
 //    ejecutar_lineas().
 //
-// B) AccionCache — las 4 variantes son tupla, no struct
-//    (Emitir(Vec<InputId>), Macro(String), AbrirArchivo(String),
-//    Ui(String)). Si algún día se reescribe perfil_cache.rs,
-//    no volver a variantes struct sin revisar compilador.rs
-//    y este archivo — ya se rompió una vez por esto.
+// B) AccionCache — Emitir/Macro/Ui siguen siendo tupla; AbrirArchivo
+//    es struct (ruta, iniciar, instancias, abrir_con, argumento —
+//    ver perfil_cache.rs). Si se vuelve a tocar esa variante, revisar
+//    también compilador.rs y este archivo — ya se rompió una vez por
+//    un desajuste entre los tres.
 //    Emitir guarda modificadores + gatillo en ese orden
 //    (último elemento = gatillo, ver perfil_cache.rs) — nunca
 //    un InputId suelto, para no perder el Mod de un combo
@@ -111,9 +111,12 @@
 //    eso Emitir va a COLA_SALIDA: un canal + un único hilo
 //    de salida de por vida, no uno por id — no hace falta
 //    Detener un Emitir a mitad de camino, así que no necesita
-//    la maquinaria de INSTANCIAS. Solo Ui/AbrirArchivo siguen
-//    sin hilo — son de verdad instantáneas, no producen
-//    eventos físicos encadenados.
+//    la maquinaria de INSTANCIAS. AbrirArchivo también corre en
+//    su propio hilo (ShellExecuteW + enumerar ventanas para
+//    enfocar puede tardar) pero sin pasar por INSTANCIAS —es
+//    de una sola vez, no hay nada que Detener a mitad de camino.
+//    Solo Ui sigue sin hilo — es de verdad instantánea, no
+//    produce eventos físicos encadenados.
 //
 // F) Estado compartido entre hilos: INSTANCIAS
 //    (Mutex<HashMap<id, bool>>, true = "debe detenerse").
@@ -225,9 +228,18 @@
 // resolver_input(interno) / ejecutar_down() /
 // ejecutar_up() / ejecutar_pulse() / emitir() / esperar()
 //     Los pasos físicos individuales del Idioma Runtime.
-// abrir_archivo() / mostrar_ui()
+// abrir_archivo(ruta, iniciar, instancias, abrir_con, argumento)
+//     En su propio hilo: si Instancias es Única y hay un proceso
+//     objetivo conocido (ruta si es .exe, o abrir_con si se
+//     personalizó), intenta enfocarlo con back_app::enfocar_proceso()
+//     antes de lanzar nada nuevo. Si no lo encuentra (o Instancias es
+//     Múltiple), arma el comando según el tipo de ítem (.exe: ejecuta
+//     con argumento; .lnk: abre el acceso directo; carpeta/documento:
+//     ShellExecuteW "open" resuelve solo, salvo que haya abrir_con) y
+//     lo lanza con el modo de ventana de iniciar.
+// mostrar_ui()
 //     Sin implementar todavía (fuera de esta sesión de
-//     trabajo) — quedan como punto de entrada ya conectado.
+//     trabajo) — queda como punto de entrada ya conectado.
 // emitir_evento()
 //     Único punto de salida real hacia back_interception.
 // ------------------------------------------------------
@@ -256,7 +268,8 @@
 // ejecutar_accion()
 //     ├─ Emitir → COLA_SALIDA (encola, no bloquea) → hilo
 //     │           de salida dedicado → emitir_combo()
-//     ├─ AbrirArchivo / Ui → ejecución directa
+//     ├─ Ui → ejecución directa
+//     ├─ AbrirArchivo → hilo propio (ShellExecuteW, sin INSTANCIAS)
 //     └─ con Extra o Macro de archivo → hilo propio (id)
 //               ↓
 //         ejecutar_lineas() [loop, revisa INSTANCIAS
@@ -268,6 +281,7 @@
 //               ↓
 //         Dispositivo físico
 // ======================================================
+use crate::back_app;
 use crate::back_coordenada;
 
 use crate::back_interception;
@@ -282,7 +296,8 @@ use crate::config;
 use crate::eventos::InputId;
 
 use crate::perfil_cache::{
-    AccionCache, CondicionTrigger, CoordenadaCache, ExtraCache, PostAccionCache,
+    AccionCache, CondicionTrigger, CoordenadaCache, ExtraCache, IniciarVentana, InstanciasAbrir,
+    PostAccionCache,
 };
 
 use crate::runt_extra;
@@ -295,6 +310,8 @@ use std::fs::File;
 
 use std::io::{BufRead, BufReader};
 
+use std::path::Path;
+
 use std::sync::mpsc::Sender;
 
 use std::sync::Mutex;
@@ -302,6 +319,12 @@ use std::sync::Mutex;
 use std::thread;
 
 use std::time::Duration;
+
+use windows_sys::Win32::UI::Shell::ShellExecuteW;
+
+use windows_sys::Win32::UI::WindowsAndMessaging::{
+    SHOW_WINDOW_CMD, SW_SHOWMAXIMIZED, SW_SHOWMINIMIZED, SW_SHOWNORMAL,
+};
 
 // ======================================================
 // 🗂️ INSTANCIAS ACTIVAS
@@ -493,8 +516,14 @@ fn ejecutar_accion(
             ejecutar_macro_en_hilo(id, ruta);
         }
 
-        AccionCache::AbrirArchivo(ruta) => {
-            abrir_archivo(ruta);
+        AccionCache::AbrirArchivo {
+            ruta,
+            iniciar,
+            instancias,
+            abrir_con,
+            argumento,
+        } => {
+            abrir_archivo(ruta, iniciar, instancias, abrir_con, argumento);
         }
 
         AccionCache::Ui(valor) => {
@@ -629,14 +658,117 @@ fn ejecutar_click_coordenada(
 
 // ======================================================
 // 📂 ABRIR ARCHIVO
+// ------------------------------------------------------
+// Corre en su propio hilo (mismo motivo que ejecutar_macro_en_hilo:
+// no bloquear el hilo de captura). Sin registrarse en INSTANCIAS —
+// es de una sola vez, no hay Extra ni loop que Detener a mitad de
+// camino.
+//
+// "Única": el proceso objetivo solo se conoce de antemano en dos
+// casos — ruta es un .exe (objetivo = su propio nombre de archivo),
+// o hay abrir_con (objetivo = el nombre de archivo del programa
+// alternativo). Para carpeta/.lnk/documento sin abrir_con no hay
+// forma de saber qué proceso buscar sin resolver el programa
+// asociado por Windows (eso vive en back_registro.rs, Etapa 7B,
+// todavía no conectado acá) — en esos casos Única no tiene efecto
+// y siempre se lanza de nuevo.
 // ======================================================
 
-fn abrir_archivo(ruta: String) {
-    // El backend decide cómo abrir la ruta
-    // según corresponda (programa, documento,
-    // carpeta, URL, etc.).
+fn abrir_archivo(
+    ruta: String,
+    iniciar: IniciarVentana,
+    instancias: InstanciasAbrir,
+    abrir_con: Option<String>,
+    argumento: String,
+) {
+    thread::spawn(move || {
+        if instancias == InstanciasAbrir::Unica {
+            if let Some(nombre) = nombre_proceso_objetivo(&ruta, &abrir_con) {
+                if back_app::enfocar_proceso(&nombre) {
+                    return;
+                }
+            }
+        }
 
-    let _ = ruta;
+        let extension = extension_de(&ruta);
+
+        let (archivo, parametros) = if extension == "exe" {
+            (ruta.clone(), argumento)
+        } else if extension == "lnk" {
+            (ruta.clone(), String::new())
+        } else if let Some(programa) = abrir_con {
+            (programa, format!("\"{}\"", ruta))
+        } else {
+            // Carpeta o documento sin abrir_con personalizado:
+            // ShellExecuteW "open" sobre la ruta sola ya resuelve
+            // ambos casos (Explorer para carpetas, programa asociado
+            // por Windows para documentos).
+            (ruta.clone(), String::new())
+        };
+
+        ejecutar_shell_execute(&archivo, &parametros, mostrar_para_iniciar(&iniciar));
+    });
+}
+
+fn nombre_proceso_objetivo(ruta: &str, abrir_con: &Option<String>) -> Option<String> {
+    if let Some(programa) = abrir_con {
+        return nombre_archivo(programa);
+    }
+
+    if extension_de(ruta) == "exe" {
+        return nombre_archivo(ruta);
+    }
+
+    None
+}
+
+fn nombre_archivo(ruta: &str) -> Option<String> {
+    Path::new(ruta)
+        .file_name()
+        .map(|nombre| nombre.to_string_lossy().to_string())
+}
+
+fn extension_de(ruta: &str) -> String {
+    Path::new(ruta)
+        .extension()
+        .map(|ext| ext.to_string_lossy().to_lowercase())
+        .unwrap_or_default()
+}
+
+fn mostrar_para_iniciar(iniciar: &IniciarVentana) -> SHOW_WINDOW_CMD {
+    match iniciar {
+        IniciarVentana::Ventana => SW_SHOWNORMAL,
+        IniciarVentana::Minimizado => SW_SHOWMINIMIZED,
+        IniciarVentana::Maximizado => SW_SHOWMAXIMIZED,
+    }
+}
+
+fn ejecutar_shell_execute(archivo: &str, parametros: &str, mostrar: SHOW_WINDOW_CMD) {
+    let operacion: Vec<u16> = "open".encode_utf16().chain(std::iter::once(0)).collect();
+
+    let archivo_ancho: Vec<u16> = archivo.encode_utf16().chain(std::iter::once(0)).collect();
+
+    let parametros_ancho: Vec<u16> = parametros
+        .encode_utf16()
+        .chain(std::iter::once(0))
+        .collect();
+
+    let parametros_ptr = if parametros.is_empty() {
+        std::ptr::null()
+    } else {
+        parametros_ancho.as_ptr()
+    };
+
+    unsafe {
+        ShellExecuteW(
+            std::ptr::null_mut(),
+            operacion.as_ptr(),
+            archivo_ancho.as_ptr(),
+            parametros_ptr,
+            std::ptr::null(),
+            mostrar,
+        );
+    }
 }
 
 // ======================================================
