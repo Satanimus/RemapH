@@ -28,7 +28,8 @@
 //
 // Listas de ProgramaRegistro{nombre, ruta} — la ruta ya resuelta al
 // ejecutable real, lista para usarse como "Abrir con" o para pedirle
-// su ícono a back_app.rs::extraer_icono_ruta().
+// su ícono a back_app.rs::extraer_icono_ruta(). También, suelta, la
+// ruta del programa predeterminado de una extensión puntual.
 //
 // ------------------------------------------------------
 // 5. Funciones del archivo
@@ -45,6 +46,15 @@
 //     Parser compartido: de un valor crudo de shell\open\command (o
 //     de un nombre de exe a resolver contra Applications\<exe>) saca
 //     la ruta real del ejecutable, sin comillas ni "%1".
+//
+// programa_predeterminado(extension)
+//     El programa que Windows abriría por defecto para esa extensión
+//     (HKCR\.ext → ProgID → HKCR\<ProgID>\shell\open\command). Usado
+//     por runtime.rs (nombre_proceso_objetivo() y abrir_archivo()) del
+//     tipo "Abrir Archivo/App" para lanzar el visor/editor asociado
+//     directamente en vez de delegar en ShellExecuteExW "open" sobre
+//     el documento — necesario para que Instancias Múltiple/Iniciar
+//     Minimizado-Maximizado tengan efecto real (ver runtime.rs).
 // ======================================================
 
 use std::collections::HashSet;
@@ -194,6 +204,42 @@ pub fn obtener_recientes(extension: &str) -> Vec<ProgramaRegistro> {
     }
 
     lista
+}
+
+// ======================================================
+// PROGRAMA PREDETERMINADO DE UNA EXTENSIÓN
+// ------------------------------------------------------
+// A diferencia de obtener_recientes() (OpenWithList, historial del
+// usuario), esto resuelve el programa que Windows usaría HOY por
+// defecto para abrir esa extensión: HKCR\.ext da el ProgID asociado,
+// y HKCR\<ProgID>\shell\open\command da el comando real — mismo
+// parser (resolver_ruta_comando) que ya usa el resto del archivo.
+// ======================================================
+
+pub fn programa_predeterminado(extension: &str) -> Option<String> {
+    let extension = extension.trim_start_matches('.');
+
+    if extension.is_empty() {
+        return None;
+    }
+
+    let raiz = RegKey::predef(HKEY_CLASSES_ROOT);
+
+    let clave_extension = raiz.open_subkey(format!(".{}", extension)).ok()?;
+
+    let prog_id: String = clave_extension.get_value("").ok()?;
+
+    if prog_id.is_empty() {
+        return None;
+    }
+
+    let clave_comando = raiz
+        .open_subkey(format!("{}\\shell\\open\\command", prog_id))
+        .ok()?;
+
+    let comando: String = clave_comando.get_value("").ok()?;
+
+    resolver_ruta_comando(&comando)
 }
 
 // ======================================================

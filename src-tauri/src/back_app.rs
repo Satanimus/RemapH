@@ -63,8 +63,12 @@
 //     Reevalúa el estado de todas las apps vigiladas y actualiza cache.
 // esta_abierta()
 //     Indica si un ejecutable aparece entre los procesos corriendo ahora mismo.
+// alternar_foco()
+//     Núcleo compartido: dado un HWND, si ya está en primer plano lo minimiza, si no lo restaura/enfoca. Toggle usado por enfocar_proceso() y enfocar_carpeta().
 // enfocar_proceso()
-//     Busca una ventana visible del proceso indicado y la trae al frente (SetForegroundWindow). Usado por "Abrir Archivo/App" con Instancias Única.
+//     Busca una ventana visible del proceso indicado y alterna minimizar/restaurar (alternar_foco). Usado por "Abrir Archivo/App" con Instancias Única.
+// enfocar_carpeta()
+//     Igual que enfocar_proceso() pero para carpetas: matchea proceso explorer.exe + título de ventana con el nombre de la carpeta (por nombre de proceso solo no alcanza).
 // listar_ventanas_visibles()
 //     Foto de todos los HWND visibles del sistema en este instante. Usado por runtime.rs::abrir_archivo() como "antes" de lanzar.
 // buscar_ventana_nueva()
@@ -450,8 +454,9 @@ use windows_sys::Win32::Foundation::HWND;
 use windows_sys::Win32::System::Threading::{AttachThreadInput, GetCurrentThreadId};
 use windows_sys::Win32::UI::Accessibility::{SetWinEventHook, HWINEVENTHOOK};
 use windows_sys::Win32::UI::WindowsAndMessaging::{
-    DispatchMessageW, EnumWindows, GetMessageW, IsIconic, IsWindowVisible, SetForegroundWindow,
-    ShowWindow, TranslateMessage, EVENT_SYSTEM_FOREGROUND, MSG, SW_RESTORE, WINEVENT_OUTOFCONTEXT,
+    DispatchMessageW, EnumWindows, GetMessageW, GetWindowTextW, IsIconic, IsWindowVisible,
+    SetForegroundWindow, ShowWindow, TranslateMessage, EVENT_SYSTEM_FOREGROUND, MSG, SW_MINIMIZE,
+    SW_RESTORE, WINEVENT_OUTOFCONTEXT,
 };
 
 pub fn iniciar_monitor() {
@@ -528,13 +533,43 @@ fn esta_abierta(nombre: &str) -> bool {
 }
 
 // ======================================================
-// 🔎 ENFOCAR PROCESO
+// 🔁 ALTERNAR FOCO (toggle minimizar/restaurar)
 // ------------------------------------------------------
-// Usado por runtime.rs::abrir_archivo() cuando Instancias == Única:
-// busca entre las ventanas visibles del sistema una que pertenezca
-// al proceso `nombre` (nombre de archivo del ejecutable, ej.
-// "notepad.exe") y la trae al frente. Devuelve false si no encontró
-// ninguna — el llamador decide entonces lanzar el proceso de nuevo.
+// Núcleo compartido por enfocar_proceso() y enfocar_carpeta(): dado
+// un HWND ya encontrado, si esa ventana ya es la que está en primer
+// plano ahora mismo (y no está minimizada) la minimiza; en
+// cualquier otro caso (minimizada, o en segundo plano) la restaura y
+// le fuerza el foco vía forzar_foco() (AttachThreadInput +
+// SetForegroundWindow).
+// ======================================================
+
+fn alternar_foco(hwnd: HWND) {
+    unsafe {
+        let ya_en_foco = GetForegroundWindow() == hwnd && IsIconic(hwnd) == 0;
+
+        if ya_en_foco {
+            ShowWindow(hwnd, SW_MINIMIZE);
+        } else {
+            forzar_foco(hwnd);
+        }
+    }
+}
+
+// ======================================================
+// 🔎 ENFOCAR PROCESO (toggle minimizar/restaurar)
+// ------------------------------------------------------
+// Usado por runtime.rs::abrir_archivo() cuando Instancias == Única y
+// se conoce un nombre de ejecutable puntual (.exe directo, abrir_con,
+// o el programa predeterminado resuelto por back_registro para un
+// documento): busca entre las ventanas visibles del sistema una que
+// pertenezca al proceso `nombre` (nombre de archivo del ejecutable,
+// ej. "notepad.exe") y le aplica alternar_foco(). Devuelve false si
+// no encontró ninguna — el llamador decide entonces lanzar el
+// proceso de nuevo.
+//
+// NO se usa para carpetas — ver enfocar_carpeta() más abajo, ya que
+// matchear solo por nombre de proceso ("explorer.exe") traería
+// cualquier ventana de Explorer, no la carpeta puntual que se pidió.
 // ======================================================
 
 struct ContextoEnfoque {
@@ -556,7 +591,9 @@ pub fn enfocar_proceso(nombre: &str) -> bool {
         return false;
     }
 
-    forzar_foco(contexto.hwnd)
+    alternar_foco(contexto.hwnd);
+
+    true
 }
 
 unsafe extern "system" fn callback_enfoque(hwnd: HWND, lparam: isize) -> i32 {
@@ -581,6 +618,100 @@ unsafe extern "system" fn callback_enfoque(hwnd: HWND, lparam: isize) -> i32 {
 
             return 0;
         }
+    }
+
+    1
+}
+
+// ======================================================
+// 🔎 ENFOCAR CARPETA (toggle minimizar/restaurar, por título)
+// ------------------------------------------------------
+// Usado por runtime.rs::abrir_archivo() cuando Instancias == Única y
+// la ruta es una carpeta. A diferencia de enfocar_proceso(), acá el
+// nombre de proceso ("explorer.exe") no alcanza para identificar LA
+// carpeta puntual — cualquier ventana de Explorer lo matchearía. Se
+// combina entonces: proceso == explorer.exe Y título de la ventana
+// contiene el nombre de la carpeta (heurístico — Explorer muestra el
+// nombre de la carpeta en el título de su ventana). Devuelve false
+// si no encontró ninguna coincidencia — el llamador decide lanzar de
+// nuevo (abrir_archivo ya fuerza una ventana de Explorer genuinamente
+// nueva en ese caso, ver el branch de carpeta ahí).
+// ======================================================
+
+struct ContextoEnfoqueCarpeta {
+    nombre_carpeta: String,
+    hwnd: HWND,
+}
+
+pub fn enfocar_carpeta(ruta: &str) -> bool {
+    let nombre_carpeta = Path::new(ruta)
+        .file_name()
+        .map(|nombre| nombre.to_string_lossy().to_lowercase())
+        .unwrap_or_default();
+
+    if nombre_carpeta.is_empty() {
+        return false;
+    }
+
+    let mut contexto = ContextoEnfoqueCarpeta {
+        nombre_carpeta,
+        hwnd: std::ptr::null_mut(),
+    };
+
+    unsafe {
+        EnumWindows(
+            Some(callback_enfoque_carpeta),
+            &mut contexto as *mut _ as isize,
+        );
+    }
+
+    if contexto.hwnd.is_null() {
+        return false;
+    }
+
+    alternar_foco(contexto.hwnd);
+
+    true
+}
+
+unsafe extern "system" fn callback_enfoque_carpeta(hwnd: HWND, lparam: isize) -> i32 {
+    let contexto = &mut *(lparam as *mut ContextoEnfoqueCarpeta);
+
+    if IsWindowVisible(hwnd) == 0 {
+        return 1;
+    }
+
+    let mut pid = 0u32;
+
+    GetWindowThreadProcessId(hwnd, &mut pid);
+
+    let Some(ruta_proceso) = obtener_ruta_proceso(pid) else {
+        return 1;
+    };
+
+    let nombre_proceso = Path::new(&ruta_proceso)
+        .file_name()
+        .map(|nombre| nombre.to_string_lossy().to_lowercase())
+        .unwrap_or_default();
+
+    if nombre_proceso != "explorer.exe" {
+        return 1;
+    }
+
+    let mut buffer = [0u16; 512];
+
+    let largo = GetWindowTextW(hwnd, buffer.as_mut_ptr(), buffer.len() as i32);
+
+    if largo <= 0 {
+        return 1;
+    }
+
+    let titulo = String::from_utf16_lossy(&buffer[..largo as usize]).to_lowercase();
+
+    if titulo.contains(&contexto.nombre_carpeta) {
+        contexto.hwnd = hwnd;
+
+        return 0;
     }
 
     1

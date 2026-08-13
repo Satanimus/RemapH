@@ -230,20 +230,32 @@
 // ejecutar_up() / ejecutar_pulse() / emitir() / esperar()
 //     Los pasos físicos individuales del Idioma Runtime.
 // abrir_archivo(ruta, iniciar, instancias, abrir_con, argumento)
-//     En su propio hilo: si Instancias es Única y hay un proceso
-//     objetivo conocido (ruta si es .exe, o abrir_con si se
-//     personalizó), intenta enfocarlo con back_app::enfocar_proceso()
-//     antes de lanzar nada nuevo. Si no lo encuentra (o Instancias es
-//     Múltiple), arma el comando según el tipo de ítem (.exe: ejecuta
-//     con argumento; .lnk: abre el acceso directo; carpeta/documento:
-//     ShellExecuteExW "open" resuelve solo, salvo que haya abrir_con)
-//     y lo lanza con el modo de ventana de iniciar. Si iniciar no es
-//     Minimizado, además busca la ventana NUEVA que apareció tras
-//     lanzar (comparando contra un snapshot tomado antes — ver
-//     back_app::buscar_ventana_nueva, con reintentos cortos; el PID
-//     recién lanzado no siempre existe, ej. carpeta) y le fuerza el
-//     foco con back_app::forzar_foco (AttachThreadInput +
+//     En su propio hilo: si Instancias es Única, intenta encontrar
+//     una ventana ya abierta antes de lanzar nada nuevo — carpeta vía
+//     back_app::enfocar_carpeta() (proceso explorer.exe + título),
+//     cualquier otro caso con proceso objetivo conocido (.exe directo,
+//     abrir_con, o el programa predeterminado de la extensión resuelto
+//     por back_registro) vía back_app::enfocar_proceso(); ambas hacen
+//     TOGGLE minimizar/restaurar si la encuentran. Si no encuentra
+//     nada (o Instancias es Múltiple), arma el comando según el tipo
+//     de ítem (.exe: ejecuta con argumento; .lnk: abre el acceso
+//     directo; carpeta: fuerza explorer.exe nuevo; abrir_con: el
+//     programa elegido; documento sin abrir_con: el programa
+//     predeterminado de la extensión resuelto por back_registro,
+//     lanzado directo — evita depender del "open" de Windows, que
+//     puede reusar una instancia ya corriendo e ignorar Instancias/el
+//     modo de ventana) y lo lanza con el modo de ventana de iniciar.
+//     Si iniciar no es Minimizado, además busca la ventana NUEVA que
+//     apareció tras lanzar (comparando contra un snapshot tomado
+//     antes — ver back_app::buscar_ventana_nueva, con reintentos
+//     cortos; el PID recién lanzado no siempre existe, ej. carpeta) y
+//     le fuerza el foco con back_app::forzar_foco (AttachThreadInput +
 //     SetForegroundWindow).
+//     LÍMITE CONOCIDO: apps de instancia única por diseño propio
+//     (ej. el Notepad moderno de Windows 11, la app Fotos) pueden
+//     seguir enrutando la apertura a la ventana ya abierta pase lo
+//     que pase acá — no hay forma de forzar una ventana/proceso
+//     realmente nuevo desde afuera en esos casos.
 // mostrar_ui()
 //     Sin implementar todavía (fuera de esta sesión de
 //     trabajo) — queda como punto de entrada ya conectado.
@@ -291,6 +303,7 @@
 // ======================================================
 use crate::back_app;
 use crate::back_coordenada;
+use crate::back_registro;
 
 use crate::back_interception;
 
@@ -676,22 +689,29 @@ fn ejecutar_click_coordenada(
 // es de una sola vez, no hay Extra ni loop que Detener a mitad de
 // camino.
 //
-// "Única": el proceso objetivo solo se conoce de antemano en dos
-// casos — ruta es un .exe (objetivo = su propio nombre de archivo),
-// o hay abrir_con (objetivo = el nombre de archivo del programa
-// alternativo). Para carpeta/.lnk/documento sin abrir_con no hay
-// forma de saber qué proceso buscar sin resolver el programa
-// asociado por Windows (eso vive en back_registro.rs, Etapa 7B,
-// todavía no conectado acá) — en esos casos Única no tiene efecto
-// y siempre se lanza de nuevo. Esto SÍ sigue siendo por nombre (no
-// por PID): a diferencia del forzado de primer plano de abajo, acá
-// se está buscando un proceso que puede llevar rato corriendo, no
-// uno que se acaba de lanzar. Nota: aunque para carpeta el programa
-// SÍ se conoce de antemano (siempre "explorer.exe", ver más abajo),
-// deliberadamente no se usa acá — enfocar_proceso() trae al frente
-// la primera ventana de ese nombre que encuentre, y con Explorer eso
-// podría ser la ventana de OTRA carpeta ya abierta, no la que se
-// pidió.
+// "Única": el proceso objetivo se conoce de antemano en tres casos —
+// ruta es un .exe (objetivo = su propio nombre de archivo), hay
+// abrir_con (objetivo = el nombre de archivo del programa
+// alternativo), o es un documento sin abrir_con (objetivo = el
+// programa predeterminado de la extensión, resuelto por
+// back_registro::programa_predeterminado() — mismo programa que
+// abrir_archivo() va a lanzar más abajo si no encuentra nada). Para
+// esos tres casos se usa back_app::enfocar_proceso(), que SÍ sigue
+// siendo por nombre de proceso (no por PID): a diferencia del
+// forzado de primer plano de más abajo, acá se está buscando un
+// proceso que puede llevar rato corriendo, no uno que se acaba de
+// lanzar.
+//
+// Para .lnk (puede apuntar a cualquier destino, sin resolver por
+// ahora) Única no tiene efecto y siempre se lanza de nuevo.
+//
+// CARPETA es un caso aparte: aunque el programa se conoce de
+// antemano (siempre "explorer.exe"), matchear solo por nombre de
+// proceso traería la primera ventana de Explorer que encuentre —
+// podría ser la de OTRA carpeta ya abierta, no la que se pidió. Por
+// eso usa back_app::enfocar_carpeta() en vez de enfocar_proceso():
+// combina proceso == explorer.exe con el título de la ventana
+// conteniendo el nombre de la carpeta (heurístico).
 //
 // PRIMER PLANO: se lanza con ShellExecuteExW en vez de ShellExecuteW
 // para obtener el HANDLE del proceso creado (SEE_MASK_NOCLOSEPROCESS)
@@ -729,7 +749,14 @@ fn abrir_archivo(
 ) {
     thread::spawn(move || {
         if instancias == InstanciasAbrir::Unica {
-            if let Some(nombre) = nombre_proceso_objetivo(&ruta, &abrir_con) {
+            if Path::new(&ruta).is_dir() {
+                // Carpeta: por nombre de proceso solo no alcanza
+                // (cualquier ventana de Explorer matchearía) — ver
+                // back_app::enfocar_carpeta().
+                if back_app::enfocar_carpeta(&ruta) {
+                    return;
+                }
+            } else if let Some(nombre) = nombre_proceso_objetivo(&ruta, &abrir_con) {
                 if back_app::enfocar_proceso(&nombre) {
                     return;
                 }
@@ -758,10 +785,19 @@ fn abrir_archivo(
             // funciona para .exe/abrir_con.
             ("explorer.exe".to_string(), format!("\"{}\"", ruta))
         } else {
-            // Documento sin abrir_con personalizado: ShellExecuteExW
-            // "open" sobre la ruta sola resuelve con el programa
-            // asociado por Windows.
-            (ruta.clone(), String::new())
+            // Documento sin abrir_con personalizado: en vez de
+            // delegar en ShellExecuteExW "open" sobre la ruta sola
+            // (que puede reutilizar una instancia ya corriendo vía
+            // DDE, ignorando Instancias Múltiple y el modo de
+            // ventana), se resuelve el programa predeterminado de la
+            // extensión por registro (back_registro) y se lo lanza
+            // directo con la ruta como parámetro — mismo patrón que
+            // abrir_con. Si no se pudo resolver, cae al "open" de
+            // siempre.
+            match back_registro::programa_predeterminado(&extension) {
+                Some(programa) => (programa, format!("\"{}\"", ruta)),
+                None => (ruta.clone(), String::new()),
+            }
         };
 
         // Snapshot de ventanas visibles ANTES de lanzar — solo hace
@@ -815,11 +851,23 @@ fn nombre_proceso_objetivo(ruta: &str, abrir_con: &Option<String>) -> Option<Str
         return nombre_archivo(programa);
     }
 
-    if extension_de(ruta) == "exe" {
+    let extension = extension_de(ruta);
+
+    if extension == "exe" {
         return nombre_archivo(ruta);
     }
 
-    None
+    if extension == "lnk" {
+        // Un .lnk puede apuntar a cualquier cosa — resolver su
+        // destino real queda fuera de alcance por ahora. Única no
+        // tiene efecto para este caso (mismo comportamiento previo).
+        return None;
+    }
+
+    // Documento: mismo programa predeterminado que abrir_archivo()
+    // va a lanzar si no lo encuentra abierto (ver back_registro).
+    back_registro::programa_predeterminado(&extension)
+        .and_then(|programa| nombre_archivo(&programa))
 }
 
 fn nombre_archivo(ruta: &str) -> Option<String> {
