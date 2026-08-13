@@ -65,6 +65,12 @@
 //     Indica si un ejecutable aparece entre los procesos corriendo ahora mismo.
 // enfocar_proceso()
 //     Busca una ventana visible del proceso indicado y la trae al frente (SetForegroundWindow). Usado por "Abrir Archivo/App" con Instancias Única.
+// listar_ventanas_visibles()
+//     Foto de todos los HWND visibles del sistema en este instante. Usado por runtime.rs::abrir_archivo() como "antes" de lanzar.
+// buscar_ventana_nueva()
+//     Compara contra un snapshot anterior y devuelve una ventana visible que no estaba ahí (prioriza coincidir con un PID si se conoce). Usado por runtime.rs::abrir_archivo() para el forzado de primer plano tras lanzar.
+// forzar_foco()
+//     AttachThreadInput + SetForegroundWindow: fuerza el foco a una ventana puntual, evitando la protección anti robo-de-foco de Windows.
 // ======================================================
 
 use std::collections::HashSet;
@@ -441,12 +447,11 @@ unsafe fn icono_desde_hicon(hicon: *mut std::ffi::c_void) -> Option<IconoRaw> {
 use crate::cache;
 use crate::perfil_cache::AppCache;
 use windows_sys::Win32::Foundation::HWND;
-use windows_sys::Win32::System::Threading::GetCurrentThreadId;
+use windows_sys::Win32::System::Threading::{AttachThreadInput, GetCurrentThreadId};
 use windows_sys::Win32::UI::Accessibility::{SetWinEventHook, HWINEVENTHOOK};
 use windows_sys::Win32::UI::WindowsAndMessaging::{
-    AttachThreadInput, DispatchMessageW, EnumWindows, GetMessageW, IsIconic, IsWindowVisible,
-    SetForegroundWindow, ShowWindow, TranslateMessage, EVENT_SYSTEM_FOREGROUND, MSG, SW_RESTORE,
-    WINEVENT_OUTOFCONTEXT,
+    DispatchMessageW, EnumWindows, GetMessageW, IsIconic, IsWindowVisible, SetForegroundWindow,
+    ShowWindow, TranslateMessage, EVENT_SYSTEM_FOREGROUND, MSG, SW_RESTORE, WINEVENT_OUTOFCONTEXT,
 };
 
 pub fn iniciar_monitor() {
@@ -582,58 +587,118 @@ unsafe extern "system" fn callback_enfoque(hwnd: HWND, lparam: isize) -> i32 {
 }
 
 // ======================================================
-// 🔎 BUSCAR VENTANA DE UN PID
+// 🪟 SNAPSHOT DE VENTANAS VISIBLES
 // ------------------------------------------------------
-// Usado por runtime.rs::abrir_archivo() para el forzado de primer
-// plano tras lanzar con ShellExecuteExW: a diferencia de
-// enfocar_proceso() (que busca por NOMBRE de archivo, útil cuando
-// el proceso ya podía estar corriendo de antes), acá se busca por
-// PID exacto — el que devuelve el propio lanzamiento — así que sirve
-// también para carpeta/documento sin abrir_con, donde de antemano no
-// se conoce qué programa va a terminar abriendo Windows.
-//
-// Devuelve None si el proceso todavía no creó ninguna ventana visible
-// (puede pasar varias veces seguidas mientras arranca) — el llamador
-// decide cuántas veces reintentar.
+// Usado por runtime.rs::abrir_archivo() como el "antes" de lanzar,
+// para poder detectar después cuál ventana es nueva (ver
+// buscar_ventana_nueva). No filtra por proceso — es una foto cruda
+// de todos los HWND visibles del sistema en este instante.
 // ======================================================
 
-struct ContextoEnfoquePid {
-    pid: u32,
-    hwnd: HWND,
+pub type VentanaSnapshot = HashSet<HWND>;
+
+pub fn listar_ventanas_visibles() -> VentanaSnapshot {
+    let mut vistas: VentanaSnapshot = HashSet::new();
+
+    unsafe {
+        EnumWindows(
+            Some(callback_listar_visibles),
+            &mut vistas as *mut _ as isize,
+        );
+    }
+
+    vistas
 }
 
-pub fn buscar_ventana_de_pid(pid: u32) -> Option<HWND> {
-    let mut contexto = ContextoEnfoquePid {
+unsafe extern "system" fn callback_listar_visibles(hwnd: HWND, lparam: isize) -> i32 {
+    let vistas = &mut *(lparam as *mut VentanaSnapshot);
+
+    if IsWindowVisible(hwnd) != 0 {
+        vistas.insert(hwnd);
+    }
+
+    1
+}
+
+// ======================================================
+// 🔎 BUSCAR VENTANA NUEVA (tras lanzar)
+// ------------------------------------------------------
+// Reemplaza a la vieja búsqueda por PID exacto: ShellExecuteExW NO
+// siempre entrega un PID utilizable — al abrir una CARPETA, Windows
+// no lanza un explorer.exe nuevo, reusa la instancia que ya está
+// corriendo (se lo pide por mensaje interno), así que hProcess llega
+// nulo. Lo mismo puede pasar con un documento cuyo programa asociado
+// ya estaba abierto y lo recibe por DDE en vez de lanzar una
+// instancia nueva. Buscar solo por PID en esos casos además sería
+// CONTRAPRODUCENTE: ese PID ya es dueño de ventanas viejas (las que
+// tenía abiertas de antes), así que el primer match encontrado podía
+// ser una ventana vieja sin ninguna relación con lo que se acaba de
+// abrir — foco robado al lugar equivocado, no solo foco faltante.
+//
+// Estrategia: comparar contra el snapshot tomado ANTES de lanzar
+// (ver listar_ventanas_visibles) y devolver una ventana visible que
+// no estaba ahí — es decir, que apareció como consecuencia del
+// lanzamiento. Si se conoce el PID, se prioriza una ventana nueva de
+// ESE proceso puntual (caso normal .exe/abrir_con, más preciso); si
+// no hay PID o ninguna ventana nueva es de ese proceso todavía, cae
+// a "la primera ventana nueva que sea" — mejor esfuerzo para el caso
+// de reuso de proceso (carpeta/documento).
+//
+// Devuelve None si todavía no apareció ninguna ventana nueva (puede
+// pasar varias veces seguidas mientras el proceso arranca, o Windows
+// termina de procesar el pedido) — el llamador decide cuántas veces
+// reintentar.
+// ======================================================
+
+struct ContextoVentanaNueva {
+    anteriores: VentanaSnapshot,
+    pid: Option<u32>,
+    con_pid: Option<HWND>,
+    cualquiera: Option<HWND>,
+}
+
+pub fn buscar_ventana_nueva(anteriores: &VentanaSnapshot, pid: Option<u32>) -> Option<HWND> {
+    let mut contexto = ContextoVentanaNueva {
+        anteriores: anteriores.clone(),
         pid,
-        hwnd: std::ptr::null_mut(),
+        con_pid: None,
+        cualquiera: None,
     };
 
     unsafe {
-        EnumWindows(Some(callback_enfoque_pid), &mut contexto as *mut _ as isize);
+        EnumWindows(
+            Some(callback_ventana_nueva),
+            &mut contexto as *mut _ as isize,
+        );
     }
 
-    if contexto.hwnd.is_null() {
-        None
-    } else {
-        Some(contexto.hwnd)
-    }
+    contexto.con_pid.or(contexto.cualquiera)
 }
 
-unsafe extern "system" fn callback_enfoque_pid(hwnd: HWND, lparam: isize) -> i32 {
-    let contexto = &mut *(lparam as *mut ContextoEnfoquePid);
+unsafe extern "system" fn callback_ventana_nueva(hwnd: HWND, lparam: isize) -> i32 {
+    let contexto = &mut *(lparam as *mut ContextoVentanaNueva);
 
-    if IsWindowVisible(hwnd) == 0 {
+    if IsWindowVisible(hwnd) == 0 || contexto.anteriores.contains(&hwnd) {
         return 1;
     }
 
-    let mut pid = 0u32;
+    if contexto.cualquiera.is_none() {
+        contexto.cualquiera = Some(hwnd);
+    }
 
-    GetWindowThreadProcessId(hwnd, &mut pid);
+    if let Some(pid_buscado) = contexto.pid {
+        let mut pid = 0u32;
 
-    if pid == contexto.pid {
-        contexto.hwnd = hwnd;
+        GetWindowThreadProcessId(hwnd, &mut pid);
 
-        return 0;
+        if pid == pid_buscado {
+            contexto.con_pid = Some(hwnd);
+
+            // Ya encontramos el mejor candidato posible (ventana
+            // nueva Y del proceso exacto) — no hace falta seguir
+            // enumerando el resto de las ventanas del sistema.
+            return 0;
+        }
     }
 
     1

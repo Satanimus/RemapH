@@ -75,6 +75,7 @@ windows-sys = {
         "Win32_System_DataExchange",
         "Win32_System_Diagnostics_ToolHelp",
         "Win32_System_LibraryLoader",
+        "Win32_System_Registry",
         "Win32_System_SystemInformation",
         "Win32_System_Threading",
         "Win32_UI_Input_KeyboardAndMouse",
@@ -84,3 +85,10 @@ windows-sys = {
         "Win32_UI_Accessibility",
     ]
 }
+# Nota (AttachThreadInput/ShellExecuteExW, primer plano al Abrir
+# Archivo/App): "Win32_System_Registry" agregado acá porque
+# SHELLEXECUTEINFOW (y por lo tanto ShellExecuteExW) están, dentro de
+# windows-sys, condicionados a esa feature con #[cfg(...)] — sin ella
+# ni el struct ni la función existen, aunque el bloque "Win32_UI_Shell"
+# ya esté habilitado (confirmado leyendo el fuente del crate, versiones
+# 0.59 y 0.60).

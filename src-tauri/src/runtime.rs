@@ -238,8 +238,10 @@
 //     con argumento; .lnk: abre el acceso directo; carpeta/documento:
 //     ShellExecuteExW "open" resuelve solo, salvo que haya abrir_con)
 //     y lo lanza con el modo de ventana de iniciar. Si iniciar no es
-//     Minimizado, además busca la ventana del PID recién lanzado
-//     (buscar_ventana_de_pid, con reintentos cortos) y le fuerza el
+//     Minimizado, además busca la ventana NUEVA que apareció tras
+//     lanzar (comparando contra un snapshot tomado antes — ver
+//     back_app::buscar_ventana_nueva, con reintentos cortos; el PID
+//     recién lanzado no siempre existe, ej. carpeta) y le fuerza el
 //     foco con back_app::forzar_foco (AttachThreadInput +
 //     SetForegroundWindow).
 // mostrar_ui()
@@ -688,18 +690,23 @@ fn ejecutar_click_coordenada(
 //
 // PRIMER PLANO: se lanza con ShellExecuteExW en vez de ShellExecuteW
 // para obtener el HANDLE del proceso creado (SEE_MASK_NOCLOSEPROCESS)
-// y de ahí su PID — con el PID exacto se puede esperar a que ese
-// proceso puntual cree una ventana visible (buscar_ventana_de_pid) y
-// forzarle el foco con AttachThreadInput (back_app::forzar_foco), que
-// sí tiene efecto garantizado a diferencia de un SetForegroundWindow
-// suelto (Windows bloquea el robo de foco de ventanas recién creadas
-// si el hilo que lo pide no está "pegado" al hilo en foco actual).
-// A diferencia del enfoque anterior (buscar por nombre de proceso),
-// esto cubre TODOS los casos por igual — incluida carpeta y
-// documento sin abrir_con, donde de antemano no se sabe qué programa
-// va a terminar abriendo Windows, pero el PID lanzado siempre se
-// conoce. Con Minimizado no se fuerza nada: no tendría sentido traer
-// al frente una ventana que se pidió minimizada.
+// y de ahí su PID cuando lo hay. Ese PID NO siempre existe: al abrir
+// una CARPETA, Windows reusa el explorer.exe que ya está corriendo
+// (se lo pide por mensaje interno) en vez de lanzar uno nuevo, así
+// que hProcess llega nulo — lo mismo puede pasar con un documento
+// cuyo programa asociado ya estaba abierto (DDE). Por eso el forzado
+// de foco no depende solo del PID: se toma un snapshot de ventanas
+// visibles ANTES de lanzar (back_app::listar_ventanas_visibles) y
+// después se busca la ventana NUEVA que apareció
+// (back_app::buscar_ventana_nueva — prioriza el PID si lo hay, si no
+// cae a "la primera ventana nueva que sea"), forzándole el foco con
+// AttachThreadInput (back_app::forzar_foco), que sí tiene efecto
+// garantizado a diferencia de un SetForegroundWindow suelto (Windows
+// bloquea el robo de foco de ventanas recién creadas si el hilo que
+// lo pide no está "pegado" al hilo en foco actual). Esto cubre TODOS
+// los casos por igual — incluida carpeta y documento sin abrir_con.
+// Con Minimizado no se fuerza nada: no tendría sentido traer al
+// frente una ventana que se pidió minimizada.
 // ======================================================
 
 fn abrir_archivo(
@@ -734,12 +741,20 @@ fn abrir_archivo(
             (ruta.clone(), String::new())
         };
 
+        // Snapshot de ventanas visibles ANTES de lanzar — solo hace
+        // falta si de verdad vamos a forzar el foco después
+        // (Minimizado nunca lo hace, no tiene sentido pagar el
+        // EnumWindows si el resultado no se va a usar).
+        let snapshot_previo = if iniciar != IniciarVentana::Minimizado {
+            Some(back_app::listar_ventanas_visibles())
+        } else {
+            None
+        };
+
         let pid = ejecutar_shell_execute(&archivo, &parametros, mostrar_para_iniciar(&iniciar));
 
-        if iniciar != IniciarVentana::Minimizado {
-            if let Some(pid) = pid {
-                forzar_primer_plano(pid);
-            }
+        if let Some(snapshot_previo) = snapshot_previo {
+            forzar_primer_plano(pid, snapshot_previo);
         }
     });
 }
@@ -747,19 +762,22 @@ fn abrir_archivo(
 // ======================================================
 // 🔝 FORZAR PRIMER PLANO (reintentos cortos + AttachThreadInput)
 // ------------------------------------------------------
-// La ventana del proceso recién lanzado puede tardar unos instantes
-// en existir — se reintenta buscar_ventana_de_pid() cada 100ms hasta
-// encontrarla o agotar los intentos. Una vez encontrada,
-// back_app::forzar_foco() hace el trabajo real (AttachThreadInput +
-// SetForegroundWindow) — ver el comentario de ese archivo.
+// La ventana nueva puede tardar unos instantes en existir — se
+// reintenta buscar_ventana_nueva() cada 100ms hasta encontrarla o
+// agotar los intentos. `pid` puede ser None (ver ejecutar_shell_execute):
+// pasa siempre igual, buscar_ventana_nueva() cae a "cualquier ventana
+// nueva" en ese caso — necesario porque ShellExecuteExW no siempre
+// entrega un PID (ej. carpeta: reusa el explorer.exe ya corriendo).
+// Una vez encontrada la ventana, back_app::forzar_foco() hace el
+// trabajo real (AttachThreadInput + SetForegroundWindow).
 // ======================================================
 
-fn forzar_primer_plano(pid: u32) {
+fn forzar_primer_plano(pid: Option<u32>, snapshot_previo: back_app::VentanaSnapshot) {
     const INTENTOS: u32 = 20;
     const ESPERA: Duration = Duration::from_millis(100);
 
     for _ in 0..INTENTOS {
-        if let Some(hwnd) = back_app::buscar_ventana_de_pid(pid) {
+        if let Some(hwnd) = back_app::buscar_ventana_nueva(&snapshot_previo, pid) {
             back_app::forzar_foco(hwnd);
 
             return;
@@ -818,13 +836,12 @@ fn mostrar_para_iniciar(iniciar: &IniciarVentana) -> SHOW_WINDOW_CMD {
 // hProcess utilizable — en ese caso simplemente no hay forzado de
 // primer plano, el resto de la apertura no se ve afectada.
 //
-// [!] Escrito sin poder compilar (sin acceso a red / sin
-// windows-sys vendorizado acá): los tipos exactos de fMask y nShow
-// en SHELLEXECUTEINFOW pueden variar de firma según la versión del
-// crate (a veces fMask espera SHELLEXECUTEINFOW_FLAGS en vez de u32
-// directo, a veces nShow es i32 y a veces SHOW_WINDOW_CMD/u32) — si
-// el compilador marca error de tipos en esas dos líneas, es cuestión
-// de ajustar el cast/wrapper puntual, la lógica de fondo no cambia.
+// Tipos verificados contra el fuente real de windows-sys (0.59 y
+// 0.60): fMask es u32 (SEE_MASK_NOCLOSEPROCESS también, sin cast) y
+// nShow es i32 (de ahí el `mostrar as i32`, ya que SHOW_WINDOW_CMD es
+// alias de i32). SHELLEXECUTEINFOW y ShellExecuteExW están detrás de
+// `#[cfg(feature = "Win32_System_Registry")]` dentro del crate — ver
+// Cargo.toml, esa feature se agregó puntualmente por esto.
 // ======================================================
 
 fn ejecutar_shell_execute(
