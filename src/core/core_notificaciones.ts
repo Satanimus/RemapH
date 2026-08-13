@@ -5,7 +5,7 @@
 //
 // La lógica solo llama:
 //
-// Notificacion 001
+// Notificacion 001 / 002
 //
 // Los textos viven aquí.
 // ======================================================
@@ -38,6 +38,11 @@ const TEXTOS = {
     `Disparador idéntico en dos atajos genera conflicto: ` +
     `${textoApp(datos.appA)} con ` +
     `${textoApp(datos.appB)}.`,
+
+  notificacion002: (datos: DatosNotificacion) =>
+    `⚠ (Fila ${datos.filaA} y ${datos.filaB}) ` +
+    `Disparador de rueda con Extra Repetición anula ` +
+    `identificación del mismo disparador con modo [Mantenido].`,
 };
 
 // ======================================================
@@ -61,13 +66,16 @@ function textoApp(app: AppPerfil): string {
 // ======================================================
 
 export function obtenerTextoNotificacion(
-  codigo: "001",
+  codigo: "001" | "002",
 
   datos: DatosNotificacion,
 ): string {
   switch (codigo) {
     case "001":
       return TEXTOS.notificacion001(datos);
+
+    case "002":
+      return TEXTOS.notificacion002(datos);
   }
 }
 

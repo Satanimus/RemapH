@@ -50,7 +50,7 @@ export function actualizarStatusbar(filas: FilaPerfil[]): void {
 
     .map((conflicto) =>
       obtenerTextoNotificacion(
-        "001",
+        conflicto.codigo,
 
         {
           filaA: conflicto.numeroA,
