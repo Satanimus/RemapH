@@ -119,8 +119,8 @@
 use serde::{Deserialize, Serialize};
 
 use crate::perfil_json::{
-    perfil_json, AppJson, CoordenadaJson, MenuAccionJson, MenuExpressExtraJson,
-    PortapapelesAccionJson, PortapapelesExtraJson, RemapeoJson, TriggerJson,
+    perfil_json, AbrirAccionJson, AbrirExtraJson, AppJson, CoordenadaJson, MenuAccionJson,
+    MenuExpressExtraJson, PortapapelesAccionJson, PortapapelesExtraJson, RemapeoJson, TriggerJson,
 };
 
 // ======================================================
@@ -190,6 +190,15 @@ pub struct FilaUI {
 
     #[serde(rename = "portapapelesExtra", default)]
     pub portapapeles_extra: PortapapelesExtraJson,
+
+    // Solo relevantes cuando tipo == "abrir" (Abrir Archivo/App). Ver
+    // AbrirAccionJson / AbrirExtraJson en perfil_json.rs.
+    // #[serde(default)] mismo criterio que menu_accion/menu_extra.
+    #[serde(rename = "abrirAccion", default)]
+    pub abrir_accion: AbrirAccionJson,
+
+    #[serde(rename = "abrirExtra", default)]
+    pub abrir_extra: AbrirExtraJson,
 
     pub color: String,
 
@@ -325,6 +334,10 @@ fn convertir_fila(fila: FilaUI) -> RemapeoJson {
         portapapeles_accion: fila.portapapeles_accion,
 
         portapapeles_extra: fila.portapapeles_extra,
+
+        abrir_accion: fila.abrir_accion,
+
+        abrir_extra: fila.abrir_extra,
 
         color: fila.color,
 

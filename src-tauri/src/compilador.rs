@@ -134,6 +134,14 @@
 //     (nunca None). Empaqueta portapapeles_accion + portapapeles_extra
 //     en un solo AccionCache, mismo criterio que MenuExpress — sin
 //     referencias a otras filas, así que nunca hay datos faltantes.
+//
+// convertir_abrir()
+//     Resuelve tipo == "abrir" → Option<AccionCache::AbrirArchivo>.
+//     None si todavía no se eligió ruta (dato faltante, descarte
+//     silencioso de siempre) O si la ruta ya no existe en disco —
+//     este segundo caso además registra una AdvertenciaCompilacion
+//     con el número de fila, para que la UI pueda avisar "(Fila N)
+//     Archivo o programa no encontrado." y mostrar la fila OFF ⚠️.
 // ------------------------------------------------------
 
 use crate::cache;
@@ -142,19 +150,37 @@ use crate::eventos::InputId;
 
 use crate::perfil_cache::{
     AccionCache, AlcanceMultimedia, AppCache, ColorBotonMenu, ComandoMultimedia,
-    ComportamientoMenu, CoordenadaCache, ExtraCache, FormaMenu, MenuBotonCache, PostAccionCache,
-    PuntoReferenciaCache, RemapeoCache, TamanoBotonPortapapeles, TamanoMenu, TriggerCache,
-    UbicacionCache, UbicacionMenu,
+    ComportamientoMenu, CoordenadaCache, ExtraCache, FormaMenu, IniciarVentana, InstanciasAbrir,
+    MenuBotonCache, PostAccionCache, PuntoReferenciaCache, RemapeoCache, TamanoBotonPortapapeles,
+    TamanoMenu, TriggerCache, UbicacionCache, UbicacionMenu,
 };
 
 use crate::perfil_json::{perfil_json, AppJson, CoordenadaJson, RemapeoJson};
 
 // ======================================================
+// ⚠️ ADVERTENCIA DE COMPILACIÓN
+// ------------------------------------------------------
+// Aviso no fatal generado al compilar: la fila se descarta de la
+// cache (no se ejecuta) pero el motivo se le muestra al usuario en
+// vez de fallar en silencio — hoy solo lo genera convertir_abrir()
+// (ruta que ya no existe), pero cualquier chequeo futuro con el
+// mismo criterio ("dato guardado pero inválido, no solo faltante")
+// puede sumar advertencias acá.
+// ======================================================
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct AdvertenciaCompilacion {
+    pub fila: usize,
+
+    pub mensaje: String,
+}
+
+// ======================================================
 // ⚙️ COMPILAR
 // ======================================================
 
-pub fn compilar(perfil: &perfil_json) {
-    let remapeos = compilar_perfil(perfil);
+pub fn compilar(perfil: &perfil_json) -> Vec<AdvertenciaCompilacion> {
+    let (remapeos, advertencias) = compilar_perfil(perfil);
 
     cache::borrar_cache();
     cache::escribir_cache(remapeos);
@@ -172,30 +198,49 @@ pub fn compilar(perfil: &perfil_json) {
     // hubiera quedado corriendo), tratando la recompilación como un
     // reinicio — ver back_portapapeles.rs::cerrar_todas().
     crate::back_portapapeles::cerrar_todas();
+
+    advertencias
 }
 
 // ======================================================
 // 📦 COMPILAR PERFIL
+// ------------------------------------------------------
+// numero_fila viaja en base 1 (el mismo "número de fila" que ve el
+// usuario en la columna Número) — se calcula acá con enumerate(),
+// no se guarda en ningún lado, así que siempre refleja el orden
+// actual del perfil.
 // ======================================================
 
-pub fn compilar_perfil(perfil: &perfil_json) -> Vec<RemapeoCache> {
-    perfil
+pub fn compilar_perfil(perfil: &perfil_json) -> (Vec<RemapeoCache>, Vec<AdvertenciaCompilacion>) {
+    let mut advertencias = Vec::new();
+
+    let remapeos = perfil
         .remapeos
         .iter()
-        .filter_map(|remapeo| compilar_remapeo(remapeo, perfil))
-        .collect()
+        .enumerate()
+        .filter_map(|(indice, remapeo)| {
+            compilar_remapeo(indice + 1, remapeo, perfil, &mut advertencias)
+        })
+        .collect();
+
+    (remapeos, advertencias)
 }
 
 // ======================================================
 // 🧩 COMPILAR REMAPEO
 // ======================================================
 
-fn compilar_remapeo(remapeo: &RemapeoJson, perfil: &perfil_json) -> Option<RemapeoCache> {
+fn compilar_remapeo(
+    numero_fila: usize,
+    remapeo: &RemapeoJson,
+    perfil: &perfil_json,
+    advertencias: &mut Vec<AdvertenciaCompilacion>,
+) -> Option<RemapeoCache> {
     if remapeo.estado != "ON" {
         return None;
     }
 
-    let accion = convertir_accion(remapeo, perfil)?;
+    let accion = convertir_accion(numero_fila, remapeo, perfil, advertencias)?;
 
     // El Extra (Turbo/Mantener/Normal-con-repetición) es un molde de
     // Idioma Runtime pensado para una Acción tipo Emitir (down/up de

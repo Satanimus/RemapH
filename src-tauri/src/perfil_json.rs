@@ -76,6 +76,10 @@
 //     Crea un Input a partir de fuente y control.
 // AppJson
 //     Representa el contexto donde existe el trigger.
+// AbrirAccionJson / AbrirExtraJson
+//     Datos del tipo "abrir" (Abrir Archivo/App) — ruta elegida y
+//     personalización (inicio de ventana, instancias, programa
+//     alternativo o argumento). Ver definición más abajo.
 // perfil_json::nuevo()
 //     Crea un perfil vacío.
 // ------------------------------------------------------
@@ -164,6 +168,19 @@ pub struct RemapeoJson {
     pub portapapeles_accion: PortapapelesAccionJson,
     #[serde(default)]
     pub portapapeles_extra: PortapapelesExtraJson,
+    // Solo relevantes cuando tipo == "abrir" (Abrir Archivo/App).
+    // abrir_accion es la columna Acción (ruta absoluta elegida —
+    // archivo, carpeta, .exe o .lnk); abrir_extra es la columna
+    // Extra (modo de inicio de ventana, instancias, y programa
+    // alternativo o argumento personalizado según corresponda).
+    // #[serde(default)] mismo criterio que menu_accion/menu_extra,
+    // para que perfiles guardados antes de esta feature sigan
+    // cargando sin romper. Ver AbrirAccionJson / AbrirExtraJson más
+    // abajo.
+    #[serde(default)]
+    pub abrir_accion: AbrirAccionJson,
+    #[serde(default)]
+    pub abrir_extra: AbrirExtraJson,
     pub color: String,
     pub nota: String,
 }
@@ -423,6 +440,64 @@ impl Default for PortapapelesExtraJson {
             tamano_boton: "mediano".to_string(),
             tamano_texto: "mediano".to_string(),
             limite: 10,
+        }
+    }
+}
+
+// ======================================================
+// 📂 ABRIR ARCHIVO/APP — ACCIÓN / EXTRA
+// ------------------------------------------------------
+// Datos del tipo "abrir". A diferencia de MenuExpress/Portapapeles
+// no hay id propio ni pool compartido: cada fila es totalmente
+// independiente, dueña de su propia ruta.
+//
+// AbrirAccionJson (columna Acción):
+//   ruta: ruta absoluta del archivo/carpeta/programa elegido con
+//     "Seleccionar...". None hasta que se elige algo — mismo
+//     criterio de "dato faltante" que el resto del compilador (la
+//     fila se descarta en silencio mientras no haya ruta, ver
+//     compilador.rs).
+//
+// AbrirExtraJson (columna Extra):
+//   iniciar: "ventana" | "minimizado" | "maximizado" — modo de
+//     ventana al lanzar (pasa directo a ShellExecuteW).
+//   instancias: "unica" | "multiple" — en "unica", si el programa
+//     objetivo ya está corriendo, se enfoca en vez de abrir otro.
+//   abrir_con: ruta absoluta de un programa alternativo elegido
+//     para abrir el archivo (en vez del asociado por Windows).
+//     Solo tiene sentido cuando ruta NO es un .exe/.lnk — None si
+//     no se personalizó (se usa el programa por defecto del
+//     sistema). Mutuamente excluyente con `argumento` en la UI
+//     (uno u otro según la extensión de `ruta`), pero ambos
+//     campos viajan siempre presentes acá.
+//   argumento: texto libre agregado a la ejecución cuando ruta ES
+//     un .exe (ej. "--config"). "" si no se personalizó.
+// ======================================================
+
+#[derive(Clone, Debug, Default, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct AbrirAccionJson {
+    pub ruta: Option<String>,
+}
+
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AbrirExtraJson {
+    pub iniciar: String,
+
+    pub instancias: String,
+
+    pub abrir_con: Option<String>,
+
+    pub argumento: String,
+}
+
+impl Default for AbrirExtraJson {
+    fn default() -> Self {
+        Self {
+            iniciar: "ventana".to_string(),
+            instancias: "multiple".to_string(),
+            abrir_con: None,
+            argumento: String::new(),
         }
     }
 }

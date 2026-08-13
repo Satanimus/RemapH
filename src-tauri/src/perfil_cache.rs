@@ -106,7 +106,9 @@
 //      Parte compilada del remapeo.
 //
 // AccionCache
-//      Orden física de ejecución.
+//      Orden física de ejecución. Incluye AbrirArchivo{ruta,
+//      iniciar, instancias, abrir_con, argumento} — ver
+//      IniciarVentana / InstanciasAbrir más abajo.
 //
 // ExtraCache
 //      Como debe comportarse la Accion.
@@ -214,7 +216,22 @@ pub enum AccionCache {
 
     Macro(String),
 
-    AbrirArchivo(String),
+    // Acción tipo "Abrir Archivo/App". ruta es siempre absoluta y ya
+    // fue verificada en compilador.rs (Path::exists()) — si no
+    // existía, la fila entera se descartó antes de llegar acá, así
+    // que runtime.rs nunca necesita volver a comprobarlo. iniciar/
+    // instancias vienen de la columna Extra; abrir_con y argumento
+    // son mutuamente excluyentes en la práctica (uno u otro según
+    // la extensión de ruta, ver spec), pero ambos viajan siempre
+    // presentes acá — runtime.rs decide cuál usar mirando la
+    // extensión de ruta, igual que ya hace la UI.
+    AbrirArchivo {
+        ruta: String,
+        iniciar: IniciarVentana,
+        instancias: InstanciasAbrir,
+        abrir_con: Option<String>,
+        argumento: String,
+    },
 
     Ui(String),
 
@@ -486,6 +503,42 @@ pub enum AlcanceMultimedia {
     Global,
 
     EnApp { programa: String },
+}
+
+// ======================================================
+// 📂 ABRIR ARCHIVO/APP CACHE
+// ======================================================
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum IniciarVentana {
+    Ventana,
+    Minimizado,
+    Maximizado,
+}
+
+impl IniciarVentana {
+    pub fn como_str(&self) -> &'static str {
+        match self {
+            IniciarVentana::Ventana => "ventana",
+            IniciarVentana::Minimizado => "minimizado",
+            IniciarVentana::Maximizado => "maximizado",
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum InstanciasAbrir {
+    Unica,
+    Multiple,
+}
+
+impl InstanciasAbrir {
+    pub fn como_str(&self) -> &'static str {
+        match self {
+            InstanciasAbrir::Unica => "unica",
+            InstanciasAbrir::Multiple => "multiple",
+        }
+    }
 }
 
 // ======================================================
