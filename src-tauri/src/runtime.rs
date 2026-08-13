@@ -112,9 +112,10 @@
 //    de salida de por vida, no uno por id — no hace falta
 //    Detener un Emitir a mitad de camino, así que no necesita
 //    la maquinaria de INSTANCIAS. AbrirArchivo también corre en
-//    su propio hilo (ShellExecuteW + enumerar ventanas para
-//    enfocar puede tardar) pero sin pasar por INSTANCIAS —es
-//    de una sola vez, no hay nada que Detener a mitad de camino.
+//    su propio hilo (ShellExecuteExW + buscar la ventana del PID
+//    lanzado para forzarle el foco puede tardar) pero sin pasar
+//    por INSTANCIAS —es de una sola vez, no hay nada que Detener
+//    a mitad de camino.
 //    Solo Ui sigue sin hilo — es de verdad instantánea, no
 //    produce eventos físicos encadenados.
 //
@@ -235,8 +236,12 @@
 //     antes de lanzar nada nuevo. Si no lo encuentra (o Instancias es
 //     Múltiple), arma el comando según el tipo de ítem (.exe: ejecuta
 //     con argumento; .lnk: abre el acceso directo; carpeta/documento:
-//     ShellExecuteW "open" resuelve solo, salvo que haya abrir_con) y
-//     lo lanza con el modo de ventana de iniciar.
+//     ShellExecuteExW "open" resuelve solo, salvo que haya abrir_con)
+//     y lo lanza con el modo de ventana de iniciar. Si iniciar no es
+//     Minimizado, además busca la ventana del PID recién lanzado
+//     (buscar_ventana_de_pid, con reintentos cortos) y le fuerza el
+//     foco con back_app::forzar_foco (AttachThreadInput +
+//     SetForegroundWindow).
 // mostrar_ui()
 //     Sin implementar todavía (fuera de esta sesión de
 //     trabajo) — queda como punto de entrada ya conectado.
@@ -269,7 +274,8 @@
 //     ├─ Emitir → COLA_SALIDA (encola, no bloquea) → hilo
 //     │           de salida dedicado → emitir_combo()
 //     ├─ Ui → ejecución directa
-//     ├─ AbrirArchivo → hilo propio (ShellExecuteW, sin INSTANCIAS)
+//     ├─ AbrirArchivo → hilo propio (ShellExecuteExW + forzar
+//     │                 primer plano por PID, sin INSTANCIAS)
 //     └─ con Extra o Macro de archivo → hilo propio (id)
 //               ↓
 //         ejecutar_lineas() [loop, revisa INSTANCIAS
@@ -320,7 +326,11 @@ use std::thread;
 
 use std::time::Duration;
 
-use windows_sys::Win32::UI::Shell::ShellExecuteW;
+use windows_sys::Win32::Foundation::CloseHandle;
+
+use windows_sys::Win32::System::Threading::GetProcessId;
+
+use windows_sys::Win32::UI::Shell::{ShellExecuteExW, SEE_MASK_NOCLOSEPROCESS, SHELLEXECUTEINFOW};
 
 use windows_sys::Win32::UI::WindowsAndMessaging::{
     SHOW_WINDOW_CMD, SW_SHOWMAXIMIZED, SW_SHOWMINIMIZED, SW_SHOWNORMAL,
@@ -671,20 +681,25 @@ fn ejecutar_click_coordenada(
 // forma de saber qué proceso buscar sin resolver el programa
 // asociado por Windows (eso vive en back_registro.rs, Etapa 7B,
 // todavía no conectado acá) — en esos casos Única no tiene efecto
-// y siempre se lanza de nuevo.
+// y siempre se lanza de nuevo. Esto SÍ sigue siendo por nombre (no
+// por PID): a diferencia del forzado de primer plano de abajo, acá
+// se está buscando un proceso que puede llevar rato corriendo, no
+// uno que se acaba de lanzar.
 //
-// PRIMER PLANO: ShellExecuteW lanza la ventana con el SHOW_WINDOW_CMD
-// pedido, pero Windows no siempre le da foco a una ventana recién
-// creada (protección anti robo-de-foco del sistema) — con Ventana o
-// Maximizado se fuerza el foco con el mismo enfocar_proceso() que ya
-// usa el caso "Única" (SetForegroundWindow), reintentando un rato
-// corto porque el proceso puede tardar en crear su ventana. Con
-// Minimizado no se fuerza nada: forzar foco sobre una ventana que se
-// pidió minimizada no tendría sentido. Mismo límite que "Única": solo
-// puede apuntar por nombre de proceso cuando ese nombre se conoce de
-// antemano (.exe/.lnk/abrir_con) — carpeta o documento sin abrir_con
-// abren sin forzado de foco (se confía en el comportamiento default
-// de Windows).
+// PRIMER PLANO: se lanza con ShellExecuteExW en vez de ShellExecuteW
+// para obtener el HANDLE del proceso creado (SEE_MASK_NOCLOSEPROCESS)
+// y de ahí su PID — con el PID exacto se puede esperar a que ese
+// proceso puntual cree una ventana visible (buscar_ventana_de_pid) y
+// forzarle el foco con AttachThreadInput (back_app::forzar_foco), que
+// sí tiene efecto garantizado a diferencia de un SetForegroundWindow
+// suelto (Windows bloquea el robo de foco de ventanas recién creadas
+// si el hilo que lo pide no está "pegado" al hilo en foco actual).
+// A diferencia del enfoque anterior (buscar por nombre de proceso),
+// esto cubre TODOS los casos por igual — incluida carpeta y
+// documento sin abrir_con, donde de antemano no se sabe qué programa
+// va a terminar abriendo Windows, pero el PID lanzado siempre se
+// conoce. Con Minimizado no se fuerza nada: no tendría sentido traer
+// al frente una ventana que se pidió minimizada.
 // ======================================================
 
 fn abrir_archivo(
@@ -703,14 +718,6 @@ fn abrir_archivo(
             }
         }
 
-        // Se resuelve ANTES de mover abrir_con dentro del match de
-        // abajo (que consume el String cuando hay programa
-        // alternativo) — nombre_proceso_objetivo() solo necesita una
-        // referencia, pero una vez movido abrir_con ya no se puede
-        // volver a pedir prestado, así que el resultado se guarda acá
-        // para reusarlo después de lanzar (ver FORZAR PRIMER PLANO).
-        let nombre_para_enfocar = nombre_proceso_objetivo(&ruta, &abrir_con);
-
         let extension = extension_de(&ruta);
 
         let (archivo, parametros) = if extension == "exe" {
@@ -721,38 +728,40 @@ fn abrir_archivo(
             (programa, format!("\"{}\"", ruta))
         } else {
             // Carpeta o documento sin abrir_con personalizado:
-            // ShellExecuteW "open" sobre la ruta sola ya resuelve
+            // ShellExecuteExW "open" sobre la ruta sola ya resuelve
             // ambos casos (Explorer para carpetas, programa asociado
             // por Windows para documentos).
             (ruta.clone(), String::new())
         };
 
-        ejecutar_shell_execute(&archivo, &parametros, mostrar_para_iniciar(&iniciar));
+        let pid = ejecutar_shell_execute(&archivo, &parametros, mostrar_para_iniciar(&iniciar));
 
         if iniciar != IniciarVentana::Minimizado {
-            if let Some(nombre) = nombre_para_enfocar {
-                forzar_primer_plano(&nombre);
+            if let Some(pid) = pid {
+                forzar_primer_plano(pid);
             }
         }
     });
 }
 
 // ======================================================
-// 🔝 FORZAR PRIMER PLANO (reintentos cortos)
+// 🔝 FORZAR PRIMER PLANO (reintentos cortos + AttachThreadInput)
 // ------------------------------------------------------
 // La ventana del proceso recién lanzado puede tardar unos instantes
-// en existir — se reintenta enfocar_proceso() cada 100ms hasta
-// encontrarla o agotar los intentos, en vez de un solo intento
-// inmediato que probablemente falle contra un proceso que todavía no
-// terminó de arrancar.
+// en existir — se reintenta buscar_ventana_de_pid() cada 100ms hasta
+// encontrarla o agotar los intentos. Una vez encontrada,
+// back_app::forzar_foco() hace el trabajo real (AttachThreadInput +
+// SetForegroundWindow) — ver el comentario de ese archivo.
 // ======================================================
 
-fn forzar_primer_plano(nombre: &str) {
+fn forzar_primer_plano(pid: u32) {
     const INTENTOS: u32 = 20;
     const ESPERA: Duration = Duration::from_millis(100);
 
     for _ in 0..INTENTOS {
-        if back_app::enfocar_proceso(nombre) {
+        if let Some(hwnd) = back_app::buscar_ventana_de_pid(pid) {
+            back_app::forzar_foco(hwnd);
+
             return;
         }
 
@@ -793,7 +802,36 @@ fn mostrar_para_iniciar(iniciar: &IniciarVentana) -> SHOW_WINDOW_CMD {
     }
 }
 
-fn ejecutar_shell_execute(archivo: &str, parametros: &str, mostrar: SHOW_WINDOW_CMD) {
+// ======================================================
+// 🚀 EJECUTAR SHELLEXECUTEEXW
+// ------------------------------------------------------
+// Variante "Ex" de ShellExecuteW: misma operación ("open" sobre
+// archivo+parámetros+modo de ventana), pero con SEE_MASK_NOCLOSEPROCESS
+// deja en hProcess un HANDLE abierto al proceso recién creado —
+// de ahí se saca el PID (GetProcessId) que necesita
+// forzar_primer_plano() para encontrar su ventana. El handle se
+// cierra acá mismo apenas se lee el PID (CloseHandle) — no hace
+// falta mantenerlo abierto más que eso.
+//
+// Devuelve None si ShellExecuteExW falló (ruta inválida, sin
+// permisos, etc.) o si por algún motivo no llegó a entregar un
+// hProcess utilizable — en ese caso simplemente no hay forzado de
+// primer plano, el resto de la apertura no se ve afectada.
+//
+// [!] Escrito sin poder compilar (sin acceso a red / sin
+// windows-sys vendorizado acá): los tipos exactos de fMask y nShow
+// en SHELLEXECUTEINFOW pueden variar de firma según la versión del
+// crate (a veces fMask espera SHELLEXECUTEINFOW_FLAGS en vez de u32
+// directo, a veces nShow es i32 y a veces SHOW_WINDOW_CMD/u32) — si
+// el compilador marca error de tipos en esas dos líneas, es cuestión
+// de ajustar el cast/wrapper puntual, la lógica de fondo no cambia.
+// ======================================================
+
+fn ejecutar_shell_execute(
+    archivo: &str,
+    parametros: &str,
+    mostrar: SHOW_WINDOW_CMD,
+) -> Option<u32> {
     let operacion: Vec<u16> = "open".encode_utf16().chain(std::iter::once(0)).collect();
 
     let archivo_ancho: Vec<u16> = archivo.encode_utf16().chain(std::iter::once(0)).collect();
@@ -809,15 +847,31 @@ fn ejecutar_shell_execute(archivo: &str, parametros: &str, mostrar: SHOW_WINDOW_
         parametros_ancho.as_ptr()
     };
 
+    let mut info: SHELLEXECUTEINFOW = unsafe { std::mem::zeroed() };
+
+    info.cbSize = std::mem::size_of::<SHELLEXECUTEINFOW>() as u32;
+    info.fMask = SEE_MASK_NOCLOSEPROCESS;
+    info.lpVerb = operacion.as_ptr();
+    info.lpFile = archivo_ancho.as_ptr();
+    info.lpParameters = parametros_ptr;
+    info.nShow = mostrar as i32;
+
+    let exito = unsafe { ShellExecuteExW(&mut info) };
+
+    if exito == 0 || info.hProcess.is_null() {
+        return None;
+    }
+
+    let pid = unsafe { GetProcessId(info.hProcess) };
+
     unsafe {
-        ShellExecuteW(
-            std::ptr::null_mut(),
-            operacion.as_ptr(),
-            archivo_ancho.as_ptr(),
-            parametros_ptr,
-            std::ptr::null(),
-            mostrar,
-        );
+        CloseHandle(info.hProcess);
+    }
+
+    if pid == 0 {
+        None
+    } else {
+        Some(pid)
     }
 }
 

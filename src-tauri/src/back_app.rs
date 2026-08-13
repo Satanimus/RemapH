@@ -441,10 +441,12 @@ unsafe fn icono_desde_hicon(hicon: *mut std::ffi::c_void) -> Option<IconoRaw> {
 use crate::cache;
 use crate::perfil_cache::AppCache;
 use windows_sys::Win32::Foundation::HWND;
+use windows_sys::Win32::System::Threading::GetCurrentThreadId;
 use windows_sys::Win32::UI::Accessibility::{SetWinEventHook, HWINEVENTHOOK};
 use windows_sys::Win32::UI::WindowsAndMessaging::{
-    DispatchMessageW, EnumWindows, GetMessageW, IsIconic, IsWindowVisible, SetForegroundWindow,
-    ShowWindow, TranslateMessage, EVENT_SYSTEM_FOREGROUND, MSG, SW_RESTORE, WINEVENT_OUTOFCONTEXT,
+    AttachThreadInput, DispatchMessageW, EnumWindows, GetMessageW, IsIconic, IsWindowVisible,
+    SetForegroundWindow, ShowWindow, TranslateMessage, EVENT_SYSTEM_FOREGROUND, MSG, SW_RESTORE,
+    WINEVENT_OUTOFCONTEXT,
 };
 
 pub fn iniciar_monitor() {
@@ -549,13 +551,7 @@ pub fn enfocar_proceso(nombre: &str) -> bool {
         return false;
     }
 
-    unsafe {
-        if IsIconic(contexto.hwnd) != 0 {
-            ShowWindow(contexto.hwnd, SW_RESTORE);
-        }
-
-        SetForegroundWindow(contexto.hwnd) != 0
-    }
+    forzar_foco(contexto.hwnd)
 }
 
 unsafe extern "system" fn callback_enfoque(hwnd: HWND, lparam: isize) -> i32 {
@@ -583,4 +579,108 @@ unsafe extern "system" fn callback_enfoque(hwnd: HWND, lparam: isize) -> i32 {
     }
 
     1
+}
+
+// ======================================================
+// 🔎 BUSCAR VENTANA DE UN PID
+// ------------------------------------------------------
+// Usado por runtime.rs::abrir_archivo() para el forzado de primer
+// plano tras lanzar con ShellExecuteExW: a diferencia de
+// enfocar_proceso() (que busca por NOMBRE de archivo, útil cuando
+// el proceso ya podía estar corriendo de antes), acá se busca por
+// PID exacto — el que devuelve el propio lanzamiento — así que sirve
+// también para carpeta/documento sin abrir_con, donde de antemano no
+// se conoce qué programa va a terminar abriendo Windows.
+//
+// Devuelve None si el proceso todavía no creó ninguna ventana visible
+// (puede pasar varias veces seguidas mientras arranca) — el llamador
+// decide cuántas veces reintentar.
+// ======================================================
+
+struct ContextoEnfoquePid {
+    pid: u32,
+    hwnd: HWND,
+}
+
+pub fn buscar_ventana_de_pid(pid: u32) -> Option<HWND> {
+    let mut contexto = ContextoEnfoquePid {
+        pid,
+        hwnd: std::ptr::null_mut(),
+    };
+
+    unsafe {
+        EnumWindows(Some(callback_enfoque_pid), &mut contexto as *mut _ as isize);
+    }
+
+    if contexto.hwnd.is_null() {
+        None
+    } else {
+        Some(contexto.hwnd)
+    }
+}
+
+unsafe extern "system" fn callback_enfoque_pid(hwnd: HWND, lparam: isize) -> i32 {
+    let contexto = &mut *(lparam as *mut ContextoEnfoquePid);
+
+    if IsWindowVisible(hwnd) == 0 {
+        return 1;
+    }
+
+    let mut pid = 0u32;
+
+    GetWindowThreadProcessId(hwnd, &mut pid);
+
+    if pid == contexto.pid {
+        contexto.hwnd = hwnd;
+
+        return 0;
+    }
+
+    1
+}
+
+// ======================================================
+// 🔝 FORZAR FOCO (AttachThreadInput)
+// ------------------------------------------------------
+// SetForegroundWindow() solo, sin más, puede fallar en silencio: la
+// protección anti robo-de-foco de Windows solo deja que un hilo le dé
+// foco a una ventana si ese hilo está "pegado" (misma cola de
+// entrada) al hilo que tiene el foco actual. Acá se fuerza esa
+// condición con AttachThreadInput: se pega temporalmente el hilo
+// actual al hilo dueño de la ventana en foco AHORA, se pide el foco
+// para `hwnd`, y se despega. Con eso SetForegroundWindow ya no
+// depende del historial de interacción del usuario ni de qué proceso
+// lo llama.
+// ======================================================
+
+pub fn forzar_foco(hwnd: HWND) -> bool {
+    unsafe {
+        if IsIconic(hwnd) != 0 {
+            ShowWindow(hwnd, SW_RESTORE);
+        }
+
+        let ventana_actual = GetForegroundWindow();
+
+        let hilo_actual = GetCurrentThreadId();
+
+        let mut pid_actual = 0u32;
+
+        let hilo_de_ventana_actual = GetWindowThreadProcessId(ventana_actual, &mut pid_actual);
+
+        // Ventana en foco puede no existir (escritorio vacío) o ser
+        // la misma que ya queremos enfocar — en ambos casos no hace
+        // falta pegar/despegar hilos, SetForegroundWindow directo
+        // alcanza.
+        if ventana_actual.is_null() || hilo_de_ventana_actual == hilo_actual {
+            return SetForegroundWindow(hwnd) != 0;
+        }
+
+        AttachThreadInput(hilo_actual, hilo_de_ventana_actual, 1);
+
+        let resultado = SetForegroundWindow(hwnd) != 0;
+
+        AttachThreadInput(hilo_actual, hilo_de_ventana_actual, 0);
+
+        resultado
+    }
 }
