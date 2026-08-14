@@ -1149,16 +1149,26 @@ fn notificar_ventanas_abiertas() {
 // modificación de portapapeles, para no generar un duplicado."
 //
 // pegar() (más abajo) escribe al portapapeles del sistema (texto vía
-// arboard, imagen vía escribir_imagen_multiformato() — ver
-// back_portapapeles_captura.rs) antes de simular Ctrl+V — eso por sí
+// arboard, imagen vía escribir_imagen_como_bitmap() — ver
+// back_portapapeles_captura.rs) antes de emitir Ctrl+V — eso por sí
 // solo ya dispara WM_CLIPBOARDUPDATE en el listener de
 // back_portapapeles_captura.rs, como cualquier otro cambio real (una
 // sola vez: para imagen sigue siendo una única transacción Open/
-// Empty/Set×2/Close, no dos avisos). Sin este bloqueo, en_cambio_del_
+// Empty/Set/Close, no dos avisos). Sin este bloqueo, en_cambio_del_
 // sistema() (si hay algún Registro activo) o resolver_elemento_
 // simple() (si no hay ninguno) tratarían ese aviso como un cambio
 // nuevo del usuario y generarían un rotativo duplicado del mismo
 // contenido que ya existía.
+//
+// IGNORAR_PROXIMO_CAMBIO_MS subió de 400 a 600: pegar() ahora espera
+// 500ms (ver el Sleep justo antes de emitir_ctrl_v(), necesario para
+// que Paint llegue a "asentar" una imagen pesada antes del Ctrl+V
+// automático) DESPUÉS de escribir el portapapeles pero ANTES de que
+// se dispare cualquier lectura/reescritura asociada — con la ventana
+// vieja de 400ms, ese margen ya alcanzaba a vencer antes de que el
+// bloqueo hiciera falta, y una imagen clickeada volvía a aparecer
+// duplicada en el pool. 600ms deja margen sobre los 600ms del Sleep
+// más el tiempo real de escritura + procesamiento del propio evento.
 //
 // Se usa un timestamp con expiración corta (no solo un booleano) en
 // vez de "bloqueado hasta que llegue el próximo aviso": si por lo
@@ -1170,7 +1180,7 @@ fn notificar_ventanas_abiertas() {
 // más abajo (Etapa G).
 // ======================================================
 
-const IGNORAR_PROXIMO_CAMBIO_MS: u128 = 400;
+const IGNORAR_PROXIMO_CAMBIO_MS: u128 = 600;
 
 static IGNORAR_HASTA: Mutex<Option<std::time::Instant>> = Mutex::new(None);
 
@@ -1244,11 +1254,86 @@ pub fn pegar(ruta: &Path) -> Result<(), String> {
     // reportaba insertar los eventos sin objeción— no lograba que
     // Paint reaccionara. Ver comentario largo en
     // runtime::emitir_ctrl_v().
+
+    // Con contenido de imagen ya confirmado correcto (InsideClipboard/
+    // Win+V/Ctrl+V físico), y el envío de teclas ya confirmado exitoso
+    // en cada paso (logs de back_interception::emitir_teclado), Paint
+    // no reaccionaba al Ctrl+V AUTOMÁTICO cuando el contenido era
+    // imagen — pero el mismo mecanismo sí funcionaba para texto.
+    // Confirmado por prueba: Paint necesita tiempo real para "asentar"
+    // una imagen pesada en el portapapeles antes de poder leerla, algo
+    // que con Ctrl+V físico el usuario da naturalmente sin darse
+    // cuenta. 400ms todavía daba error; 500ms funciona de forma
+    // confiable — se deja con margen (600ms) para no quedar al límite
+    // exacto medido, ya que el tiempo real puede variar con el tamaño
+    // de la imagen o la carga del sistema.
+
+    // Algunas apps (Photoshop confirmado) no re-consultan el
+    // portapapeles solo por WM_CLIPBOARDUPDATE — lo cachean mientras
+    // tienen el foco, y recién lo vuelven a leer cuando RECUPERAN el
+    // foco (ej. al volver de otra ventana). Sin esto, clickear el
+    // botón de una imagen nueva mientras Photoshop ya tenía el foco
+    // pegaba la imagen VIEJA que tenía cacheada — tanto por el Ctrl+V
+    // automático como por uno físico del usuario, hasta que cambiaba
+    // de ventana y volvía. forzar_relectura_portapapeles() simula ese
+    // cambio de foco de forma invisible para que la relectura ocurra
+    // sola, sin que el usuario tenga que hacerlo a mano.
+    forzar_relectura_portapapeles();
+
+    std::thread::sleep(std::time::Duration::from_millis(600));
+
     crate::runtime::emitir_ctrl_v();
 
     println!("📋 [diag] runtime::emitir_ctrl_v() disparado — pegar() termina OK");
 
     Ok(())
+}
+
+/// Roba el foco un instante (a la ventana oculta del listener de
+/// Portapapeles — HWND_MESSAGE, sin UI visible, el usuario nunca la
+/// ve) y se lo devuelve de inmediato a quien lo tenía. El único
+/// propósito es forzar el evento de "recuperar foco" en la ventana
+/// original, para las apps (Photoshop confirmado) que solo
+/// re-consultan el portapapeles en ese momento, no ante
+/// WM_CLIPBOARDUPDATE por sí solo.
+///
+/// Se usa el HWND del listener (oculto) y NO el de la ventana visible
+/// de Portapapeles a propósito: esa ventana tiene WS_EX_NOACTIVATE
+/// puesto de forma deliberada (ver desactivar_activacion() más abajo
+/// — spec: "no robarle el foco a la app activa del usuario"),
+/// exactamente para que Windows nunca la ofrezca como candidata a
+/// foco. Usar una ventana sin ese estilo, invisible para el usuario,
+/// logra el mismo efecto técnico sin contradecir esa decisión.
+///
+/// Sin efecto si el listener no está corriendo (no debería pasar:
+/// back_portapapeles.rs lo asegura antes de habilitar el pegado) o si
+/// no se pudo determinar la ventana que tenía el foco — en ese caso
+/// simplemente no se fuerza la relectura, el resto de pegar() sigue
+/// igual.
+fn forzar_relectura_portapapeles() {
+    use windows_sys::Win32::Foundation::HWND;
+    use windows_sys::Win32::UI::WindowsAndMessaging::{GetForegroundWindow, SetForegroundWindow};
+
+    let Some(hwnd_listener) = back_portapapeles_captura::hwnd_listener() else {
+        println!("📋 [diag] forzar_relectura_portapapeles: listener no está corriendo, se omite");
+        return;
+    };
+
+    let hwnd_listener = hwnd_listener as HWND;
+
+    unsafe {
+        let hwnd_original = GetForegroundWindow();
+
+        if hwnd_original.is_null() {
+            println!("📋 [diag] forzar_relectura_portapapeles: no hay ventana con foco, se omite");
+            return;
+        }
+
+        SetForegroundWindow(hwnd_listener);
+        SetForegroundWindow(hwnd_original);
+    }
+
+    println!("📋 [diag] forzar_relectura_portapapeles: foco robado y devuelto");
 }
 
 fn contenido_desde_archivo(ruta: &Path) -> Result<ContenidoPortapapeles, String> {

@@ -573,6 +573,16 @@ static HWND_ACTUAL: Mutex<Option<isize>> = Mutex::new(None);
 
 const NOMBRE_CLASE: &str = "RemapHPortapapelesListener";
 
+/// Handle (como isize crudo) de la ventana oculta del listener de
+/// Portapapeles, si está corriendo. Usado por back_portapapeles.rs
+/// para robarle el foco un instante a la ventana activa y devolvérselo
+/// (ver forzar_relectura_portapapeles() ahí) — algunas apps (Photoshop
+/// confirmado) solo re-consultan el portapapeles al recuperar el foco,
+/// no ante WM_CLIPBOARDUPDATE por sí solo.
+pub fn hwnd_listener() -> Option<isize> {
+    *HWND_ACTUAL.lock().unwrap()
+}
+
 /// Arranca el listener si no estaba corriendo. Sin efecto si ya
 /// estaba corriendo (lo llama back_portapapeles.rs cada vez que
 /// "debe existir" pasa a ser true — puede llamarse de más sin
