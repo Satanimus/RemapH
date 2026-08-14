@@ -55,7 +55,13 @@
 //     Trigger preparado para mostrar captura.
 //
 // ResultadoPerfil
-//     Resultado completo para actualizar UI.
+//     Resultado completo para actualizar UI. advertencias es
+//     Option: None cuando la operación no recompiló (revertir
+//     cambios), Some(vec) cuando sí.
+//
+// ResultadoPerfilInicial
+//     Versión mínima de ResultadoPerfil para el arranque de la app
+//     (main.ts::iniciarApp): perfil + advertencias, nada más.
 //
 // EstadoCachePerfil
 //     Estado de cache de un perfil.
@@ -117,6 +123,8 @@
 // ======================================================
 
 use serde::{Deserialize, Serialize};
+
+use crate::compilador::AdvertenciaCompilacion;
 
 use crate::perfil_json::{
     perfil_json, AbrirAccionJson, AbrirExtraJson, AppJson, CoordenadaJson, MenuAccionJson,
@@ -264,6 +272,15 @@ pub struct TriggerCapturaUI {
 
 // ======================================================
 // 📦 RESULTADO PERFIL
+// ------------------------------------------------------
+// advertencias: lo que devolvió la compilación disparada por esta
+// misma operación (ver perfil.rs) — None cuando la operación NO
+// recompila (restaurar_perfil_actual, que a propósito no toca la
+// cache: revertir cambios sin guardar no debe reiniciar remapeos ya
+// corriendo). None es distinto de Some(vec![]) — "no sé, no cambié
+// nada" vs "compilé y no hay advertencias" — para que la UI sepa
+// cuándo NO debe pisar las advertencias vigentes (ver
+// ui_toolbar.ts::aplicarResultadoPerfil).
 // ======================================================
 
 #[derive(Serialize)]
@@ -275,6 +292,25 @@ pub struct ResultadoPerfil {
     pub perfiles: Vec<String>,
 
     pub cache_activo: bool,
+
+    pub advertencias: Option<Vec<AdvertenciaCompilacion>>,
+}
+
+// ======================================================
+// 📦 RESULTADO PERFIL INICIAL (arranque de la app)
+// ------------------------------------------------------
+// Versión mínima de ResultadoPerfil para main.ts::iniciarApp(): solo
+// lo que hace falta para el primer render (el perfil y las
+// advertencias de su compilación automática) — nombre/perfiles/
+// cache_activo ya se piden aparte al armar la toolbar (ver
+// ui_toolbar.ts).
+// ======================================================
+
+#[derive(Serialize)]
+pub struct ResultadoPerfilInicial {
+    pub perfil: perfil_json,
+
+    pub advertencias: Vec<AdvertenciaCompilacion>,
 }
 
 // ======================================================

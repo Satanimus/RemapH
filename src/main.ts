@@ -14,21 +14,14 @@ import { convertirperfil_json } from "./core/core_perfil_json";
 
 import type { perfil_json } from "./core/core_perfil_json";
 
-import { establecerAdvertenciasCompilacion } from "./core/core_advertencias_compilacion";
+import {
+  establecerAdvertenciasCompilacion,
+  type ResultadoCompilacion,
+} from "./core/core_advertencias_compilacion";
 
 import { iniciarAjusteTextoBotones } from "./ui/util/util_texto_boton";
 
-// ======================================================
-// 📦 RESULTADO COMPILACIÓN (espejo de ResultadoCompilacion en
-// compilador.rs — ver AdvertenciaCompilacion en
-// core_advertencias_compilacion.ts)
-// ======================================================
-
-interface ResultadoCompilacionJson {
-  activo: boolean;
-
-  advertencias: { fila: number; mensaje: string }[];
-}
+import { actualizarStatusbar } from "./ui/ui_statusbar";
 
 // ======================================================
 // 💾 GUARDAR Y ACTIVAR PERFIL
@@ -44,13 +37,9 @@ interface ResultadoCompilacionJson {
 async function guardarPerfil(): Promise<void> {
   const perfil = obtenerPerfilUi();
 
-  const resultado = await invoke<ResultadoCompilacionJson>(
-    "compilar_perfil",
-
-    {
-      filas: perfil.filas,
-    },
-  );
+  const resultado = await invoke<ResultadoCompilacion>("compilar_perfil", {
+    filas: perfil.filas,
+  });
 
   establecerAdvertenciasCompilacion(resultado.advertencias);
 
@@ -59,16 +48,31 @@ async function guardarPerfil(): Promise<void> {
 
 // ======================================================
 // 🚀 INICIAR APLICACIÓN
+// ------------------------------------------------------
+// obtener_perfil_actual() compila automáticamente al cargar (ver
+// perfil.rs) — sus advertencias se guardan ANTES de crearApp() para
+// que la primera tabla ya nazca con el "OFF ⚠️" correcto en cada
+// fila (comp_controles.ts::crearEstado() lee el snapshot actual de
+// advertencias al construir cada fila). El statusbar en cambio se
+// arma vacío por defecto al crearse (ver ui_statusbar.ts), así que
+// se lo actualiza a mano después, ya con la tabla montada.
 // ======================================================
 
 async function iniciarApp(): Promise<void> {
-  const perfil_json = await invoke<perfil_json>("obtener_perfil_actual");
+  const resultado = await invoke<{
+    perfil: perfil_json;
+    advertencias: ResultadoCompilacion["advertencias"];
+  }>("obtener_perfil_actual");
 
-  const perfil = await convertirperfil_json(perfil_json);
+  establecerAdvertenciasCompilacion(resultado.advertencias);
+
+  const perfil = await convertirperfil_json(resultado.perfil);
 
   establecerPerfilUi(perfil);
 
   document.body.replaceChildren(crearApp(guardarPerfil));
+
+  actualizarStatusbar(perfil.filas);
 
   iniciarAjusteTextoBotones();
 }

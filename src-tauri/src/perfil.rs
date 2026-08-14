@@ -37,7 +37,9 @@
 // Funciones:
 //
 // activar_perfil()
-//     Carga perfil actual y activa cache.
+//     Carga perfil actual y activa cache. Devuelve
+//     ResultadoCompilacion (antes solo un bool) con las advertencias
+//     de esta compilación.
 //
 // desactivar_perfil()
 //     Desactiva perfil actual.
@@ -47,7 +49,9 @@
 //     Recibe perfil ya convertido desde perfil_ui.
 //
 // obtener_perfil_actual()
-//     Obtiene perfil actual.
+//     Obtiene perfil actual (compila automáticamente). Devuelve
+//     ResultadoPerfilInicial (perfil + advertencias de esa
+//     compilación).
 //
 // obtener_perfiles()
 //     Lista perfiles disponibles.
@@ -80,7 +84,8 @@
 //     Cambia perfil activo.
 //
 // resultado_perfil()
-//     Construye respuesta completa para UI.
+//     Construye respuesta completa para UI. advertencias es
+//     Option: None si la operación no recompiló (restaurar_perfil_actual).
 //
 // siguiente_nombre()
 //     Genera nombre disponible.
@@ -99,21 +104,25 @@ use crate::usuario;
 use std::fs;
 use std::path::Path;
 
-use crate::compilador::ResultadoCompilacion;
-use crate::perfil_ui::ResultadoPerfil;
+use crate::compilador::{AdvertenciaCompilacion, ResultadoCompilacion};
+use crate::perfil_ui::{ResultadoPerfil, ResultadoPerfilInicial};
 
 // ======================================================
 // 🟢 ACTIVAR PERFIL
+// ------------------------------------------------------
+// Devuelve ResultadoCompilacion completo (no solo el bool de antes)
+// para que el botón "Activar perfil" de la UI pueda refrescar el
+// "OFF ⚠️" de cada fila y el statusbar con las advertencias de ESTA
+// compilación — antes se perdían en silencio (ver
+// ui_toolbar.ts::botonEstado).
 // ======================================================
 
-pub fn activar_perfil() -> Result<bool, String> {
+pub fn activar_perfil() -> Result<ResultadoCompilacion, String> {
     let ruta = usuario::perfil_actual()?;
 
     let perfil = cargar_desde_disco(&ruta)?;
 
-    compilador::compilar(&perfil);
-
-    Ok(!cache::esta_vacia())
+    Ok(compilador::compilar(&perfil))
 }
 
 // ======================================================
@@ -126,9 +135,13 @@ pub fn desactivar_perfil() {
 
 // ======================================================
 // 📂 OBTENER PERFIL ACTUAL
+// ------------------------------------------------------
+// Devuelve también las advertencias de esta compilación automática
+// (antes se perdían — main.ts::iniciarApp() nunca se enteraba de
+// una fila "abrir" con ruta que ya no existe al abrir el programa).
 // ======================================================
 
-pub fn obtener_perfil_actual() -> Result<perfil_json, String> {
+pub fn obtener_perfil_actual() -> Result<ResultadoPerfilInicial, String> {
     let ruta = usuario::perfil_actual()?;
 
     if !ruta.exists() {
@@ -136,16 +149,22 @@ pub fn obtener_perfil_actual() -> Result<perfil_json, String> {
 
         guardar_en_disco(&perfil, &ruta)?;
 
-        compilador::compilar(&perfil);
+        let resultado = compilador::compilar(&perfil);
 
-        return Ok(perfil);
+        return Ok(ResultadoPerfilInicial {
+            perfil,
+            advertencias: resultado.advertencias,
+        });
     }
 
     let perfil = cargar_desde_disco(&ruta)?;
 
-    compilador::compilar(&perfil);
+    let resultado = compilador::compilar(&perfil);
 
-    Ok(perfil)
+    Ok(ResultadoPerfilInicial {
+        perfil,
+        advertencias: resultado.advertencias,
+    })
 }
 
 // ======================================================
@@ -186,6 +205,13 @@ pub fn obtener_estado_cache() -> bool {
 
 // ======================================================
 // 🔄 RESTAURAR PERFIL
+// ------------------------------------------------------
+// A propósito NO recompila (no llama compilador::compilar): revertir
+// ediciones sin guardar no debe reiniciar la cache ni lo que ya esté
+// corriendo (cerrar MenuExpress/Portapapeles abiertos, etc. — ver
+// compilador::compilar). advertencias viaja en None para que la UI
+// sepa que debe dejar las advertencias vigentes tal como están, no
+// pisarlas con una lista vacía.
 // ======================================================
 
 pub fn restaurar_perfil_actual() -> Result<ResultadoPerfil, String> {
@@ -201,7 +227,7 @@ pub fn restaurar_perfil_actual() -> Result<ResultadoPerfil, String> {
 
     let nombre = usuario::nombre_actual()?;
 
-    resultado_perfil(perfil, nombre)
+    resultado_perfil(perfil, nombre, None)
 }
 
 // ======================================================
@@ -219,9 +245,9 @@ pub fn clonar_perfil(perfil: perfil_json) -> Result<ResultadoPerfil, String> {
 
     guardar_en_disco(&perfil, &ruta)?;
 
-    compilador::compilar(&perfil);
+    let resultado = compilador::compilar(&perfil);
 
-    resultado_perfil(perfil, nombre)
+    resultado_perfil(perfil, nombre, Some(resultado.advertencias))
 }
 
 // ======================================================
@@ -253,9 +279,9 @@ pub fn renombrar_perfil(nuevo_nombre: String) -> Result<ResultadoPerfil, String>
 
     let perfil = cargar_desde_disco(&nueva_ruta)?;
 
-    compilador::compilar(&perfil);
+    let resultado = compilador::compilar(&perfil);
 
-    resultado_perfil(perfil, nuevo_nombre)
+    resultado_perfil(perfil, nuevo_nombre, Some(resultado.advertencias))
 }
 
 // ======================================================
@@ -285,13 +311,19 @@ pub fn eliminar_perfil_actual() -> Result<ResultadoPerfil, String> {
 
     let perfil = cargar_desde_disco(&ruta)?;
 
-    compilador::compilar(&perfil);
+    let resultado = compilador::compilar(&perfil);
 
-    resultado_perfil(perfil, siguiente_nombre)
+    resultado_perfil(perfil, siguiente_nombre, Some(resultado.advertencias))
 }
 
 // ======================================================
 // 🆕 CREAR PERFIL
+// ------------------------------------------------------
+// No llama compilador::compilar (perfil nuevo siempre vacío, nada
+// que compilar) pero SÍ vació la cache arriba — Some(vec![]) refleja
+// eso con precisión: se compiló (en los hechos, a nada) y no hay
+// advertencias, a diferencia de restaurar_perfil_actual que ni
+// siquiera toca la cache.
 // ======================================================
 
 pub fn crear_perfil_nuevo() -> Result<ResultadoPerfil, String> {
@@ -305,7 +337,7 @@ pub fn crear_perfil_nuevo() -> Result<ResultadoPerfil, String> {
 
     guardar_en_disco(&perfil, &ruta)?;
 
-    resultado_perfil(perfil, nombre)
+    resultado_perfil(perfil, nombre, Some(Vec::new()))
 }
 
 // ======================================================
@@ -323,16 +355,20 @@ pub fn seleccionar_perfil(nombre: String) -> Result<ResultadoPerfil, String> {
 
     let perfil = cargar_desde_disco(&ruta)?;
 
-    compilador::compilar(&perfil);
+    let resultado = compilador::compilar(&perfil);
 
-    resultado_perfil(perfil, nombre)
+    resultado_perfil(perfil, nombre, Some(resultado.advertencias))
 }
 
 // ======================================================
 // 📦 RESULTADO
 // ======================================================
 
-fn resultado_perfil(perfil: perfil_json, nombre: String) -> Result<ResultadoPerfil, String> {
+fn resultado_perfil(
+    perfil: perfil_json,
+    nombre: String,
+    advertencias: Option<Vec<AdvertenciaCompilacion>>,
+) -> Result<ResultadoPerfil, String> {
     Ok(ResultadoPerfil {
         perfil,
 
@@ -341,6 +377,8 @@ fn resultado_perfil(perfil: perfil_json, nombre: String) -> Result<ResultadoPerf
         perfiles: usuario::perfiles()?,
 
         cache_activo: !cache::esta_vacia(),
+
+        advertencias,
     })
 }
 

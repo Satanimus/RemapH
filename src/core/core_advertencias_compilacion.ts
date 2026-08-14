@@ -1,10 +1,18 @@
 // ======================================================
 // ⚠️ core_Advertencias_Compilacion
 // ------------------------------------------------------
-// Guarda en memoria el Vec<AdvertenciaCompilacion> que devuelve
-// compilar_perfil() (ver ResultadoCompilacion en compilador.rs) tras
-// cada guardado — hoy solo lo genera convertir_abrir() cuando la
-// ruta de una fila "abrir" ya no existe en disco.
+// Guarda en memoria el Vec<AdvertenciaCompilacion> de la ÚLTIMA
+// compilación conocida — hoy solo lo genera convertir_abrir() en
+// compilador.rs cuando la ruta de una fila "abrir" ya no existe en
+// disco. Se actualiza en cada punto donde el backend compila y
+// devuelve ResultadoCompilacion/advertencias: guardar cambios
+// (main.ts::guardarPerfil), activar perfil manualmente
+// (ui_toolbar.ts::botonEstado), cargar el perfil al abrir la app
+// (main.ts::iniciarApp) y cambiar/clonar/renombrar/eliminar perfil
+// (ui_toolbar.ts::aplicarResultadoPerfil). NO se actualiza al
+// revertir cambios sin guardar (restaurar_perfil_actual no
+// recompila a propósito — ver perfil.rs), para no pisar advertencias
+// vigentes con una lista vacía.
 //
 // A diferencia de core_conflictos.ts (que recalcula en vivo, en el
 // frontend, cada vez que se edita una fila), esto es un snapshot
@@ -26,6 +34,21 @@ export interface AdvertenciaCompilacion {
   fila: number;
 
   mensaje: string;
+}
+
+// ======================================================
+// 📦 RESULTADO COMPILACIÓN (espejo de ResultadoCompilacion en
+// compilador.rs)
+// ------------------------------------------------------
+// Lo que devuelven los comandos que compilan: compilar_perfil,
+// activar_perfil. Tipo compartido para no duplicarlo en cada
+// llamador (ver main.ts, ui_toolbar.ts).
+// ======================================================
+
+export interface ResultadoCompilacion {
+  activo: boolean;
+
+  advertencias: AdvertenciaCompilacion[];
 }
 
 // ======================================================

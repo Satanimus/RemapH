@@ -26,6 +26,11 @@ import { convertirperfil_json } from "../core/core_perfil_json";
 
 import { establecerPerfilUi } from "../core/core_perfil_ui";
 
+import {
+  establecerAdvertenciasCompilacion,
+  type ResultadoCompilacion,
+} from "../core/core_advertencias_compilacion";
+
 import { reconstruirTabla, desactivarModoMover } from "./ui_tabla_control";
 
 import {
@@ -166,9 +171,13 @@ export function crearToolbar(alGuardar: () => Promise<void>): HTMLElement {
 
         marcarPerfilSegunCache(toolbar, cacheDot, false);
       } else if (estadoActual === "inactivo") {
-        const activo = await invoke<boolean>("activar_perfil");
+        const resultado = await invoke<ResultadoCompilacion>("activar_perfil");
 
-        marcarPerfilSegunCache(toolbar, cacheDot, activo);
+        establecerAdvertenciasCompilacion(resultado.advertencias);
+
+        reconstruirTabla();
+
+        marcarPerfilSegunCache(toolbar, cacheDot, resultado.activo);
       }
     } catch (error) {
       console.error(
@@ -210,6 +219,11 @@ export function crearToolbar(alGuardar: () => Promise<void>): HTMLElement {
 
 // ======================================================
 // APLICAR RESULTADO PERFIL
+// ------------------------------------------------------
+// resultado.advertencias es null cuando la operación no recompiló
+// (revertir cambios sin guardar, ver perfil.rs::
+// restaurar_perfil_actual) — en ese caso se dejan las advertencias
+// vigentes tal como están, sin pisarlas con una lista vacía.
 // ======================================================
 
 async function aplicarResultadoPerfil(
@@ -221,6 +235,10 @@ async function aplicarResultadoPerfil(
   const perfil = await convertirperfil_json(resultado.perfil);
 
   establecerPerfilUi(perfil);
+
+  if (resultado.advertencias !== null) {
+    establecerAdvertenciasCompilacion(resultado.advertencias);
+  }
 
   reconstruirTabla();
 

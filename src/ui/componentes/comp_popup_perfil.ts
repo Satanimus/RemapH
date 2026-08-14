@@ -15,8 +15,14 @@ import { obtenerPerfilUi } from "../../core/core_perfil_ui";
 
 import type { perfil_json } from "../../core/core_perfil_json";
 
+import type { AdvertenciaCompilacion } from "../../core/core_advertencias_compilacion";
+
 // ======================================================
 // RESULTADO PERFIL
+// ------------------------------------------------------
+// advertencias: null cuando la operación no recompiló (ver
+// perfil.rs::restaurar_perfil_actual / ui_toolbar.ts::
+// aplicarResultadoPerfil).
 // ======================================================
 
 export interface ResultadoPerfil {
@@ -27,6 +33,8 @@ export interface ResultadoPerfil {
   perfiles: string[];
 
   cache_activo: boolean;
+
+  advertencias: AdvertenciaCompilacion[] | null;
 }
 
 // ======================================================

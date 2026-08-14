@@ -136,8 +136,9 @@ use crate::captura_coordenada;
 use crate::compilador::ResultadoCompilacion;
 use crate::config;
 use crate::perfil;
-use crate::perfil_json::perfil_json;
-use crate::perfil_ui::{convertir_perfil, FilaUI, ResultadoPerfil, TriggerCapturaUI};
+use crate::perfil_ui::{
+    convertir_perfil, FilaUI, ResultadoPerfil, ResultadoPerfilInicial, TriggerCapturaUI,
+};
 use crate::pulsadores;
 
 use base64::engine::general_purpose::STANDARD as BASE64;
@@ -153,7 +154,7 @@ use windows_sys::Win32::UI::Input::KeyboardAndMouse::*;
 // ======================================================
 
 #[tauri::command]
-pub fn activar_perfil() -> Result<bool, String> {
+pub fn activar_perfil() -> Result<ResultadoCompilacion, String> {
     perfil::activar_perfil()
 }
 
@@ -163,7 +164,7 @@ pub fn desactivar_perfil() {
 }
 
 #[tauri::command]
-pub fn obtener_perfil_actual() -> Result<perfil_json, String> {
+pub fn obtener_perfil_actual() -> Result<ResultadoPerfilInicial, String> {
     perfil::obtener_perfil_actual()
 }
 
