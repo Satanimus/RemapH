@@ -1289,51 +1289,86 @@ pub fn pegar(ruta: &Path) -> Result<(), String> {
     Ok(())
 }
 
-/// Roba el foco un instante (a la ventana oculta del listener de
-/// Portapapeles — HWND_MESSAGE, sin UI visible, el usuario nunca la
-/// ve) y se lo devuelve de inmediato a quien lo tenía. El único
-/// propósito es forzar el evento de "recuperar foco" en la ventana
-/// original, para las apps (Photoshop confirmado) que solo
-/// re-consultan el portapapeles en ese momento, no ante
+/// Roba el foco un instante y se lo devuelve de inmediato a quien lo
+/// tenía. El único propósito es forzar el evento de "recuperar foco"
+/// en la ventana original, para las apps (Photoshop confirmado) que
+/// solo re-consultan el portapapeles en ese momento, no ante
 /// WM_CLIPBOARDUPDATE por sí solo.
 ///
-/// Se usa el HWND del listener (oculto) y NO el de la ventana visible
-/// de Portapapeles a propósito: esa ventana tiene WS_EX_NOACTIVATE
-/// puesto de forma deliberada (ver desactivar_activacion() más abajo
-/// — spec: "no robarle el foco a la app activa del usuario"),
-/// exactamente para que Windows nunca la ofrezca como candidata a
-/// foco. Usar una ventana sin ese estilo, invisible para el usuario,
-/// logra el mismo efecto técnico sin contradecir esa decisión.
+/// SEGUNDA CORRECCIÓN (la primera no alcanzaba): se robaba el foco al
+/// HWND del listener de Portapapeles (back_portapapeles_captura.rs),
+/// pero ese HWND es una ventana "mensaje-only" (HWND_MESSAGE) — un
+/// tipo de ventana que Windows deja completamente afuera del árbol
+/// normal de ventanas y que NUNCA puede convertirse en primer plano,
+/// ni con AttachThreadInput ni con ningún truco: no es una cuestión
+/// de permisos como la que resuelve back_app::forzar_foco(), es una
+/// limitación estructural de ese tipo de ventana. Por eso el primer
+/// robo de foco no hacía nada en la práctica: el foco nunca salía de
+/// verdad de la app activa, así que nunca volvía tampoco, y Photoshop
+/// no se enteraba de nada.
 ///
-/// Sin efecto si el listener no está corriendo (no debería pasar:
-/// back_portapapeles.rs lo asegura antes de habilitar el pegado) o si
-/// no se pudo determinar la ventana que tenía el foco — en ese caso
-/// simplemente no se fuerza la relectura, el resto de pegar() sigue
-/// igual.
+/// Ahora se usa como blanco la propia ventana FLOTANTE de Portapapeles
+/// que está abierta (la que el usuario clickeó) — una ventana real,
+/// no mensaje-only. Tiene WS_EX_NOACTIVATE puesto (no debe robarle el
+/// foco a la app activa al abrirse ni al clickear un elemento), pero
+/// ese estilo solo bloquea la activación AUTOMÁTICA; un
+/// SetForegroundWindow() explícito sí puede activarla (documentado
+/// por Microsoft, y ya usado en la práctica por enfocar_para_edicion()
+/// más abajo para los popups de Renombrar/Editar). Se sigue usando
+/// back_app::forzar_foco() (AttachThreadInput + ALT simulado) para
+/// las dos mitades del robo/devolución, por las dudas de que la
+/// protección anti robo-de-foco normal también esté en juego.
+///
+/// Sin efecto si no hay ninguna ventana de Portapapeles abierta (no
+/// debería pasar: forzar_relectura_portapapeles() solo se llama desde
+/// pegar(), que a su vez solo se dispara clickeando un elemento
+/// DENTRO de una de esas ventanas) o si no se pudo determinar la
+/// ventana que tenía el foco — en esos casos simplemente no se fuerza
+/// la relectura, el resto de pegar() sigue igual.
 fn forzar_relectura_portapapeles() {
-    use windows_sys::Win32::Foundation::HWND;
-    use windows_sys::Win32::UI::WindowsAndMessaging::{GetForegroundWindow, SetForegroundWindow};
+    use windows_sys::Win32::UI::WindowsAndMessaging::GetForegroundWindow;
 
-    let Some(hwnd_listener) = back_portapapeles_captura::hwnd_listener() else {
-        println!("📋 [diag] forzar_relectura_portapapeles: listener no está corriendo, se omite");
+    let Some(hwnd_propio) = hwnd_de_alguna_ventana_abierta() else {
+        println!(
+            "📋 [diag] forzar_relectura_portapapeles: ninguna ventana de Portapapeles abierta, se omite"
+        );
         return;
     };
 
-    let hwnd_listener = hwnd_listener as HWND;
+    let hwnd_original = unsafe { GetForegroundWindow() };
 
-    unsafe {
-        let hwnd_original = GetForegroundWindow();
-
-        if hwnd_original.is_null() {
-            println!("📋 [diag] forzar_relectura_portapapeles: no hay ventana con foco, se omite");
-            return;
-        }
-
-        SetForegroundWindow(hwnd_listener);
-        SetForegroundWindow(hwnd_original);
+    if hwnd_original.is_null() {
+        println!("📋 [diag] forzar_relectura_portapapeles: no hay ventana con foco, se omite");
+        return;
     }
 
-    println!("📋 [diag] forzar_relectura_portapapeles: foco robado y devuelto");
+    let ok = crate::back_app::robar_y_devolver_foco(hwnd_propio, hwnd_original);
+
+    println!(
+        "📋 [diag] forzar_relectura_portapapeles: robo+devolución de foco ok={}",
+        ok
+    );
+}
+
+/// HWND real (Win32) de cualquiera de las ventanas flotantes de
+/// Portapapeles que estén abiertas ahora mismo — no importa cuál,
+/// solo hace falta UNA ventana real (no mensaje-only) para poder
+/// robarle el foco un instante. Mismo mecanismo de extracción del
+/// HWND que ya usan desactivar_activacion()/permitir_activacion() más
+/// abajo (raw_window_handle sobre el WebviewWindow de Tauri).
+fn hwnd_de_alguna_ventana_abierta() -> Option<windows_sys::Win32::Foundation::HWND> {
+    use raw_window_handle::{HasWindowHandle, RawWindowHandle};
+
+    let app = app_handle()?;
+    let id = con_ventanas(|mapa| mapa.keys().next().cloned())?;
+    let ventana = app.get_webview_window(&label_de(&id))?;
+    let handle = ventana.window_handle().ok()?;
+
+    let RawWindowHandle::Win32(win32) = handle.as_raw() else {
+        return None;
+    };
+
+    Some(win32.hwnd.get() as windows_sys::Win32::Foundation::HWND)
 }
 
 fn contenido_desde_archivo(ruta: &Path) -> Result<ContenidoPortapapeles, String> {

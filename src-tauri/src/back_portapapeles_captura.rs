@@ -574,11 +574,19 @@ static HWND_ACTUAL: Mutex<Option<isize>> = Mutex::new(None);
 const NOMBRE_CLASE: &str = "RemapHPortapapelesListener";
 
 /// Handle (como isize crudo) de la ventana oculta del listener de
-/// Portapapeles, si está corriendo. Usado por back_portapapeles.rs
-/// para robarle el foco un instante a la ventana activa y devolvérselo
-/// (ver forzar_relectura_portapapeles() ahí) — algunas apps (Photoshop
-/// confirmado) solo re-consultan el portapapeles al recuperar el foco,
-/// no ante WM_CLIPBOARDUPDATE por sí solo.
+/// Portapapeles, si está corriendo.
+///
+/// YA NO SE USA para robar el foco: back_portapapeles.rs::
+/// forzar_relectura_portapapeles() lo intentó primero con este HWND,
+/// pero al ser una ventana "mensaje-only" (HWND_MESSAGE) nunca puede
+/// convertirse en primer plano — limitación estructural de ese tipo
+/// de ventana, no arreglable con AttachThreadInput ni ningún truco de
+/// foco. Se cambió a usar el HWND de la ventana flotante de
+/// Portapapeles que esté abierta (ver hwnd_de_alguna_ventana_abierta()
+/// en back_portapapeles.rs), que sí es una ventana real. DEJADA SIN
+/// BORRAR a modo de referencia/rollback, mismo criterio que
+/// simular_ctrl_v() en back_portapapeles.rs.
+#[allow(dead_code)]
 pub fn hwnd_listener() -> Option<isize> {
     *HWND_ACTUAL.lock().unwrap()
 }

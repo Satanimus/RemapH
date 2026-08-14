@@ -954,6 +954,51 @@ pub fn forzar_foco(hwnd: HWND) -> bool {
 }
 
 // ======================================================
+// 🔁 ROBAR Y DEVOLVER FOCO (sin Alt)
+// ------------------------------------------------------
+// Pensada para "robar el foco un instante y devolverlo ya" (Portapapeles),
+// a diferencia de forzar_foco() que es "dame el foco y quedate ahí"
+// (Abrir Archivo/App). NO simula Alt: alcanza con AttachThreadInput,
+// porque acá el hilo que llama se pega justo al hilo de la app que
+// YA tiene el foco real en este instante (la app a la que el usuario
+// le va a pegar el contenido) — ese es el caso ideal para que
+// SetForegroundWindow funcione sin necesitar el refuerzo de Alt.
+// Evitar Alt evita efectos secundarios reales en la app de destino
+// (confirmado: en Paint togglea el modo de mnemónicos de menú, en
+// Firefox abre/tiembla la barra de menú superior).
+// ======================================================
+
+pub fn robar_y_devolver_foco(hwnd_temporal: HWND, hwnd_original: HWND) -> bool {
+    unsafe {
+        if hwnd_original.is_null() || hwnd_temporal.is_null() {
+            return false;
+        }
+
+        let hilo_actual = GetCurrentThreadId();
+
+        let mut pid_original = 0u32;
+
+        let hilo_de_ventana_original = GetWindowThreadProcessId(hwnd_original, &mut pid_original);
+
+        // Ya somos el dueño del foco (caso raro acá) — no hace falta
+        // pegar/despegar hilos.
+        if hilo_de_ventana_original == hilo_actual {
+            SetForegroundWindow(hwnd_temporal);
+            return SetForegroundWindow(hwnd_original) != 0;
+        }
+
+        AttachThreadInput(hilo_actual, hilo_de_ventana_original, 1);
+
+        SetForegroundWindow(hwnd_temporal);
+        let resultado = SetForegroundWindow(hwnd_original) != 0;
+
+        AttachThreadInput(hilo_actual, hilo_de_ventana_original, 0);
+
+        resultado
+    }
+}
+
+// ======================================================
 // 🔑 SIMULAR PULSACIÓN DE ALT (refuerzo de forzar_foco)
 // ------------------------------------------------------
 // keybd_event (en vez de SendInput) alcanza para este propósito
