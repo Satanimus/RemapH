@@ -4,7 +4,7 @@
 // ETAPA 1 DEL FLUJO
 // ------------------------------------------------------
 // 1. ¿Qué hace este archivo?
-// Recibe información proveniente del backend de captura y del módulo instante, y la estructura en un formato estándar
+// Recibe información proveniente del backend de captura y la estructura en un formato estándar
 // (InputEvent) que será utilizado por todo el motor.
 // Los constructores permiten instanciar fácilmente estos formatos.
 // Aquí todavía NO existe el concepto de trigger. Sólo existen eventos físicos.
@@ -16,14 +16,12 @@
 // ------------------------------------------------------
 // 3. ¿Qué información recibe?
 // Construye un InputEvent a partir de información proporcionada por el backend de captura.
-// El Instante ya viene generado por el backend mediante instante::ahora().
 // Eventos físicos:
-// InputId / Estado (Down / Up / Pulse) / Instante
+// InputId / Estado (Down / Up / Pulse)
 //
 // Ejemplo:
 // keyboard:A
 // Down
-// 105263 ms
 // ------------------------------------------------------
 // 4. ¿Qué información entrega?
 // InputEvent
@@ -31,7 +29,6 @@
 // InputEvent {
 //     input: keyboard:A,
 //     state: Down,
-//     instante: 105263,
 // }
 // ------------------------------------------------------
 // 5. Funciones del archivo
@@ -62,17 +59,10 @@
 //     ↓
 // InputEvent {
 //     input: keyboard:A,
-//     state: Down,
-//     instante: 105263,}
+//     state: Down,}
 // ======================================================
 use serde::{Deserialize, Serialize};
 use std::hash::Hash;
-
-// ======================================================
-// ⏱️ INSTANTE
-// ======================================================
-
-pub type Instante = u64;
 
 // ======================================================
 // 🆔 IDENTIDAD DE INPUT
@@ -146,8 +136,6 @@ pub struct InputEvent {
 
     pub state: InputState,
 
-    pub instante: Instante,
-
     // Magnitud física real del evento (hoy solo la rueda del
     // mouse la usa — cuántas "muescas" trae un Stroke). None
     // para cualquier evento que no la necesite (teclado,
@@ -167,13 +155,11 @@ impl InputEvent {
     // ==================================================
 
     #[inline]
-    pub fn down(input: InputId, instante: Instante) -> Self {
+    pub fn down(input: InputId) -> Self {
         Self {
             input,
 
             state: InputState::Down,
-
-            instante,
 
             magnitud: None,
         }
@@ -184,13 +170,11 @@ impl InputEvent {
     // ==================================================
 
     #[inline]
-    pub fn up(input: InputId, instante: Instante) -> Self {
+    pub fn up(input: InputId) -> Self {
         Self {
             input,
 
             state: InputState::Up,
-
-            instante,
 
             magnitud: None,
         }
@@ -201,13 +185,11 @@ impl InputEvent {
     // ==================================================
 
     #[inline]
-    pub fn pulse(input: InputId, instante: Instante) -> Self {
+    pub fn pulse(input: InputId) -> Self {
         Self {
             input,
 
             state: InputState::Pulse,
-
-            instante,
 
             magnitud: None,
         }
@@ -218,13 +200,11 @@ impl InputEvent {
     // ==================================================
 
     #[inline]
-    pub fn pulse_con_magnitud(input: InputId, instante: Instante, magnitud: i16) -> Self {
+    pub fn pulse_con_magnitud(input: InputId, magnitud: i16) -> Self {
         Self {
             input,
 
             state: InputState::Pulse,
-
-            instante,
 
             magnitud: Some(magnitud),
         }

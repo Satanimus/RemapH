@@ -64,7 +64,6 @@
 // ======================================================
 
 use crate::eventos::{InputEvent, InputId};
-use crate::instante::ahora;
 use crate::pulsadores;
 use interception::MouseFilter;
 
@@ -103,13 +102,13 @@ pub fn convertir(state: MouseFilter, rolling: i16) -> Option<InputEvent> {
 
     if rolling > 0 {
         return construir("WheelUp", |input| {
-            InputEvent::pulse_con_magnitud(input, ahora(), rolling)
+            InputEvent::pulse_con_magnitud(input, rolling)
         });
     }
 
     if rolling < 0 {
         return construir("WheelDown", |input| {
-            InputEvent::pulse_con_magnitud(input, ahora(), rolling)
+            InputEvent::pulse_con_magnitud(input, rolling)
         });
     }
 
@@ -118,43 +117,43 @@ pub fn convertir(state: MouseFilter, rolling: i16) -> Option<InputEvent> {
     // ----------------------------------------------
 
     if state.contains(MouseFilter::LEFT_BUTTON_DOWN) {
-        return construir("LeftButton", |input| InputEvent::down(input, ahora()));
+        return construir("LeftButton", InputEvent::down);
     }
 
     if state.contains(MouseFilter::LEFT_BUTTON_UP) {
-        return construir("LeftButton", |input| InputEvent::up(input, ahora()));
+        return construir("LeftButton", InputEvent::up);
     }
 
     if state.contains(MouseFilter::RIGHT_BUTTON_DOWN) {
-        return construir("RightButton", |input| InputEvent::down(input, ahora()));
+        return construir("RightButton", InputEvent::down);
     }
 
     if state.contains(MouseFilter::RIGHT_BUTTON_UP) {
-        return construir("RightButton", |input| InputEvent::up(input, ahora()));
+        return construir("RightButton", InputEvent::up);
     }
 
     if state.contains(MouseFilter::MIDDLE_BUTTON_DOWN) {
-        return construir("MiddleButton", |input| InputEvent::down(input, ahora()));
+        return construir("MiddleButton", InputEvent::down);
     }
 
     if state.contains(MouseFilter::MIDDLE_BUTTON_UP) {
-        return construir("MiddleButton", |input| InputEvent::up(input, ahora()));
+        return construir("MiddleButton", InputEvent::up);
     }
 
     if state.contains(MouseFilter::BUTTON_4_DOWN) {
-        return construir("Button4", |input| InputEvent::down(input, ahora()));
+        return construir("Button4", InputEvent::down);
     }
 
     if state.contains(MouseFilter::BUTTON_4_UP) {
-        return construir("Button4", |input| InputEvent::up(input, ahora()));
+        return construir("Button4", InputEvent::up);
     }
 
     if state.contains(MouseFilter::BUTTON_5_DOWN) {
-        return construir("Button5", |input| InputEvent::down(input, ahora()));
+        return construir("Button5", InputEvent::down);
     }
 
     if state.contains(MouseFilter::BUTTON_5_UP) {
-        return construir("Button5", |input| InputEvent::up(input, ahora()));
+        return construir("Button5", InputEvent::up);
     }
 
     // ----------------------------------------------

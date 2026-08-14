@@ -23,7 +23,6 @@ mod compilador;
 mod config;
 mod entrada;
 mod eventos;
-mod instante;
 mod perfil;
 mod perfil_cache;
 mod perfil_json;

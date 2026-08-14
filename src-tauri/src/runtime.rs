@@ -1096,7 +1096,7 @@ fn mostrar_ui(valor: String) {
 // ======================================================
 
 fn emitir(input: InputId) {
-    let evento = crate::eventos::InputEvent::pulse(input, crate::instante::ahora());
+    let evento = crate::eventos::InputEvent::pulse(input);
 
     emitir_evento(evento);
 }
@@ -1253,13 +1253,13 @@ fn emitir_combo_arriba(inputs: &[InputId]) {
 }
 
 fn emitir_down_input(input: InputId) {
-    let evento = crate::eventos::InputEvent::down(input, crate::instante::ahora());
+    let evento = crate::eventos::InputEvent::down(input);
 
     emitir_evento(evento);
 }
 
 fn emitir_up_input(input: InputId) {
-    let evento = crate::eventos::InputEvent::up(input, crate::instante::ahora());
+    let evento = crate::eventos::InputEvent::up(input);
 
     emitir_evento(evento);
 }
@@ -1791,7 +1791,7 @@ fn ejecutar_down(identificador: &str) {
         return;
     };
 
-    let evento = crate::eventos::InputEvent::down(input, crate::instante::ahora());
+    let evento = crate::eventos::InputEvent::down(input);
 
     emitir_evento(evento);
 }
@@ -1805,7 +1805,7 @@ fn ejecutar_up(identificador: &str) {
         return;
     };
 
-    let evento = crate::eventos::InputEvent::up(input, crate::instante::ahora());
+    let evento = crate::eventos::InputEvent::up(input);
 
     emitir_evento(evento);
 }

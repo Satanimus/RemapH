@@ -84,7 +84,6 @@
 // ======================================================
 
 use crate::eventos::{InputEvent, InputId};
-use crate::instante;
 use crate::pulsadores;
 use interception::ScanCode;
 
@@ -291,9 +290,9 @@ pub fn convertir(code: ScanCode, es_extendida: bool, presionado: bool) -> Option
     let input = InputId::new("keyboard", interno);
 
     Some(if presionado {
-        InputEvent::down(input, instante::ahora())
+        InputEvent::down(input)
     } else {
-        InputEvent::up(input, instante::ahora())
+        InputEvent::up(input)
     })
 }
 
