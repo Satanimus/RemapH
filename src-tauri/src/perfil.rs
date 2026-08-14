@@ -355,6 +355,19 @@ pub fn seleccionar_perfil(nombre: String) -> Result<ResultadoPerfil, String> {
 
     let perfil = cargar_desde_disco(&ruta)?;
 
+    // usuario::perfil_actual() decide cuál es "el perfil actual" mirando
+    // qué archivo .json fue modificado más recientemente en disco — no
+    // hay ningún otro estado que lo registre. Si acá solo leyéramos el
+    // archivo sin re-escribirlo, su fecha de modificación no cambiaría
+    // y el perfil recién seleccionado NO pasaría a ser "el actual": el
+    // sistema seguiría apuntando al perfil anterior (el último que sí
+    // se guardó). Eso es lo que causaba que, tras cambiar de perfil en
+    // el listado, "Renombrar" (y guardar_perfil, eliminar, etc., que
+    // también dependen de usuario::perfil_actual()) siguiera operando
+    // sobre el perfil viejo. Re-guardamos el mismo contenido para
+    // "tocar" el archivo y que su mtime quede al día.
+    guardar_en_disco(&perfil, &ruta)?;
+
     let resultado = compilador::compilar(&perfil);
 
     resultado_perfil(perfil, nombre, Some(resultado.advertencias))
