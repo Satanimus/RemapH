@@ -12,6 +12,7 @@ import {
 } from "../../core/core_perfil_acciones";
 import type { FilaPerfil } from "../../core/core_perfil";
 import { crearEntrada } from "../../core/core_entrada";
+import { crearTrigger } from "../../core/core_trigger";
 import { reconstruirFila } from "../ui_tabla_control";
 import { reconstruirTabla } from "../ui_tabla_control";
 import { activarModoMover } from "../ui_tabla_control";
@@ -345,38 +346,83 @@ export function abrirPopupExtra(
   });
 }
 
+// ======================================================
+// ➕ POPUP MODIFICADOR (botón "+" del capturador)
+// ------------------------------------------------------
+// No usa abrirLista() porque "Eliminar Captura" necesita su propio
+// estilo (rojo, ver .popup-perfil-eliminar) distinto del resto de
+// las opciones — mismo motivo que abrirPopupNumero más abajo.
+// ======================================================
+
 export function abrirPopupModificador(
   evento: MouseEvent,
   contexto: ContextoFila,
   filaPerfil: FilaPerfil,
   destino: "Trigger" | "Accion" = "Trigger",
 ): void {
-  abrirLista(evento, ["Win +"], (texto) => {
-    const entrada = crearModificador(texto);
+  const lista = document.createElement("div");
 
-    if (!entrada) {
-      return;
-    }
+  lista.className = "popup-lista";
+
+  // ----------------------------------
+  // ➕ WIN +
+  // ----------------------------------
+
+  const botonWin = document.createElement("button");
+
+  botonWin.className = "ui-btn";
+  botonWin.textContent = "Win +";
+
+  botonWin.addEventListener("click", () => {
+    const entrada = crearModificador("Win +");
 
     const trigger =
       destino === "Trigger" ? filaPerfil.trigger : filaPerfil.accion;
 
-    if (!trigger) {
-      return;
+    if (entrada && trigger) {
+      const existe = trigger.modificadores.some(
+        (modificador) => modificador.codigo === entrada.codigo,
+      );
+
+      if (!existe) {
+        trigger.modificadores.unshift(entrada);
+
+        reconstruirFila(contexto.id);
+      }
     }
 
-    const existe = trigger.modificadores.some(
-      (modificador) => modificador.codigo === entrada.codigo,
-    );
+    ocultarPopup();
+  });
 
-    if (existe) {
-      return;
+  // ----------------------------------
+  // 🗑️ ELIMINAR CAPTURA
+  // ------------------------------------------------
+  // Borra el Trigger/Acción ya capturado en esta fila y el botón
+  // grande vuelve a "🚩 Capturar". Simple, sin doble confirmación
+  // (a diferencia de "Eliminar" fila/perfil) — acá se pierde solo
+  // esta captura puntual, no toda la fila.
+  // ------------------------------------------------
+
+  const botonEliminar = document.createElement("button");
+
+  botonEliminar.className = "ui-btn popup-perfil-eliminar";
+  botonEliminar.textContent = "Eliminar Captura";
+
+  botonEliminar.addEventListener("click", () => {
+    if (destino === "Trigger") {
+      filaPerfil.trigger = crearTrigger();
+    } else {
+      filaPerfil.accion = null;
     }
-
-    trigger.modificadores.unshift(entrada);
 
     reconstruirFila(contexto.id);
+
+    ocultarPopup();
   });
+
+  lista.append(botonWin, botonEliminar);
+
+  mostrarPopup(lista, evento.clientX, evento.clientY);
 }
 
 function crearModificador(texto: string) {
