@@ -1314,10 +1314,15 @@ pub fn pegar(ruta: &Path) -> Result<(), String> {
 /// ese estilo solo bloquea la activación AUTOMÁTICA; un
 /// SetForegroundWindow() explícito sí puede activarla (documentado
 /// por Microsoft, y ya usado en la práctica por enfocar_para_edicion()
-/// más abajo para los popups de Renombrar/Editar). Se sigue usando
-/// back_app::forzar_foco() (AttachThreadInput + ALT simulado) para
-/// las dos mitades del robo/devolución, por las dudas de que la
-/// protección anti robo-de-foco normal también esté en juego.
+/// más abajo para los popups de Renombrar/Editar).
+///
+/// Robo y devolución van los dos en UNA sola llamada a
+/// back_app::robar_y_devolver_foco() (un solo AttachThreadInput, un
+/// solo refuerzo de Shift — no Alt) en vez de dos llamadas separadas
+/// a forzar_foco(): ver el comentario largo ahí para el porqué (Alt
+/// duplicado tenía efectos secundarios reales: togglea el modo de
+/// mnemónicos de menú en apps clásicas como Paint, y revela la barra
+/// de menú superior en Firefox).
 ///
 /// Sin efecto si no hay ninguna ventana de Portapapeles abierta (no
 /// debería pasar: forzar_relectura_portapapeles() solo se llama desde

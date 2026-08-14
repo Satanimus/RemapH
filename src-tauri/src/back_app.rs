@@ -459,7 +459,9 @@ use crate::perfil_cache::{AppCache, IniciarVentana};
 use windows_sys::Win32::Foundation::HWND;
 use windows_sys::Win32::System::Threading::{AttachThreadInput, GetCurrentThreadId};
 use windows_sys::Win32::UI::Accessibility::{SetWinEventHook, HWINEVENTHOOK};
-use windows_sys::Win32::UI::Input::KeyboardAndMouse::{keybd_event, KEYEVENTF_KEYUP, VK_MENU};
+use windows_sys::Win32::UI::Input::KeyboardAndMouse::{
+    keybd_event, KEYEVENTF_KEYUP, VK_MENU, VK_SHIFT,
+};
 use windows_sys::Win32::UI::WindowsAndMessaging::{
     DispatchMessageW, EnumWindows, GetMessageW, GetWindow, GetWindowLongPtrW, GetWindowTextW,
     IsIconic, IsWindowVisible, IsZoomed, SetForegroundWindow, ShowWindow, TranslateMessage,
@@ -954,18 +956,29 @@ pub fn forzar_foco(hwnd: HWND) -> bool {
 }
 
 // ======================================================
-// 🔁 ROBAR Y DEVOLVER FOCO (sin Alt)
+// 🔁 ROBAR Y DEVOLVER FOCO (una sola pulsación de Shift, no Alt)
 // ------------------------------------------------------
-// Pensada para "robar el foco un instante y devolverlo ya" (Portapapeles),
-// a diferencia de forzar_foco() que es "dame el foco y quedate ahí"
-// (Abrir Archivo/App). NO simula Alt: alcanza con AttachThreadInput,
-// porque acá el hilo que llama se pega justo al hilo de la app que
-// YA tiene el foco real en este instante (la app a la que el usuario
-// le va a pegar el contenido) — ese es el caso ideal para que
-// SetForegroundWindow funcione sin necesitar el refuerzo de Alt.
-// Evitar Alt evita efectos secundarios reales en la app de destino
-// (confirmado: en Paint togglea el modo de mnemónicos de menú, en
-// Firefox abre/tiembla la barra de menú superior).
+// Pensada para "robar el foco un instante y devolverlo ya" (usado por
+// Portapapeles), a diferencia de forzar_foco() que es "dame el foco a
+// esta ventana y quedate ahí" (Abrir Archivo/App). Se probó primero
+// sin ningún refuerzo (solo AttachThreadInput) — no alcanzó para que
+// Photoshop realmente reciba el ciclo de desactivar/reactivar (mismo
+// motivo por el que forzar_foco() necesita el refuerzo de Alt: ver
+// comentario ahí, "AttachThreadInput solo no siempre alcanza"). Se
+// probó después con el mismo refuerzo de Alt que forzar_foco(), pero
+// llamado dos veces seguidas (una para robar, otra para devolver) —
+// eso mandaba DOS pulsaciones de Alt reales e independientes, que no
+// siempre caían sobre la misma ventana ni se cancelaban entre sí:
+// togglea el modo de mnemónicos de menú en apps clásicas (confirmado
+// en Paint) y revela la barra de menú superior en Firefox.
+//
+// Acá se resuelven los dos problemas a la vez: un solo
+// AttachThreadInput (robar y devolver sin soltar el hilo en el medio,
+// así como mucho se manda una sola tecla de refuerzo por pegado, no
+// dos) y esa tecla es Shift en vez de Alt — Shift solo, sin ninguna
+// otra tecla, no tiene ningún atajo ni toggle conocido a nivel de
+// Windows ni en apps comunes (a diferencia de Alt, que universalmente
+// abre el modo de menú por teclado en apps clásicas).
 // ======================================================
 
 pub fn robar_y_devolver_foco(hwnd_temporal: HWND, hwnd_original: HWND) -> bool {
@@ -981,13 +994,16 @@ pub fn robar_y_devolver_foco(hwnd_temporal: HWND, hwnd_original: HWND) -> bool {
         let hilo_de_ventana_original = GetWindowThreadProcessId(hwnd_original, &mut pid_original);
 
         // Ya somos el dueño del foco (caso raro acá) — no hace falta
-        // pegar/despegar hilos.
+        // pegar/despegar hilos ni ningún refuerzo.
         if hilo_de_ventana_original == hilo_actual {
             SetForegroundWindow(hwnd_temporal);
             return SetForegroundWindow(hwnd_original) != 0;
         }
 
         AttachThreadInput(hilo_actual, hilo_de_ventana_original, 1);
+
+        keybd_event(VK_SHIFT as u8, 0, 0, 0);
+        keybd_event(VK_SHIFT as u8, 0, KEYEVENTF_KEYUP, 0);
 
         SetForegroundWindow(hwnd_temporal);
         let resultado = SetForegroundWindow(hwnd_original) != 0;
