@@ -251,30 +251,39 @@
 // abrir_archivo(ruta, iniciar, instancias, abrir_con, argumento)
 //     En su propio hilo: si Instancias es Única, intenta encontrar
 //     una ventana ya abierta antes de lanzar nada nuevo — carpeta vía
-//     back_app::enfocar_carpeta() (proceso explorer.exe + título),
-//     cualquier otro caso con proceso objetivo conocido (.exe directo,
-//     abrir_con, o el programa predeterminado de la extensión resuelto
-//     por back_registro) vía back_app::enfocar_proceso(); ambas hacen
-//     TOGGLE minimizar/restaurar si la encuentran. Si no encuentra
-//     nada (o Instancias es Múltiple), arma el comando según el tipo
-//     de ítem (.exe: ejecuta con argumento; .lnk: abre el acceso
-//     directo; carpeta: fuerza explorer.exe nuevo; abrir_con: el
-//     programa elegido; documento sin abrir_con: el programa
-//     predeterminado de la extensión resuelto por back_registro,
-//     lanzado directo — evita depender del "open" de Windows, que
-//     puede reusar una instancia ya corriendo e ignorar Instancias/el
-//     modo de ventana) y lo lanza con el modo de ventana de iniciar.
-//     Si iniciar no es Minimizado, además busca la ventana NUEVA que
-//     apareció tras lanzar (comparando contra un snapshot tomado
-//     antes — ver back_app::buscar_ventana_nueva, con reintentos
-//     cortos; el PID recién lanzado no siempre existe, ej. carpeta) y
-//     le fuerza el foco con back_app::forzar_foco (AttachThreadInput +
-//     SetForegroundWindow).
-//     LÍMITE CONOCIDO: apps de instancia única por diseño propio
-//     (ej. el Notepad moderno de Windows 11, la app Fotos) pueden
-//     seguir enrutando la apertura a la ventana ya abierta pase lo
-//     que pase acá — no hay forma de forzar una ventana/proceso
-//     realmente nuevo desde afuera en esos casos.
+//     back_app::enfocar_carpeta() (proceso explorer.exe + título);
+//     .exe directo vía back_app::enfocar_proceso() (solo proceso, no
+//     hay archivo que matchear en el título); cualquier documento
+//     (propio o vía abrir_con) vía back_app::enfocar_documento()
+//     (proceso objetivo conocido — .exe directo, abrir_con, el
+//     programa predeterminado de la extensión resuelto por
+//     back_registro, o el mapeo de apps UWP conocidas de
+//     proceso_uwp_conocido() — Y título de la ventana conteniendo el
+//     nombre de ESE archivo puntual, para no confundirlo con otro
+//     archivo ya abierto en el mismo programa). Las tres hacen TOGGLE
+//     minimizar/restaurar si la encuentran. Si no encuentra nada (o
+//     Instancias es Múltiple), arma el comando según el tipo de ítem
+//     (.exe: ejecuta con argumento; .lnk: abre el acceso directo;
+//     carpeta: fuerza explorer.exe nuevo; abrir_con: el programa
+//     elegido; documento sin abrir_con: el programa predeterminado de
+//     la extensión resuelto por back_registro, lanzado directo — evita
+//     depender del "open" de Windows, que puede reusar una instancia
+//     ya corriendo e ignorar Instancias/el modo de ventana) y lo lanza
+//     con el modo de ventana de iniciar. Siempre busca después la
+//     ventana NUEVA que apareció tras lanzar (comparando contra un
+//     snapshot tomado antes — ver back_app::buscar_ventana_nueva, con
+//     reintentos cortos; el PID recién lanzado no siempre existe, ej.
+//     carpeta) y le reafirma el modo pedido con
+//     back_app::reafirmar_modo_ventana() — no solo el foco: también el
+//     tamaño/estado de ventana, para las apps que ignoran el nShow que
+//     se les pasó y se muestran igual una vez que cargan.
+//     LÍMITE CONOCIDO: apps de instancia única por diseño propio (ej.
+//     el Notepad moderno de Windows 11, la app Fotos) pueden seguir
+//     enrutando la apertura a la ventana ya abierta pase lo que pase
+//     acá — no hay forma de forzar una ventana/proceso realmente nuevo
+//     desde afuera en esos casos, y por lo tanto tampoco de reafirmar
+//     el modo de ventana sobre esa reutilización (reafirmar_modo_ventana
+//     solo actúa sobre una ventana nueva).
 // mostrar_ui()
 //     Sin implementar todavía (fuera de esta sesión de
 //     trabajo) — queda como punto de entrada ya conectado.
@@ -708,18 +717,24 @@ fn ejecutar_click_coordenada(
 // es de una sola vez, no hay Extra ni loop que Detener a mitad de
 // camino.
 //
-// "Única": el proceso objetivo se conoce de antemano en tres casos —
-// ruta es un .exe (objetivo = su propio nombre de archivo), hay
+// "Única": el proceso objetivo se conoce de antemano en varios casos
+// — ruta es un .exe (objetivo = su propio nombre de archivo), hay
 // abrir_con (objetivo = el nombre de archivo del programa
-// alternativo), o es un documento sin abrir_con (objetivo = el
-// programa predeterminado de la extensión, resuelto por
+// alternativo), es un documento sin abrir_con (objetivo = el programa
+// predeterminado de la extensión, resuelto por
 // back_registro::programa_predeterminado() — mismo programa que
-// abrir_archivo() va a lanzar más abajo si no encuentra nada). Para
-// esos tres casos se usa back_app::enfocar_proceso(), que SÍ sigue
-// siendo por nombre de proceso (no por PID): a diferencia del
-// forzado de primer plano de más abajo, acá se está buscando un
-// proceso que puede llevar rato corriendo, no uno que se acaba de
-// lanzar.
+// abrir_archivo() va a lanzar más abajo si no encuentra nada), o cae
+// al mapeo de apps UWP conocidas (proceso_uwp_conocido(), ej. la app
+// Fotos para imágenes — mitigación del BUG 4, ver su comentario). Para
+// .exe directo se usa back_app::enfocar_proceso() (solo nombre de
+// proceso, no por PID: a diferencia del forzado de primer plano de
+// más abajo, acá se busca un proceso que puede llevar rato corriendo,
+// no uno que se acaba de lanzar). Para cualquier documento (con o sin
+// abrir_con) se usa back_app::enfocar_documento(): además del nombre
+// de proceso, exige que el TÍTULO de la ventana contenga el nombre de
+// ESTE archivo puntual (ver BUG 6 más abajo) — sin eso, con el mismo
+// programa ya abierto en OTRO archivo, se le hacía toggle a ese otro
+// archivo y nunca se llegaba a abrir el pedido.
 //
 // Para .lnk (puede apuntar a cualquier destino, sin resolver por
 // ahora) Única no tiene efecto y siempre se lanza de nuevo.
@@ -728,35 +743,38 @@ fn ejecutar_click_coordenada(
 // antemano (siempre "explorer.exe"), matchear solo por nombre de
 // proceso traería la primera ventana de Explorer que encuentre —
 // podría ser la de OTRA carpeta ya abierta, no la que se pidió. Por
-// eso usa back_app::enfocar_carpeta() en vez de enfocar_proceso():
-// combina proceso == explorer.exe con el título de la ventana
-// conteniendo el nombre de la carpeta (heurístico).
+// eso usa back_app::enfocar_carpeta() (mismo mecanismo de título que
+// enfocar_documento, especializado a "explorer.exe" + nombre de
+// carpeta).
 //
-// PRIMER PLANO: se lanza con ShellExecuteExW en vez de ShellExecuteW
-// para obtener el HANDLE del proceso creado (SEE_MASK_NOCLOSEPROCESS)
-// y de ahí su PID cuando lo hay. Ese PID NO siempre existe: un
-// documento cuyo programa asociado ya estaba abierto puede recibir
-// la apertura por DDE (hProcess llega nulo, sin proceso nuevo). Por
-// eso el forzado de foco no depende solo del PID: se toma un
-// snapshot de ventanas visibles ANTES de lanzar
-// (back_app::listar_ventanas_visibles) y después se busca la ventana
-// NUEVA que apareció (back_app::buscar_ventana_nueva — prioriza el
-// PID si lo hay, si no cae a "la primera ventana nueva que sea"),
-// forzándole el foco con AttachThreadInput (back_app::forzar_foco),
+// PRIMER PLANO / MODO DE VENTANA: se lanza con ShellExecuteExW en vez
+// de ShellExecuteW para obtener el HANDLE del proceso creado
+// (SEE_MASK_NOCLOSEPROCESS) y de ahí su PID cuando lo hay. Ese PID NO
+// siempre existe: un documento cuyo programa asociado ya estaba
+// abierto puede recibir la apertura por DDE (hProcess llega nulo, sin
+// proceso nuevo). Por eso el reforzado de después no depende solo del
+// PID: se toma un snapshot de ventanas visibles ANTES de lanzar
+// (back_app::listar_ventanas_visibles, siempre — también con
+// Minimizado, ver BUG 7/8) y después se busca la ventana NUEVA que
+// apareció (back_app::buscar_ventana_nueva — prioriza el PID si lo
+// hay, si no cae a "la primera ventana nueva que sea"), reafirmándole
+// el modo de ventana pedido con back_app::reafirmar_modo_ventana()
+// (no solo el foco — también Minimizar/Maximizar explícito, para las
+// apps que ignoran el nShow que se les pasó). El foco en sí usa
+// AttachThreadInput + un toque de ALT simulado (back_app::forzar_foco),
 // que sí tiene efecto garantizado a diferencia de un
 // SetForegroundWindow suelto (Windows bloquea el robo de foco de
-// ventanas recién creadas si el hilo que lo pide no está "pegado" al
-// hilo en foco actual). CARPETA es un caso aparte (ver el `if
-// Path::new(&ruta).is_dir()` de abajo): ShellExecuteExW "open" sobre
-// una ruta de carpeta reusa la ventana de Explorer que ya esté
-// corriendo (misma negociación por DDE que un doble clic normal) en
-// vez de crear una nueva — ni PID ni ventana nueva garantizados, el
-// snapshot-diff de arriba no tiene nada que detectar. Por eso ahí se
-// lanza "explorer.exe" como programa con la ruta de parámetro en vez
-// del verbo "open" directo: fuerza proceso y ventana genuinamente
-// nuevos, mismo camino confiable que ya funciona para .exe/abrir_con.
-// Con Minimizado no se fuerza nada: no tendría sentido traer al
-// frente una ventana que se pidió minimizada.
+// ventanas recién creadas o ya visibles en 2º plano si el hilo que lo
+// pide no está "pegado" al hilo en foco actual). CARPETA es un caso
+// aparte (ver el `if Path::new(&ruta).is_dir()` de abajo):
+// ShellExecuteExW "open" sobre una ruta de carpeta reusa la ventana de
+// Explorer que ya esté corriendo (misma negociación por DDE que un
+// doble clic normal) en vez de crear una nueva — ni PID ni ventana
+// nueva garantizados, el snapshot-diff de arriba no tiene nada que
+// detectar. Por eso ahí se lanza "explorer.exe" como programa con la
+// ruta de parámetro en vez del verbo "open" directo: fuerza proceso y
+// ventana genuinamente nuevos, mismo camino confiable que ya funciona
+// para .exe/abrir_con.
 // ======================================================
 
 fn abrir_archivo(
@@ -766,6 +784,12 @@ fn abrir_archivo(
     abrir_con: Option<String>,
     argumento: String,
 ) {
+    // Calculado antes del hilo: instancias == Única lo necesita para
+    // decidir la rama de matching (.exe / documento / carpeta), y la
+    // rama de lanzamiento más abajo también lo necesita — un único
+    // cálculo, sin repetirlo.
+    let extension = extension_de(&ruta);
+
     thread::spawn(move || {
         if instancias == InstanciasAbrir::Unica {
             if Path::new(&ruta).is_dir() {
@@ -775,14 +799,33 @@ fn abrir_archivo(
                 if back_app::enfocar_carpeta(&ruta) {
                     return;
                 }
-            } else if let Some(nombre) = nombre_proceso_objetivo(&ruta, &abrir_con) {
-                if back_app::enfocar_proceso(&nombre) {
-                    return;
+            } else if extension == "exe" {
+                // .exe directo: no hay un archivo/documento que
+                // matchear en el título, solo el proceso en sí.
+                if let Some(nombre) = nombre_proceso_objetivo(&ruta, &abrir_con) {
+                    if back_app::enfocar_proceso(&nombre) {
+                        return;
+                    }
+                }
+            } else if extension != "lnk" {
+                // BUG 6: documento (propio o vía "Abrir con") — matchear
+                // SOLO por proceso traía la ventana de CUALQUIER archivo
+                // ya abierto en ese programa (ej. Notepad++ con otro
+                // archivo distinto) y le hacía toggle, sin nunca llegar a
+                // abrir el archivo pedido. Ahora exige además que el
+                // título de la ventana contenga el nombre de este
+                // archivo puntual — ver back_app::enfocar_documento().
+                if let Some(nombre_proceso) = nombre_proceso_objetivo(&ruta, &abrir_con) {
+                    if let Some(nombre_archivo) = nombre_archivo(&ruta) {
+                        if back_app::enfocar_documento(&nombre_proceso, &nombre_archivo) {
+                            return;
+                        }
+                    }
                 }
             }
+            // .lnk: puede apuntar a cualquier destino sin resolver por
+            // ahora — Única no tiene efecto, cae a lanzar siempre.
         }
-
-        let extension = extension_de(&ruta);
 
         let (archivo, parametros) = if extension == "exe" {
             (ruta.clone(), argumento)
@@ -819,26 +862,24 @@ fn abrir_archivo(
             }
         };
 
-        // Snapshot de ventanas visibles ANTES de lanzar — solo hace
-        // falta si de verdad vamos a forzar el foco después
-        // (Minimizado nunca lo hace, no tiene sentido pagar el
-        // EnumWindows si el resultado no se va a usar).
-        let snapshot_previo = if iniciar != IniciarVentana::Minimizado {
-            Some(back_app::listar_ventanas_visibles())
-        } else {
-            None
-        };
+        // BUG 7 / BUG 8: antes, con Minimizado no se tomaba snapshot y
+        // nunca se volvía a tocar la ventana nueva — asumía que
+        // ShellExecuteExW con nShow=SW_SHOWMINIMIZED bastaba. Muchas
+        // apps (frameworks Qt/Electron, y Lightburn en particular)
+        // ignoran esa sugerencia y se muestran igual una vez que
+        // cargan. Ahora se toma el snapshot siempre, y
+        // forzar_primer_plano() reafirma el modo pedido (no solo el
+        // foco) para los tres casos — ver back_app::reafirmar_modo_ventana.
+        let snapshot_previo = back_app::listar_ventanas_visibles();
 
         let pid = ejecutar_shell_execute(&archivo, &parametros, mostrar_para_iniciar(&iniciar));
 
-        if let Some(snapshot_previo) = snapshot_previo {
-            forzar_primer_plano(pid, snapshot_previo);
-        }
+        forzar_primer_plano(pid, snapshot_previo, &iniciar);
     });
 }
 
 // ======================================================
-// 🔝 FORZAR PRIMER PLANO (reintentos cortos + AttachThreadInput)
+// 🔝 FORZAR PRIMER PLANO (reintentos cortos + reafirmar modo)
 // ------------------------------------------------------
 // La ventana nueva puede tardar unos instantes en existir — se
 // reintenta buscar_ventana_nueva() cada 100ms hasta encontrarla o
@@ -846,17 +887,25 @@ fn abrir_archivo(
 // pasa siempre igual, buscar_ventana_nueva() cae a "cualquier ventana
 // nueva" en ese caso — necesario porque ShellExecuteExW no siempre
 // entrega un PID (ej. carpeta: reusa el explorer.exe ya corriendo).
-// Una vez encontrada la ventana, back_app::forzar_foco() hace el
-// trabajo real (AttachThreadInput + SetForegroundWindow).
+//
+// BUG 7 / BUG 8: una vez encontrada la ventana, ya no solo se le
+// fuerza el foco — back_app::reafirmar_modo_ventana() además reafirma
+// el modo pedido (Minimizado/Maximizado/Ventana) con un ShowWindow
+// explícito, para las apps que ignoran el nShow que se le pasó a
+// ShellExecuteExW y se muestran igual una vez que terminan de cargar.
 // ======================================================
 
-fn forzar_primer_plano(pid: Option<u32>, snapshot_previo: back_app::VentanaSnapshot) {
+fn forzar_primer_plano(
+    pid: Option<u32>,
+    snapshot_previo: back_app::VentanaSnapshot,
+    iniciar: &IniciarVentana,
+) {
     const INTENTOS: u32 = 20;
     const ESPERA: Duration = Duration::from_millis(100);
 
     for _ in 0..INTENTOS {
         if let Some(hwnd) = back_app::buscar_ventana_nueva(&snapshot_previo, pid) {
-            back_app::forzar_foco(hwnd);
+            back_app::reafirmar_modo_ventana(hwnd, iniciar);
 
             return;
         }
@@ -884,9 +933,48 @@ fn nombre_proceso_objetivo(ruta: &str, abrir_con: &Option<String>) -> Option<Str
     }
 
     // Documento: mismo programa predeterminado que abrir_archivo()
-    // va a lanzar si no lo encuentra abierto (ver back_registro).
+    // va a lanzar si no lo encuentra abierto (ver back_registro). Si
+    // no se pudo resolver por registro, cae al mapeo de apps UWP
+    // conocidas (ver proceso_uwp_conocido) — mitigación puntual del
+    // BUG 4.
     back_registro::programa_predeterminado(&extension)
         .and_then(|programa| nombre_archivo(&programa))
+        .or_else(|| proceso_uwp_conocido(&extension).map(str::to_string))
+}
+
+// ======================================================
+// 🖼️ MITIGACIÓN BUG 4 — VISOR "FOTOS" (UWP)
+// ------------------------------------------------------
+// La app moderna "Fotos" de Windows es un paquete UWP: no se registra
+// en HKCR\<ext>\shell\open\command como un programa.exe común (usa
+// activación COM/DelegateExecute), así que
+// back_registro::programa_predeterminado() no encuentra nada para
+// extensiones de imagen y nombre_proceso_objetivo() quedaba sin poder
+// intentar el toggle de Instancias Única — siempre abría una ventana
+// nueva.
+//
+// Esto es una LIMITACIÓN REAL, no un bug corregible del todo: no hay
+// un ejecutable puntual que lanzar ni una instancia controlable desde
+// afuera con ShellExecuteExW para una app UWP. Como mitigación
+// parcial, se hardcodea el nombre de proceso conocido de "Fotos"
+// (Microsoft.Photos.exe) para extensiones de imagen comunes — esto
+// permite que el TOGGLE de Única funcione (si "Fotos" ya está
+// corriendo con esa imagen en el título, se enfoca/minimiza en vez de
+// abrir otra). "Abrir nuevo" (primera vez, o si el toggle no
+// encuentra coincidencia) sigue sin control fino: cae al "open" de
+// siempre sobre la ruta, que Windows resuelve por su cuenta vía COM y
+// siempre abre una ventana nueva — eso no tiene vuelta con las
+// herramientas usadas acá.
+// ======================================================
+
+fn proceso_uwp_conocido(extension: &str) -> Option<&'static str> {
+    match extension {
+        "jpg" | "jpeg" | "png" | "bmp" | "gif" | "tif" | "tiff" | "webp" => {
+            Some("Microsoft.Photos.exe")
+        }
+
+        _ => None,
+    }
 }
 
 fn nombre_archivo(ruta: &str) -> Option<String> {

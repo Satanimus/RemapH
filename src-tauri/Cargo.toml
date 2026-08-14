@@ -74,6 +74,7 @@ windows-sys = {
         "Win32_Foundation",
         "Win32_System_DataExchange",
         "Win32_System_Diagnostics_ToolHelp",
+        "Win32_System_Environment",
         "Win32_System_LibraryLoader",
         "Win32_System_Registry",
         "Win32_System_SystemInformation",
@@ -92,3 +93,10 @@ windows-sys = {
 # ni el struct ni la función existen, aunque el bloque "Win32_UI_Shell"
 # ya esté habilitado (confirmado leyendo el fuente del crate, versiones
 # 0.59 y 0.60).
+# Nota (bug "notepad.exe no encontrado" con %SystemRoot%):
+# "Win32_System_Environment" agregado para ExpandEnvironmentStringsW,
+# usada por back_registro.rs::resolver_ruta_comando() — el valor
+# crudo que devuelve el registro para el programa predeterminado o
+# recientes de una extensión puede traer variables de entorno sin
+# expandir (ej. "%SystemRoot%\System32\notepad.exe"), y
+# ShellExecuteExW no las expande solo (a diferencia del Explorador).

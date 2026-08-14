@@ -66,15 +66,21 @@
 // alternar_foco()
 //     Núcleo compartido: dado un HWND, si ya está en primer plano lo minimiza, si no lo restaura/enfoca. Toggle usado por enfocar_proceso() y enfocar_carpeta().
 // enfocar_proceso()
-//     Busca una ventana visible del proceso indicado y alterna minimizar/restaurar (alternar_foco). Usado por "Abrir Archivo/App" con Instancias Única.
-// enfocar_carpeta()
-//     Igual que enfocar_proceso() pero para carpetas: matchea proceso explorer.exe + título de ventana con el nombre de la carpeta (por nombre de proceso solo no alcanza).
+//     Busca una ventana "real" (ver es_ventana_real) del proceso indicado y alterna minimizar/restaurar (alternar_foco). Usado por "Abrir Archivo/App" con Instancias Única cuando no hay un archivo puntual que matchear en el título (caso .exe).
+// enfocar_carpeta() / enfocar_documento()
+//     Envoltorios de enfocar_por_titulo(): matchean proceso + título de ventana conteniendo el nombre de la carpeta/archivo (por nombre de proceso solo no alcanza — ver bug de Notepad++ con Múltiples archivos).
+// enfocar_por_titulo()
+//     Núcleo compartido por enfocar_carpeta/enfocar_documento.
+// es_ventana_real()
+//     Filtro "tipo Alt-Tab" (sin dueño, sin WS_EX_TOOLWINDOW) — evita matchear paletas/diálogos de una app en vez de su ventana principal.
 // listar_ventanas_visibles()
 //     Foto de todos los HWND visibles del sistema en este instante. Usado por runtime.rs::abrir_archivo() como "antes" de lanzar.
 // buscar_ventana_nueva()
 //     Compara contra un snapshot anterior y devuelve una ventana visible que no estaba ahí (prioriza coincidir con un PID si se conoce). Usado por runtime.rs::abrir_archivo() para el forzado de primer plano tras lanzar.
 // forzar_foco()
-//     AttachThreadInput + SetForegroundWindow: fuerza el foco a una ventana puntual, evitando la protección anti robo-de-foco de Windows.
+//     AttachThreadInput + un toque de ALT simulado (ver simular_pulsacion_alt) + SetForegroundWindow: fuerza el foco a una ventana puntual, evitando la protección anti robo-de-foco de Windows incluso cuando la ventana ya está visible en 2º plano sin cambio de estado.
+// reafirmar_modo_ventana()
+//     Tras encontrar la ventana nueva de un lanzamiento reciente, reafirma el modo pedido (Minimizado/Maximizado/Ventana) con ShowWindow explícito — no solo el foco. Usado por runtime.rs::forzar_primer_plano().
 // ======================================================
 
 use std::collections::HashSet;
@@ -449,14 +455,16 @@ unsafe fn icono_desde_hicon(hicon: *mut std::ffi::c_void) -> Option<IconoRaw> {
 // ======================================================
 
 use crate::cache;
-use crate::perfil_cache::AppCache;
+use crate::perfil_cache::{AppCache, IniciarVentana};
 use windows_sys::Win32::Foundation::HWND;
 use windows_sys::Win32::System::Threading::{AttachThreadInput, GetCurrentThreadId};
 use windows_sys::Win32::UI::Accessibility::{SetWinEventHook, HWINEVENTHOOK};
+use windows_sys::Win32::UI::Input::KeyboardAndMouse::{keybd_event, KEYEVENTF_KEYUP, VK_MENU};
 use windows_sys::Win32::UI::WindowsAndMessaging::{
-    DispatchMessageW, EnumWindows, GetMessageW, GetWindowTextW, IsIconic, IsWindowVisible,
-    SetForegroundWindow, ShowWindow, TranslateMessage, EVENT_SYSTEM_FOREGROUND, MSG, SW_MINIMIZE,
-    SW_RESTORE, WINEVENT_OUTOFCONTEXT,
+    DispatchMessageW, EnumWindows, GetMessageW, GetWindow, GetWindowLongPtrW, GetWindowTextW,
+    IsIconic, IsWindowVisible, IsZoomed, SetForegroundWindow, ShowWindow, TranslateMessage,
+    EVENT_SYSTEM_FOREGROUND, GWL_EXSTYLE, GW_OWNER, MSG, SW_MAXIMIZE, SW_MINIMIZE, SW_RESTORE,
+    WINEVENT_OUTOFCONTEXT, WS_EX_TOOLWINDOW,
 };
 
 pub fn iniciar_monitor() {
@@ -543,6 +551,32 @@ fn esta_abierta(nombre: &str) -> bool {
 // SetForegroundWindow).
 // ======================================================
 
+// ======================================================
+// 🪟 ¿ES UNA VENTANA "REAL"? (filtro tipo Alt-Tab)
+// ------------------------------------------------------
+// BUG 5: EnumWindows visita TODAS las ventanas visibles de un
+// proceso, en el orden de Z que sea — incluidas paletas, diálogos y
+// otras ventanas "herramienta" que un proceso como Photoshop crea
+// además de su ventana principal. Si el callback de matching agarra
+// una de esas por error, GetForegroundWindow() == hwnd nunca da
+// true aunque la app sí esté visualmente en primer plano (el
+// usuario ve la ventana principal en foco, no esa herramienta), así
+// que alternar_foco() nunca dispara el minimizado.
+// Filtro estándar: una ventana "real" (la que un Alt-Tab mostraría)
+// no tiene dueño (GetWindow GW_OWNER) y no tiene el estilo extendido
+// WS_EX_TOOLWINDOW.
+// ======================================================
+
+unsafe fn es_ventana_real(hwnd: HWND) -> bool {
+    if !GetWindow(hwnd, GW_OWNER).is_null() {
+        return false;
+    }
+
+    let estilo_extendido = GetWindowLongPtrW(hwnd, GWL_EXSTYLE) as u32;
+
+    estilo_extendido & WS_EX_TOOLWINDOW == 0
+}
+
 fn alternar_foco(hwnd: HWND) {
     unsafe {
         let ya_en_foco = GetForegroundWindow() == hwnd && IsIconic(hwnd) == 0;
@@ -599,7 +633,7 @@ pub fn enfocar_proceso(nombre: &str) -> bool {
 unsafe extern "system" fn callback_enfoque(hwnd: HWND, lparam: isize) -> i32 {
     let contexto = &mut *(lparam as *mut ContextoEnfoque);
 
-    if IsWindowVisible(hwnd) == 0 {
+    if IsWindowVisible(hwnd) == 0 || !es_ventana_real(hwnd) {
         return 1;
     }
 
@@ -624,43 +658,70 @@ unsafe extern "system" fn callback_enfoque(hwnd: HWND, lparam: isize) -> i32 {
 }
 
 // ======================================================
-// 🔎 ENFOCAR CARPETA (toggle minimizar/restaurar, por título)
+// 🔎 ENFOCAR CARPETA / DOCUMENTO (toggle minimizar/restaurar, por título)
 // ------------------------------------------------------
 // Usado por runtime.rs::abrir_archivo() cuando Instancias == Única y
-// la ruta es una carpeta. A diferencia de enfocar_proceso(), acá el
-// nombre de proceso ("explorer.exe") no alcanza para identificar LA
-// carpeta puntual — cualquier ventana de Explorer lo matchearía. Se
-// combina entonces: proceso == explorer.exe Y título de la ventana
-// contiene el nombre de la carpeta (heurístico — Explorer muestra el
-// nombre de la carpeta en el título de su ventana). Devuelve false
-// si no encontró ninguna coincidencia — el llamador decide lanzar de
-// nuevo (abrir_archivo ya fuerza una ventana de Explorer genuinamente
-// nueva en ese caso, ver el branch de carpeta ahí).
+// la ruta es una carpeta (enfocar_carpeta) o un documento con programa
+// conocido, propio o vía "Abrir con" (enfocar_documento). A diferencia
+// de enfocar_proceso(), acá el nombre de proceso solo no alcanza para
+// identificar LA carpeta/archivo puntual — cualquier ventana del mismo
+// proceso lo matchearía (ej. otra carpeta ya abierta en Explorer, u
+// otro archivo ya abierto en Notepad++).
+//
+// BUG 6: antes, Instancias Única para documentos usaba enfocar_proceso
+// (solo por nombre de proceso) — con Notepad++ ya corriendo, abrir un
+// SEGUNDO archivo distinto encontraba la ventana existente, hacía
+// toggle sobre ELLA (minimizaba/restauraba el primer archivo) y nunca
+// llegaba a lanzar el segundo. Al exigir también que el título de la
+// ventana contenga el nombre del archivo pedido, un archivo distinto
+// ya no matchea acá — cae a lanzar igual, que es justo lo que hace que
+// apps de instancia única como Notepad++ agreguen una pestaña nueva
+// sola.
+//
+// Se combina: proceso == nombre_proceso Y título de la ventana
+// contiene el texto buscado (heurístico — tanto Explorer como la
+// inmensa mayoría de editores/visores muestran el nombre de
+// carpeta/archivo en el título de su ventana). Devuelve false si no
+// encontró ninguna coincidencia — el llamador decide lanzar de nuevo.
 // ======================================================
-
-struct ContextoEnfoqueCarpeta {
-    nombre_carpeta: String,
-    hwnd: HWND,
-}
 
 pub fn enfocar_carpeta(ruta: &str) -> bool {
     let nombre_carpeta = Path::new(ruta)
         .file_name()
-        .map(|nombre| nombre.to_string_lossy().to_lowercase())
+        .map(|nombre| nombre.to_string_lossy().to_string())
         .unwrap_or_default();
 
     if nombre_carpeta.is_empty() {
         return false;
     }
 
-    let mut contexto = ContextoEnfoqueCarpeta {
-        nombre_carpeta,
+    enfocar_por_titulo("explorer.exe", &nombre_carpeta)
+}
+
+pub fn enfocar_documento(nombre_proceso: &str, nombre_archivo: &str) -> bool {
+    if nombre_proceso.is_empty() || nombre_archivo.is_empty() {
+        return false;
+    }
+
+    enfocar_por_titulo(nombre_proceso, nombre_archivo)
+}
+
+struct ContextoEnfoqueTitulo {
+    nombre_proceso: String,
+    texto_titulo: String,
+    hwnd: HWND,
+}
+
+fn enfocar_por_titulo(nombre_proceso: &str, texto_titulo: &str) -> bool {
+    let mut contexto = ContextoEnfoqueTitulo {
+        nombre_proceso: nombre_proceso.to_lowercase(),
+        texto_titulo: texto_titulo.to_lowercase(),
         hwnd: std::ptr::null_mut(),
     };
 
     unsafe {
         EnumWindows(
-            Some(callback_enfoque_carpeta),
+            Some(callback_enfoque_titulo),
             &mut contexto as *mut _ as isize,
         );
     }
@@ -674,10 +735,10 @@ pub fn enfocar_carpeta(ruta: &str) -> bool {
     true
 }
 
-unsafe extern "system" fn callback_enfoque_carpeta(hwnd: HWND, lparam: isize) -> i32 {
-    let contexto = &mut *(lparam as *mut ContextoEnfoqueCarpeta);
+unsafe extern "system" fn callback_enfoque_titulo(hwnd: HWND, lparam: isize) -> i32 {
+    let contexto = &mut *(lparam as *mut ContextoEnfoqueTitulo);
 
-    if IsWindowVisible(hwnd) == 0 {
+    if IsWindowVisible(hwnd) == 0 || !es_ventana_real(hwnd) {
         return 1;
     }
 
@@ -694,7 +755,7 @@ unsafe extern "system" fn callback_enfoque_carpeta(hwnd: HWND, lparam: isize) ->
         .map(|nombre| nombre.to_string_lossy().to_lowercase())
         .unwrap_or_default();
 
-    if nombre_proceso != "explorer.exe" {
+    if nombre_proceso != contexto.nombre_proceso {
         return 1;
     }
 
@@ -708,7 +769,7 @@ unsafe extern "system" fn callback_enfoque_carpeta(hwnd: HWND, lparam: isize) ->
 
     let titulo = String::from_utf16_lossy(&buffer[..largo as usize]).to_lowercase();
 
-    if titulo.contains(&contexto.nombre_carpeta) {
+    if titulo.contains(&contexto.texto_titulo) {
         contexto.hwnd = hwnd;
 
         return 0;
@@ -871,6 +932,17 @@ pub fn forzar_foco(hwnd: HWND) -> bool {
             return SetForegroundWindow(hwnd) != 0;
         }
 
+        // BUG 3 (resto): con la ventana ya visible en 2º plano y SIN
+        // cambio de estado (no estaba minimizada, así que arriba no
+        // se llamó a ShowWindow/SW_RESTORE), AttachThreadInput solo
+        // no siempre alcanza para saltar la protección anti
+        // robo-de-foco. El truco documentado: simular una pulsación
+        // de ALT justo antes — Windows lo trata como si el pedido de
+        // foco viniera de un input real del usuario, no de otro
+        // proceso. Se hace acá (no en alternar_foco) para que
+        // cualquier llamador de forzar_foco se beneficie por igual.
+        simular_pulsacion_alt();
+
         AttachThreadInput(hilo_actual, hilo_de_ventana_actual, 1);
 
         let resultado = SetForegroundWindow(hwnd) != 0;
@@ -878,5 +950,73 @@ pub fn forzar_foco(hwnd: HWND) -> bool {
         AttachThreadInput(hilo_actual, hilo_de_ventana_actual, 0);
 
         resultado
+    }
+}
+
+// ======================================================
+// 🔑 SIMULAR PULSACIÓN DE ALT (refuerzo de forzar_foco)
+// ------------------------------------------------------
+// keybd_event (en vez de SendInput) alcanza para este propósito
+// puntual: no importa que esté deprecada, solo se necesita que el
+// sistema registre una pulsación de tecla real para que
+// SetForegroundWindow deje de estar bloqueado — no hace falta que
+// otra ventana la "reciba" ni que el usuario la vea. Se usa dentro
+// de forzar_foco justo antes de SetForegroundWindow.
+// ======================================================
+
+unsafe fn simular_pulsacion_alt() {
+    keybd_event(VK_MENU as u8, 0, 0, 0);
+
+    keybd_event(VK_MENU as u8, 0, KEYEVENTF_KEYUP, 0);
+}
+
+// ======================================================
+// 🔁 REAFIRMAR MODO DE VENTANA (BUG 7 y parte de BUG 8)
+// ------------------------------------------------------
+// El nShow que se le pasa a ShellExecuteExW es solo una SUGERENCIA —
+// muchas apps (frameworks Qt/Electron modernos, y Lightburn en
+// particular) la ignoran y llaman su propio ShowWindow al terminar de
+// cargar, pisando el modo pedido. runtime.rs::forzar_primer_plano()
+// ya encuentra la ventana nueva tras lanzar (para el foco); esta
+// función reutiliza ese mismo hallazgo para, además, reafirmar el
+// modo de ventana pedido con un ShowWindow explícito:
+// • Minimizado: si la app se mostró igual (no está minimizada), se
+//   fuerza SW_MINIMIZE — y a propósito NO se roba el foco acá (no
+//   tendría sentido traer al frente una ventana que se pidió
+//   minimizada).
+// • Maximizado: si no quedó maximizada, se fuerza SW_MAXIMIZE, y
+//   además sí se reafirma el foco (forzar_foco) — antes solo se
+//   reafirmaba el foco, nunca el tamaño.
+// • Ventana: comportamiento de siempre, solo reafirma el foco.
+//
+// LÍMITE: esto solo tiene efecto sobre una ventana NUEVA (lanzamiento
+// fresco). Para apps de instancia única que reusan su ventana ya
+// abierta (ej. Notepad++ agregando una pestaña) no hay ventana nueva
+// que ajustar — ShellExecuteExW ni siquiera crea proceso/ventana en
+// ese caso, así que el modo de ventana pedido no tiene forma de
+// aplicarse ahí sin controlar la app por dentro (fuera de alcance).
+// ======================================================
+
+pub fn reafirmar_modo_ventana(hwnd: HWND, iniciar: &IniciarVentana) {
+    unsafe {
+        match iniciar {
+            IniciarVentana::Minimizado => {
+                if IsIconic(hwnd) == 0 {
+                    ShowWindow(hwnd, SW_MINIMIZE);
+                }
+            }
+
+            IniciarVentana::Maximizado => {
+                if IsZoomed(hwnd) == 0 {
+                    ShowWindow(hwnd, SW_MAXIMIZE);
+                }
+
+                forzar_foco(hwnd);
+            }
+
+            IniciarVentana::Ventana => {
+                forzar_foco(hwnd);
+            }
+        }
     }
 }

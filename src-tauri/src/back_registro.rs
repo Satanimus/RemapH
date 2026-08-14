@@ -45,7 +45,13 @@
 // resolver_ruta_comando() / ruta_desde_applications()
 //     Parser compartido: de un valor crudo de shell\open\command (o
 //     de un nombre de exe a resolver contra Applications\<exe>) saca
-//     la ruta real del ejecutable, sin comillas ni "%1".
+//     la ruta real del ejecutable, sin comillas ni "%1", con sus
+//     variables de entorno ya expandidas (ver expandir_variables_entorno).
+//
+// expandir_variables_entorno(ruta)
+//     BUG 1: expande %SystemRoot%, %ProgramFiles%, etc. vía
+//     ExpandEnvironmentStringsW — el registro a veces las devuelve
+//     sin expandir y ShellExecuteExW no lo hace por su cuenta.
 //
 // programa_predeterminado(extension)
 //     El programa que Windows abriría por defecto para esa extensión
@@ -62,6 +68,8 @@ use std::path::Path;
 
 use winreg::enums::{HKEY_CLASSES_ROOT, HKEY_CURRENT_USER};
 use winreg::RegKey;
+
+use windows_sys::Win32::System::Environment::ExpandEnvironmentStringsW;
 
 // ======================================================
 // MODELO
@@ -103,8 +111,44 @@ fn resolver_ruta_comando(comando: &str) -> Option<String> {
     if ruta.is_empty() {
         None
     } else {
-        Some(ruta.to_string())
+        Some(expandir_variables_entorno(ruta))
     }
+}
+
+// ======================================================
+// EXPANDIR VARIABLES DE ENTORNO (BUG 1)
+// ------------------------------------------------------
+// El valor crudo de shell\open\command puede venir con variables sin
+// expandir, ej. "%SystemRoot%\System32\notepad.exe" — el Explorador
+// las expande solo al ejecutar, pero ShellExecuteExW (lo que usa
+// runtime.rs) NO lo hace, así que sin este paso Windows recibe la
+// ruta literal "%SystemRoot%\..." y falla con "no puede encontrar el
+// archivo". Se expande acá, una única vez, para que toda ruta que
+// sale de este archivo ya esté lista para pasarle directo a
+// ShellExecuteExW. Si ExpandEnvironmentStringsW falla o la ruta no
+// tenía variables, devuelve la ruta original sin tocar.
+// ======================================================
+
+fn expandir_variables_entorno(ruta: &str) -> String {
+    let entrada: Vec<u16> = ruta.encode_utf16().chain(std::iter::once(0)).collect();
+
+    let mut buffer = [0u16; 1024];
+
+    let escritos = unsafe {
+        ExpandEnvironmentStringsW(entrada.as_ptr(), buffer.as_mut_ptr(), buffer.len() as u32)
+    };
+
+    // escritos incluye el terminador nulo; 0 es error, y un valor
+    // mayor al buffer significa que no entró completo (ruta
+    // absurdamente larga) — en ambos casos se prefiere devolver la
+    // ruta cruda antes que una expansión truncada/corrupta.
+    if escritos == 0 || escritos as usize > buffer.len() {
+        return ruta.to_string();
+    }
+
+    let largo = (escritos - 1) as usize;
+
+    String::from_utf16_lossy(&buffer[..largo])
 }
 
 // ======================================================
