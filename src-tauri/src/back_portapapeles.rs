@@ -287,10 +287,11 @@ use serde::Serialize;
 
 use tauri::{AppHandle, Emitter, Manager, WebviewUrl, WebviewWindowBuilder};
 
-use windows_sys::Win32::Foundation::SYSTEMTIME;
+use windows_sys::Win32::Foundation::{GetLastError, SYSTEMTIME};
 use windows_sys::Win32::System::SystemInformation::GetLocalTime;
 use windows_sys::Win32::UI::Input::KeyboardAndMouse::{
-    SendInput, INPUT, INPUT_0, INPUT_KEYBOARD, KEYBDINPUT, KEYEVENTF_KEYUP, VIRTUAL_KEY, VK_CONTROL,
+    MapVirtualKeyW, SendInput, INPUT, INPUT_0, INPUT_KEYBOARD, KEYBDINPUT, KEYEVENTF_KEYUP,
+    KEYEVENTF_SCANCODE, MAPVK_VK_TO_VSC, VIRTUAL_KEY, VK_CONTROL,
 };
 
 use crate::back_portapapeles_captura::{self, ContenidoPortapapeles};
@@ -1235,9 +1236,17 @@ pub fn pegar(ruta: &Path) -> Result<(), String> {
         }
     }
 
-    simular_ctrl_v();
+    // Se usa el motor real de emisión de RemapH (back_interception,
+    // nivel driver) en vez de simular_ctrl_v() (SendInput/WinAPI,
+    // función dejada más abajo sin usar por ahora, no borrada). Se
+    // confirmó que un atajo de Menú Express con el mismo Ctrl+V
+    // pegaba en Paint sin problema, mientras que SendInput —aunque
+    // reportaba insertar los eventos sin objeción— no lograba que
+    // Paint reaccionara. Ver comentario largo en
+    // runtime::emitir_ctrl_v().
+    crate::runtime::emitir_ctrl_v();
 
-    println!("📋 [diag] simular_ctrl_v() disparado — pegar() termina OK");
+    println!("📋 [diag] runtime::emitir_ctrl_v() disparado — pegar() termina OK");
 
     Ok(())
 }
@@ -1286,13 +1295,20 @@ fn dimensiones_png(ruta: &Path) -> Option<(u32, u32)> {
 }
 
 // ======================================================
-// ⌨️ SIMULAR CTRL+V (SendInput crudo)
+// ⌨️ SIMULAR CTRL+V (SendInput crudo) — YA NO SE USA
 // ------------------------------------------------------
-// Mismo patrón que back_multimedia.rs::enviar_vk — down de Ctrl,
-// down de V, up de V, up de Ctrl, todo en un solo SendInput (4
-// eventos). Sin KEYEVENTF_EXTENDEDKEY acá: Ctrl y V no son teclas
-// extendidas (a diferencia de las teclas multimedia de
-// back_multimedia.rs), así que no corresponde marcarlas así.
+// DEJADO SIN BORRAR a modo de referencia/rollback: pegar()
+// usaba esto para el pegado automático, pero se comprobó que
+// SendInput —aunque reportaba insertar los 4 eventos sin
+// objeción, con o sin delay entre teclas, con o sin scan
+// code real— no lograba que Paint (UWP) reaccionara al
+// Ctrl+V. La causa real: este es el único lugar del proyecto
+// que emitía teclas vía SendInput/WinAPI en vez del motor
+// real de RemapH (back_interception, nivel driver) — ver
+// runtime.rs sección 5.G, "Backend de salida: emitir_evento()
+// usa back_interception exclusivamente. Ya no existe el modo
+// dual con back_windows". pegar() ahora llama
+// crate::runtime::emitir_ctrl_v() en su lugar.
 //
 // VK_V no existe como constante en windows-sys (ni en la Win32 API
 // en general): Winuser.h no define constantes para las teclas
@@ -1302,33 +1318,78 @@ fn dimensiones_png(ruta: &Path) -> Option<(u32, u32)> {
 // use the numeric value"). 0x56 es 'V'.
 // ======================================================
 
+#[allow(dead_code)]
 const VK_V: VIRTUAL_KEY = 0x56;
 
+#[allow(dead_code)]
 fn simular_ctrl_v() {
-    let mut eventos = [
-        input_teclado(VK_CONTROL, false),
-        input_teclado(VK_V, false),
-        input_teclado(VK_V, true),
-        input_teclado(VK_CONTROL, true),
-    ];
-
+    // Se manda cada evento por separado (4 llamadas a SendInput, no
+    // un solo array de 4) con un pequeño delay entre cada una — un
+    // solo SendInput con los 4 juntos los procesa en microsegundos,
+    // sin tiempo real entre keydown/keyup; Paint (UWP) puede no
+    // llegar a registrar el estado de Ctrl como "presionado" antes
+    // de que le llegue el keydown de V si van pegados así.
+    //
+    // También se agrega el scan code real de cada tecla (vía
+    // MapVirtualKeyW + KEYEVENTF_SCANCODE) — antes solo se mandaba
+    // el virtual key code (wVk) con wScan en 0. SendInput ya
+    // confirmó insertar los 4 eventos sin objeción (ver diagnóstico
+    // previo), así que Windows los acepta a nivel de cola de input;
+    // el scan code es para el caso de que Paint específicamente
+    // valide/prefiera ese campo al decidir si un Ctrl+V "cuenta".
     unsafe {
-        SendInput(
-            eventos.len() as u32,
-            eventos.as_mut_ptr(),
-            std::mem::size_of::<INPUT>() as i32,
+        enviar_tecla(VK_CONTROL, false);
+        std::thread::sleep(std::time::Duration::from_millis(15));
+
+        enviar_tecla(VK_V, false);
+        std::thread::sleep(std::time::Duration::from_millis(15));
+
+        enviar_tecla(VK_V, true);
+        std::thread::sleep(std::time::Duration::from_millis(15));
+
+        enviar_tecla(VK_CONTROL, true);
+    }
+
+    println!("📋 [diag] simular_ctrl_v: secuencia con delays + scan code enviada");
+}
+
+/// Manda un solo evento de teclado (keydown o keyup) vía SendInput,
+/// con el scan code real de la tecla (no solo el virtual key code).
+/// Loguea si SendInput no insertó el evento.
+#[allow(dead_code)]
+unsafe fn enviar_tecla(vk: VIRTUAL_KEY, soltar: bool) {
+    let mut evento = input_teclado(vk, soltar);
+
+    let insertados = SendInput(1, &mut evento, std::mem::size_of::<INPUT>() as i32);
+
+    if insertados != 1 {
+        let codigo_error = GetLastError();
+        println!(
+            "📋 [diag] SendInput (tecla vk={:?} soltar={}): FALLÓ, GetLastError()={}",
+            vk, soltar, codigo_error
         );
     }
 }
 
+#[allow(dead_code)]
 fn input_teclado(vk: VIRTUAL_KEY, soltar: bool) -> INPUT {
+    // Scan code real de la tecla en el layout actual — antes iba en
+    // 0 (solo se mandaba el virtual key code). MapVirtualKeyW
+    // devuelve 0 si no encuentra mapeo; en ese caso KEYEVENTF_SCANCODE
+    // igual queda puesto pero con wScan en 0, equivalente al
+    // comportamiento anterior — no empeora nada.
+    let scan_code = unsafe { MapVirtualKeyW(vk as u32, MAPVK_VK_TO_VSC) } as u16;
+
+    let mut flags = if soltar { KEYEVENTF_KEYUP } else { 0 };
+    flags |= KEYEVENTF_SCANCODE;
+
     INPUT {
         r#type: INPUT_KEYBOARD,
         Anonymous: INPUT_0 {
             ki: KEYBDINPUT {
                 wVk: vk,
-                wScan: 0,
-                dwFlags: if soltar { KEYEVENTF_KEYUP } else { 0 },
+                wScan: scan_code,
+                dwFlags: flags,
                 time: 0,
                 dwExtraInfo: 0,
             },

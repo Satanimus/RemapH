@@ -18,6 +18,10 @@
 // Cache — únicamente a través de ejecutar(orden), con un
 //     OrdenRuntime::Iniciar{id, accion, extra} o
 //     OrdenRuntime::Detener{id}.
+// back_portapapeles.rs — llama emitir_ctrl_v() directo (no
+//     a través de ejecutar()/OrdenRuntime) para el pegado
+//     automático tras escribir al portapapeles. Ver comentario
+//     largo en emitir_ctrl_v() más abajo.
 // ------------------------------------------------------
 // 3. ¿Qué información recibe?
 // ejecutar(orden: OrdenRuntime) — punto de entrada único.
@@ -157,7 +161,16 @@
 // G) Backend de salida: emitir_evento() usa
 //    back_interception exclusivamente. Ya no existe el
 //    modo dual con back_windows (descartado para la 1.0,
-//    ver decisiones de backend/).
+//    ver decisiones de backend/). Esto también aplica a
+//    emitir_ctrl_v() (usado por back_portapapeles.rs, ver
+//    comentario ahí): antes esa función usaba SendInput/
+//    WinAPI directo, único lugar del proyecto que lo hacía
+//    para emitir teclas — se confirmó que Paint (UWP) no
+//    reaccionaba a esos eventos aunque SendInput reportara
+//    insertarlos sin objeción, mientras que el mismo Ctrl+V
+//    emitido vía back_interception (como cualquier otro
+//    Emitir del motor) sí funcionaba. emitir_ctrl_v() unifica
+//    ese caso con el resto del backend de salida.
 // ------------------------------------------------------
 // 6. Funciones del archivo
 //
@@ -191,6 +204,12 @@
 //     Ejecuta (o solo la mitad de) un combo: DOWN de los
 //     mods en orden, DOWN+UP del gatillo, UP de los mods en
 //     orden inverso.
+// emitir_ctrl_v()
+//     Atajo público de conveniencia: arma [LeftControl, V]
+//     como InputId y los emite con emitir_combo() — mismo
+//     camino real (back_interception) que un Emitir
+//     configurado por el usuario. Usado por
+//     back_portapapeles::pegar() para el pegado automático.
 // ejecutar_macro_en_hilo(id, ruta)
 //     Lee un archivo de macro de usuario, lo corre en un
 //     hilo nuevo (mismo intérprete que un Extra).
@@ -1054,6 +1073,35 @@ fn ejecutar_emitir(inputs: &[InputId], condicion: &CondicionTrigger) {
 fn emitir_combo(inputs: &[InputId]) {
     emitir_combo_abajo(inputs);
     emitir_combo_arriba(inputs);
+}
+
+/// Emite Ctrl+V por el mismo camino que un combo de Emitir real
+/// (back_interception, nivel driver) — NO SendInput/WinAPI. Usado
+/// por back_portapapeles::pegar() para el pegado automático tras
+/// escribir al portapapeles: se comprobó que el SendInput de WinAPI,
+/// aunque reportaba insertar los eventos sin objeción, no lograba
+/// que Paint (UWP) reaccionara — mientras que un atajo de Menú
+/// Express con el mismo Ctrl+V, emitido por este camino
+/// (emitir_combo → back_interception), sí funcionaba. Ver
+/// comentario largo en la sección 5.G de este archivo: "Backend de
+/// salida: emitir_evento() usa back_interception exclusivamente" —
+/// este es el único camino de emisión que el proyecto considera
+/// vigente.
+///
+/// Los nombres "LeftControl" y "V" son la columna "interno" de
+/// pulsadores.tsv (mismo criterio que compilador.rs::convertir_input,
+/// que arma los InputId de un Emitir configurado por el usuario a
+/// partir de esa misma columna vía perfil.json) — no la columna
+/// "interception" que usa resolver_input() más abajo en este archivo
+/// para las líneas DOWN/UP/pulse del Idioma Runtime, que es un
+/// camino distinto.
+pub fn emitir_ctrl_v() {
+    let inputs = [
+        InputId::new("keyboard", "LeftControl"),
+        InputId::new("keyboard", "V"),
+    ];
+
+    emitir_combo(&inputs);
 }
 
 // ======================================================
