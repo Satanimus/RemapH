@@ -670,12 +670,15 @@
     justify-content: flex-start;
     width: 100%;
     gap: var(--gap8);
+    height: 34px;
+    flex-shrink: 0;
 }
 
 .app-popup-nombre {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    line-height: 34px;
 }
 
 .app-popup-global {

@@ -1,29 +1,32 @@
 // ======================================================
 // 📂🗂️ comp_Popup_Abrir_Con
 // ------------------------------------------------------
-// Popup de selección de "Abrir con..." del tipo "Abrir Archivo/App"
-// (filaPerfil.tipo === "abrir"), abierto desde el botón "Abrir con"
-// dentro del popup Extra (ver comp_popup_abrir_extra.ts) cuando
-// abrirAccion.ruta NO es un .exe.
+// Sección "Abrir con..." del popup Extra del tipo "Abrir Archivo/App"
+// (filaPerfil.tipo === "abrir"). Ya no es un listado siempre visible
+// ni un popup aparte: es un botón más, misma fila que el resto del
+// popup Extra (ver crearBotonAbrirCon), que muestra "Predeterminado"
+// o el nombre del programa guardado. Al hacerle click se despliega
+// el listado justo debajo, dentro del mismo popup Extra (ver
+// crearListaAbrirCon, usada desde comp_popup_abrir_extra.ts). Elegir
+// cualquier ítem del listado lo colapsa de nuevo y el botón pasa a
+// mostrar la nueva selección.
 //
-// Mismo estilo que comp_popup_app.ts: caja oscura con un listado de
-// botones (ícono + nombre), pero acá la fuente es el registro de
-// Windows en vez de los procesos corriendo — obtener_programas_abrir_con()
-// (recientes de esa extensión primero, luego instalados, ver
-// back_registro.rs) — más una opción fija al final, "Examinar...",
-// que cae al selector manual ya existente (seleccionar_archivo
-// filtrado a .exe) para cuando el programa deseado no aparece
-// listado.
+// Fuente del listado: el registro de Windows —
+// obtener_programas_abrir_con() (recientes de esa extensión primero,
+// luego instalados, ver back_registro.rs) — más dos ítems fijos:
+// "Predeterminado" arriba (limpia abrirCon → vuelve al programa que
+// Windows tiene asociado por defecto para esa extensión) y
+// "Examinar..." al final, que cae al selector manual ya existente
+// (seleccionar_archivo filtrado a .exe) para cuando el programa
+// deseado no aparece listado.
 //
 // El ícono de cada ítem NO viaja en la respuesta del listado — se
 // pide aparte por ítem con obtener_icono_ruta() (mismo patrón que ya
-// usa la columna App), para no bloquear el popup completo esperando
-// todos los íconos antes de mostrar nada.
+// usa la columna App), para no bloquear el listado esperando todos
+// los íconos antes de mostrarlo.
 // ======================================================
 
 import { invoke } from "@tauri-apps/api/core";
-
-import { mostrarPopup, ocultarPopup } from "./comp_popup_contenedor";
 
 import { reconstruirFila } from "../ui_tabla_control";
 
@@ -31,7 +34,9 @@ import type { ContextoFila } from "../../core/core_contexto_fila";
 
 import type { FilaPerfil } from "../../core/core_perfil";
 
-import { extensionDeRuta } from "../../core/core_abrir";
+import { extensionDeRuta, nombreDeRuta } from "../../core/core_abrir";
+
+import { crearIndicadorActivo } from "./comp_popup_grupo";
 
 // ======================================================
 // 📦 MODELOS BACKEND
@@ -49,6 +54,35 @@ interface ProgramaJson {
   nombre: string;
 
   ruta: string;
+}
+
+// ======================================================
+// 🔘 BOTÓN "ABRIR CON" (colapsado)
+// ------------------------------------------------------
+// Misma fila que Iniciar/Instancias en el popup Extra (ver
+// crearFilaPopup en comp_popup_abrir_extra.ts) — muestra la
+// selección actual, alternar() despliega/colapsa el listado.
+// ======================================================
+
+export function crearBotonAbrirCon(
+  filaPerfil: FilaPerfil,
+  alternar: () => void,
+): HTMLButtonElement {
+  const boton = document.createElement("button");
+
+  boton.className = "ui-btn";
+
+  const abrirCon = filaPerfil.abrirExtra.abrirCon;
+
+  boton.textContent = abrirCon ? nombreDeRuta(abrirCon) : "Predeterminado";
+
+  if (abrirCon) {
+    boton.title = abrirCon;
+  }
+
+  boton.addEventListener("click", alternar);
+
+  return boton;
 }
 
 // ======================================================
@@ -98,16 +132,27 @@ function crearIcono(datos: IconoJson): HTMLElement {
 // Ícono en fallback hasta que resuelve obtener_icono_ruta() (mismo
 // patrón asíncrono que crearAccionAbrir() en
 // comp_popup_abrir_accion.ts) — no bloquea el listado esperando el
-// ícono de cada ítem antes de mostrarlo.
+// ícono de cada ítem antes de mostrarlo. Muestra el indicador cyan
+// (mismo patrón que crearGrupoOpciones) cuando es el programa
+// guardado actualmente en abrirCon.
 // ======================================================
 
 function crearBotonPrograma(
+  contexto: ContextoFila,
+  filaPerfil: FilaPerfil,
   programa: ProgramaJson,
-  seleccionar: () => void,
+  activo: boolean,
+  alSeleccionar: () => void,
 ): HTMLButtonElement {
   const boton = document.createElement("button");
 
   boton.className = "ui-btn app-popup-programa";
+
+  boton.dataset.activo = activo ? "true" : "false";
+
+  if (activo) {
+    boton.append(crearIndicadorActivo());
+  }
 
   const icono = crearIconoFallback();
 
@@ -134,9 +179,62 @@ function crearBotonPrograma(
     .catch(() => {});
 
   boton.addEventListener("click", () => {
-    seleccionar();
+    filaPerfil.abrirExtra.abrirCon = programa.ruta;
 
-    ocultarPopup();
+    reconstruirFila(contexto.id);
+
+    alSeleccionar();
+  });
+
+  return boton;
+}
+
+// ======================================================
+// ⭯ PREDETERMINADO (fija arriba del listado)
+// ------------------------------------------------------
+// Limpia abrirCon (vuelve a null): el archivo se vuelve a abrir con
+// el programa que Windows tiene asociado por defecto para esa
+// extensión, igual que antes de personalizar "Abrir con".
+// ======================================================
+
+function crearBotonPredeterminado(
+  contexto: ContextoFila,
+  filaPerfil: FilaPerfil,
+  activo: boolean,
+  alSeleccionar: () => void,
+): HTMLButtonElement {
+  const boton = document.createElement("button");
+
+  boton.className = "ui-btn app-popup-programa";
+
+  boton.dataset.activo = activo ? "true" : "false";
+
+  if (activo) {
+    boton.append(crearIndicadorActivo());
+  }
+
+  const icono = document.createElement("span");
+
+  icono.className = "app-popup-global-icono";
+
+  icono.textContent = "⭯";
+
+  boton.append(icono);
+
+  const nombre = document.createElement("span");
+
+  nombre.className = "app-popup-nombre";
+
+  nombre.textContent = "Predeterminado";
+
+  boton.append(nombre);
+
+  boton.addEventListener("click", () => {
+    filaPerfil.abrirExtra.abrirCon = null;
+
+    reconstruirFila(contexto.id);
+
+    alSeleccionar();
   });
 
   return boton;
@@ -148,13 +246,14 @@ function crearBotonPrograma(
 // Mismo comando que ya usaba el botón "Abrir con" antes de esta
 // etapa (seleccionar_archivo filtrado a .exe) — queda como vía de
 // escape para cuando el programa deseado no aparece en el listado
-// del registro.
+// del registro. Si se cancela el selector nativo, el listado queda
+// desplegado tal cual estaba (no hay nada que colapsar).
 // ======================================================
 
 function crearBotonExaminar(
   contexto: ContextoFila,
   filaPerfil: FilaPerfil,
-  alSeleccionar?: () => void,
+  alSeleccionar: () => void,
 ): HTMLButtonElement {
   const boton = document.createElement("button");
 
@@ -177,8 +276,6 @@ function crearBotonExaminar(
   boton.append(nombre);
 
   boton.addEventListener("click", async () => {
-    ocultarPopup();
-
     const ruta = await invoke<string | null>("seleccionar_archivo", {
       extensiones: ["exe"],
     });
@@ -191,7 +288,7 @@ function crearBotonExaminar(
 
     reconstruirFila(contexto.id);
 
-    alSeleccionar?.();
+    alSeleccionar();
   });
 
   return boton;
@@ -210,21 +307,23 @@ function crearSeparador(): HTMLElement {
 }
 
 // ======================================================
-// 📂🗂️ ABRIR POPUP "ABRIR CON..."
+// 📂🗂️ LISTADO DESPLEGABLE "ABRIR CON"
 // ------------------------------------------------------
-// Sin filtro Principales/Otros (a diferencia de comp_popup_app.ts):
-// acá la lista ya viene ordenada por relevancia desde el backend
-// (recientes de esa extensión primero, luego instalados) y suele ser
-// mucho más corta que "todos los procesos corriendo" — no amerita
-// dividirla en dos pestañas.
+// Se muestra debajo del botón (ver crearBotonAbrirCon) solo cuando
+// está desplegado — la ubicación y el estado expandido/colapsado los
+// decide comp_popup_abrir_extra.ts, acá solo se arma el contenido.
+//
+// alSeleccionar la llama cualquier ítem elegido (Predeterminado, un
+// programa, o Examinar con selección exitosa) — quien la pasa
+// (comp_popup_abrir_extra.ts) es quien colapsa el listado y redibuja
+// el popup Extra completo.
 // ======================================================
 
-export async function abrirPopupAbrirCon(
-  evento: MouseEvent,
+export async function crearListaAbrirCon(
   contexto: ContextoFila,
   filaPerfil: FilaPerfil,
-  alSeleccionar?: () => void,
-): Promise<void> {
+  alSeleccionar: () => void,
+): Promise<HTMLElement> {
   const extension = extensionDeRuta(filaPerfil.abrirAccion.ruta);
 
   const programas = await invoke<ProgramaJson[]>(
@@ -232,17 +331,7 @@ export async function abrirPopupAbrirCon(
     { extension },
   );
 
-  const popup = document.createElement("div");
-
-  popup.className = "app-popup";
-
-  const titulo = document.createElement("span");
-
-  titulo.className = "app-popup-lista-titulo";
-
-  titulo.textContent = "Abrir con:";
-
-  popup.append(titulo);
+  const abrirCon = filaPerfil.abrirExtra.abrirCon;
 
   const caja = document.createElement("div");
 
@@ -252,25 +341,36 @@ export async function abrirPopupAbrirCon(
 
   lista.className = "app-popup-lista";
 
+  lista.append(
+    crearBotonPredeterminado(
+      contexto,
+      filaPerfil,
+      abrirCon === null,
+      alSeleccionar,
+    ),
+  );
+
   programas.forEach((programa) => {
     lista.append(
-      crearBotonPrograma(programa, () => {
-        filaPerfil.abrirExtra.abrirCon = programa.ruta;
-
-        reconstruirFila(contexto.id);
-
-        alSeleccionar?.();
-      }),
+      crearBotonPrograma(
+        contexto,
+        filaPerfil,
+        programa,
+        programa.ruta === abrirCon,
+        alSeleccionar,
+      ),
     );
   });
 
   caja.append(lista);
 
-  popup.append(caja);
+  const contenedor = document.createElement("div");
 
-  popup.append(crearSeparador());
+  contenedor.append(caja);
 
-  popup.append(crearBotonExaminar(contexto, filaPerfil, alSeleccionar));
+  contenedor.append(crearSeparador());
 
-  mostrarPopup(popup, evento.clientX, evento.clientY);
+  contenedor.append(crearBotonExaminar(contexto, filaPerfil, alSeleccionar));
+
+  return contenedor;
 }

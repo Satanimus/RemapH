@@ -169,8 +169,15 @@
 //    reaccionaba a esos eventos aunque SendInput reportara
 //    insertarlos sin objeción, mientras que el mismo Ctrl+V
 //    emitido vía back_interception (como cualquier otro
-//    Emitir del motor) sí funcionaba. emitir_ctrl_v() unifica
-//    ese caso con el resto del backend de salida.
+//    Emitir del motor) sí funcionaba. La primera versión de
+//    emitir_ctrl_v() llamaba emitir_combo() directo desde el
+//    hilo que originó el pegado (comando Tauri) — a
+//    diferencia de un Emitir real, que SIEMPRE pasa por
+//    COLA_SALIDA (ver E) y nunca corre en el hilo que
+//    disparó el trigger. emitir_ctrl_v() ahora encola en
+//    COLA_SALIDA igual que cualquier Emitir, para eliminar
+//    esa única diferencia de contexto que quedaba entre un
+//    atajo de Menú Express y el pegado automático.
 // ------------------------------------------------------
 // 6. Funciones del archivo
 //
@@ -206,10 +213,11 @@
 //     orden inverso.
 // emitir_ctrl_v()
 //     Atajo público de conveniencia: arma [LeftControl, V]
-//     como InputId y los emite con emitir_combo() — mismo
-//     camino real (back_interception) que un Emitir
-//     configurado por el usuario. Usado por
-//     back_portapapeles::pegar() para el pegado automático.
+//     como InputId y los ENCOLA en COLA_SALIDA (no llama
+//     emitir_combo() directo) — mismo camino real, mismo
+//     hilo dedicado, que un Emitir configurado por el
+//     usuario. Usado por back_portapapeles::pegar() para el
+//     pegado automático.
 // ejecutar_macro_en_hilo(id, ruta)
 //     Lee un archivo de macro de usuario, lo corre en un
 //     hilo nuevo (mismo intérprete que un Extra).
@@ -760,7 +768,8 @@ fn ejecutar_click_coordenada(
 // hay, si no cae a "la primera ventana nueva que sea"), reafirmándole
 // el modo de ventana pedido con back_app::reafirmar_modo_ventana()
 // (no solo el foco — también Minimizar/Maximizar explícito, para las
-// apps que ignoran el nShow que se les pasó). El foco en sí usa
+// apps que ignoran el nShow que se le pasó a ShellExecuteExW y se
+// muestran igual una vez que terminan de cargar). El foco en sí usa
 // AttachThreadInput + un toque de ALT simulado (back_app::forzar_foco),
 // que sí tiene efecto garantizado a diferencia de un
 // SetForegroundWindow suelto (Windows bloquea el robo de foco de
@@ -1170,11 +1179,21 @@ fn emitir_combo(inputs: &[InputId]) {
 /// aunque reportaba insertar los eventos sin objeción, no lograba
 /// que Paint (UWP) reaccionara — mientras que un atajo de Menú
 /// Express con el mismo Ctrl+V, emitido por este camino
-/// (emitir_combo → back_interception), sí funcionaba. Ver
-/// comentario largo en la sección 5.G de este archivo: "Backend de
-/// salida: emitir_evento() usa back_interception exclusivamente" —
-/// este es el único camino de emisión que el proyecto considera
-/// vigente.
+/// (COLA_SALIDA → back_interception), sí funcionaba.
+///
+/// IMPORTANTE — encola en COLA_SALIDA en vez de llamar
+/// emitir_combo() directo. Un atajo de Menú Express llama
+/// runtime::ejecutar(OrdenRuntime::Iniciar { accion:
+/// AccionCache::Emitir(...), .. }) — eso pasa por ejecutar_accion(),
+/// que para Emitir SIEMPRE encola en COLA_SALIDA (ver comentario
+/// largo ahí: "Emitir tampoco corre [en el hilo que llamó a
+/// ejecutar()]... Por eso Emitir va a COLA_SALIDA: un canal + un
+/// único hilo de salida de por vida"), nunca llama a emitir_combo()
+/// desde el hilo que originó el trigger. Esta función replica
+/// exactamente eso — encola, no ejecuta directo — para correr en el
+/// mismo hilo dedicado que cualquier Emitir real, sin ninguna
+/// diferencia de contexto entre un atajo de Menú Express y este
+/// pegado automático.
 ///
 /// Los nombres "LeftControl" y "V" son la columna "interno" de
 /// pulsadores.tsv (mismo criterio que compilador.rs::convertir_input,
@@ -1184,12 +1203,15 @@ fn emitir_combo(inputs: &[InputId]) {
 /// para las líneas DOWN/UP/pulse del Idioma Runtime, que es un
 /// camino distinto.
 pub fn emitir_ctrl_v() {
-    let inputs = [
+    let inputs = vec![
         InputId::new("keyboard", "LeftControl"),
         InputId::new("keyboard", "V"),
     ];
 
-    emitir_combo(&inputs);
+    let _ = COLA_SALIDA
+        .lock()
+        .unwrap()
+        .send((inputs, CondicionTrigger::Simple));
 }
 
 // ======================================================

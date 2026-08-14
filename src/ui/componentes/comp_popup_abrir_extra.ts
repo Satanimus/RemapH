@@ -15,12 +15,19 @@
 //     según esRutaExe(abrirAccion.ruta) — mutuamente excluyentes acá,
 //     ver core_abrir.ts.
 //
-// El selector de "Abrir con" abre un popup con el listado de
-// recientes/instalados del registro (ver comp_popup_abrir_con.ts,
-// back_registro.rs) — la opción "Examinar..." al final de ese
-// listado es la que cae al selector manual (seleccionar_archivo
-// filtrado a .exe, mismo comando que usa "Seleccionar..." de la
-// columna Acción) para cuando el programa deseado no aparece.
+// "Abrir con" es un botón más (misma fila que Iniciar/Instancias)
+// que muestra "Predeterminado" o el nombre del programa guardado —
+// al hacerle click despliega el listado (ver comp_popup_abrir_con.ts,
+// back_registro.rs) justo debajo, dentro de ESTE MISMO popup, nunca
+// como un popup aparte. Elegir un ítem del listado lo colapsa de
+// nuevo y redibuja el popup con el nuevo nombre en el botón.
+//
+// abrirConExpandido vive en el scope de abrirPopupExtraAbrir (no en
+// el perfil: es puramente visual, no se guarda) — por eso dibujar()
+// es una función interna que se llama a sí misma en cada redibujado
+// en vez de volver a invocar abrirPopupExtraAbrir desde afuera: así
+// el booleano sobrevive entre un redibujado y el siguiente mientras
+// el popup sigue abierto.
 // ======================================================
 
 import { mostrarPopup } from "./comp_popup_contenedor";
@@ -32,11 +39,11 @@ import type { ContextoFila } from "../../core/core_contexto_fila";
 import type { FilaPerfil } from "../../core/core_perfil";
 
 import type { IniciarAbrir, InstanciasAbrir } from "../../core/core_abrir";
-import { esRutaExe, nombreDeRuta } from "../../core/core_abrir";
+import { esRutaExe } from "../../core/core_abrir";
 
 import { crearGrupoOpciones, crearFilaPopup } from "./comp_popup_grupo";
 
-import { abrirPopupAbrirCon } from "./comp_popup_abrir_con";
+import { crearBotonAbrirCon, crearListaAbrirCon } from "./comp_popup_abrir_con";
 
 // ======================================================
 // ➖ SEPARADOR (mismo estilo que el resto de los popups)
@@ -54,110 +61,121 @@ function crearSeparador(): HTMLElement {
 // 📂🎛️ ABRIR POPUP EXTRA "ABRIR ARCHIVO/APP"
 // ======================================================
 
-export function abrirPopupExtraAbrir(
+export async function abrirPopupExtraAbrir(
   evento: MouseEvent,
   contexto: ContextoFila,
   filaPerfil: FilaPerfil,
-): void {
+): Promise<void> {
   const abrirExtra = filaPerfil.abrirExtra;
 
-  const popup = document.createElement("div");
+  // Puramente visual — arranca siempre colapsado en cada apertura
+  // nueva del popup (ver comentario de arriba).
+  let abrirConExpandido = false;
 
-  popup.className = "popup-extra";
+  const dibujar = async (): Promise<void> => {
+    const popup = document.createElement("div");
 
-  const redibujar = () => abrirPopupExtraAbrir(evento, contexto, filaPerfil);
+    popup.className = "popup-extra";
 
-  // ----------------------------------
-  // INICIAR
-  // ----------------------------------
+    // ----------------------------------
+    // INICIAR
+    // ----------------------------------
 
-  const iniciarOpciones: { texto: string; valor: IniciarAbrir }[] = [
-    { texto: "Ventana", valor: "ventana" },
-    { texto: "Minimizado", valor: "minimizado" },
-    { texto: "Maximizado", valor: "maximizado" },
-  ];
+    const iniciarOpciones: { texto: string; valor: IniciarAbrir }[] = [
+      { texto: "Ventana", valor: "ventana" },
+      { texto: "Minimizado", valor: "minimizado" },
+      { texto: "Maximizado", valor: "maximizado" },
+    ];
 
-  popup.append(
-    crearFilaPopup(
-      "Iniciar",
-      crearGrupoOpciones(iniciarOpciones, abrirExtra.iniciar, (valor) => {
-        abrirExtra.iniciar = valor;
+    popup.append(
+      crearFilaPopup(
+        "Iniciar",
+        crearGrupoOpciones(iniciarOpciones, abrirExtra.iniciar, (valor) => {
+          abrirExtra.iniciar = valor;
+
+          reconstruirFila(contexto.id);
+          dibujar();
+        }),
+      ),
+    );
+
+    // ----------------------------------
+    // INSTANCIAS
+    // ----------------------------------
+
+    const instanciasOpciones: { texto: string; valor: InstanciasAbrir }[] = [
+      { texto: "Única", valor: "unica" },
+      { texto: "Múltiple", valor: "multiple" },
+    ];
+
+    popup.append(
+      crearFilaPopup(
+        "Instancias",
+        crearGrupoOpciones(
+          instanciasOpciones,
+          abrirExtra.instancias,
+          (valor) => {
+            abrirExtra.instancias = valor;
+
+            reconstruirFila(contexto.id);
+            dibujar();
+          },
+        ),
+      ),
+    );
+
+    popup.append(crearSeparador());
+
+    // ----------------------------------
+    // ABRIR CON (documento/carpeta) — ARGUMENTO (.exe)
+    // ----------------------------------
+
+    if (esRutaExe(filaPerfil.abrirAccion.ruta)) {
+      const input = document.createElement("input");
+
+      input.type = "text";
+      input.className = "popup-input";
+      input.placeholder = "--argumento";
+      input.value = abrirExtra.argumento;
+
+      const confirmar = () => {
+        abrirExtra.argumento = input.value;
 
         reconstruirFila(contexto.id);
-        redibujar();
-      }),
-    ),
-  );
+      };
 
-  // ----------------------------------
-  // INSTANCIAS
-  // ----------------------------------
+      input.addEventListener("blur", confirmar);
 
-  const instanciasOpciones: { texto: string; valor: InstanciasAbrir }[] = [
-    { texto: "Única", valor: "unica" },
-    { texto: "Múltiple", valor: "multiple" },
-  ];
+      input.addEventListener("keydown", (eventoTecla) => {
+        if (eventoTecla.key === "Enter") {
+          input.blur();
+        }
+      });
 
-  popup.append(
-    crearFilaPopup(
-      "Instancias",
-      crearGrupoOpciones(instanciasOpciones, abrirExtra.instancias, (valor) => {
-        abrirExtra.instancias = valor;
+      popup.append(crearFilaPopup("Argumento", input));
+    } else {
+      popup.append(
+        crearFilaPopup(
+          "Abrir con",
+          crearBotonAbrirCon(filaPerfil, () => {
+            abrirConExpandido = !abrirConExpandido;
+            dibujar();
+          }),
+        ),
+      );
 
-        reconstruirFila(contexto.id);
-        redibujar();
-      }),
-    ),
-  );
-
-  popup.append(crearSeparador());
-
-  // ----------------------------------
-  // ABRIR CON (documento/carpeta) — ARGUMENTO (.exe)
-  // ----------------------------------
-
-  if (esRutaExe(filaPerfil.abrirAccion.ruta)) {
-    const input = document.createElement("input");
-
-    input.type = "text";
-    input.className = "popup-input";
-    input.placeholder = "--argumento";
-    input.value = abrirExtra.argumento;
-
-    const confirmar = () => {
-      abrirExtra.argumento = input.value;
-
-      reconstruirFila(contexto.id);
-    };
-
-    input.addEventListener("blur", confirmar);
-
-    input.addEventListener("keydown", (eventoTecla) => {
-      if (eventoTecla.key === "Enter") {
-        input.blur();
+      if (abrirConExpandido) {
+        popup.append(
+          await crearListaAbrirCon(contexto, filaPerfil, () => {
+            abrirConExpandido = false;
+            dibujar();
+          }),
+        );
       }
-    });
-
-    popup.append(crearFilaPopup("Argumento", input));
-  } else {
-    const boton = document.createElement("button");
-
-    boton.className = "ui-btn";
-
-    boton.textContent = abrirExtra.abrirCon
-      ? nombreDeRuta(abrirExtra.abrirCon)
-      : "Seleccionar...";
-
-    if (abrirExtra.abrirCon) {
-      boton.title = abrirExtra.abrirCon;
     }
 
-    boton.addEventListener("click", (eventoClick) => {
-      abrirPopupAbrirCon(eventoClick, contexto, filaPerfil, redibujar);
-    });
+    mostrarPopup(popup, evento.clientX, evento.clientY);
+  };
 
-    popup.append(crearFilaPopup("Abrir con", boton));
-  }
-
-  mostrarPopup(popup, evento.clientX, evento.clientY);
+  await dibujar();
 }
