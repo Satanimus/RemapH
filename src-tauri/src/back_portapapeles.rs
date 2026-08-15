@@ -792,6 +792,29 @@ pub fn eliminar(ruta: &Path) -> Result<(), String> {
 }
 
 // ======================================================
+// 🧹 LIMPIAR TODO
+// ------------------------------------------------------
+// Borra todos los rotativos del pool (los fijados de cada fila no
+// se tocan, son un pool aparte). Si nadie está en modo Registro (ni
+// siquiera `id_portapapeles`, el que pidió limpiar), activa la
+// supresión de auto-lectura para que el modo Simple no regenere un
+// rotativo nuevo hasta el próximo cambio de estado de Registro (ver
+// SUPRIMIR_AUTO_LECTURA más abajo — spec Cambio 1).
+// ======================================================
+
+pub fn limpiar_todo(id_portapapeles: &str) -> Result<(), String> {
+    for elemento in listar_rotativos()? {
+        eliminar(&elemento.ruta)?;
+    }
+
+    if !esta_activo(id_portapapeles) && !hay_algun_activo() {
+        marcar_supresion_auto_lectura();
+    }
+
+    Ok(())
+}
+
+// ======================================================
 // 🟢 ACTIVOS (ids en modo Registro) — ETAPA F
 // ------------------------------------------------------
 // id de fila -> límite que ESA fila pidió (columna Extra,
@@ -810,11 +833,53 @@ fn con_activos<R>(f: impl FnOnce(&mut HashMap<String, u32>) -> R) -> R {
     f(mapa)
 }
 
+// ======================================================
+// 🚫🔄 SUPRESIÓN DE AUTO-LECTURA (Simple) — spec "Limpiar todo"
+// ------------------------------------------------------
+// Se pone en true cuando limpiar_todo() corre en modo Simple puro
+// (Registro OFF, nadie más en modo Registro tampoco — ver
+// hay_algun_activo()). Mientras esté en true, construir_datos() NO
+// debe generar un rotativo nuevo en la rama Simple (debe devolver
+// lista vacía en vez de llamar a resolver_elemento_simple()) — así
+// "Limpiar todo" deja la ventana realmente vacía, y cerrar/reabrir
+// no la vuelve a poblar sola.
+//
+// Se limpia (vuelve a false) en activar_registro()/
+// desactivar_registro() — cualquier cambio de estado de Registro
+// "libera" la supresión, así que la próxima vez que se entre en
+// modo Simple se vuelve a leer el portapapeles normalmente (spec:
+// "Solo se crea de nuevo el mismo cuando cambia de estado Registro
+// ON/Off y se vuelve a leer el portapapeles").
+// ======================================================
+
+static SUPRIMIR_AUTO_LECTURA: Mutex<bool> = Mutex::new(false);
+
+fn marcar_supresion_auto_lectura() {
+    if let Ok(mut valor) = SUPRIMIR_AUTO_LECTURA.lock() {
+        *valor = true;
+    }
+}
+
+fn limpiar_supresion_auto_lectura() {
+    if let Ok(mut valor) = SUPRIMIR_AUTO_LECTURA.lock() {
+        *valor = false;
+    }
+}
+
+fn debe_suprimir_auto_lectura() -> bool {
+    SUPRIMIR_AUTO_LECTURA
+        .lock()
+        .map(|valor| *valor)
+        .unwrap_or(false)
+}
+
 /// Agrega (o actualiza el límite de) un id en modo Registro y se
 /// asegura de que el listener esté corriendo (ETAPA J.1 — ya no
 /// "una sola vez para siempre": asegurar_listener() es idempotente,
 /// así que llamarla de más no tiene costo).
 pub fn activar_registro(id_portapapeles: &str, limite: u32) {
+    limpiar_supresion_auto_lectura();
+
     con_activos(|activos| {
         activos.insert(id_portapapeles.to_string(), limite);
     });
@@ -826,6 +891,8 @@ pub fn activar_registro(id_portapapeles: &str, limite: u32) {
 /// que el listener siga corriendo (ni Registro activo ni ventana
 /// abierta — ver debe_existir_listener()), lo detiene.
 pub fn desactivar_registro(id_portapapeles: &str) {
+    limpiar_supresion_auto_lectura();
+
     con_activos(|activos| {
         activos.remove(id_portapapeles);
     });
@@ -917,10 +984,11 @@ fn detener_listener_si_no_hace_falta() {
 //   crear).
 // • Si no hay Registro pero sí alguna ventana Simple abierta: guarda
 //   un rotativo nuevo (ya se sabe que es distinto al más reciente,
-//   por el chequeo de hash de arriba). Sin aplicar ningún límite acá
-//   (el límite es un concepto exclusivo de Registro — spec: "los
-//   fijados no se eliminan ni cuentan para el límite", y un Simple
-//   puro ni siquiera tiene uno configurado con sentido).
+//   por el chequeo de hash de arriba) y aplica límite 1 — Simple da
+//   la ILUSIÓN de que solo se sobreescribe el elemento actual, nunca
+//   se acumula más de un rotativo en el pool mientras nadie está en
+//   modo Registro (spec: "no se guarda nada [de más]", en contraste
+//   con Registro, que sí acumula hasta su límite configurado).
 // • Si no hay ni Registro ni ventana abierta, no se toca el pool —
 //   no debería llegar a pasar (el listener no estaría corriendo),
 //   pero queda como red de seguridad.
@@ -959,6 +1027,11 @@ pub fn en_cambio_del_sistema(contenido: &ContenidoPortapapeles) {
     } else if hay_alguna_ventana_abierta() {
         if guardar_rotativo(contenido).is_ok() {
             marcar_imagen_guardada_ahora(contenido);
+            // Simple puro (nadie en Registro): un solo rotativo a la
+            // vez, mismo mecanismo de límite que Registro pero fijo
+            // en 1 — da la ilusión de "sobreescribir" en vez de
+            // acumular (ver comentario arriba).
+            let _ = aplicar_limite(1);
         }
     } else {
         return;
@@ -2161,9 +2234,29 @@ fn construir_datos(id: &str, paquete: &PortapapelesPaquete) -> PortapapelesDatos
             .map(|elemento| vec![elemento_a_ui(&elemento)])
             .unwrap_or_default()
     } else {
-        resolver_elemento_simple()
-            .map(|elemento| vec![elemento_a_ui(&elemento)])
-            .unwrap_or_default()
+        // Simple puro (nadie en modo Registro). Si YA hay algo en el
+        // pool —incluido lo que en_cambio_del_sistema() acaba de
+        // guardar por un cambio real del portapapeles del sistema,
+        // aun con Registro OFF y la supresión activa (bug: antes se
+        // ocultaba igual, aunque el archivo ya existía en disco)—
+        // se lista tal cual, sin generar nada nuevo. Solo cuando el
+        // pool está realmente vacío entra a jugar la supresión: ahí
+        // sí hay que decidir si se permite leer el portapapeles del
+        // sistema (resolver_elemento_simple) o no (spec Cambio 1).
+        let existentes = listar_rotativos().unwrap_or_default();
+
+        if !existentes.is_empty() {
+            existentes.iter().map(elemento_a_ui).collect()
+        } else if debe_suprimir_auto_lectura() {
+            // Ver SUPRIMIR_AUTO_LECTURA más arriba: "Limpiar todo" en
+            // modo Simple dejó el pool vacío a propósito — no
+            // regenerar nada hasta que cambie el estado de Registro.
+            Vec::new()
+        } else {
+            resolver_elemento_simple()
+                .map(|elemento| vec![elemento_a_ui(&elemento)])
+                .unwrap_or_default()
+        }
     };
 
     PortapapelesDatosUI {

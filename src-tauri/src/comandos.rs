@@ -867,10 +867,11 @@ pub fn portapapeles_limpiar_todo(
 ) -> Result<Option<crate::back_portapapeles::PortapapelesDatosUI>, String> {
     // "Limpiar todo" borra los ROTATIVOS (spec: "Botón 'Limpiar
     // todo' Borra todos los rotativos") — los fijados de esta fila
-    // no se tocan, son un pool aparte (Etapa E).
-    for elemento in crate::back_portapapeles::listar_rotativos()? {
-        crate::back_portapapeles::eliminar(&elemento.ruta)?;
-    }
+    // no se tocan, son un pool aparte (Etapa E). Con Registro OFF
+    // en todos lados, además suprime la auto-regeneración del modo
+    // Simple hasta el próximo cambio de estado de Registro (Cambio
+    // 1 — ver back_portapapeles::limpiar_todo).
+    crate::back_portapapeles::limpiar_todo(&id)?;
 
     Ok(crate::back_portapapeles::refrescar_datos(&id))
 }
