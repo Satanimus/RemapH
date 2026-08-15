@@ -208,6 +208,35 @@ pub fn obtener_programa_activo() -> Option<String> {
 }
 
 // ======================================================
+// 🆔 PID DEL PROGRAMA EN PRIMER PLANO
+// ------------------------------------------------------
+// Igual a la primera mitad de obtener_programa_activo(), pero
+// devuelve el PID en vez de resolverlo hasta el nombre de archivo —
+// lo usa back_pegado_personalizado.rs, que necesita el PID para
+// pedir la ruta completa del ejecutable vía obtener_ruta_proceso().
+// ======================================================
+
+pub fn obtener_pid_activo() -> Option<u32> {
+    let ventana = unsafe { GetForegroundWindow() };
+
+    if ventana.is_null() {
+        return None;
+    }
+
+    let mut pid = 0;
+
+    unsafe {
+        GetWindowThreadProcessId(ventana, &mut pid);
+    }
+
+    if pid == 0 {
+        return None;
+    }
+
+    Some(pid)
+}
+
+// ======================================================
 // DETERMINAR SI ES PROCESO DE WINDOWS
 // ======================================================
 
@@ -225,7 +254,7 @@ fn es_proceso_windows(ruta: &str) -> bool {
 // RUTA DEL EJECUTABLE
 // ======================================================
 
-unsafe fn obtener_ruta_proceso(pid: u32) -> Option<String> {
+pub unsafe fn obtener_ruta_proceso(pid: u32) -> Option<String> {
     let handle = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, 0, pid);
 
     if handle.is_null() {

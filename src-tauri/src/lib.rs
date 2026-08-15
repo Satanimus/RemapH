@@ -12,6 +12,7 @@ mod back_interception;
 mod back_menu_express;
 mod back_mouse;
 mod back_multimedia;
+mod back_pegado_personalizado;
 mod back_portapapeles;
 mod back_portapapeles_captura;
 mod back_registro;

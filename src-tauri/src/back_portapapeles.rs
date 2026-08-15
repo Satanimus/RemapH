@@ -1268,16 +1268,26 @@ pub fn pegar(ruta: &Path) -> Result<(), String> {
     // exacto medido, ya que el tiempo real puede variar con el tamaño
     // de la imagen o la carga del sistema.
 
-    // Algunas apps (Photoshop confirmado) no re-consultan el
+    // Photoshop (visto arriba: no re-consulta el portapapeles solo
+    // por WM_CLIPBOARDUPDATE, forzar_relectura_portapapeles() era el
+    // parche para eso) ahora tiene su propio camino dedicado — ver
+    // back_pegado_personalizado.rs. Si la app activa es Photoshop,
+    // intentar() ya se encarga de todo (script .jsx corrido en la
+    // instancia abierta) y pegar() termina acá, sin Ctrl+V simulado
+    // ni el parche de relectura, que ya no hacen falta para este caso.
+    if crate::back_pegado_personalizado::intentar() {
+        println!("📋 [diag] pegado personalizado tomó el control — pegar() termina OK");
+
+        return Ok(());
+    }
+
+    // Este era el parche general para apps que no re-consultan el
     // portapapeles solo por WM_CLIPBOARDUPDATE — lo cachean mientras
     // tienen el foco, y recién lo vuelven a leer cuando RECUPERAN el
-    // foco (ej. al volver de otra ventana). Sin esto, clickear el
-    // botón de una imagen nueva mientras Photoshop ya tenía el foco
-    // pegaba la imagen VIEJA que tenía cacheada — tanto por el Ctrl+V
-    // automático como por uno físico del usuario, hasta que cambiaba
-    // de ventana y volvía. forzar_relectura_portapapeles() simula ese
-    // cambio de foco de forma invisible para que la relectura ocurra
-    // sola, sin que el usuario tenga que hacerlo a mano.
+    // foco (ej. al volver de otra ventana). El único caso confirmado
+    // hasta ahora era Photoshop, que ya cortó camino arriba — se deja
+    // igual para cualquier otra app que tenga el mismo problema, sin
+    // haberlo confirmado todavía.
     forzar_relectura_portapapeles();
 
     std::thread::sleep(std::time::Duration::from_millis(600));
