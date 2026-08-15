@@ -3,34 +3,51 @@
 // ------------------------------------------------------
 // Punto de entrada de la Ventana de Configuración
 // (configuracion.html — página independiente, ver
-// vite.config.ts). Etapa 5 del plan: "General" y "Teclas"
-// tienen contenido real — "Apariencia" queda como
-// placeholder hasta la Etapa 6.
+// vite.config.ts). Etapa 6 del plan: las 3 pestañas tienen
+// contenido real.
 //
-// Ambas pestañas comparten la misma mecánica (tabla de 3
+// Las 3 pestañas comparten la misma mecánica (tabla de 3
 // columnas, editar marca en verde, "Guardar cambios" valida
 // y manda un lote, "Restablecer esta pestaña" borra los
 // overrides) armada una sola vez en crearPestanaEditable() y
 // reutilizada con distinta fuente de datos:
 //
-// • General → configuracion_listar_general() / _guardar_lote
+// • General    → configuracion_listar_general() / _guardar_lote
 //   (catálogo de config.rs, ver configuracion_usuario.rs).
-// • Teclas  → configuracion_listar_teclas() / _guardar_lote_teclas
+// • Teclas     → configuracion_listar_teclas() / _guardar_lote_teclas
 //   (catálogo de pulsadores.tsv, agrupado en subtítulos acá
 //   mismo — ver categorizarTecla()).
+// • Apariencia → configuracion_listar_apariencia() / _guardar_lote_apariencia
+//   (catálogo de styl_variables.css, ver apariencia.tsv). Es
+//   la única con controles extra (Guardar/Cargar tema) y con
+//   tipos de campo nuevos ("color" y "pixeles") — ver
+//   crearInputColor()/crearInputPixeles() y el bloque
+//   "PESTAÑA APARIENCIA" al final del archivo.
 // ======================================================
 
 import { invoke } from "@tauri-apps/api/core";
+
+import { aplicarOverridesApariencia } from "../core/core_apariencia";
 
 import "../styles/styl_variables.css";
 import "../styles/styl_general.css";
 import "./configuracion.css";
 
+// La propia Ventana de Configuración también debe reflejar el
+// tema personalizado mientras se lo edita (no solo el resto de
+// ventanas de la app).
+void aplicarOverridesApariencia();
+
 // ======================================================
 // 🧭 TIPOS COMPARTIDOS
 // ======================================================
 
-type TipoValorConfiguracion = "numero" | "numero_par" | "texto";
+type TipoValorConfiguracion =
+  | "numero"
+  | "numero_par"
+  | "texto"
+  | "color"
+  | "pixeles";
 
 interface FilaConfiguracion {
   clave: string;
@@ -92,10 +109,8 @@ cuerpo.className = "configuracion-cuerpo";
 const panelGeneral = document.createElement("div");
 panelGeneral.className = "configuracion-panel";
 
-const panelApariencia = crearPanelPlaceholder(
-  "La pestaña Apariencia todavía no está implementada.",
-);
-panelApariencia.classList.add("oculto");
+const panelApariencia = document.createElement("div");
+panelApariencia.className = "configuracion-panel oculto";
 
 const panelTeclas = document.createElement("div");
 panelTeclas.className = "configuracion-panel oculto";
@@ -117,22 +132,6 @@ function crearBotonTab(texto: string, activa: boolean): HTMLButtonElement {
   boton.textContent = texto;
 
   return boton;
-}
-
-function crearPanelPlaceholder(texto: string): HTMLDivElement {
-  const panel = document.createElement("div");
-
-  panel.className = "configuracion-panel";
-
-  const aviso = document.createElement("div");
-
-  aviso.className = "configuracion-placeholder";
-
-  aviso.textContent = texto;
-
-  panel.append(aviso);
-
-  return panel;
 }
 
 // ======================================================
@@ -207,6 +206,10 @@ function construirValorDesdeInputs(
     return `${inputs[0].value.trim()},${inputs[1].value.trim()}`;
   }
 
+  if (fila.tipo === "pixeles") {
+    return `${inputs[0].value.trim()}px`;
+  }
+
   return inputs[0].value.trim();
 }
 
@@ -243,6 +246,22 @@ function validarValor(fila: FilaConfiguracion, valor: string): string | null {
 
       return null;
     }
+
+    case "pixeles": {
+      if (!/^\d+px$/.test(valor)) {
+        return "Debe ser un tamaño en píxeles (ej. 16px)";
+      }
+
+      return null;
+    }
+
+    case "color": {
+      if (!/^#[0-9a-fA-F]{6}$/.test(valor)) {
+        return "Color inválido (formato #RRGGBB)";
+      }
+
+      return null;
+    }
   }
 }
 
@@ -252,6 +271,15 @@ function crearInputNumero(valorInicial: string): HTMLInputElement {
   input.type = "number";
   input.min = "0";
   input.step = "1";
+  input.value = valorInicial;
+
+  return input;
+}
+
+function crearInputColor(valorInicial: string): HTMLInputElement {
+  const input = document.createElement("input");
+
+  input.type = "color";
   input.value = valorInicial;
 
   return input;
@@ -282,6 +310,17 @@ interface OpcionesPestana {
   restablecer: () => Promise<void>;
 
   textoConfirmacionRestablecer: string;
+
+  // Elementos extra a agregar en el pie, antes de los botones
+  // Restablecer/Guardar (solo lo usa Apariencia, para Guardar/Cargar
+  // tema — ver "PESTAÑA APARIENCIA" al final del archivo).
+  accionesExtra?: HTMLElement[];
+
+  // Se llama después de un guardado o restablecido exitoso, además
+  // del toast de confirmación (solo lo usa Apariencia, para pedirle
+  // al backend que recargue el resto de ventanas y así se vea el
+  // cambio — ver configuracion_refrescar_ventanas_apariencia).
+  despuesDeAplicar?: () => Promise<void>;
 }
 
 interface Pestana {
@@ -296,6 +335,8 @@ function crearPestanaEditable(opciones: OpcionesPestana): Pestana {
     guardarLote,
     restablecer,
     textoConfirmacionRestablecer,
+    accionesExtra,
+    despuesDeAplicar,
   } = opciones;
 
   // ----------------------------------------------------
@@ -335,6 +376,10 @@ function crearPestanaEditable(opciones: OpcionesPestana): Pestana {
   botonGuardar.type = "button";
   botonGuardar.className = "configuracion-boton configuracion-boton-primario";
   botonGuardar.textContent = "Guardar cambios";
+
+  if (accionesExtra && accionesExtra.length > 0) {
+    pieAcciones.append(...accionesExtra);
+  }
 
   pieAcciones.append(botonRestablecer, botonGuardar);
 
@@ -401,7 +446,19 @@ function crearPestanaEditable(opciones: OpcionesPestana): Pestana {
 
     const tdDefecto = document.createElement("td");
     tdDefecto.className = "configuracion-valor-defecto";
-    tdDefecto.textContent = formatearValor(fila.tipo, fila.valorDefecto);
+
+    if (fila.tipo === "color") {
+      const swatch = document.createElement("span");
+      swatch.className = "configuracion-swatch";
+      swatch.style.backgroundColor = fila.valorDefecto;
+
+      tdDefecto.append(
+        swatch,
+        document.createTextNode(formatearValor(fila.tipo, fila.valorDefecto)),
+      );
+    } else {
+      tdDefecto.textContent = formatearValor(fila.tipo, fila.valorDefecto);
+    }
 
     const tdPersonalizado = document.createElement("td");
     tdPersonalizado.className = "configuracion-valor-personalizado";
@@ -425,6 +482,22 @@ function crearPestanaEditable(opciones: OpcionesPestana): Pestana {
       tdPersonalizado.append(envoltorio);
     } else if (fila.tipo === "numero") {
       const input = crearInputNumero(valorActual);
+
+      inputs.push(input);
+
+      tdPersonalizado.append(input);
+    } else if (fila.tipo === "pixeles") {
+      // valorActual siempre trae el sufijo "px" (ver
+      // configuracion_listar_apariencia) — el input numérico solo
+      // edita el número, el "px" se reapendea al construir el valor
+      // (ver construirValorDesdeInputs).
+      const input = crearInputNumero(valorActual.replace(/px$/, ""));
+
+      inputs.push(input);
+
+      tdPersonalizado.append(input);
+    } else if (fila.tipo === "color") {
+      const input = crearInputColor(valorActual);
 
       inputs.push(input);
 
@@ -553,6 +626,10 @@ function crearPestanaEditable(opciones: OpcionesPestana): Pestana {
 
       limpiarEstadoFilas();
       mostrarToast("✅ Guardado");
+
+      if (despuesDeAplicar) {
+        await despuesDeAplicar();
+      }
     } catch (error) {
       mostrarError(`No se pudo guardar: ${String(error)}`);
     } finally {
@@ -578,6 +655,10 @@ function crearPestanaEditable(opciones: OpcionesPestana): Pestana {
       await cargar();
 
       mostrarToast("✅ Restablecido");
+
+      if (despuesDeAplicar) {
+        await despuesDeAplicar();
+      }
     } catch (error) {
       mostrarError(`No se pudo restablecer: ${String(error)}`);
     } finally {
@@ -784,8 +865,164 @@ const pestanaTeclas = crearPestanaEditable({
 });
 
 // ======================================================
+// 🎨 PESTAÑA APARIENCIA (Etapa 6)
+// ------------------------------------------------------
+// Reutiliza crearPestanaEditable() igual que General/Teclas,
+// agrupando filas en "Colores" y "Tamaños" (apariencia.tsv ya
+// viene ordenado así, ver ese archivo). Es la única pestaña
+// con accionesExtra (Guardar/Cargar tema) y con
+// despuesDeAplicar (aplica el cambio en esta misma ventana y
+// le pide al backend que recargue el resto — ver
+// core_apariencia.ts / comandos.rs).
+// ======================================================
+
+// Modelo tal cual lo entrega configuracion_listar_apariencia (snake_case).
+interface FilaCssCruda {
+  clave: string;
+  nombre_ui: string;
+  tipo: string;
+  valor_defecto: string;
+  valor_personalizado: string | null;
+}
+
+function grupoApariencia(tipo: string): string {
+  return tipo === "color" ? "Colores" : "Tamaños";
+}
+
+// aplicarOverridesApariencia() actualiza ESTA ventana (la Ventana de
+// Configuración queda afuera del reload que hace el backend — ver
+// configuracion_refrescar_ventanas_apariencia), así que después de
+// cualquier cambio hay que llamarla acá a mano, además de pedirle al
+// backend que recargue el resto.
+async function refrescarTrasCambioApariencia(): Promise<void> {
+  await aplicarOverridesApariencia();
+  await invoke("configuracion_refrescar_ventanas_apariencia");
+}
+
+// ----------------------------------------------------
+// Controles extra: Guardar tema / Cargar tema
+// ----------------------------------------------------
+
+const inputNombreTema = document.createElement("input");
+inputNombreTema.type = "text";
+inputNombreTema.className = "configuracion-input-tema";
+inputNombreTema.placeholder = "Nombre del tema";
+
+const botonGuardarTema = document.createElement("button");
+botonGuardarTema.type = "button";
+botonGuardarTema.className = "configuracion-boton";
+botonGuardarTema.textContent = "Guardar tema…";
+
+const botonCargarTema = document.createElement("button");
+botonCargarTema.type = "button";
+botonCargarTema.className = "configuracion-boton";
+botonCargarTema.textContent = "Cargar tema…";
+
+const contenedorTema = document.createElement("div");
+contenedorTema.className = "configuracion-acciones-tema";
+contenedorTema.append(inputNombreTema, botonGuardarTema, botonCargarTema);
+
+// Asignada más abajo, apenas se crea pestanaApariencia — los
+// listeners de clic solo se ejecutan ante una interacción del
+// usuario, muy después de ese punto, así que ya la van a ver
+// asignada.
+let recargarApariencia: () => Promise<void> = async () => {};
+
+botonGuardarTema.addEventListener("click", async () => {
+  botonGuardarTema.disabled = true;
+
+  try {
+    const guardado = await invoke<boolean>("configuracion_guardar_tema", {
+      nombreSugerido: inputNombreTema.value.trim(),
+    });
+
+    if (guardado) {
+      mostrarToast("✅ Tema guardado");
+    }
+  } catch (error) {
+    window.alert(`No se pudo guardar el tema: ${String(error)}`);
+  } finally {
+    botonGuardarTema.disabled = false;
+  }
+});
+
+botonCargarTema.addEventListener("click", async () => {
+  botonCargarTema.disabled = true;
+
+  try {
+    const resultado = await invoke<ResultadoGuardado | null>(
+      "configuracion_cargar_tema",
+    );
+
+    if (resultado === null) {
+      // El usuario canceló el selector de archivo.
+      return;
+    }
+
+    if (resultado.errores.length > 0) {
+      window.alert(
+        "No se pudo cargar el tema:\n" +
+          resultado.errores
+            .map((error) => `• ${error.clave || "General"}: ${error.mensaje}`)
+            .join("\n"),
+      );
+      return;
+    }
+
+    await recargarApariencia();
+    mostrarToast("✅ Tema cargado");
+    await refrescarTrasCambioApariencia();
+  } catch (error) {
+    window.alert(`No se pudo cargar el tema: ${String(error)}`);
+  } finally {
+    botonCargarTema.disabled = false;
+  }
+});
+
+const pestanaApariencia = crearPestanaEditable({
+  panel: panelApariencia,
+
+  encabezados: ["Nombre", "Valor por defecto", "Valor personalizado"],
+
+  accionesExtra: [contenedorTema],
+
+  cargarFilas: async () => {
+    const crudas = await invoke<FilaCssCruda[]>(
+      "configuracion_listar_apariencia",
+    );
+
+    return crudas.map((cruda) => ({
+      clave: cruda.clave,
+      nombreMostrado: cruda.nombre_ui,
+      grupo: grupoApariencia(cruda.tipo),
+      tipo: cruda.tipo as TipoValorConfiguracion,
+      valorDefecto: cruda.valor_defecto,
+      valorPersonalizado: cruda.valor_personalizado,
+    }));
+  },
+
+  guardarLote: (cambios) =>
+    invoke<ResultadoGuardado>("configuracion_guardar_lote_apariencia", {
+      cambios,
+    }),
+
+  restablecer: async () => {
+    await invoke("configuracion_restablecer_seccion", { prefijo: "css." });
+  },
+
+  despuesDeAplicar: refrescarTrasCambioApariencia,
+
+  textoConfirmacionRestablecer:
+    "¿Restablecer todos los valores de Apariencia a los de fábrica? " +
+    "Se pierden los valores personalizados de esta pestaña.",
+});
+
+recargarApariencia = pestanaApariencia.cargar;
+
+// ======================================================
 // 🏁 INICIAR
 // ======================================================
 
 pestanaGeneral.cargar();
+pestanaApariencia.cargar();
 pestanaTeclas.cargar();

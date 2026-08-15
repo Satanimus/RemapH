@@ -1,0 +1,56 @@
+# apariencia.tsv — Catálogo de fábrica para la pestaña "Apariencia"
+# de la Ventana de Configuración.
+#
+# Columnas (separadas por TAB): clave | nombre_ui | valor_defecto | tipo
+#
+# - clave: debe coincidir EXACTO con el nombre de la variable CSS en
+#   styl_variables.css, SIN el prefijo "--" (ej. clave "bg" ->
+#   variable "--bg"). No puede contener un punto (reservado para el
+#   prefijo "css." de Configuracion_Usuario.txt).
+# - tipo: "color" (string "#RRGGBB", editable con un selector nativo)
+#   o "pixeles" (entero seguido de "px", ej. "16px").
+# - valor_defecto: mismo valor EFECTIVO que en styl_variables.css
+#   (si una variable está redefinida más de una vez en el archivo,
+#   el que vale en cascada es el último), en el mismo formato que
+#   "tipo".
+#
+# No es un espejo 1 a 1 de styl_variables.css: solo se listan acá las
+# variables que tiene sentido dejar personalizables (colores propios
+# de fábrica que no son "puramente estructurales" y tamaños simples
+# en px). Variables con formato no soportado (ej. "--row-hover-bg",
+# que es un color con alfa de 8 dígitos, o "--tag-none: transparent",
+# una palabra clave) quedan fuera a propósito.
+#
+# ⚠️ Sincronización: cualquier variable nueva/eliminada/renombrada en
+# styl_variables.css que deba ser personalizable acá debe reflejarse
+# en este archivo. configuracion_usuario.rs valida las claves al
+# cargar Configuracion_Usuario.txt e ignora silenciosamente las que
+# no matcheen ninguna fila de este archivo.
+
+clave	nombre_ui	valor_defecto	tipo
+highlight	Color de resaltado (UI)	#03A9F4	color
+highlight-red	Color de resaltado (alerta)	#C62828	color
+bg	Fondo general	#181818	color
+panel	Fondo de panel	#222222	color
+panel2	Fondo de panel secundario	#2B2B2B	color
+border	Color de borde	#404040	color
+text	Color de texto principal	#F2F2F2	color
+text-soft	Color de texto secundario	#BDBDBD	color
+row-bg	Fondo de fila	#202020	color
+button-bg	Fondo de botón	#1a1a1a	color
+green	Verde (éxito)	#388E3C	color
+red	Rojo (error)	#C62828	color
+yellow	Amarillo (aviso)	#D8A628	color
+blue	Azul	#1976D2	color
+tag-cyan	Etiqueta de fila — cian	#03A9F4	color
+tag-purple	Etiqueta de fila — violeta	#7B1FA2	color
+tag-pink	Etiqueta de fila — rosa	#C2185B	color
+color-trigger-sintaxis	Color de sintaxis (capturador)	#1976D2	color
+fs12	Tamaño de texto pequeño	12px	pixeles
+fs14	Tamaño de texto normal	14px	pixeles
+fs16	Tamaño de texto grande	16px	pixeles
+toolbar-height	Alto de la barra de herramientas	48px	pixeles
+row-height	Alto de fila	40px	pixeles
+r6	Radio de bordes	6px	pixeles
+gap8	Espaciado estándar	8px	pixeles
+gap16	Espaciado grande	16px	pixeles

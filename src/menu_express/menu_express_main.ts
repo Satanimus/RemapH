@@ -54,10 +54,14 @@
 
 import { invoke } from "@tauri-apps/api/core";
 
+import { aplicarOverridesApariencia } from "../core/core_apariencia";
+
 import "../styles/styl_variables.css";
 import "./menu_express.css";
 
 import { iniciarAjusteTextoBotones } from "../ui/util/util_texto_boton";
+
+void aplicarOverridesApariencia();
 
 // ======================================================
 // 🧭 TIPOS

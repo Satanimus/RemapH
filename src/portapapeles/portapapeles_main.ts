@@ -25,8 +25,12 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 
+import { aplicarOverridesApariencia } from "../core/core_apariencia";
+
 import "../styles/styl_variables.css";
 import "../styles/portapapeles.css";
+
+void aplicarOverridesApariencia();
 
 // ======================================================
 // 🧭 TIPOS

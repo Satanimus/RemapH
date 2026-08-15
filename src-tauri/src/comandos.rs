@@ -1198,3 +1198,188 @@ pub async fn configuracion_guardar_lote_teclas(
         }),
     }
 }
+
+// ======================================================
+// 🎨 CONFIGURACIÓN — PESTAÑA APARIENCIA (Etapa 6)
+// ------------------------------------------------------
+// Mismo patrón que General/Teclas: el catálogo (colores y
+// tamaños expuestos, ver apariencia.tsv) y los overrides
+// "css." viven en configuracion_usuario.rs — acá solo se
+// convierte a/desde los modelos serializables de la UI y se
+// resuelven los diálogos nativos de Guardar/Cargar tema.
+//
+// A diferencia de General, no hay setter de Rust que aplicar
+// en caliente: los overrides se inyectan como variables CSS
+// inline desde el propio frontend al arrancar cada ventana
+// (ver obtener_overrides_apariencia() y core_apariencia.ts).
+// Por eso, después de guardar un lote o cargar un tema, la UI
+// llama a configuracion_refrescar_ventanas_apariencia() para
+// que las ventanas abiertas se recarguen y vuelvan a leer los
+// overrides ya persistidos.
+// ======================================================
+
+#[derive(Serialize)]
+pub struct ConfiguracionFilaCssUI {
+    pub clave: String,
+
+    pub nombre_ui: String,
+
+    // "color" | "pixeles"
+    pub tipo: String,
+
+    pub valor_defecto: String,
+
+    // None = sin override, se muestra el valor de fábrica.
+    pub valor_personalizado: Option<String>,
+}
+
+fn tipo_css_a_texto(tipo: &configuracion_usuario::TipoValorCss) -> String {
+    match tipo {
+        configuracion_usuario::TipoValorCss::Color => "color".to_string(),
+        configuracion_usuario::TipoValorCss::Pixeles => "pixeles".to_string(),
+    }
+}
+
+#[tauri::command]
+pub async fn configuracion_listar_apariencia() -> Result<Vec<ConfiguracionFilaCssUI>, String> {
+    let overrides = configuracion_usuario::leer_overrides_css()?;
+
+    let filas = configuracion_usuario::cargar_catalogo_css()
+        .iter()
+        .map(|entrada| ConfiguracionFilaCssUI {
+            clave: entrada.clave.clone(),
+
+            nombre_ui: entrada.nombre_ui.clone(),
+
+            tipo: tipo_css_a_texto(&entrada.tipo),
+
+            valor_defecto: entrada.valor_defecto.clone(),
+
+            valor_personalizado: overrides.get(&entrada.clave).cloned(),
+        })
+        .collect();
+
+    Ok(filas)
+}
+
+#[tauri::command]
+pub async fn configuracion_guardar_lote_apariencia(
+    cambios: Vec<ConfiguracionCambioUI>,
+) -> Result<ConfiguracionResultadoGuardadoUI, String> {
+    let pares: Vec<(String, String)> = cambios
+        .into_iter()
+        .map(|cambio| (cambio.clave, cambio.valor))
+        .collect();
+
+    match configuracion_usuario::guardar_lote_css(&pares) {
+        Ok(()) => Ok(ConfiguracionResultadoGuardadoUI {
+            errores: Vec::new(),
+        }),
+
+        Err(errores) => Ok(ConfiguracionResultadoGuardadoUI {
+            errores: errores
+                .into_iter()
+                .map(|(clave, mensaje)| ConfiguracionErrorUI { clave, mensaje })
+                .collect(),
+        }),
+    }
+}
+
+// ======================================================
+// 🖼️ APARIENCIA — TEMAS (.theme)
+// ------------------------------------------------------
+// Ambos comandos devuelven un resultado "vacío" cuando el
+// usuario cancela el diálogo nativo (rfd): no es un error,
+// simplemente no pasó nada.
+//
+// configuracion_guardar_tema(nombre_sugerido) → bool
+//     false = el usuario canceló el diálogo "Guardar como".
+//
+// configuracion_cargar_tema() → Option<ConfiguracionResultadoGuardadoUI>
+//     None = el usuario canceló el selector de archivo.
+//     Some(resultado) = se intentó importar; resultado.errores
+//     vacío significa éxito (mismo contrato que guardar_lote).
+// ======================================================
+
+#[tauri::command]
+pub async fn configuracion_guardar_tema(nombre_sugerido: String) -> Result<bool, String> {
+    let nombre_archivo = if nombre_sugerido.trim().is_empty() {
+        "tema.theme".to_string()
+    } else {
+        format!("{}.theme", nombre_sugerido.trim())
+    };
+
+    let Some(ruta) = rfd::FileDialog::new()
+        .set_file_name(&nombre_archivo)
+        .add_filter("Tema RemapH", &["theme"])
+        .save_file()
+    else {
+        return Ok(false);
+    };
+
+    configuracion_usuario::exportar_tema(&ruta)?;
+
+    Ok(true)
+}
+
+#[tauri::command]
+pub async fn configuracion_cargar_tema() -> Result<Option<ConfiguracionResultadoGuardadoUI>, String>
+{
+    let Some(ruta) = rfd::FileDialog::new()
+        .add_filter("Tema RemapH", &["theme"])
+        .pick_file()
+    else {
+        return Ok(None);
+    };
+
+    match configuracion_usuario::importar_tema(&ruta) {
+        Ok(()) => Ok(Some(ConfiguracionResultadoGuardadoUI {
+            errores: Vec::new(),
+        })),
+
+        Err(errores) => Ok(Some(ConfiguracionResultadoGuardadoUI {
+            errores: errores
+                .into_iter()
+                .map(|(clave, mensaje)| ConfiguracionErrorUI { clave, mensaje })
+                .collect(),
+        })),
+    }
+}
+
+// ======================================================
+// 🎨 APARIENCIA — OVERRIDES EN CALIENTE
+// ------------------------------------------------------
+// obtener_overrides_apariencia()
+//     La llama CADA ventana (principal, captura, menu_express,
+//     portapapeles y la propia Configuración) apenas arranca,
+//     vía core_apariencia.ts, para inyectar las variables CSS
+//     personalizadas como estilo inline en <html> antes de
+//     mostrar contenido.
+//
+// configuracion_refrescar_ventanas_apariencia()
+//     Recarga (location.reload) todas las ventanas abiertas
+//     salvo la propia Configuración, para que vuelvan a pedir
+//     obtener_overrides_apariencia() con los valores recién
+//     guardados. Recargar en vez de destruir/recrear evita
+//     perder la posición/estado de las ventanas flotantes de
+//     MenuExpress y Portapapeles (que dependen de un id
+//     dinámico armado por back_menu_express.rs/
+//     back_portapapeles.rs) — mismo resultado visual, sin ese
+//     riesgo, y sin necesidad de eventos Tauri.
+// ======================================================
+
+#[tauri::command]
+pub fn obtener_overrides_apariencia() -> std::collections::HashMap<String, String> {
+    configuracion_usuario::leer_overrides_css().unwrap_or_default()
+}
+
+#[tauri::command]
+pub fn configuracion_refrescar_ventanas_apariencia(app: tauri::AppHandle) {
+    for (label, ventana) in app.webview_windows() {
+        if label == VENTANA_CONFIGURACION {
+            continue;
+        }
+
+        let _ = ventana.eval("window.location.reload();");
+    }
+}

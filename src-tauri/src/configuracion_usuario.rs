@@ -14,21 +14,24 @@
 //
 // • sin prefijo   → General (variable de config.rs).
 // • "css."        → Apariencia (variable de
-//                    styl_variables.css). Se agrega en
-//                    la Etapa 6.
+//                    styl_variables.css).
 // • "pulsador."   → Teclas (nombre visible de
 //                    pulsadores.tsv).
 //
-// Este archivo conoce la parte SIN prefijo (General) y la
-// parte "pulsador." (Teclas): para General carga el
+// Este archivo conoce las 3 secciones. Para General carga el
 // catálogo de fábrica (configuracion.tsv), aplica overrides
-// sobre config.rs y persiste cambios; para Teclas valida
+// sobre config.rs y persiste cambios. Para Teclas valida
 // contra pulsadores::por_interno() (el catálogo lo posee
 // pulsadores.rs, no este archivo) y persiste, pero no
 // aplica nada en caliente — pulsadores.rs lee el override
-// en el momento (nombre_ui_efectivo()). Las claves "css."
-// solo pasan a través de él como texto plano (las lee/
-// escribe el módulo de la Etapa 6).
+// en el momento (nombre_ui_efectivo()). Para Apariencia
+// carga su propio catálogo de fábrica (apariencia.tsv) y
+// valida contra él, pero tampoco aplica nada en caliente
+// acá: no hay setter Rust, el frontend (core_apariencia.ts)
+// pide los overrides ya guardados y los inyecta como estilo
+// inline al arrancar cada ventana; guardar un cambio (o
+// cargar un tema) hace que comandos.rs recargue esas
+// ventanas para que vuelvan a pedirlos.
 //
 // No valida en la UI. No arma la tabla que ve el usuario
 // (eso es Etapa 3/4, en comandos.rs y configuracion.ts).
@@ -105,6 +108,26 @@
 //     valor no esté vacío; no hay setter que aplicar en
 //     caliente (pulsadores::nombre_ui_efectivo() lee el
 //     override en el momento).
+//
+// cargar_catalogo_css()
+//     Carga (una sola vez) apariencia.tsv.
+//
+// leer_overrides_css()
+//     Devuelve solo los overrides con prefijo "css."
+//     (Apariencia), con la clave ya sin el prefijo (variable
+//     CSS → valor personalizado).
+//
+// guardar_lote_css(cambios)
+//     Igual que guardar_lote_pulsadores() pero para
+//     Apariencia: valida cada clave contra apariencia.tsv y
+//     cada valor según su tipo (color "#RRGGBB" o pixeles
+//     "Npx"); no hay setter que aplicar en caliente.
+//
+// exportar_tema(ruta) / importar_tema(ruta)
+//     Vuelcan/leen los overrides de Apariencia como archivo
+//     .theme (mismo formato "clave=valor", sin el prefijo
+//     "css."). importar_tema reusa guardar_lote_css(), así
+//     que también es todo o nada.
 // ------------------------------------------------------
 // Transformación:
 //
@@ -715,4 +738,288 @@ pub fn guardar_lote_pulsadores(cambios: &[(String, String)]) -> Result<(), Vec<(
     }
 
     escribir_mapa_completo(&mapa).map_err(|error| vec![(String::new(), error)])
+}
+
+// ======================================================
+// 🎨 APARIENCIA (Etapa 6) — prefijo "css."
+// ------------------------------------------------------
+// Mismo espíritu que el catálogo de General (cargar_catalogo/
+// EntradaCatalogo), pero para las variables de
+// styl_variables.css: tipo propio (color/pixeles, no numero/
+// numero_par/texto) y ningún setter de config.rs que aplicar
+// — el valor vive únicamente en Configuracion_Usuario.txt y
+// lo consume el frontend (ver comandos.rs, sección Apariencia,
+// y core_apariencia.ts).
+// ======================================================
+
+#[derive(Clone, Debug, PartialEq)]
+pub enum TipoValorCss {
+    Color,
+    Pixeles,
+}
+
+#[derive(Clone, Debug)]
+pub struct EntradaCatalogoCss {
+    pub clave: String,
+
+    pub nombre_ui: String,
+
+    pub valor_defecto: String,
+
+    pub tipo: TipoValorCss,
+}
+
+static CATALOGO_CSS: OnceLock<Vec<EntradaCatalogoCss>> = OnceLock::new();
+
+pub fn cargar_catalogo_css() -> &'static Vec<EntradaCatalogoCss> {
+    CATALOGO_CSS.get_or_init(|| {
+        let texto = include_str!("apariencia.tsv");
+
+        let mut catalogo: Vec<EntradaCatalogoCss> = Vec::new();
+
+        for (numero_linea, linea) in texto.lines().enumerate() {
+            let linea = linea.trim();
+
+            if linea.is_empty() || linea.starts_with('#') {
+                continue;
+            }
+
+            let columnas: Vec<&str> = linea.split('\t').collect();
+
+            if columnas.len() != 4 {
+                panic!(
+                    "❌ Error interno en apariencia.tsv. Línea {}",
+                    numero_linea + 1
+                );
+            }
+
+            // Fila de encabezado ("clave  nombre_ui  valor_defecto  tipo").
+            if columnas[0].trim() == "clave" {
+                continue;
+            }
+
+            let clave = columnas[0].trim();
+
+            let nombre_ui = columnas[1].trim();
+
+            let valor_defecto = columnas[2].trim();
+
+            let tipo_texto = columnas[3].trim();
+
+            if clave.is_empty() {
+                panic!(
+                    "❌ Entrada de apariencia sin clave. Línea {}",
+                    numero_linea + 1
+                );
+            }
+
+            if clave.contains('.') {
+                panic!(
+                    "❌ Clave de apariencia.tsv no puede contener un punto (reservado para el prefijo css.): \"{}\"",
+                    clave
+                );
+            }
+
+            let tipo = match tipo_texto {
+                "color" => TipoValorCss::Color,
+                "pixeles" => TipoValorCss::Pixeles,
+                _ => panic!(
+                    "❌ Tipo desconocido \"{}\" en apariencia.tsv. Línea {}",
+                    tipo_texto,
+                    numero_linea + 1
+                ),
+            };
+
+            if catalogo.iter().any(|entrada: &EntradaCatalogoCss| entrada.clave == clave) {
+                panic!("❌ Clave duplicada en apariencia.tsv: {}", clave);
+            }
+
+            catalogo.push(EntradaCatalogoCss {
+                clave: clave.to_string(),
+
+                nombre_ui: nombre_ui.to_string(),
+
+                valor_defecto: valor_defecto.to_string(),
+
+                tipo,
+            });
+        }
+
+        catalogo
+    })
+}
+
+const PREFIJO_CSS: &str = "css.";
+
+// ======================================================
+// 📥 LEER OVERRIDES (solo Apariencia, prefijo "css.")
+// ======================================================
+
+pub fn leer_overrides_css() -> Result<HashMap<String, String>, String> {
+    let mapa = leer_mapa_completo()?;
+
+    Ok(mapa
+        .into_iter()
+        .filter_map(|(clave, valor)| {
+            clave
+                .strip_prefix(PREFIJO_CSS)
+                .map(|variable| (variable.to_string(), valor))
+        })
+        .collect())
+}
+
+// ======================================================
+// ✅ VALIDAR SEGÚN TIPO (Apariencia, sin aplicar)
+// ======================================================
+
+fn validar_css_segun_tipo(tipo: &TipoValorCss, valor: &str) -> Result<(), String> {
+    match tipo {
+        TipoValorCss::Color => {
+            let valor = valor.trim();
+
+            let valido = valor.len() == 7
+                && valor.starts_with('#')
+                && valor[1..]
+                    .chars()
+                    .all(|caracter| caracter.is_ascii_hexdigit());
+
+            if valido {
+                Ok(())
+            } else {
+                Err(format!(
+                    "Color inválido, debe tener el formato #RRGGBB: \"{}\"",
+                    valor
+                ))
+            }
+        }
+
+        TipoValorCss::Pixeles => {
+            let valor = valor.trim();
+
+            let Some(numero) = valor.strip_suffix("px") else {
+                return Err(format!(
+                    "Debe ser un tamaño en píxeles, ej. \"16px\": \"{}\"",
+                    valor
+                ));
+            };
+
+            numero
+                .parse::<u64>()
+                .map(|_| ())
+                .map_err(|_| format!("Debe ser un tamaño en píxeles, ej. \"16px\": \"{}\"", valor))
+        }
+    }
+}
+
+// ======================================================
+// 📦 GUARDAR LOTE — APARIENCIA (todo o nada)
+// ------------------------------------------------------
+// Misma mecánica que guardar_lote()/guardar_lote_pulsadores():
+// valida TODO el lote primero contra apariencia.tsv; si algo
+// falla no aplica ni persiste nada. No hay aplicar_valor():
+// no existe setter de Rust para variables CSS, el override
+// solo se persiste — quien lo "aplica" es el frontend, al leer
+// obtener_overrides_apariencia() en el arranque de cada
+// ventana (ver comandos.rs).
+// ======================================================
+
+pub fn guardar_lote_css(cambios: &[(String, String)]) -> Result<(), Vec<(String, String)>> {
+    let catalogo = cargar_catalogo_css();
+
+    let mut errores: Vec<(String, String)> = Vec::new();
+
+    for (clave, valor) in cambios {
+        match catalogo.iter().find(|entrada| &entrada.clave == clave) {
+            None => errores.push((
+                clave.clone(),
+                format!("Variable CSS desconocida: \"{}\"", clave),
+            )),
+
+            Some(entrada) => {
+                if let Err(mensaje) = validar_css_segun_tipo(&entrada.tipo, valor) {
+                    errores.push((clave.clone(), mensaje));
+                }
+            }
+        }
+    }
+
+    if !errores.is_empty() {
+        return Err(errores);
+    }
+
+    let mut mapa = leer_mapa_completo().map_err(|error| vec![(String::new(), error)])?;
+
+    for (clave, valor) in cambios {
+        mapa.insert(
+            format!("{}{}", PREFIJO_CSS, clave),
+            valor.trim().to_string(),
+        );
+    }
+
+    escribir_mapa_completo(&mapa).map_err(|error| vec![(String::new(), error)])
+}
+
+// ======================================================
+// 🖼️ TEMAS (.theme) — exportar/importar overrides de Apariencia
+// ------------------------------------------------------
+// Formato idéntico a Configuracion_Usuario.txt ("clave=valor",
+// comentarios con #) pero SOLO con las variables CSS y SIN el
+// prefijo "css." — un archivo de tema es portable entre
+// instalaciones de RemapH, no debe depender del formato interno
+// del archivo de usuario.
+// ======================================================
+
+pub fn exportar_tema(ruta: &std::path::Path) -> Result<(), String> {
+    let overrides = leer_overrides_css()?;
+
+    let mut claves: Vec<&String> = overrides.keys().collect();
+
+    claves.sort();
+
+    let mut contenido = String::from(
+        "# Tema de Apariencia — RemapH.\n\
+         # Generado desde la Ventana de Configuración (pestaña Apariencia).\n\
+         # Formato: variable=valor (una línea por variable CSS, sin el\n\
+         # prefijo \"css.\" que usa Configuracion_Usuario.txt).\n\n",
+    );
+
+    for clave in claves {
+        contenido.push_str(&format!("{}={}\n", clave, overrides[clave]));
+    }
+
+    fs::write(ruta, contenido).map_err(|error| error.to_string())
+}
+
+pub fn importar_tema(ruta: &std::path::Path) -> Result<(), Vec<(String, String)>> {
+    let texto = fs::read_to_string(ruta).map_err(|error| {
+        vec![(
+            String::new(),
+            format!("No se pudo leer el archivo de tema: {}", error),
+        )]
+    })?;
+
+    let mut cambios: Vec<(String, String)> = Vec::new();
+
+    for linea in texto.lines() {
+        let linea = linea.trim();
+
+        if linea.is_empty() || linea.starts_with('#') {
+            continue;
+        }
+
+        let Some((clave, valor)) = linea.split_once('=') else {
+            continue;
+        };
+
+        cambios.push((clave.trim().to_string(), valor.trim().to_string()));
+    }
+
+    if cambios.is_empty() {
+        return Err(vec![(
+            String::new(),
+            "El archivo de tema no contiene variables válidas".to_string(),
+        )]);
+    }
+
+    guardar_lote_css(&cambios)
 }

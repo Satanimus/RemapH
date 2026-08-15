@@ -6,6 +6,8 @@ import "./styles.css";
 
 import { invoke } from "@tauri-apps/api/core";
 
+import { aplicarOverridesApariencia } from "./core/core_apariencia";
+
 import { crearApp } from "./ui/ui_app";
 
 import { establecerPerfilUi, obtenerPerfilUi } from "./core/core_perfil_ui";
@@ -22,6 +24,11 @@ import {
 import { iniciarAjusteTextoBotones } from "./ui/util/util_texto_boton";
 
 import { actualizarStatusbar } from "./ui/ui_statusbar";
+
+// Se dispara apenas se ejecuta el módulo, en paralelo con el resto
+// del arranque (ver core_apariencia.ts) — no hace falta esperarlo
+// acá, setProperty() en <html> aplica en cuanto resuelve.
+void aplicarOverridesApariencia();
 
 // ======================================================
 // 💾 GUARDAR Y ACTIVAR PERFIL

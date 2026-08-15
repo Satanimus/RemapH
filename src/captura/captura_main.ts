@@ -18,8 +18,12 @@
 
 import { invoke } from "@tauri-apps/api/core";
 
+import { aplicarOverridesApariencia } from "../core/core_apariencia";
+
 import "../styles/styl_variables.css";
 import "./captura.css";
+
+void aplicarOverridesApariencia();
 
 // ======================================================
 // 🧭 TIPOS

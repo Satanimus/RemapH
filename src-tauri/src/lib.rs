@@ -146,6 +146,12 @@ pub fn run() {
             comandos::configuracion_restablecer_seccion,
             comandos::configuracion_listar_teclas,
             comandos::configuracion_guardar_lote_teclas,
+            comandos::configuracion_listar_apariencia,
+            comandos::configuracion_guardar_lote_apariencia,
+            comandos::configuracion_guardar_tema,
+            comandos::configuracion_cargar_tema,
+            comandos::obtener_overrides_apariencia,
+            comandos::configuracion_refrescar_ventanas_apariencia,
         ])
         .run(tauri::generate_context!())
         .expect("error al ejecutar Tauri");

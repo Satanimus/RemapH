@@ -115,6 +115,18 @@
 
 .configuracion-valor-defecto {
     color: var(--text-soft);
+    display: flex;
+    align-items: center;
+    gap: var(--gap8);
+}
+
+.configuracion-swatch {
+    display: inline-block;
+    width: 14px;
+    height: 14px;
+    border-radius: var(--r4);
+    border: 1px solid var(--border-light);
+    flex-shrink: 0;
 }
 
 /* Fila separadora de subtítulo (pestaña Teclas: Letras,
@@ -137,6 +149,32 @@
 
 .configuracion-valor-personalizado input {
     width: 100%;
+}
+
+.configuracion-valor-personalizado input[type="color"] {
+    width: 44px;
+    height: 28px;
+    padding: 2px;
+}
+
+/* Grupo de controles de tema (Apariencia) — empujado al borde
+   izquierdo del pie, mientras Restablecer/Guardar quedan a la
+   derecha (el pie sigue siendo flex-end por defecto). */
+.configuracion-acciones-tema {
+    display: flex;
+    align-items: center;
+    gap: var(--gap8);
+    margin-right: auto;
+}
+
+.configuracion-input-tema {
+    padding: var(--gap8);
+    background: var(--panel2);
+    border: 1px solid var(--border-light);
+    border-radius: var(--r4);
+    color: var(--text);
+    font-size: var(--fs13);
+    width: 160px;
 }
 
 .configuracion-par {
