@@ -145,10 +145,6 @@ fn cargar() -> &'static Vec<Pulsador> {
                 continue;
             }
 
-            if numero_linea == 0 {
-                continue;
-            }
-
             let columnas: Vec<&str> = linea.split('\t').collect();
 
             if columnas.len() != 5 {
@@ -156,6 +152,21 @@ fn cargar() -> &'static Vec<Pulsador> {
                     "❌ Error interno en pulsadores.tsv. Línea {}",
                     numero_linea + 1
                 );
+            }
+
+            // Fila de encabezado ("fuente  nativo  interno  interception  ui").
+            // No empieza con '#' (así se ve en un editor tabular como
+            // columnas reales), así que hay que descartarla explícitamente
+            // por contenido — igual que configuracion.tsv/apariencia.tsv
+            // descartan su fila "clave  nombre_ui  ...". Antes se hacía
+            // por número de línea (`numero_linea == 0`), pero esa cuenta
+            // incluye los comentarios de arriba del archivo, así que el
+            // salto caía en la primera línea de comentario y no en el
+            // encabezado real: el header terminaba procesado como un
+            // pulsador más (interno "interno", ui "ui"), visible en la
+            // pestaña Teclas dentro de "Símbolos".
+            if columnas[0].trim() == "fuente" {
+                continue;
             }
 
             let fuente = columnas[0].trim();

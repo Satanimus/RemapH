@@ -972,9 +972,13 @@ pub fn guardar_lote_css(cambios: &[(String, String)]) -> Result<(), Vec<(String,
 pub fn exportar_tema(ruta: &std::path::Path) -> Result<(), String> {
     let overrides = leer_overrides_css()?;
 
-    let mut claves: Vec<&String> = overrides.keys().collect();
-
-    claves.sort();
+    // Se exporta el valor EFECTIVO de cada variable del catálogo
+    // (override si existe, si no el de fábrica) — no solo las
+    // claves con override guardado. Si no fuera así, guardar un
+    // tema sin haber tocado nada en esta sesión produciría un
+    // archivo .theme vacío, aunque en pantalla se vea una paleta
+    // completa (la de fábrica).
+    let catalogo = cargar_catalogo_css();
 
     let mut contenido = String::from(
         "# Tema de Apariencia — RemapH.\n\
@@ -983,8 +987,12 @@ pub fn exportar_tema(ruta: &std::path::Path) -> Result<(), String> {
          # prefijo \"css.\" que usa Configuracion_Usuario.txt).\n\n",
     );
 
-    for clave in claves {
-        contenido.push_str(&format!("{}={}\n", clave, overrides[clave]));
+    for entrada in catalogo {
+        let valor_efectivo = overrides
+            .get(&entrada.clave)
+            .unwrap_or(&entrada.valor_defecto);
+
+        contenido.push_str(&format!("{}={}\n", entrada.clave, valor_efectivo));
     }
 
     fs::write(ruta, contenido).map_err(|error| error.to_string())

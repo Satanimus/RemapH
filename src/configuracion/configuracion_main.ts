@@ -361,6 +361,14 @@ function crearPestanaEditable(opciones: OpcionesPestana): Pestana {
 
   tabla.append(thead, tbody);
 
+  // La tabla en sí no scrollea (ver configuracion.css) — este
+  // contenedor es el que tiene overflow-y y ocupa el espacio
+  // disponible del panel, dejando que la tabla crezca a su altura
+  // natural adentro.
+  const scrollTabla = document.createElement("div");
+  scrollTabla.className = "configuracion-tabla-scroll";
+  scrollTabla.append(tabla);
+
   const mensajeError = document.createElement("div");
   mensajeError.className = "configuracion-error oculto";
 
@@ -383,7 +391,7 @@ function crearPestanaEditable(opciones: OpcionesPestana): Pestana {
 
   pieAcciones.append(botonRestablecer, botonGuardar);
 
-  panel.append(tabla, mensajeError, pieAcciones);
+  panel.append(scrollTabla, mensajeError, pieAcciones);
 
   // ----------------------------------------------------
   // Estado propio de esta pestaña
@@ -448,14 +456,19 @@ function crearPestanaEditable(opciones: OpcionesPestana): Pestana {
     tdDefecto.className = "configuracion-valor-defecto";
 
     if (fila.tipo === "color") {
+      const envoltorioSwatch = document.createElement("span");
+      envoltorioSwatch.className = "configuracion-swatch-wrap";
+
       const swatch = document.createElement("span");
       swatch.className = "configuracion-swatch";
       swatch.style.backgroundColor = fila.valorDefecto;
 
-      tdDefecto.append(
+      envoltorioSwatch.append(
         swatch,
         document.createTextNode(formatearValor(fila.tipo, fila.valorDefecto)),
       );
+
+      tdDefecto.append(envoltorioSwatch);
     } else {
       tdDefecto.textContent = formatearValor(fila.tipo, fila.valorDefecto);
     }

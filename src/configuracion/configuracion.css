@@ -63,6 +63,11 @@
     flex-direction: column;
     width: 100%;
     height: 100%;
+    /* min-height: 0 es necesario para que un hijo flex con overflow
+       (.configuracion-tabla-scroll) pueda scrollear en vez de
+       empujar la altura del panel — sin esto, un flex item por
+       defecto no se encoge más allá del tamaño de su contenido. */
+    min-height: 0;
     padding: var(--gap16);
     gap: var(--gap12);
 }
@@ -82,9 +87,18 @@
    TABLA
    ====================================================== */
 
-.configuracion-tabla {
+/* La tabla no scrollea por sí sola (overflow no funciona de forma
+   confiable en un elemento <table>, que crece libre en altura): el
+   que scrollea es este contenedor, que la envuelve. La tabla adentro
+   queda a su altura natural y el thead se pega arriba (sticky) sobre
+   ESTE contenedor, no sobre la ventana. */
+.configuracion-tabla-scroll {
     flex: 1;
+    min-height: 0;
     overflow-y: auto;
+}
+
+.configuracion-tabla {
     border-collapse: collapse;
     width: 100%;
     font-size: var(--fs13);
@@ -93,6 +107,7 @@
 .configuracion-tabla thead th {
     position: sticky;
     top: 0;
+    z-index: 1;
 
     background: var(--panel2);
     color: var(--text-soft);
@@ -115,7 +130,17 @@
 
 .configuracion-valor-defecto {
     color: var(--text-soft);
-    display: flex;
+}
+
+/* El swatch de color (Apariencia) necesita ir en línea junto al
+   texto — pero el contenedor NO debe ser display:flex en el <td>:
+   un <td> con vertical-align:middle centra su contenido de forma
+   fiable solo cuando el contenido es inline (o inline-block); un
+   hijo directo en flex/block rompe ese centrado y el texto queda
+   pegado arriba. inline-flex conserva el centrado de la celda y
+   alinea swatch+texto entre sí. */
+.configuracion-valor-defecto .configuracion-swatch-wrap {
+    display: inline-flex;
     align-items: center;
     gap: var(--gap8);
 }
