@@ -6,37 +6,41 @@
 // 1. ¿Qué hace este archivo?
 // Módulo aislado: decide si la app activa necesita un camino de
 // pegado distinto al genérico (Ctrl+V simulado) y, si corresponde,
-// lo ejecuta. Por ahora solo conoce Photoshop — el script vive
-// embebido en el binario (include_str!, carpeta scripts/ del repo),
-// no como archivo suelto en disco del usuario. Si en el futuro
-// aparecen más programas con el mismo problema, se agrega acá un
-// caso más (mismo patrón), sin tocar nada externo.
+// lo ejecuta. Por ahora solo conoce Photoshop — los scripts viven
+// embebidos en el binario (include_str! / const, sin archivos
+// sueltos en disco del usuario). Si en el futuro aparecen más
+// programas con el mismo problema, se agrega acá un caso más
+// (mismo patrón), sin tocar nada externo.
 // ------------------------------------------------------
 // 2. ¿Quién llama este archivo?
-// Etapa 2: back_portapapeles.rs::pegar(), justo donde hoy se llama
-// incondicionalmente a crate::runtime::emitir_ctrl_v() — ahí se va a
-// intentar primero el camino personalizado y, si no corresponde,
-// seguir con el camino genérico de siempre. Todavía no está
-// conectado.
+// back_portapapeles.rs::pegar(), justo donde antes se llamaba
+// incondicionalmente a crate::runtime::emitir_ctrl_v() — ahí se
+// intenta primero el camino personalizado y, si no corresponde,
+// sigue con el camino genérico de siempre.
 // ------------------------------------------------------
 // 3. ¿Qué información recibe?
 // Nada como parámetro — consulta directo la app activa (back_app).
 // ------------------------------------------------------
 // 4. ¿Qué información entrega?
-// bool: true si se ejecutó el script personalizado (Photoshop),
+// bool: true si se ejecutó el camino personalizado (Photoshop),
 // false si la app activa no tiene camino personalizado y debe
 // seguir el pegado genérico.
 // ------------------------------------------------------
 // 5. Funciones del archivo
 // intentar()
 //     Punto de entrada único. Revisa la app activa y, si es
-//     Photoshop, escribe el script embebido a un archivo temporal y
-//     lo manda a ejecutar en la instancia ya abierta.
+//     Photoshop, dispara la secuencia de doble relanzamiento.
 // es_photoshop()
 //     Compara el nombre de archivo del proceso activo.
-// ejecutar_script_photoshop()
-//     Resuelve PID→ruta del ejecutable, escribe el .jsx embebido a
-//     %TEMP% y lanza "<photoshop.exe> <script.jsx>".
+// ejecutar_doble_script_photoshop()
+//     Resuelve PID→ruta del ejecutable UNA sola vez y hace dos
+//     relanzamientos separados por config::delay_entre_scripts_
+//     photoshop(): primero un script vacío (solo para provocar la
+//     activación real de Photoshop), después el script que pega de
+//     verdad.
+// lanzar_script_photoshop()
+//     Escribe un contenido de script a un archivo temporal único y
+//     lo manda a ejecutar en la instancia ya abierta.
 // ======================================================
 
 use std::fs;
@@ -47,6 +51,24 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use crate::back_app;
 
 const SCRIPT_PHOTOSHOP: &str = include_str!("../scripts/photoshop_pegar.jsx");
+
+// Script "vacío" (no-op): no hace nada dentro de Photoshop, su único
+// propósito es viajar en un relanzamiento propio para provocar la
+// activación real de la ventana de Photoshop — la misma activación
+// que, según la hipótesis en investigación, es la que de verdad hace
+// que Photoshop revise si hay algo nuevo en el portapapeles (no
+// ningún truco nuestro de robo-y-devuelve-foco).
+const SCRIPT_VACIO: &str = "// no-op: solo dispara el relanzamiento/activación, no pega nada\n";
+
+// ======================================================
+// ⏱️ Ver config::delay_entre_scripts_photoshop() / establecer_
+// delay_entre_scripts_photoshop() (config.rs) — espera entre el
+// relanzamiento con SCRIPT_VACIO (activación) y el relanzamiento con
+// SCRIPT_PHOTOSHOP (pegado real). Ya no es una constante local:
+// se dejó de fase de pruebas fijas para pasar a ser un valor
+// configurable único, junto con el resto de los timers de
+// portapapeles.
+// ======================================================
 
 // Contador para que cada invocación use un nombre de archivo
 // temporal distinto — evita que Photoshop pueda tratar dos pedidos
@@ -66,19 +88,9 @@ pub fn intentar() -> bool {
         return false;
     }
 
-    println!("🎨 [diag] pegado personalizado: app activa es Photoshop, uso script dedicado");
+    println!("🎨 [diag] pegado personalizado: app activa es Photoshop, uso doble relanzamiento");
 
-    // DIAGNÓSTICO: delay grande a propósito (600) para confirmar si el
-    // desfasaje de "pega el ítem anterior" es un tema de timing —
-    // Photoshop necesitando más tiempo del que le dábamos (600ms,
-    // heredado del ajuste para Paint) para terminar de invalidar su
-    // caché interna del portapapeles tras forzar_relectura_
-    // portapapeles(). Si con esto el desfasaje desaparece, se ajusta
-    // a un valor más razonable después; si sigue igual, el problema
-    // no es de timing y hay que mirar otra cosa.
-    std::thread::sleep(std::time::Duration::from_millis(600));
-
-    ejecutar_script_photoshop()
+    ejecutar_doble_script_photoshop()
 }
 
 // ======================================================
@@ -90,10 +102,10 @@ fn es_photoshop(nombre_proceso: &str) -> bool {
 }
 
 // ======================================================
-// ▶️ EJECUTAR SCRIPT EN LA INSTANCIA YA ABIERTA
+// ▶️▶️ DOS RELANZAMIENTOS: ACTIVAR, ESPERAR, PEGAR
 // ======================================================
 
-fn ejecutar_script_photoshop() -> bool {
+fn ejecutar_doble_script_photoshop() -> bool {
     let Some(pid) = back_app::obtener_pid_activo() else {
         println!("🎨 [diag] pegado personalizado: no se pudo obtener PID de la app activa");
         return false;
@@ -104,6 +116,31 @@ fn ejecutar_script_photoshop() -> bool {
         return false;
     };
 
+    println!("🎨 [diag] pegado personalizado: relanzamiento 1/2 (activación, script vacío)");
+    let activacion_ok = lanzar_script_photoshop(&ruta_exe, SCRIPT_VACIO, "activar");
+
+    let delay = crate::config::delay_entre_scripts_photoshop();
+    println!(
+        "🎨 [diag] pegado personalizado: espero {}ms entre relanzamientos",
+        delay
+    );
+    std::thread::sleep(std::time::Duration::from_millis(delay));
+
+    println!("🎨 [diag] pegado personalizado: relanzamiento 2/2 (pegado real)");
+    let pegado_ok = lanzar_script_photoshop(&ruta_exe, SCRIPT_PHOTOSHOP, "pegar");
+
+    if !activacion_ok {
+        println!("🎨 [diag] pegado personalizado: el relanzamiento de activación falló (sigo igual con el de pegado)");
+    }
+
+    pegado_ok
+}
+
+// ======================================================
+// ▶️ EJECUTAR UN SCRIPT EN LA INSTANCIA YA ABIERTA
+// ======================================================
+
+fn lanzar_script_photoshop(ruta_exe: &str, contenido_script: &str, etiqueta: &str) -> bool {
     let marca = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .map(|duracion| duracion.as_millis())
@@ -111,13 +148,15 @@ fn ejecutar_script_photoshop() -> bool {
 
     let contador = CONTADOR.fetch_add(1, Ordering::Relaxed);
 
-    let ruta_temporal =
-        std::env::temp_dir().join(format!("remaph_photoshop_pegar_{}_{}.jsx", marca, contador));
+    let ruta_temporal = std::env::temp_dir().join(format!(
+        "remaph_photoshop_{}_{}_{}.jsx",
+        etiqueta, marca, contador
+    ));
 
-    if let Err(error) = fs::write(&ruta_temporal, SCRIPT_PHOTOSHOP) {
+    if let Err(error) = fs::write(&ruta_temporal, contenido_script) {
         println!(
-            "🎨 [diag] pegado personalizado: error escribiendo script temporal: {}",
-            error
+            "🎨 [diag] pegado personalizado ({}): error escribiendo script temporal: {}",
+            etiqueta, error
         );
         return false;
     }
@@ -125,24 +164,18 @@ fn ejecutar_script_photoshop() -> bool {
     // .status() en vez de .spawn(): se espera a que el proceso que
     // reenvía el script a la instancia de Photoshop ya abierta
     // termine de verdad, en vez de devolver el control de inmediato.
-    // Sin esto, pegar() volvía OK antes de que el reenvío terminara,
-    // y un click siguiente podía escribir contenido nuevo al
-    // portapapeles mientras el pedido anterior todavía no había
-    // llegado a ejecutarse adentro de Photoshop — eso producía el
-    // desfasaje de "un paso atrás" (clickear el ítem 2 pegaba el 1,
-    // clickear el 3 pegaba el 2, etc.).
-    match Command::new(&ruta_exe).arg(&ruta_temporal).status() {
+    match Command::new(ruta_exe).arg(&ruta_temporal).status() {
         Ok(estado) => {
             println!(
-                "🎨 [diag] pegado personalizado: script enviado a Photoshop, estado={}",
-                estado
+                "🎨 [diag] pegado personalizado ({}): script enviado a Photoshop, estado={}",
+                etiqueta, estado
             );
             true
         }
         Err(error) => {
             println!(
-                "🎨 [diag] pegado personalizado: error lanzando Photoshop con el script: {}",
-                error
+                "🎨 [diag] pegado personalizado ({}): error lanzando Photoshop con el script: {}",
+                etiqueta, error
             );
             false
         }

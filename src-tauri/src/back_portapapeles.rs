@@ -1180,13 +1180,11 @@ fn notificar_ventanas_abiertas() {
 // más abajo (Etapa G).
 // ======================================================
 
-const IGNORAR_PROXIMO_CAMBIO_MS: u128 = 600;
-
 static IGNORAR_HASTA: Mutex<Option<std::time::Instant>> = Mutex::new(None);
 
 fn marcar_ignorar_proximo_cambio() {
     let vencimiento = std::time::Instant::now()
-        + std::time::Duration::from_millis(IGNORAR_PROXIMO_CAMBIO_MS as u64);
+        + std::time::Duration::from_millis(crate::config::tiempo_ignorar_cambio_portapapeles());
 
     *IGNORAR_HASTA.lock().unwrap() = Some(vencimiento);
 }
@@ -1290,7 +1288,9 @@ pub fn pegar(ruta: &Path) -> Result<(), String> {
     // haberlo confirmado todavía.
     forzar_relectura_portapapeles();
 
-    std::thread::sleep(std::time::Duration::from_millis(600));
+    std::thread::sleep(std::time::Duration::from_millis(
+        crate::config::tiempo_espera_pegado_generico(),
+    ));
 
     crate::runtime::emitir_ctrl_v();
 

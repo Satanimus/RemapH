@@ -141,6 +141,26 @@
 //     única fuente de verdad que menu_boton_*. El tamaño de TEXTO de
 //     Portapapeles reusa menu_texto_pequeno/mediano/grande tal cual,
 //     no tiene funciones propias.
+//
+// tiempo_ignorar_cambio_portapapeles()
+// establecer_tiempo_ignorar_cambio_portapapeles()
+//     Ventana (desde que se pega algo) durante la cual se ignora el
+//     próximo aviso de cambio de portapapeles, para no generar un
+//     rotativo duplicado del mismo contenido que ya existía (el
+//     propio pegado dispara su propio aviso de cambio).
+//
+// tiempo_espera_pegado_generico()
+// establecer_tiempo_espera_pegado_generico()
+//     Pausa en pegar(), solo para apps SIN camino personalizado (no
+//     Photoshop), entre forzar_relectura_portapapeles() y el Ctrl+V
+//     simulado — le da tiempo a la app de "asentar" el contenido
+//     nuevo antes del pegado automático.
+//
+// delay_entre_scripts_photoshop()
+// establecer_delay_entre_scripts_photoshop()
+//     Solo Photoshop: pausa entre el relanzamiento de activación
+//     (script vacío) y el relanzamiento que pega de verdad. Ver
+//     back_pegado_personalizado.rs.
 // ------------------------------------------------------
 // Transformación:
 //
@@ -580,4 +600,42 @@ pub fn portapapeles_boton_grande() -> (u64, u64) {
 pub fn establecer_portapapeles_boton_grande(ancho: u64, alto: u64) {
     PORTAPAPELES_BOTON_GRANDE_ANCHO.store(ancho, Ordering::Relaxed);
     PORTAPAPELES_BOTON_GRANDE_ALTO.store(alto, Ordering::Relaxed);
+}
+
+// ======================================================
+// 📋 PORTAPAPELES — TIMERS DE PEGADO
+// ------------------------------------------------------
+// Los 3 tiempos de espera involucrados en pegar() (back_portapapeles.
+// rs) y en el camino personalizado de Photoshop (back_pegado_
+// personalizado.rs). Antes hardcodeados, ahora únicos valores de
+// verdad y configurables desde acá — mismo criterio que el resto de
+// este archivo.
+// ======================================================
+
+static TIEMPO_IGNORAR_CAMBIO_PORTAPAPELES: AtomicU64 = AtomicU64::new(600);
+static TIEMPO_ESPERA_PEGADO_GENERICO: AtomicU64 = AtomicU64::new(600);
+static DELAY_ENTRE_SCRIPTS_PHOTOSHOP: AtomicU64 = AtomicU64::new(50);
+
+pub fn tiempo_ignorar_cambio_portapapeles() -> u64 {
+    TIEMPO_IGNORAR_CAMBIO_PORTAPAPELES.load(Ordering::Relaxed)
+}
+
+pub fn establecer_tiempo_ignorar_cambio_portapapeles(valor: u64) {
+    TIEMPO_IGNORAR_CAMBIO_PORTAPAPELES.store(valor, Ordering::Relaxed);
+}
+
+pub fn tiempo_espera_pegado_generico() -> u64 {
+    TIEMPO_ESPERA_PEGADO_GENERICO.load(Ordering::Relaxed)
+}
+
+pub fn establecer_tiempo_espera_pegado_generico(valor: u64) {
+    TIEMPO_ESPERA_PEGADO_GENERICO.store(valor, Ordering::Relaxed);
+}
+
+pub fn delay_entre_scripts_photoshop() -> u64 {
+    DELAY_ENTRE_SCRIPTS_PHOTOSHOP.load(Ordering::Relaxed)
+}
+
+pub fn establecer_delay_entre_scripts_photoshop(valor: u64) {
+    DELAY_ENTRE_SCRIPTS_PHOTOSHOP.store(valor, Ordering::Relaxed);
 }
