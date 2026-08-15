@@ -6,10 +6,10 @@
 // 1. ¿Qué hace este archivo?
 // Módulo aislado: decide si la app activa necesita un camino de
 // pegado distinto al genérico (Ctrl+V simulado) y, si corresponde,
-// lo ejecuta. Por ahora solo conoce Photoshop — los scripts viven
-// embebidos en el binario (include_str! / const, sin archivos
-// sueltos en disco del usuario). Si en el futuro aparecen más
-// programas con el mismo problema, se agrega acá un caso más
+// lo ejecuta. Por ahora solo conoce Photoshop — el script vacío de
+// activación vive embebido en el binario (include_str! / const, sin
+// archivos sueltos en disco del usuario). Si en el futuro aparecen
+// más programas con el mismo problema, se agrega acá un caso más
 // (mismo patrón), sin tocar nada externo.
 // ------------------------------------------------------
 // 2. ¿Quién llama este archivo?
@@ -31,28 +31,31 @@
 // intentar()
 //     Punto de entrada único. Resuelve PID+ruta del programa activo
 //     en una sola consulta (back_app::obtener_pid_y_ruta_activo) y,
-//     si es Photoshop, dispara la secuencia de doble relanzamiento.
+//     si es Photoshop, dispara la secuencia activar→esperar→pegar.
 // es_photoshop()
 //     Compara el nombre de archivo del proceso activo.
-// ejecutar_doble_script_photoshop()
-//     Resuelve PID→ruta del ejecutable UNA sola vez y hace dos
-//     relanzamientos separados por config::delay_entre_scripts_
-//     photoshop(): primero un script vacío (solo para provocar la
-//     activación real de Photoshop), después el script que pega de
-//     verdad.
+// ejecutar_pegado_photoshop()
+//     Relanza Photoshop con el script vacío ya escrito en disco (solo
+//     para provocar la activación real de la ventana), espera
+//     config::delay_entre_scripts_photoshop() y después pega con el
+//     MISMO camino que usa el resto de RemapH: crate::runtime::
+//     emitir_ctrl_v(). Ya no arma ni lanza un segundo script .jsx de
+//     pegado — un relanzamiento menos de Photoshop por click.
+// ruta_script_vacio()
+//     Devuelve la ruta del script vacío en disco, escribiéndolo una
+//     única vez (primer uso) en vez de en cada click — el contenido
+//     nunca cambia, así que no hace falta recrearlo cada vez.
 // lanzar_script_photoshop()
-//     Escribe un contenido de script a un archivo temporal único y
-//     lo manda a ejecutar en la instancia ya abierta.
+//     Manda un archivo de script ya existente a ejecutar en la
+//     instancia de Photoshop ya abierta.
 // ======================================================
 
 use std::fs;
+use std::path::PathBuf;
 use std::process::Command;
-use std::sync::atomic::{AtomicU32, Ordering};
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::sync::OnceLock;
 
 use crate::back_app;
-
-const SCRIPT_PHOTOSHOP: &str = include_str!("../scripts/photoshop_pegar.jsx");
 
 // Script "vacío" (no-op): no hace nada dentro de Photoshop, su único
 // propósito es viajar en un relanzamiento propio para provocar la
@@ -65,17 +68,18 @@ const SCRIPT_VACIO: &str = "// no-op: solo dispara el relanzamiento/activación,
 // ======================================================
 // ⏱️ Ver config::delay_entre_scripts_photoshop() / establecer_
 // delay_entre_scripts_photoshop() (config.rs) — espera entre el
-// relanzamiento con SCRIPT_VACIO (activación) y el relanzamiento con
-// SCRIPT_PHOTOSHOP (pegado real). Ya no es una constante local:
-// se dejó de fase de pruebas fijas para pasar a ser un valor
-// configurable único, junto con el resto de los timers de
-// portapapeles.
+// relanzamiento con SCRIPT_VACIO (activación) y el Ctrl+V simulado
+// (pegado real). Ya no es una constante local: se dejó de fase de
+// pruebas fijas para pasar a ser un valor configurable único, junto
+// con el resto de los timers de portapapeles.
 // ======================================================
 
-// Contador para que cada invocación use un nombre de archivo
-// temporal distinto — evita que Photoshop pueda tratar dos pedidos
-// seguidos como "el mismo de antes" si llegan cerca en el tiempo.
-static CONTADOR: AtomicU32 = AtomicU32::new(0);
+// Ruta del script vacío en disco. Se escribe una sola vez (primer
+// llamado a ruta_script_vacio() en toda la vida del proceso) y se
+// reutiliza en todos los clicks siguientes — antes se reescribía a un
+// archivo temporal con nombre único en CADA click, que era trabajo
+// (y tiempo) de más para un contenido que nunca cambia.
+static RUTA_SCRIPT_VACIO: OnceLock<Option<PathBuf>> = OnceLock::new();
 
 // ======================================================
 // 🎯 PUNTO DE ENTRADA
@@ -97,9 +101,9 @@ pub fn intentar() -> bool {
         return false;
     }
 
-    println!("🎨 [diag] pegado personalizado: app activa es Photoshop, uso doble relanzamiento");
+    println!("🎨 [diag] pegado personalizado: app activa es Photoshop, uso activación + Ctrl+V");
 
-    ejecutar_doble_script_photoshop(&ruta_exe)
+    ejecutar_pegado_photoshop(&ruta_exe)
 }
 
 // ======================================================
@@ -111,70 +115,93 @@ fn es_photoshop(nombre_proceso: &str) -> bool {
 }
 
 // ======================================================
-// ▶️▶️ DOS RELANZAMIENTOS: ACTIVAR, ESPERAR, PEGAR
+// ▶️ ACTIVAR (script vacío reutilizado), ESPERAR, PEGAR (Ctrl+V)
 // ======================================================
 
-fn ejecutar_doble_script_photoshop(ruta_exe: &str) -> bool {
-    println!("🎨 [diag] pegado personalizado: relanzamiento 1/2 (activación, script vacío)");
-    let activacion_ok = lanzar_script_photoshop(ruta_exe, SCRIPT_VACIO, "activar");
+fn ejecutar_pegado_photoshop(ruta_exe: &str) -> bool {
+    println!(
+        "🎨 [diag] pegado personalizado: relanzamiento de activación (script vacío reutilizado)"
+    );
+
+    let activacion_ok = match ruta_script_vacio() {
+        Some(ruta_script) => lanzar_script_photoshop(ruta_exe, &ruta_script),
+        None => {
+            println!("🎨 [diag] pegado personalizado: no hay script vacío disponible, salto la activación");
+            false
+        }
+    };
+
+    if !activacion_ok {
+        println!("🎨 [diag] pegado personalizado: el relanzamiento de activación falló (sigo igual con el Ctrl+V)");
+    }
 
     let delay = crate::config::delay_entre_scripts_photoshop();
     println!(
-        "🎨 [diag] pegado personalizado: espero {}ms entre relanzamientos",
+        "🎨 [diag] pegado personalizado: espero {}ms antes del Ctrl+V",
         delay
     );
     std::thread::sleep(std::time::Duration::from_millis(delay));
 
-    println!("🎨 [diag] pegado personalizado: relanzamiento 2/2 (pegado real)");
-    let pegado_ok = lanzar_script_photoshop(ruta_exe, SCRIPT_PHOTOSHOP, "pegar");
+    // Mismo camino que usa pegar() para cualquier app sin ruta
+    // personalizada — antes acá se lanzaba un segundo script .jsx
+    // (app.activeDocument.paste()) en una segunda relanzada de
+    // Photoshop; ahora se simula Ctrl+V como el camino genérico, sin
+    // ese segundo relanzamiento.
+    println!("🎨 [diag] pegado personalizado: disparo Ctrl+V simulado (mismo camino que el pegado genérico)");
+    crate::runtime::emitir_ctrl_v();
 
-    if !activacion_ok {
-        println!("🎨 [diag] pegado personalizado: el relanzamiento de activación falló (sigo igual con el de pegado)");
-    }
-
-    pegado_ok
+    true
 }
 
 // ======================================================
-// ▶️ EJECUTAR UN SCRIPT EN LA INSTANCIA YA ABIERTA
+// 📄 RUTA DEL SCRIPT VACÍO (se escribe una sola vez)
 // ======================================================
 
-fn lanzar_script_photoshop(ruta_exe: &str, contenido_script: &str, etiqueta: &str) -> bool {
-    let marca = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map(|duracion| duracion.as_millis())
-        .unwrap_or(0);
+fn ruta_script_vacio() -> Option<PathBuf> {
+    RUTA_SCRIPT_VACIO
+        .get_or_init(|| {
+            let ruta = std::env::temp_dir().join("remaph_photoshop_activar.jsx");
 
-    let contador = CONTADOR.fetch_add(1, Ordering::Relaxed);
+            match fs::write(&ruta, SCRIPT_VACIO) {
+                Ok(()) => {
+                    println!(
+                        "🎨 [diag] pegado personalizado: script vacío escrito una vez en {:?}",
+                        ruta
+                    );
+                    Some(ruta)
+                }
+                Err(error) => {
+                    println!(
+                        "🎨 [diag] pegado personalizado: error escribiendo el script vacío: {}",
+                        error
+                    );
+                    None
+                }
+            }
+        })
+        .clone()
+}
 
-    let ruta_temporal = std::env::temp_dir().join(format!(
-        "remaph_photoshop_{}_{}_{}.jsx",
-        etiqueta, marca, contador
-    ));
+// ======================================================
+// ▶️ EJECUTAR UN SCRIPT YA ESCRITO EN LA INSTANCIA YA ABIERTA
+// ======================================================
 
-    if let Err(error) = fs::write(&ruta_temporal, contenido_script) {
-        println!(
-            "🎨 [diag] pegado personalizado ({}): error escribiendo script temporal: {}",
-            etiqueta, error
-        );
-        return false;
-    }
-
+fn lanzar_script_photoshop(ruta_exe: &str, ruta_script: &std::path::Path) -> bool {
     // .status() en vez de .spawn(): se espera a que el proceso que
     // reenvía el script a la instancia de Photoshop ya abierta
     // termine de verdad, en vez de devolver el control de inmediato.
-    match Command::new(ruta_exe).arg(&ruta_temporal).status() {
+    match Command::new(ruta_exe).arg(ruta_script).status() {
         Ok(estado) => {
             println!(
-                "🎨 [diag] pegado personalizado ({}): script enviado a Photoshop, estado={}",
-                etiqueta, estado
+                "🎨 [diag] pegado personalizado: script de activación enviado a Photoshop, estado={}",
+                estado
             );
             true
         }
         Err(error) => {
             println!(
-                "🎨 [diag] pegado personalizado ({}): error lanzando Photoshop con el script: {}",
-                etiqueta, error
+                "🎨 [diag] pegado personalizado: error lanzando Photoshop con el script de activación: {}",
+                error
             );
             false
         }

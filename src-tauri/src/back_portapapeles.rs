@@ -1270,9 +1270,13 @@ pub fn pegar(ruta: &Path) -> Result<(), String> {
     // por WM_CLIPBOARDUPDATE, forzar_relectura_portapapeles() era el
     // parche para eso) ahora tiene su propio camino dedicado — ver
     // back_pegado_personalizado.rs. Si la app activa es Photoshop,
-    // intentar() ya se encarga de todo (script .jsx corrido en la
-    // instancia abierta) y pegar() termina acá, sin Ctrl+V simulado
-    // ni el parche de relectura, que ya no hacen falta para este caso.
+    // intentar() ya se encarga de todo (relanzamiento con script vacío
+    // para forzar la activación real de la ventana + el MISMO Ctrl+V
+    // simulado que el camino genérico, runtime::emitir_ctrl_v()) y
+    // pegar() termina acá — sin el parche de relectura (no hace falta
+    // para este caso) ni el sleep de tiempo_espera_pegado_generico()
+    // de más abajo (Photoshop tiene su propio timer, ver
+    // config::delay_entre_scripts_photoshop()).
     if crate::back_pegado_personalizado::intentar() {
         println!("📋 [diag] pegado personalizado tomó el control — pegar() termina OK");
 

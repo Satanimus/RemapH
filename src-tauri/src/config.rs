@@ -159,8 +159,8 @@
 // delay_entre_scripts_photoshop()
 // establecer_delay_entre_scripts_photoshop()
 //     Solo Photoshop: pausa entre el relanzamiento de activación
-//     (script vacío) y el relanzamiento que pega de verdad. Ver
-//     back_pegado_personalizado.rs.
+//     (script vacío, reutilizado) y el Ctrl+V simulado que pega de
+//     verdad. Ver back_pegado_personalizado.rs.
 // ------------------------------------------------------
 // Transformación:
 //
@@ -612,7 +612,7 @@ pub fn establecer_portapapeles_boton_grande(ancho: u64, alto: u64) {
 // este archivo.
 // ======================================================
 
-static TIEMPO_IGNORAR_CAMBIO_PORTAPAPELES: AtomicU64 = AtomicU64::new(500);
+static TIEMPO_IGNORAR_CAMBIO_PORTAPAPELES: AtomicU64 = AtomicU64::new(600);
 static TIEMPO_ESPERA_PEGADO_GENERICO: AtomicU64 = AtomicU64::new(450);
 static DELAY_ENTRE_SCRIPTS_PHOTOSHOP: AtomicU64 = AtomicU64::new(1);
 
