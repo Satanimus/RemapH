@@ -467,6 +467,52 @@ pub fn listar_fijados(id_portapapeles: &str) -> Result<Vec<ElementoPortapapeles>
 }
 
 // ======================================================
+// 📌🖥️ LISTAR FIJADOS (de un Portapapeles), ya en formato UI
+// ------------------------------------------------------
+// Envoltorio de listar_fijados() + elemento_a_ui() para comandos.rs
+// — usado tanto para los fijados normales de una ventana como para
+// el popup "Ver Fijados de Otros Portapapeles" (Cambio 2, Etapa
+// 2C/2G): mismo dato, dos consumidores (fijados propios al abrir/
+// refrescar la ventana vía construir_datos, fijados de una ID
+// AJENA vía el comando portapapeles_listar_fijados_de). Evita subir
+// la visibilidad de elemento_a_ui (queda privada, solo se usa acá
+// dentro del módulo).
+// ======================================================
+
+pub fn listar_fijados_ui(id_portapapeles: &str) -> Result<Vec<ElementoPortapapelesUI>, String> {
+    Ok(listar_fijados(id_portapapeles)?
+        .iter()
+        .map(elemento_a_ui)
+        .collect())
+}
+
+// ======================================================
+// 🆔📌 LISTAR OTRAS IDS CON FIJADOS — Cambio 2
+// ------------------------------------------------------
+// Todas las IDs distintas a `propio_id` que tengan al menos un
+// archivo fijado en el pool — incluye IDs de Portapapeles que ya no
+// existen en ningún perfil (el archivo fijado sobrevive a la fila
+// que lo creó, ver es_id_portapapeles/separar_prefijo_id). Orden
+// alfabético, sin duplicados. La resolución de nombre (buscar en
+// los perfiles guardados) es responsabilidad de perfil.rs — acá
+// solo se sabe qué IDs existen en el pool, no cómo se llaman.
+// ======================================================
+
+pub fn listar_otras_ids_con_fijados(propio_id: &str) -> Result<Vec<String>, String> {
+    let mut ids: Vec<String> = listar_todos()?
+        .into_iter()
+        .filter(|e| e.fijado)
+        .filter_map(|e| e.id_portapapeles)
+        .filter(|id| id != propio_id)
+        .collect();
+
+    ids.sort();
+    ids.dedup();
+
+    Ok(ids)
+}
+
+// ======================================================
 // 🕒 HORA LOCAL (HH.MM.SS)
 // ======================================================
 
@@ -1747,6 +1793,24 @@ pub struct PortapapelesDatosUI {
     // tampoco tiene nada legible), esta lista queda vacía y la
     // ventana muestra "Portapapel vacío" (spec) en vez de una fila.
     pub rotativos: Vec<ElementoPortapapelesUI>,
+}
+
+// ======================================================
+// 🆔📌 OTRO PORTAPAPELES (con fijados) — Cambio 2
+// ------------------------------------------------------
+// Una entrada del popup "Ver Fijados de Otros Portapapeles": la ID
+// encontrada en el pool + su nombre resuelto contra los perfiles
+// guardados (perfil::buscar_nombres_portapapeles, Etapa 2B). `nombre`
+// en None cuando esa ID no está en ningún perfil (portapapeles ya
+// eliminado de la fila que lo creó, pero sus fijados sobreviven) —
+// el frontend debe mostrar la ID cruda en ese caso.
+// ======================================================
+
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct OtroPortapapelesUI {
+    pub id: String,
+    pub nombre: Option<String>,
 }
 
 // ======================================================

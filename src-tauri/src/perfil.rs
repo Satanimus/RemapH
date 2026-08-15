@@ -95,12 +95,17 @@
 //
 // cargar_desde_disco()
 //     Carga perfil json en disco
+//
+// buscar_nombres_portapapeles()
+//     Busca en todos los perfiles guardados el nombre de fila
+//     portapapeles_accion.nombre para cada id pedida (Cambio 2).
 // ======================================================
 
 use crate::cache;
 use crate::compilador;
 use crate::perfil_json::perfil_json;
 use crate::usuario;
+use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
 
@@ -439,4 +444,56 @@ fn cargar_desde_disco(ruta: &Path) -> Result<perfil_json, String> {
     let json = fs::read_to_string(ruta).map_err(|error| error.to_string())?;
 
     serde_json::from_str(&json).map_err(|error| error.to_string())
+}
+
+// ======================================================
+// 🆔📋 BUSCAR NOMBRES DE PORTAPAPELES — Cambio 2 (Etapa 2B)
+// ------------------------------------------------------
+// Recorre TODOS los perfiles guardados en la carpeta Usuario (no
+// solo el perfil actual — una ID de Portapapeles puede venir de
+// cualquier perfil guardado, no necesariamente el activo) buscando
+// filas tipo == "portapapeles" cuya id esté en `ids`. Devuelve un
+// mapa id -> nombre (RemapeoJson::portapapeles_accion.nombre).
+//
+// Las IDs que no aparecen en ningún perfil simplemente no están en
+// el mapa devuelto — el llamador (back_portapapeles::
+// listar_otras_ids_con_fijados + comandos::portapapeles_listar_otros)
+// decide qué mostrar en ese caso (spec Cambio 2: la ID cruda).
+//
+// Un solo recorrido de todos los .json de Usuario (no uno por id) —
+// barato aun con varios perfiles guardados. Si una misma id
+// apareciera en más de un perfil (no debería pasar en uso normal),
+// se queda con la primera que encuentra.
+// ======================================================
+
+pub fn buscar_nombres_portapapeles(ids: &[String]) -> HashMap<String, String> {
+    let mut resultado = HashMap::new();
+
+    let Ok(nombres_perfil) = usuario::perfiles() else {
+        return resultado;
+    };
+
+    for nombre_perfil in nombres_perfil {
+        let Ok(ruta) = usuario::ruta_perfil(&nombre_perfil) else {
+            continue;
+        };
+
+        let Ok(perfil) = cargar_desde_disco(&ruta) else {
+            continue;
+        };
+
+        for remapeo in perfil.remapeos {
+            if remapeo.tipo != "portapapeles" {
+                continue;
+            }
+
+            if ids.contains(&remapeo.id) {
+                resultado
+                    .entry(remapeo.id)
+                    .or_insert(remapeo.portapapeles_accion.nombre);
+            }
+        }
+    }
+
+    resultado
 }

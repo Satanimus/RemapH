@@ -876,6 +876,64 @@ pub fn portapapeles_limpiar_todo(
     Ok(crate::back_portapapeles::refrescar_datos(&id))
 }
 
+// ======================================================
+// 🆔📌 VER FIJADOS DE OTROS PORTAPAPELES — Cambio 2
+// ------------------------------------------------------
+// portapapeles_listar_otros: arma el popup — IDs distintas a la
+// propia que tengan fijados en el pool, con su nombre resuelto
+// contra los perfiles guardados (None si esa ID ya no está en
+// ningún perfil, el frontend muestra la ID cruda en ese caso).
+//
+// portapapeles_listar_fijados_de: los fijados de una ID AJENA (la
+// que el usuario eligió en el popup) — mismo formato que los
+// fijados normales de una ventana, pero para una ID que no es la de
+// esta ventana.
+//
+// portapapeles_fijar_como: fija bajo una ID DISTINTA a la de la
+// ventana que llama — mientras se está viendo el pool de otro
+// Portapapeles, fijar un rotativo debe quedar guardado bajo esa ID
+// mostrada, no la propia de la ventana (spec: "Si se fija otro
+// rotatorio, debe hacerse con la nueva ID, la que está mostrando
+// ahora"). `id_ventana` sigue sirviendo para refrescar_datos
+// (registro/rotativos de la ventana real, sin relación con qué ID
+// se está fijando); `id_destino` es la que se usa como prefijo del
+// archivo fijado.
+// ======================================================
+
+#[tauri::command]
+pub fn portapapeles_listar_otros(
+    id: String,
+) -> Result<Vec<crate::back_portapapeles::OtroPortapapelesUI>, String> {
+    let ids = crate::back_portapapeles::listar_otras_ids_con_fijados(&id)?;
+    let nombres = crate::perfil::buscar_nombres_portapapeles(&ids);
+
+    Ok(ids
+        .into_iter()
+        .map(|id| {
+            let nombre = nombres.get(&id).cloned();
+            crate::back_portapapeles::OtroPortapapelesUI { id, nombre }
+        })
+        .collect())
+}
+
+#[tauri::command]
+pub fn portapapeles_listar_fijados_de(
+    id_objetivo: String,
+) -> Result<Vec<crate::back_portapapeles::ElementoPortapapelesUI>, String> {
+    crate::back_portapapeles::listar_fijados_ui(&id_objetivo)
+}
+
+#[tauri::command]
+pub fn portapapeles_fijar_como(
+    id_ventana: String,
+    id_destino: String,
+    ruta: String,
+) -> Result<Option<crate::back_portapapeles::PortapapelesDatosUI>, String> {
+    crate::back_portapapeles::fijar(std::path::Path::new(&ruta), &id_destino)?;
+
+    Ok(crate::back_portapapeles::refrescar_datos(&id_ventana))
+}
+
 #[tauri::command]
 pub fn portapapeles_pegar(ruta: String) -> Result<(), String> {
     crate::back_portapapeles::pegar(std::path::Path::new(&ruta))
