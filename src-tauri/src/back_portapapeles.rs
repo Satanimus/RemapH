@@ -715,6 +715,16 @@ fn tocar_ahora(ruta: &Path) -> Result<(), String> {
 // ADS para esto, y el nombre visible viaja solo con el rename.
 // Los nombres físicos son únicos por construcción (ver
 // nombre_fisico_nuevo), así que no hace falta resolver conflictos.
+//
+// Si nadie está en modo Registro (ni siquiera `id_portapapeles`),
+// fijar un rotativo puede dejar el pool de rotativos vacío — mismo
+// caso que "Limpiar todo" en modo Simple puro (ver
+// SUPRIMIR_AUTO_LECTURA): sin la supresión, construir_datos() volvería
+// a leer el portapapeles del sistema y, como el contenido no cambió,
+// regeneraría un rotativo idéntico al que se acaba de fijar (bug:
+// quedaba duplicado — el mismo elemento como fijado Y como rotativo
+// nuevo). Se activa la misma bandera acá para que el modo Simple no
+// regenere nada hasta el próximo cambio de estado de Registro.
 // ======================================================
 
 pub fn fijar(ruta: &Path, id_portapapeles: &str) -> Result<PathBuf, String> {
@@ -737,6 +747,10 @@ pub fn fijar(ruta: &Path, id_portapapeles: &str) -> Result<PathBuf, String> {
 
     fs::rename(ruta, &nueva_ruta).map_err(|error| error.to_string())?;
     tocar_ahora(&nueva_ruta)?;
+
+    if !esta_activo(id_portapapeles) && !hay_algun_activo() {
+        marcar_supresion_auto_lectura();
+    }
 
     Ok(nueva_ruta)
 }

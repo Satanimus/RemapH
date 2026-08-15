@@ -70,6 +70,15 @@ interface PortapapelesDatos {
   rotativos: ElementoDatos[];
 }
 
+// Espejo de OtroPortapapelesUI en back_portapapeles.rs (Cambio 2,
+// Etapa 2.A) — nombre null significa que la ID no se encontró en
+// ningún perfil guardado y el frontend debe mostrar la ID cruda.
+interface OtroPortapapeles {
+  id: string;
+
+  nombre: string | null;
+}
+
 // ======================================================
 // 🆔 ID DEL PORTAPAPELES (query string)
 // ======================================================
@@ -85,6 +94,23 @@ const raiz = document.getElementById("portapapeles")!;
 let card: HTMLDivElement;
 let cuerpo: HTMLDivElement;
 let ultimosDatos: PortapapelesDatos | null = null;
+
+// ID que se está MOSTRANDO ahora mismo (fijados + nombre en la
+// barra). Igual a `id` (el de la URL/ventana) salvo mientras se
+// está viendo el pool de otro Portapapeles (Cambio 2) — en ese
+// caso se usa para: listar fijados alternativos, decidir bajo
+// qué ID se fija un rotativo nuevo, y qué nombre mostrar. Se
+// resetea solo al recargar la página (cerrar+reabrir la
+// ventana), nunca se persiste — comportamiento pedido: "al
+// cerrar y volver a llamar el portapapeles se regresa al
+// portapapel original".
+let idMostrado: string | null = id;
+let nombreMostrado: string | null = null; // null = usar datos.nombre normal
+// Últimos fijados alternativos obtenidos (verFijadosDe /
+// aplicarResultadoMutacionFijado) — usados por actualizarEnVivo
+// para no pisar la vista alternativa con los fijados reales de la
+// ventana cuando llega un evento en vivo desde otra ventana/fila.
+let fijadosAltActuales: ElementoDatos[] = [];
 
 // Referencias a nodos que una actualización EN VIVO (evento
 // "portapapeles-actualizado", ver ETAPA J.2 más abajo) actualiza in-
@@ -258,7 +284,13 @@ function construirEstructura(): {
   botonCerrar.title = "Cerrar";
   botonCerrar.addEventListener("click", cerrar);
 
-  header.append(titulo, botonCerrar);
+  const botonOtros = document.createElement("button");
+  botonOtros.className = "portapapeles-boton-otros";
+  botonOtros.textContent = "▼";
+  botonOtros.title = "Ver Fijados de Otros Portapapeles";
+  botonOtros.addEventListener("click", () => void abrirPopupOtros());
+
+  header.append(titulo, botonOtros, botonCerrar);
 
   const cuerpoNuevo = document.createElement("div");
   cuerpoNuevo.className = "portapapeles-cuerpo";
@@ -379,20 +411,66 @@ async function alternarFijado(datos: ElementoDatos): Promise<void> {
   operacionEnVuelo = true;
 
   try {
-    const comando = datos.fijado
-      ? "portapapeles_desfijar"
-      : "portapapeles_fijar";
-    const actualizados = await invoke<PortapapelesDatos | null>(comando, {
-      id,
-      ruta: datos.ruta,
-    });
-
-    if (actualizados) renderizar(actualizados);
+    if (datos.fijado) {
+      // Desfijar: no depende de bajo qué ID estaba fijado, opera
+      // directo sobre la ruta.
+      const actualizados = await invoke<PortapapelesDatos | null>(
+        "portapapeles_desfijar",
+        { id, ruta: datos.ruta },
+      );
+      await aplicarResultadoMutacionFijado(actualizados);
+    } else if (idMostrado && idMostrado !== id) {
+      // Vista alternativa: fijar bajo la ID que se está mostrando.
+      const actualizados = await invoke<PortapapelesDatos | null>(
+        "portapapeles_fijar_como",
+        { idVentana: id, idDestino: idMostrado, ruta: datos.ruta },
+      );
+      await aplicarResultadoMutacionFijado(actualizados);
+    } else {
+      const actualizados = await invoke<PortapapelesDatos | null>(
+        "portapapeles_fijar",
+        { id, ruta: datos.ruta },
+      );
+      if (actualizados) renderizar(actualizados);
+    }
   } catch {
     // Sin datos nuevos que mostrar — la lista se queda como estaba.
   } finally {
     operacionEnVuelo = false;
   }
+}
+
+// Tras fijar/desfijar mientras se está en vista alternativa, la
+// respuesta trae los fijados de la ventana REAL (no los de
+// idMostrado) — hay que volver a pedir los de idMostrado aparte y
+// pisar solo ese campo antes de renderizar.
+async function aplicarResultadoMutacionFijado(
+  actualizados: PortapapelesDatos | null,
+): Promise<void> {
+  if (!actualizados) return;
+
+  if (!idMostrado || idMostrado === id) {
+    renderizar(actualizados);
+    return;
+  }
+
+  let fijadosAlt: ElementoDatos[];
+  try {
+    fijadosAlt = await invoke<ElementoDatos[]>(
+      "portapapeles_listar_fijados_de",
+      { idObjetivo: idMostrado },
+    );
+  } catch {
+    fijadosAlt = [];
+  }
+
+  fijadosAltActuales = fijadosAlt;
+
+  renderizar({
+    ...actualizados,
+    fijados: fijadosAlt,
+    nombre: nombreMostrado ?? idMostrado,
+  });
 }
 
 // ======================================================
@@ -542,7 +620,7 @@ async function abrirPopupRenombrar(datos: ElementoDatos): Promise<void> {
         { id, ruta: datos.ruta, nuevoNombre },
       );
 
-      if (actualizados) renderizar(actualizados);
+      await aplicarResultadoMutacionFijado(actualizados);
     } catch {
       // El popup se cierra igual — no hay nada más coherente que
       // hacer con un renombre fallido acá.
@@ -624,7 +702,7 @@ async function abrirPopupEditar(datos: ElementoDatos): Promise<void> {
         { id, ruta: datos.ruta, contenido: textarea.value },
       );
 
-      if (actualizados) renderizar(actualizados);
+      await aplicarResultadoMutacionFijado(actualizados);
     } catch {
       // El popup se cierra igual — sin datos nuevos que aplicar.
     }
@@ -661,10 +739,103 @@ async function eliminarElemento(datos: ElementoDatos): Promise<void> {
       { id, ruta: datos.ruta },
     );
 
-    if (actualizados) renderizar(actualizados);
+    await aplicarResultadoMutacionFijado(actualizados);
   } catch {
     // Sin datos nuevos que mostrar.
   }
+}
+
+// ======================================================
+// 🆔📌 POPUP "OTROS PORTAPAPELES" (Cambio 2)
+// ------------------------------------------------------
+// Reutiliza las clases CSS del popup de opciones ya existente
+// (portapapeles-popup-overlay/-popup/-popup-titulo/-popup-opcion)
+// para heredar el mismo look sin CSS nuevo.
+// ======================================================
+
+async function abrirPopupOtros(): Promise<void> {
+  if (!id) return;
+  cerrarPopup();
+
+  // Se consulta con idMostrado (no `id`): si ya estamos viendo un
+  // segundo Portapapeles, ese no debe listarse a sí mismo en el
+  // popup (bug: al reabrir el popup desde la vista alternativa,
+  // seguía apareciendo el propio Portapapeles que ya se estaba
+  // mostrando, en vez de quedar oculto/actualizado).
+  const idConsulta = idMostrado ?? id;
+
+  let otros: OtroPortapapeles[];
+  try {
+    otros = await invoke<OtroPortapapeles[]>("portapapeles_listar_otros", {
+      id: idConsulta,
+    });
+  } catch {
+    otros = [];
+  }
+
+  const overlay = document.createElement("div");
+  overlay.className = "portapapeles-popup-overlay";
+  overlay.addEventListener("click", (evento) => {
+    if (evento.target === overlay) cerrarPopup();
+  });
+
+  const popup = document.createElement("div");
+  popup.className = "portapapeles-popup";
+
+  const titulo = document.createElement("div");
+  titulo.className = "portapapeles-popup-titulo";
+  titulo.textContent = "Fijados de otros Portapapeles";
+  popup.append(titulo);
+
+  if (otros.length === 0) {
+    const vacio = document.createElement("div");
+    vacio.className = "portapapeles-popup-opcion";
+    vacio.textContent = "No hay otros Portapapeles con fijados.";
+    popup.append(vacio);
+  }
+
+  otros.forEach((otro) => {
+    const boton = document.createElement("button");
+    boton.className = "portapapeles-popup-opcion";
+    boton.textContent = otro.nombre ?? otro.id;
+    boton.addEventListener("click", () => void verFijadosDe(otro));
+    popup.append(boton);
+  });
+
+  overlay.append(popup);
+  card.append(overlay);
+}
+
+// ======================================================
+// 🔀 CAMBIAR DE VISTA (switch de ID mostrada) — Cambio 2
+// ======================================================
+
+async function verFijadosDe(otro: OtroPortapapeles): Promise<void> {
+  cerrarPopup();
+  if (!ultimosDatos) return;
+
+  idMostrado = otro.id;
+  nombreMostrado = otro.nombre ?? otro.id;
+
+  let fijadosAlt: ElementoDatos[];
+  try {
+    fijadosAlt = await invoke<ElementoDatos[]>(
+      "portapapeles_listar_fijados_de",
+      { idObjetivo: otro.id },
+    );
+  } catch {
+    fijadosAlt = [];
+  }
+
+  fijadosAltActuales = fijadosAlt;
+
+  // Reusa rotativos/registro/color de ultimosDatos — spec: "diseño
+  // y color se mantiene, solo cambian los fijos y el nombre".
+  renderizar({
+    ...ultimosDatos,
+    fijados: fijadosAlt,
+    nombre: nombreMostrado ?? otro.id,
+  });
 }
 
 // ======================================================
@@ -937,10 +1108,31 @@ function renderizar(datos: PortapapelesDatos): void {
 function actualizarEnVivo(datos: PortapapelesDatos): void {
   ultimosDatos = datos;
 
-  if (tituloActual) tituloActual.textContent = datos.nombre || "Portapapeles";
-  aplicarColorFondo(datos.color);
+  if (!idMostrado || idMostrado === id) {
+    if (tituloActual) tituloActual.textContent = datos.nombre || "Portapapeles";
+    pintarListado(datos);
+  } else {
+    // Vista alternativa activa: los rotativos sí vienen de `datos`
+    // (pool global, sigue siendo válido), pero los fijados/nombre
+    // mostrados NO deben pisarse con los de la ventana real.
+    // Limitación conocida: si llega un evento en vivo estando en
+    // vista alternativa, los FIJADOS mostrados no se refrescan en
+    // tiempo real (p. ej. si alguien fijó algo bajo esa misma ID
+    // desde otra ventana) — se muestran los últimos obtenidos por
+    // verFijadosDe/aplicarResultadoMutacionFijado. Queda pendiente
+    // para una vuelta futura, no es parte de lo pedido.
+    if (tituloActual) {
+      tituloActual.textContent =
+        nombreMostrado || datos.nombre || "Portapapeles";
+    }
+    pintarListado({
+      ...datos,
+      fijados: fijadosAltActuales,
+      nombre: nombreMostrado ?? datos.nombre,
+    });
+  }
 
-  pintarListado(datos);
+  aplicarColorFondo(datos.color);
   actualizarBotonRegistro(datos);
 }
 
