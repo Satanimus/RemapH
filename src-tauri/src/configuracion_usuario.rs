@@ -17,16 +17,18 @@
 //                    styl_variables.css). Se agrega en
 //                    la Etapa 6.
 // • "pulsador."   → Teclas (nombre visible de
-//                    pulsadores.tsv). Se agrega en la
-//                    Etapa 5.
+//                    pulsadores.tsv).
 //
-// Este archivo solo conoce la parte SIN prefijo
-// (General): carga el catálogo de fábrica
-// (configuracion.tsv), aplica overrides sobre config.rs
-// y persiste cambios — sin tocar ni interpretar las
-// claves con prefijo, que solo pasan a través de él como
-// texto plano (las leen/escriben los módulos de las
-// Etapas 5 y 6).
+// Este archivo conoce la parte SIN prefijo (General) y la
+// parte "pulsador." (Teclas): para General carga el
+// catálogo de fábrica (configuracion.tsv), aplica overrides
+// sobre config.rs y persiste cambios; para Teclas valida
+// contra pulsadores::por_interno() (el catálogo lo posee
+// pulsadores.rs, no este archivo) y persiste, pero no
+// aplica nada en caliente — pulsadores.rs lee el override
+// en el momento (nombre_ui_efectivo()). Las claves "css."
+// solo pasan a través de él como texto plano (las lee/
+// escribe el módulo de la Etapa 6).
 //
 // No valida en la UI. No arma la tabla que ve el usuario
 // (eso es Etapa 3/4, en comandos.rs y configuracion.ts).
@@ -88,9 +90,21 @@
 // restablecer_seccion(prefijo)
 //     Borra del archivo todos los overrides de una
 //     sección (None = General, Some("css.") = Apariencia,
-//     Some("pulsador.") = Teclas — pensado para las Etapas
-//     5/6). Para General, además reaplica los valores de
-//     fábrica en caliente.
+//     Some("pulsador.") = Teclas). Para General, además
+//     reaplica los valores de fábrica en caliente.
+//
+// leer_overrides_pulsador()
+//     Devuelve solo los overrides con prefijo "pulsador."
+//     (Teclas), con la clave ya sin el prefijo (interno →
+//     nombre personalizado).
+//
+// guardar_lote_pulsadores(cambios)
+//     Igual que guardar_lote() pero para Teclas: valida
+//     que cada clave sea un "interno" real de
+//     pulsadores.tsv (pulsadores::por_interno) y que el
+//     valor no esté vacío; no hay setter que aplicar en
+//     caliente (pulsadores::nombre_ui_efectivo() lee el
+//     override en el momento).
 // ------------------------------------------------------
 // Transformación:
 //
@@ -623,4 +637,82 @@ pub fn cargar_al_iniciar() {
             );
         }
     }
+}
+
+// ======================================================
+// ⌨️ TECLAS (Etapa 5) — prefijo "pulsador."
+// ------------------------------------------------------
+// El catálogo de claves válidas ("interno") lo posee
+// pulsadores.rs, no este archivo — por eso se lo consulta
+// acá en vez de tener un segundo catálogo propio, igual
+// que config.rs es el dueño de los setters para General.
+// ======================================================
+
+const PREFIJO_PULSADOR: &str = "pulsador.";
+
+// ======================================================
+// 📥 LEER OVERRIDES (solo Teclas, prefijo "pulsador.")
+// ------------------------------------------------------
+// Devuelve el mapa con la clave ya sin el prefijo (interno
+// → nombre personalizado), listo para que pulsadores.rs lo
+// use directamente por interno.
+// ======================================================
+
+pub fn leer_overrides_pulsador() -> Result<HashMap<String, String>, String> {
+    let mapa = leer_mapa_completo()?;
+
+    Ok(mapa
+        .into_iter()
+        .filter_map(|(clave, valor)| {
+            clave
+                .strip_prefix(PREFIJO_PULSADOR)
+                .map(|interno| (interno.to_string(), valor))
+        })
+        .collect())
+}
+
+// ======================================================
+// 📦 GUARDAR LOTE — TECLAS (todo o nada)
+// ------------------------------------------------------
+// Misma mecánica que guardar_lote(), pero validando contra
+// pulsadores::por_interno() en vez del catálogo de General,
+// y sin aplicar_valor() (no hay setter: el override se lee
+// en el momento desde pulsadores::nombre_ui_efectivo()).
+// ======================================================
+
+pub fn guardar_lote_pulsadores(cambios: &[(String, String)]) -> Result<(), Vec<(String, String)>> {
+    let mut errores: Vec<(String, String)> = Vec::new();
+
+    for (interno, valor) in cambios {
+        if crate::pulsadores::por_interno(interno).is_none() {
+            errores.push((
+                interno.clone(),
+                format!("Pulsador interno desconocido: \"{}\"", interno),
+            ));
+
+            continue;
+        }
+
+        if valor.trim().is_empty() {
+            errores.push((
+                interno.clone(),
+                "El nombre no puede estar vacío".to_string(),
+            ));
+        }
+    }
+
+    if !errores.is_empty() {
+        return Err(errores);
+    }
+
+    let mut mapa = leer_mapa_completo().map_err(|error| vec![(String::new(), error)])?;
+
+    for (interno, valor) in cambios {
+        mapa.insert(
+            format!("{}{}", PREFIJO_PULSADOR, interno),
+            valor.trim().to_string(),
+        );
+    }
+
+    escribir_mapa_completo(&mapa).map_err(|error| vec![(String::new(), error)])
 }

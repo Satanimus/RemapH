@@ -138,10 +138,12 @@ interface InputJson {
 // El JSON que manda Rust solo trae el nombre INTERNO de
 // cada tecla (fuente de verdad, ver pulsadores.tsv) — nunca
 // el nombre visible. Traducir ese nombre a UI es
-// responsabilidad de la UI (acá), no de Rust: el día que
-// exista una columna "usuario" con nombres personalizados
-// por archivo de config, este es el único lugar que hay que
-// tocar para empezar a usarla (ver core_traductor.ts).
+// responsabilidad de la UI (acá), no de Rust. Se traduce a
+// "usuario" (no a "ui") para que, si la tecla tiene un
+// nombre personalizado (Etapa 5 de la Ventana de
+// Configuración, pestaña Teclas), la tabla principal lo
+// muestre en vez del nombre de fábrica — ver
+// core_traductor.ts.
 //
 // Para no hacer un round-trip a Tauri por cada tecla del
 // perfil, se junta primero cada `control` único que aparece
@@ -156,7 +158,7 @@ export async function convertirperfil_json(
 
     "interno",
 
-    "ui",
+    "usuario",
   );
 
   const filas = perfil_json.remapeos.map((remapeo) =>

@@ -117,6 +117,24 @@
     color: var(--text-soft);
 }
 
+/* Fila separadora de subtítulo (pestaña Teclas: Letras,
+   Números, Teclado numérico, Funciones, Especiales,
+   Símbolos, Mouse). */
+.configuracion-subtitulo td {
+    padding-top: var(--gap16);
+    color: var(--text-soft);
+    font-size: var(--fs12);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    border-bottom: 1px solid var(--border);
+    background: var(--panel2);
+}
+
+.configuracion-subtitulo:first-child td {
+    padding-top: var(--gap8);
+}
+
 .configuracion-valor-personalizado input {
     width: 100%;
 }

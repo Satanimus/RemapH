@@ -43,7 +43,7 @@ export async function traducir(
 // ======================================================
 
 export async function internoAUiNombre(interno: string): Promise<string> {
-  return traducir(interno, "interno", "ui");
+  return traducir(interno, "interno", "usuario");
 }
 
 // ======================================================

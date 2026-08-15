@@ -214,6 +214,20 @@ export function crearToolbar(alGuardar: () => Promise<void>): HTMLElement {
     );
   });
 
+  // ==================================================
+  // ⚙️ CONFIGURACIÓN
+  // ==================================================
+
+  const botonConfiguracion = toolbar.querySelector(
+    ".configuracion",
+  ) as HTMLButtonElement | null;
+
+  botonConfiguracion?.addEventListener("click", () => {
+    invoke("abrir_ventana_configuracion").catch((error) => {
+      console.error("❌ No se pudo abrir la ventana de configuración:", error);
+    });
+  });
+
   return toolbar;
 }
 

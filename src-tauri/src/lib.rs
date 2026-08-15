@@ -140,9 +140,12 @@ pub fn run() {
             comandos::establecer_portapapeles_boton_pequeno,
             comandos::establecer_portapapeles_boton_mediano,
             comandos::establecer_portapapeles_boton_grande,
+            comandos::abrir_ventana_configuracion,
             comandos::configuracion_listar_general,
             comandos::configuracion_guardar_lote,
             comandos::configuracion_restablecer_seccion,
+            comandos::configuracion_listar_teclas,
+            comandos::configuracion_guardar_lote_teclas,
         ])
         .run(tauri::generate_context!())
         .expect("error al ejecutar Tauri");

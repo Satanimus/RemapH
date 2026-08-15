@@ -78,6 +78,11 @@
 //
 // ui_desde_interno()
 //     Devuelve el nombre visible.
+//
+// nombre_ui_efectivo()
+//     Devuelve el nombre visible EFECTIVO: el override de
+//     usuario (Etapa 5 de la Ventana de Configuración,
+//     pestaña Teclas) si existe, si no el de fábrica.
 // ------------------------------------------------------
 // Transformación:
 //
@@ -97,6 +102,8 @@
 // ======================================================
 
 use std::sync::OnceLock;
+
+use crate::configuracion_usuario;
 
 // ======================================================
 // 📦 MODELO PULSADOR
@@ -279,6 +286,30 @@ pub fn ui_desde_interno(nombre: &str) -> String {
 }
 
 // ======================================================
+// 🎨 NOMBRE UI EFECTIVO (override de usuario o fábrica)
+// ------------------------------------------------------
+// Consulta el override de Configuracion_Usuario.txt
+// (prefijo "pulsador.", ver configuracion_usuario.rs)
+// antes de caer al nombre de fábrica. Un override vacío
+// (no debería llegar a persistirse así, pero por robustez)
+// también cae a fábrica. Si no se puede leer el archivo de
+// overrides, cae a fábrica sin propagar el error — traducir
+// nombres de teclas nunca puede romper el resto de la app.
+// ======================================================
+
+pub fn nombre_ui_efectivo(interno: &str) -> String {
+    if let Ok(overrides) = configuracion_usuario::leer_overrides_pulsador() {
+        if let Some(nombre) = overrides.get(interno) {
+            if !nombre.trim().is_empty() {
+                return nombre.clone();
+            }
+        }
+    }
+
+    ui_desde_interno(interno)
+}
+
+// ======================================================
 // 🌐 TRADUCCIÓN GENÉRICA POR COLUMNA
 // ------------------------------------------------------
 // Único punto de entrada para traducir entre columnas del
@@ -287,13 +318,12 @@ pub fn ui_desde_interno(nombre: &str) -> String {
 // pulsadores.tsv, solo pedir "de esta columna a esta otra".
 //
 // La columna "usuario" (nombre personalizado del usuario)
-// todavía no existe como campo propio de Pulsador — hasta
-// que se agregue, tanto para leerla como para escribirla
-// esta función cae en "ui" como mejor aproximación
-// disponible. El día que se agregue la columna real, solo
-// hay que sumar el campo a Pulsador/cargar() y estos dos
-// brazos empiezan a usarlo — nada de afuera de este archivo
-// tiene que cambiar.
+// no es un campo propio de Pulsador: como destino, resuelve
+// a nombre_ui_efectivo() (override de Configuracion_Usuario.txt
+// si existe, si no cae al "ui" de fábrica — ver Etapa 5 de la
+// Ventana de Configuración). Como origen se sigue tratando
+// igual que "interno" (no hay necesidad de buscar por nombre
+// personalizado hasta ahora).
 // ======================================================
 
 pub fn traducir(valor: &str, origen: &str, destino: &str) -> Option<String> {
@@ -306,16 +336,16 @@ pub fn traducir(valor: &str, origen: &str, destino: &str) -> Option<String> {
         _ => None,
     }?;
 
-    let campo = match destino {
-        "nativo" => &pulsador.nativo,
-        "interno" => &pulsador.interno,
-        "interception" => &pulsador.interception,
-        "ui" => &pulsador.ui,
-        "usuario" => &pulsador.ui,
+    let resultado = match destino {
+        "nativo" => pulsador.nativo.clone(),
+        "interno" => pulsador.interno.clone(),
+        "interception" => pulsador.interception.clone(),
+        "ui" => pulsador.ui.clone(),
+        "usuario" => nombre_ui_efectivo(&pulsador.interno),
         _ => return None,
     };
 
-    Some(campo.clone())
+    Some(resultado)
 }
 
 // ======================================================

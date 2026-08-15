@@ -21,6 +21,9 @@ export default defineConfig(async () => ({
   // Cuarta página independiente: la ventana overlay de Portapapeles
   // (WebviewUrl::App("portapapeles.html?id=...") — ver
   // back_portapapeles.rs, Etapa G/crear_ventana). Mismo motivo.
+  // Quinta página independiente: la Ventana de Configuración
+  // (WebviewUrl::App("configuracion.html") — ver comandos.rs,
+  // abrir_ventana_configuracion). Mismo motivo.
   build: {
     rollupOptions: {
       input: {
@@ -31,6 +34,9 @@ export default defineConfig(async () => ({
         ),
         portapapeles: fileURLToPath(
           new URL("./portapapeles.html", import.meta.url),
+        ),
+        configuracion: fileURLToPath(
+          new URL("./configuracion.html", import.meta.url),
         ),
       },
     },

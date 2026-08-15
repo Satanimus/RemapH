@@ -986,6 +986,50 @@ pub fn establecer_portapapeles_boton_grande(ancho: u64, alto: u64) {
 }
 
 // ======================================================
+// ⚙️🪟 VENTANA DE CONFIGURACIÓN
+// ------------------------------------------------------
+// abrir_ventana_configuracion()
+//     Crea la ventana bajo demanda (no vive montada). A
+//     diferencia de captura/menu_express/portapapeles, esta
+//     es una ventana NORMAL: con decoraciones, resizable,
+//     fondo sólido — el usuario la cierra con la X nativa,
+//     no hace falta un comando cerrar_....
+//
+//     Si ya estaba abierta (el usuario volvió a apretar ⚙
+//     en el toolbar), simplemente se la enfoca en vez de
+//     crear una segunda instancia.
+// ======================================================
+
+const VENTANA_CONFIGURACION: &str = "configuracion";
+
+#[tauri::command]
+pub async fn abrir_ventana_configuracion(app: tauri::AppHandle) -> Result<(), String> {
+    // Mismo motivo que abrir_ventana_captura_coordenada(): tiene que
+    // ser async o WebviewWindowBuilder::build() hace deadlock en
+    // Windows si se llama desde un comando síncrono.
+    if let Some(existente) = app.get_webview_window(VENTANA_CONFIGURACION) {
+        let _ = existente.set_focus();
+        return Ok(());
+    }
+
+    WebviewWindowBuilder::new(
+        &app,
+        VENTANA_CONFIGURACION,
+        WebviewUrl::App("configuracion.html".into()),
+    )
+    .title("RemapH — Configuración")
+    .inner_size(720.0, 560.0)
+    .min_inner_size(560.0, 420.0)
+    .resizable(true)
+    .focused(true)
+    .devtools(true)
+    .build()
+    .map_err(|error| error.to_string())?;
+
+    Ok(())
+}
+
+// ======================================================
 // ⚙️ CONFIGURACIÓN — PESTAÑA GENERAL (Etapa 3)
 // ------------------------------------------------------
 // Comandos de la pestaña "General" de la Ventana de
@@ -1086,4 +1130,71 @@ pub async fn configuracion_guardar_lote(
 #[tauri::command]
 pub async fn configuracion_restablecer_seccion(prefijo: Option<String>) -> Result<(), String> {
     configuracion_usuario::restablecer_seccion(prefijo.as_deref())
+}
+
+// ======================================================
+// ⌨️ CONFIGURACIÓN — PESTAÑA TECLAS (Etapa 5)
+// ------------------------------------------------------
+// El catálogo (108 pulsadores, ver pulsadores.tsv) lo
+// entrega tal cual pulsadores::todos() — la agrupación por
+// subtítulos (Letras, Números, etc.) se hace en la UI, acá
+// solo viaja "fuente" (keyboard/mouse) como pista. El
+// restablecimiento de esta pestaña reutiliza el comando
+// genérico configuracion_restablecer_seccion(Some("pulsador.")),
+// no hace falta uno propio.
+// ======================================================
+
+#[derive(Serialize)]
+pub struct ConfiguracionFilaTeclaUI {
+    pub interno: String,
+
+    pub fuente: String,
+
+    pub nombre_fabrica: String,
+
+    // None = sin override, se muestra el nombre de fábrica.
+    pub nombre_personalizado: Option<String>,
+}
+
+#[tauri::command]
+pub async fn configuracion_listar_teclas() -> Result<Vec<ConfiguracionFilaTeclaUI>, String> {
+    let overrides = configuracion_usuario::leer_overrides_pulsador()?;
+
+    let filas = pulsadores::todos()
+        .iter()
+        .map(|pulsador| ConfiguracionFilaTeclaUI {
+            interno: pulsador.interno.clone(),
+
+            fuente: pulsador.fuente.clone(),
+
+            nombre_fabrica: pulsador.ui.clone(),
+
+            nombre_personalizado: overrides.get(&pulsador.interno).cloned(),
+        })
+        .collect();
+
+    Ok(filas)
+}
+
+#[tauri::command]
+pub async fn configuracion_guardar_lote_teclas(
+    cambios: Vec<ConfiguracionCambioUI>,
+) -> Result<ConfiguracionResultadoGuardadoUI, String> {
+    let pares: Vec<(String, String)> = cambios
+        .into_iter()
+        .map(|cambio| (cambio.clave, cambio.valor))
+        .collect();
+
+    match configuracion_usuario::guardar_lote_pulsadores(&pares) {
+        Ok(()) => Ok(ConfiguracionResultadoGuardadoUI {
+            errores: Vec::new(),
+        }),
+
+        Err(errores) => Ok(ConfiguracionResultadoGuardadoUI {
+            errores: errores
+                .into_iter()
+                .map(|(clave, mensaje)| ConfiguracionErrorUI { clave, mensaje })
+                .collect(),
+        }),
+    }
 }
