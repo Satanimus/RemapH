@@ -49,6 +49,11 @@
 //     Lista procesos disponibles.
 // obtener_programa_activo()
 //     Devuelve la aplicación en primer plano.
+// obtener_pid_y_ruta_activo()
+//     PID + ruta completa del ejecutable en primer plano, en una
+//     sola consulta a Windows (evita repetir la misma cadena de
+//     llamadas que ya hace obtener_programa_activo() cuando el
+//     que llama necesita ambos datos, no solo el nombre).
 // obtener_ruta_proceso()
 //     Obtiene la ruta del ejecutable.
 // extraer_icono()
@@ -234,6 +239,43 @@ pub fn obtener_pid_activo() -> Option<u32> {
     }
 
     Some(pid)
+}
+
+// ======================================================
+// 🆔📄 PID + RUTA DEL PROGRAMA EN PRIMER PLANO (una sola consulta)
+// ------------------------------------------------------
+// Combina en una sola consulta a Windows lo que back_pegado_
+// personalizado.rs venía haciendo con dos llamadas separadas
+// (obtener_programa_activo() para decidir si es Photoshop, después
+// obtener_pid_activo()+obtener_ruta_proceso() para relanzarlo) — cada
+// una de esas repetía la misma cadena completa (GetForegroundWindow
+// + GetWindowThreadProcessId + OpenProcess +
+// QueryFullProcessImageNameW), consultando dos veces el mismo dato.
+// Devuelve PID y ruta completa juntos; quien llama puede sacar el
+// nombre de archivo de la ruta con Path::file_name() si solo
+// necesita eso (ver es_photoshop() en back_pegado_personalizado.rs).
+// ======================================================
+
+pub fn obtener_pid_y_ruta_activo() -> Option<(u32, String)> {
+    let ventana = unsafe { GetForegroundWindow() };
+
+    if ventana.is_null() {
+        return None;
+    }
+
+    let mut pid = 0;
+
+    unsafe {
+        GetWindowThreadProcessId(ventana, &mut pid);
+    }
+
+    if pid == 0 {
+        return None;
+    }
+
+    let ruta = unsafe { obtener_ruta_proceso(pid) }?;
+
+    Some((pid, ruta))
 }
 
 // ======================================================

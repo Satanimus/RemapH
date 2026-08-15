@@ -19,7 +19,8 @@
 // sigue con el camino genérico de siempre.
 // ------------------------------------------------------
 // 3. ¿Qué información recibe?
-// Nada como parámetro — consulta directo la app activa (back_app).
+// Nada como parámetro — consulta directo la app activa (back_app,
+// una sola vez por click, PID+ruta juntos).
 // ------------------------------------------------------
 // 4. ¿Qué información entrega?
 // bool: true si se ejecutó el camino personalizado (Photoshop),
@@ -28,8 +29,9 @@
 // ------------------------------------------------------
 // 5. Funciones del archivo
 // intentar()
-//     Punto de entrada único. Revisa la app activa y, si es
-//     Photoshop, dispara la secuencia de doble relanzamiento.
+//     Punto de entrada único. Resuelve PID+ruta del programa activo
+//     en una sola consulta (back_app::obtener_pid_y_ruta_activo) y,
+//     si es Photoshop, dispara la secuencia de doble relanzamiento.
 // es_photoshop()
 //     Compara el nombre de archivo del proceso activo.
 // ejecutar_doble_script_photoshop()
@@ -80,7 +82,14 @@ static CONTADOR: AtomicU32 = AtomicU32::new(0);
 // ======================================================
 
 pub fn intentar() -> bool {
-    let Some(nombre_activo) = back_app::obtener_programa_activo() else {
+    let Some((_pid, ruta_exe)) = back_app::obtener_pid_y_ruta_activo() else {
+        return false;
+    };
+
+    let Some(nombre_activo) = std::path::Path::new(&ruta_exe)
+        .file_name()
+        .map(|nombre| nombre.to_string_lossy().to_string())
+    else {
         return false;
     };
 
@@ -90,7 +99,7 @@ pub fn intentar() -> bool {
 
     println!("🎨 [diag] pegado personalizado: app activa es Photoshop, uso doble relanzamiento");
 
-    ejecutar_doble_script_photoshop()
+    ejecutar_doble_script_photoshop(&ruta_exe)
 }
 
 // ======================================================
@@ -105,19 +114,9 @@ fn es_photoshop(nombre_proceso: &str) -> bool {
 // ▶️▶️ DOS RELANZAMIENTOS: ACTIVAR, ESPERAR, PEGAR
 // ======================================================
 
-fn ejecutar_doble_script_photoshop() -> bool {
-    let Some(pid) = back_app::obtener_pid_activo() else {
-        println!("🎨 [diag] pegado personalizado: no se pudo obtener PID de la app activa");
-        return false;
-    };
-
-    let Some(ruta_exe) = (unsafe { back_app::obtener_ruta_proceso(pid) }) else {
-        println!("🎨 [diag] pegado personalizado: no se pudo resolver la ruta del ejecutable");
-        return false;
-    };
-
+fn ejecutar_doble_script_photoshop(ruta_exe: &str) -> bool {
     println!("🎨 [diag] pegado personalizado: relanzamiento 1/2 (activación, script vacío)");
-    let activacion_ok = lanzar_script_photoshop(&ruta_exe, SCRIPT_VACIO, "activar");
+    let activacion_ok = lanzar_script_photoshop(ruta_exe, SCRIPT_VACIO, "activar");
 
     let delay = crate::config::delay_entre_scripts_photoshop();
     println!(
@@ -127,7 +126,7 @@ fn ejecutar_doble_script_photoshop() -> bool {
     std::thread::sleep(std::time::Duration::from_millis(delay));
 
     println!("🎨 [diag] pegado personalizado: relanzamiento 2/2 (pegado real)");
-    let pegado_ok = lanzar_script_photoshop(&ruta_exe, SCRIPT_PHOTOSHOP, "pegar");
+    let pegado_ok = lanzar_script_photoshop(ruta_exe, SCRIPT_PHOTOSHOP, "pegar");
 
     if !activacion_ok {
         println!("🎨 [diag] pegado personalizado: el relanzamiento de activación falló (sigo igual con el de pegado)");
