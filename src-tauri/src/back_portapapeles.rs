@@ -1264,7 +1264,9 @@ pub fn pegar(ruta: &Path) -> Result<(), String> {
     // cuenta. 400ms todavía daba error; 500ms funciona de forma
     // confiable — se deja con margen (600ms) para no quedar al límite
     // exacto medido, ya que el tiempo real puede variar con el tamaño
-    // de la imagen o la carga del sistema.
+    // de la imagen o la carga del sistema. Texto no tiene ese problema
+    // — por eso tiene su propio timer, mucho más corto (ver
+    // config::tiempo_espera_pegado_texto()).
 
     // Photoshop (visto arriba: no re-consulta el portapapeles solo
     // por WM_CLIPBOARDUPDATE, forzar_relectura_portapapeles() era el
@@ -1274,10 +1276,12 @@ pub fn pegar(ruta: &Path) -> Result<(), String> {
     // para forzar la activación real de la ventana + el MISMO Ctrl+V
     // simulado que el camino genérico, runtime::emitir_ctrl_v()) y
     // pegar() termina acá — sin el parche de relectura (no hace falta
-    // para este caso) ni el sleep de tiempo_espera_pegado_generico()
-    // de más abajo (Photoshop tiene su propio timer, ver
-    // config::delay_entre_scripts_photoshop()).
-    if crate::back_pegado_personalizado::intentar() {
+    // para este caso) ni el sleep genérico de más abajo. Se le pasa
+    // &contenido para que decida el timer: con IMAGEN usa su propio
+    // delay independiente (config::delay_imagen_photoshop()), con
+    // TEXTO usa el mismo timer corto que cualquier app genérica
+    // (config::tiempo_espera_pegado_texto()).
+    if crate::back_pegado_personalizado::intentar(&contenido) {
         println!("📋 [diag] pegado personalizado tomó el control — pegar() termina OK");
 
         return Ok(());
@@ -1292,9 +1296,12 @@ pub fn pegar(ruta: &Path) -> Result<(), String> {
     // haberlo confirmado todavía.
     forzar_relectura_portapapeles();
 
-    std::thread::sleep(std::time::Duration::from_millis(
-        crate::config::tiempo_espera_pegado_generico(),
-    ));
+    let tiempo_espera = match contenido {
+        ContenidoPortapapeles::Imagen { .. } => crate::config::tiempo_espera_pegado_imagen(),
+        ContenidoPortapapeles::Texto(_) => crate::config::tiempo_espera_pegado_texto(),
+    };
+
+    std::thread::sleep(std::time::Duration::from_millis(tiempo_espera));
 
     crate::runtime::emitir_ctrl_v();
 

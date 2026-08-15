@@ -19,8 +19,10 @@
 // sigue con el camino genérico de siempre.
 // ------------------------------------------------------
 // 3. ¿Qué información recibe?
-// Nada como parámetro — consulta directo la app activa (back_app,
-// una sola vez por click, PID+ruta juntos).
+// &ContenidoPortapapeles del contenido que se está pegando (Texto o
+// Imagen) — pegar() ya lo tiene calculado, se lo pasa para no tener
+// que releerlo. Aparte de eso, consulta directo la app activa
+// (back_app, una sola vez por click, PID+ruta juntos).
 // ------------------------------------------------------
 // 4. ¿Qué información entrega?
 // bool: true si se ejecutó el camino personalizado (Photoshop),
@@ -35,12 +37,21 @@
 // es_photoshop()
 //     Compara el nombre de archivo del proceso activo.
 // ejecutar_pegado_photoshop()
-//     Relanza Photoshop con el script vacío ya escrito en disco (solo
-//     para provocar la activación real de la ventana), espera
-//     config::delay_entre_scripts_photoshop() y después pega con el
-//     MISMO camino que usa el resto de RemapH: crate::runtime::
-//     emitir_ctrl_v(). Ya no arma ni lanza un segundo script .jsx de
-//     pegado — un relanzamiento menos de Photoshop por click.
+//     Con IMAGEN: relanza Photoshop con el script vacío ya escrito en
+//     disco (para provocar la activación real de la ventana) y recién
+//     después espera y pega. Con TEXTO: salta directo la activación
+//     (no hace falta) y va directo al delay + pegado. En ambos casos
+//     pega con el MISMO camino que usa el resto de RemapH:
+//     crate::runtime::emitir_ctrl_v(). Ya no arma ni lanza un segundo
+//     script .jsx de pegado — un relanzamiento menos de Photoshop por
+//     click.
+// delay_para_contenido()
+//     Con IMAGEN usa el delay independiente de Photoshop
+//     (config::delay_imagen_photoshop()); con TEXTO usa el mismo
+//     timer corto que cualquier app genérica
+//     (config::tiempo_espera_pegado_texto()) — Photoshop no necesita
+//     un delay propio para texto, el problema (asentar contenido
+//     pesado) es solo de imagen.
 // ruta_script_vacio()
 //     Devuelve la ruta del script vacío en disco, escribiéndolo una
 //     única vez (primer uso) en vez de en cada click — el contenido
@@ -56,6 +67,7 @@ use std::process::Command;
 use std::sync::OnceLock;
 
 use crate::back_app;
+use crate::back_portapapeles_captura::ContenidoPortapapeles;
 
 // Script "vacío" (no-op): no hace nada dentro de Photoshop, su único
 // propósito es viajar en un relanzamiento propio para provocar la
@@ -66,12 +78,12 @@ use crate::back_app;
 const SCRIPT_VACIO: &str = "// no-op: solo dispara el relanzamiento/activación, no pega nada\n";
 
 // ======================================================
-// ⏱️ Ver config::delay_entre_scripts_photoshop() / establecer_
-// delay_entre_scripts_photoshop() (config.rs) — espera entre el
-// relanzamiento con SCRIPT_VACIO (activación) y el Ctrl+V simulado
-// (pegado real). Ya no es una constante local: se dejó de fase de
-// pruebas fijas para pasar a ser un valor configurable único, junto
-// con el resto de los timers de portapapeles.
+// ⏱️ Con IMAGEN: config::delay_imagen_photoshop() (delay propio e
+// independiente de Photoshop). Con TEXTO: config::tiempo_espera_
+// pegado_texto() (el mismo timer corto que usa cualquier app
+// genérica — ver delay_para_contenido() más abajo). Ninguno es una
+// constante local: son valores configurables únicos, junto con el
+// resto de los timers de portapapeles (config.rs).
 // ======================================================
 
 // Ruta del script vacío en disco. Se escribe una sola vez (primer
@@ -85,7 +97,7 @@ static RUTA_SCRIPT_VACIO: OnceLock<Option<PathBuf>> = OnceLock::new();
 // 🎯 PUNTO DE ENTRADA
 // ======================================================
 
-pub fn intentar() -> bool {
+pub fn intentar(contenido: &ContenidoPortapapeles) -> bool {
     let Some((_pid, ruta_exe)) = back_app::obtener_pid_y_ruta_activo() else {
         return false;
     };
@@ -103,7 +115,7 @@ pub fn intentar() -> bool {
 
     println!("🎨 [diag] pegado personalizado: app activa es Photoshop, uso activación + Ctrl+V");
 
-    ejecutar_pegado_photoshop(&ruta_exe)
+    ejecutar_pegado_photoshop(&ruta_exe, contenido)
 }
 
 // ======================================================
@@ -115,30 +127,62 @@ fn es_photoshop(nombre_proceso: &str) -> bool {
 }
 
 // ======================================================
-// ▶️ ACTIVAR (script vacío reutilizado), ESPERAR, PEGAR (Ctrl+V)
+// ⏱️ DELAY SEGÚN TIPO DE CONTENIDO
+// ------------------------------------------------------
+// Solo IMAGEN usa el delay independiente de Photoshop — es el único
+// caso confirmado (Paint, mismo problema) donde hace falta darle
+// tiempo real a la app para "asentar" contenido pesado. TEXTO usa el
+// mismo timer corto que cualquier app genérica, Photoshop incluido.
 // ======================================================
 
-fn ejecutar_pegado_photoshop(ruta_exe: &str) -> bool {
-    println!(
-        "🎨 [diag] pegado personalizado: relanzamiento de activación (script vacío reutilizado)"
-    );
+fn delay_para_contenido(contenido: &ContenidoPortapapeles) -> u64 {
+    match contenido {
+        ContenidoPortapapeles::Imagen { .. } => crate::config::delay_imagen_photoshop(),
+        ContenidoPortapapeles::Texto(_) => crate::config::tiempo_espera_pegado_texto(),
+    }
+}
 
-    let activacion_ok = match ruta_script_vacio() {
-        Some(ruta_script) => lanzar_script_photoshop(ruta_exe, &ruta_script),
-        None => {
-            println!("🎨 [diag] pegado personalizado: no hay script vacío disponible, salto la activación");
-            false
+// ======================================================
+// ▶️ ACTIVAR (solo imagen, script vacío reutilizado), ESPERAR, PEGAR
+// (Ctrl+V)
+// ------------------------------------------------------
+// El relanzamiento de activación (script vacío) solo hace falta con
+// IMAGEN — con TEXTO no es necesario, se saltea directo al delay de
+// texto + Ctrl+V, un relanzamiento de Photoshop menos.
+// ======================================================
+
+fn ejecutar_pegado_photoshop(ruta_exe: &str, contenido: &ContenidoPortapapeles) -> bool {
+    let es_imagen = matches!(contenido, ContenidoPortapapeles::Imagen { .. });
+
+    if es_imagen {
+        println!("🎨 [diag] pegado personalizado: relanzamiento de activación (script vacío reutilizado)");
+
+        let activacion_ok = match ruta_script_vacio() {
+            Some(ruta_script) => lanzar_script_photoshop(ruta_exe, &ruta_script),
+            None => {
+                println!("🎨 [diag] pegado personalizado: no hay script vacío disponible, salto la activación");
+                false
+            }
+        };
+
+        if !activacion_ok {
+            println!("🎨 [diag] pegado personalizado: el relanzamiento de activación falló (sigo igual con el Ctrl+V)");
         }
-    };
-
-    if !activacion_ok {
-        println!("🎨 [diag] pegado personalizado: el relanzamiento de activación falló (sigo igual con el Ctrl+V)");
+    } else {
+        println!(
+            "🎨 [diag] pegado personalizado: contenido texto, salto la activación (no hace falta)"
+        );
     }
 
-    let delay = crate::config::delay_entre_scripts_photoshop();
+    let delay = delay_para_contenido(contenido);
     println!(
-        "🎨 [diag] pegado personalizado: espero {}ms antes del Ctrl+V",
-        delay
+        "🎨 [diag] pegado personalizado: espero {}ms antes del Ctrl+V ({})",
+        delay,
+        if es_imagen {
+            "imagen, delay propio de Photoshop"
+        } else {
+            "texto, timer genérico"
+        }
     );
     std::thread::sleep(std::time::Duration::from_millis(delay));
 
@@ -190,12 +234,12 @@ fn lanzar_script_photoshop(ruta_exe: &str, ruta_script: &std::path::Path) -> boo
     // .spawn() en vez de .status(): no se espera a que el proceso
     // mensajero (el que reenvía el script a la instancia de Photoshop
     // ya abierta) termine de verdad — solo que arranque. El delay
-    // configurable (config::delay_entre_scripts_photoshop(), aplicado
-    // por el llamador antes del Ctrl+V) ya cumple el rol de "darle
-    // tiempo a Photoshop"; esperar ADEMÁS a que este proceso cierre
-    // era tiempo doble. Se pierde la confirmación de "estado=" en el
-    // log (ahora solo se sabe que arrancó, no que terminó bien), pero
-    // no afecta el pegado en sí.
+    // configurable aplicado por el llamador antes del Ctrl+V (ver
+    // delay_para_contenido()) ya cumple el rol de "darle tiempo a
+    // Photoshop"; esperar ADEMÁS a que este proceso cierre era tiempo
+    // doble. Se pierde la confirmación de "estado=" en el log (ahora
+    // solo se sabe que arrancó, no que terminó bien), pero no afecta
+    // el pegado en sí.
     match Command::new(ruta_exe).arg(ruta_script).spawn() {
         Ok(_hijo) => {
             println!("🎨 [diag] pegado personalizado: script de activación lanzado (sin esperar a que cierre)");

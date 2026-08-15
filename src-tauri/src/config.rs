@@ -149,18 +149,30 @@
 //     rotativo duplicado del mismo contenido que ya existía (el
 //     propio pegado dispara su propio aviso de cambio).
 //
-// tiempo_espera_pegado_generico()
-// establecer_tiempo_espera_pegado_generico()
-//     Pausa en pegar(), solo para apps SIN camino personalizado (no
-//     Photoshop), entre forzar_relectura_portapapeles() y el Ctrl+V
-//     simulado — le da tiempo a la app de "asentar" el contenido
-//     nuevo antes del pegado automático.
+// tiempo_espera_pegado_imagen()
+// establecer_tiempo_espera_pegado_imagen()
+//     Pausa en pegar(), solo para contenido IMAGEN en apps SIN camino
+//     personalizado (no Photoshop), entre forzar_relectura_
+//     portapapeles() y el Ctrl+V simulado — le da tiempo a la app de
+//     "asentar" la imagen nueva antes del pegado automático. Antes
+//     era un único valor genérico para todo contenido; se separó
+//     porque solo hace falta para imagen (ver tiempo_espera_pegado_
+//     texto()).
 //
-// delay_entre_scripts_photoshop()
-// establecer_delay_entre_scripts_photoshop()
-//     Solo Photoshop: pausa entre el relanzamiento de activación
-//     (script vacío, reutilizado) y el Ctrl+V simulado que pega de
-//     verdad. Ver back_pegado_personalizado.rs.
+// tiempo_espera_pegado_texto()
+// establecer_tiempo_espera_pegado_texto()
+//     Misma pausa que tiempo_espera_pegado_imagen(), pero para
+//     contenido TEXTO — mucho más corta porque el texto no necesita
+//     "asentarse" como una imagen pesada. También la usa Photoshop
+//     cuando el contenido es texto (ver delay_imagen_photoshop()).
+//
+// delay_imagen_photoshop()
+// establecer_delay_imagen_photoshop()
+//     Solo Photoshop y solo con contenido IMAGEN: pausa entre el
+//     relanzamiento de activación (script vacío, reutilizado) y el
+//     Ctrl+V simulado que pega de verdad. Con contenido TEXTO,
+//     Photoshop no usa este valor — usa tiempo_espera_pegado_texto()
+//     como cualquier app genérica. Ver back_pegado_personalizado.rs.
 // ------------------------------------------------------
 // Transformación:
 //
@@ -613,8 +625,9 @@ pub fn establecer_portapapeles_boton_grande(ancho: u64, alto: u64) {
 // ======================================================
 
 static TIEMPO_IGNORAR_CAMBIO_PORTAPAPELES: AtomicU64 = AtomicU64::new(600);
-static TIEMPO_ESPERA_PEGADO_GENERICO: AtomicU64 = AtomicU64::new(450);
-static DELAY_ENTRE_SCRIPTS_PHOTOSHOP: AtomicU64 = AtomicU64::new(1300);
+static TIEMPO_ESPERA_PEGADO_IMAGEN: AtomicU64 = AtomicU64::new(450);
+static TIEMPO_ESPERA_PEGADO_TEXTO: AtomicU64 = AtomicU64::new(50);
+static DELAY_IMAGEN_PHOTOSHOP: AtomicU64 = AtomicU64::new(1350);
 
 pub fn tiempo_ignorar_cambio_portapapeles() -> u64 {
     TIEMPO_IGNORAR_CAMBIO_PORTAPAPELES.load(Ordering::Relaxed)
@@ -624,18 +637,26 @@ pub fn establecer_tiempo_ignorar_cambio_portapapeles(valor: u64) {
     TIEMPO_IGNORAR_CAMBIO_PORTAPAPELES.store(valor, Ordering::Relaxed);
 }
 
-pub fn tiempo_espera_pegado_generico() -> u64 {
-    TIEMPO_ESPERA_PEGADO_GENERICO.load(Ordering::Relaxed)
+pub fn tiempo_espera_pegado_imagen() -> u64 {
+    TIEMPO_ESPERA_PEGADO_IMAGEN.load(Ordering::Relaxed)
 }
 
-pub fn establecer_tiempo_espera_pegado_generico(valor: u64) {
-    TIEMPO_ESPERA_PEGADO_GENERICO.store(valor, Ordering::Relaxed);
+pub fn establecer_tiempo_espera_pegado_imagen(valor: u64) {
+    TIEMPO_ESPERA_PEGADO_IMAGEN.store(valor, Ordering::Relaxed);
 }
 
-pub fn delay_entre_scripts_photoshop() -> u64 {
-    DELAY_ENTRE_SCRIPTS_PHOTOSHOP.load(Ordering::Relaxed)
+pub fn tiempo_espera_pegado_texto() -> u64 {
+    TIEMPO_ESPERA_PEGADO_TEXTO.load(Ordering::Relaxed)
 }
 
-pub fn establecer_delay_entre_scripts_photoshop(valor: u64) {
-    DELAY_ENTRE_SCRIPTS_PHOTOSHOP.store(valor, Ordering::Relaxed);
+pub fn establecer_tiempo_espera_pegado_texto(valor: u64) {
+    TIEMPO_ESPERA_PEGADO_TEXTO.store(valor, Ordering::Relaxed);
+}
+
+pub fn delay_imagen_photoshop() -> u64 {
+    DELAY_IMAGEN_PHOTOSHOP.load(Ordering::Relaxed)
+}
+
+pub fn establecer_delay_imagen_photoshop(valor: u64) {
+    DELAY_IMAGEN_PHOTOSHOP.store(valor, Ordering::Relaxed);
 }
