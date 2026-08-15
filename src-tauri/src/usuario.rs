@@ -70,7 +70,7 @@ use std::time::SystemTime;
 // 📁 OBTENER CARPETA USUARIO
 // ======================================================
 
-fn carpeta() -> Result<PathBuf, String> {
+pub(crate) fn carpeta() -> Result<PathBuf, String> {
     let appdata = std::env::var("APPDATA").map_err(|error| error.to_string())?;
 
     let carpeta = PathBuf::from(appdata).join("RemapH").join("Usuario");

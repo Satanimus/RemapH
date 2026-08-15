@@ -22,6 +22,7 @@ mod captura_coordenada;
 mod comandos;
 mod compilador;
 mod config;
+mod configuracion_usuario;
 mod entrada;
 mod eventos;
 mod perfil;
@@ -60,6 +61,13 @@ pub fn run() {
             // desde el hilo de entrada física (Etapa I), no desde un
             // comando Tauri.
             back_portapapeles::inicializar(app.handle().clone());
+
+            // Aplica sobre config.rs los overrides guardados en
+            // Configuracion_Usuario.txt (pestaña General de la
+            // Ventana de Configuración). Debe ir después de que
+            // exista la carpeta de usuario, pero no depende de
+            // ninguna ventana — se hace apenas arranca.
+            configuracion_usuario::cargar_al_iniciar();
 
             Ok(())
         })
@@ -132,6 +140,9 @@ pub fn run() {
             comandos::establecer_portapapeles_boton_pequeno,
             comandos::establecer_portapapeles_boton_mediano,
             comandos::establecer_portapapeles_boton_grande,
+            comandos::configuracion_listar_general,
+            comandos::configuracion_guardar_lote,
+            comandos::configuracion_restablecer_seccion,
         ])
         .run(tauri::generate_context!())
         .expect("error al ejecutar Tauri");

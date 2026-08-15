@@ -1,0 +1,45 @@
+# configuracion.tsv — Catálogo de fábrica para la pestaña "General"
+# de la Ventana de Configuración.
+#
+# Columnas (separadas por TAB): clave | nombre_ui | valor_defecto | tipo
+#
+# - clave: debe coincidir EXACTO con el nombre de la función de
+#   config.rs sin el prefijo "establecer_" (ej. clave "tiempo_doble"
+#   -> config::tiempo_doble() / config::establecer_tiempo_doble()).
+# - tipo: "numero" (un solo entero), "numero_par" (dos enteros
+#   separados por coma, ej. "60,30" -> ancho,alto) o "texto" (string).
+# - valor_defecto: mismo valor que el default en config.rs, en el
+#   mismo formato que "tipo" (par -> "ancho,alto").
+#
+# ⚠️ Sincronización: cualquier variable nueva/eliminada/renombrada en
+# config.rs debe reflejarse acá. configuracion_usuario.rs valida las
+# claves al cargar Configuracion_Usuario.txt e ignora silenciosamente
+# las que no matcheen ninguna fila de este archivo.
+
+clave	nombre_ui	valor_defecto	tipo
+tiempo_doble	Tiempo para detectar doble toque (ms)	250	numero
+tiempo_triple	Tiempo para detectar triple toque (ms)	380	numero
+tiempo_mantenido	Tiempo mínimo para Mantenido (ms)	300	numero
+sensibilidad_rueda	Sensibilidad de la rueda (pulsos)	5	numero
+tiempo_repeticion	Intervalo de repetición Turbo (ms)	30	numero
+tiempo_espera_normal	Espera antes de repetir en Normal (ms)	500	numero
+tiempo_maximo_retenido	Tiempo máximo retenido, red de seguridad (ms)	5000	numero
+tecla_guardar_coordenada	Tecla para guardar coordenada capturada	F1	texto
+intervalo_captura_coordenada	Intervalo de refresco, ventana de captura (ms)	100	numero
+delay_entre_salida_doble	Pausa entre combos, Acción Doble (ms)	30	numero
+delay_rueda_repeticion	Pausa entre repeticiones de rueda (ms)	30	numero
+tiempo_salida_mantenido	Duración de salida, Acción Mantenido (ms)	300	numero
+delta_volumen	Paso de volumen en App (unidades)	10	numero
+menu_boton_pequeno	MenuExpress: botón pequeño (ancho,alto)	60,30	numero_par
+menu_boton_mediano	MenuExpress: botón mediano (ancho,alto)	80,40	numero_par
+menu_boton_grande	MenuExpress: botón grande (ancho,alto)	100,50	numero_par
+menu_texto_pequeno	MenuExpress: tamaño de texto pequeño (px)	10	numero
+menu_texto_mediano	MenuExpress: tamaño de texto mediano (px)	13	numero
+menu_texto_grande	MenuExpress: tamaño de texto grande (px)	16	numero
+portapapeles_boton_pequeno	Portapapeles: botón pequeño (ancho,alto)	140,26	numero_par
+portapapeles_boton_mediano	Portapapeles: botón mediano (ancho,alto)	180,32	numero_par
+portapapeles_boton_grande	Portapapeles: botón grande (ancho,alto)	220,40	numero_par
+tiempo_ignorar_cambio_portapapeles	Ignorar cambio de portapapeles tras pegar (ms)	600	numero
+tiempo_espera_pegado_imagen	Espera antes de pegar imagen (ms)	450	numero
+tiempo_espera_pegado_texto	Espera antes de pegar texto (ms)	50	numero
+delay_imagen_photoshop	Pausa Photoshop, pegado de imagen (ms)	1350	numero

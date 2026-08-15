@@ -135,6 +135,7 @@ use crate::back_coordenada;
 use crate::captura_coordenada;
 use crate::compilador::ResultadoCompilacion;
 use crate::config;
+use crate::configuracion_usuario;
 use crate::perfil;
 use crate::perfil_ui::{
     convertir_perfil, FilaUI, ResultadoPerfil, ResultadoPerfilInicial, TriggerCapturaUI,
@@ -143,7 +144,7 @@ use crate::pulsadores;
 
 use base64::engine::general_purpose::STANDARD as BASE64;
 use base64::Engine as _;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 use tauri::{Manager, WebviewUrl, WebviewWindowBuilder};
 
@@ -982,4 +983,107 @@ pub fn establecer_portapapeles_boton_mediano(ancho: u64, alto: u64) {
 #[tauri::command]
 pub fn establecer_portapapeles_boton_grande(ancho: u64, alto: u64) {
     config::establecer_portapapeles_boton_grande(ancho, alto)
+}
+
+// ======================================================
+// ⚙️ CONFIGURACIÓN — PESTAÑA GENERAL (Etapa 3)
+// ------------------------------------------------------
+// Comandos de la pestaña "General" de la Ventana de
+// Configuración. Toda la lógica de catálogo/overrides vive
+// en configuracion_usuario.rs — estos comandos solo
+// convierten entre sus tipos y los modelos serializables
+// que consume la UI.
+// ======================================================
+
+#[derive(Serialize)]
+pub struct ConfiguracionFilaUI {
+    pub clave: String,
+
+    pub nombre_ui: String,
+
+    // "numero" | "numero_par" | "texto"
+    pub tipo: String,
+
+    pub valor_defecto: String,
+
+    // None = sin override, se muestra el valor de fábrica.
+    pub valor_personalizado: Option<String>,
+}
+
+#[derive(Deserialize)]
+pub struct ConfiguracionCambioUI {
+    pub clave: String,
+
+    pub valor: String,
+}
+
+#[derive(Serialize)]
+pub struct ConfiguracionErrorUI {
+    // "" = error general del lote, no asociado a una fila.
+    pub clave: String,
+
+    pub mensaje: String,
+}
+
+#[derive(Serialize)]
+pub struct ConfiguracionResultadoGuardadoUI {
+    pub errores: Vec<ConfiguracionErrorUI>,
+}
+
+fn tipo_configuracion_a_texto(tipo: &configuracion_usuario::TipoValor) -> String {
+    match tipo {
+        configuracion_usuario::TipoValor::Numero => "numero".to_string(),
+        configuracion_usuario::TipoValor::NumeroPar => "numero_par".to_string(),
+        configuracion_usuario::TipoValor::Texto => "texto".to_string(),
+    }
+}
+
+#[tauri::command]
+pub async fn configuracion_listar_general() -> Result<Vec<ConfiguracionFilaUI>, String> {
+    let overrides = configuracion_usuario::leer_overrides()?;
+
+    let filas = configuracion_usuario::cargar_catalogo()
+        .iter()
+        .map(|entrada| ConfiguracionFilaUI {
+            clave: entrada.clave.clone(),
+
+            nombre_ui: entrada.nombre_ui.clone(),
+
+            tipo: tipo_configuracion_a_texto(&entrada.tipo),
+
+            valor_defecto: entrada.valor_defecto.clone(),
+
+            valor_personalizado: overrides.get(&entrada.clave).cloned(),
+        })
+        .collect();
+
+    Ok(filas)
+}
+
+#[tauri::command]
+pub async fn configuracion_guardar_lote(
+    cambios: Vec<ConfiguracionCambioUI>,
+) -> Result<ConfiguracionResultadoGuardadoUI, String> {
+    let pares: Vec<(String, String)> = cambios
+        .into_iter()
+        .map(|cambio| (cambio.clave, cambio.valor))
+        .collect();
+
+    match configuracion_usuario::guardar_lote(&pares) {
+        Ok(()) => Ok(ConfiguracionResultadoGuardadoUI {
+            errores: Vec::new(),
+        }),
+
+        Err(errores) => Ok(ConfiguracionResultadoGuardadoUI {
+            errores: errores
+                .into_iter()
+                .map(|(clave, mensaje)| ConfiguracionErrorUI { clave, mensaje })
+                .collect(),
+        }),
+    }
+}
+
+#[tauri::command]
+pub async fn configuracion_restablecer_seccion(prefijo: Option<String>) -> Result<(), String> {
+    configuracion_usuario::restablecer_seccion(prefijo.as_deref())
 }

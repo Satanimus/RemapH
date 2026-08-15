@@ -1,0 +1,209 @@
+/* ======================================================
+   ⚙️ configuracion.css
+   ------------------------------------------------------
+   Estilos propios de la Ventana de Configuración. A
+   diferencia de captura.css, esta ventana SÍ importa
+   styl_general.css (ver configuracion_main.ts) porque es
+   una ventana normal, con decoraciones y fondo sólido, no
+   un overlay transparente.
+   ====================================================== */
+
+.configuracion-card {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    height: 100vh;
+}
+
+/* ======================================================
+   PESTAÑAS
+   ====================================================== */
+
+.configuracion-tabs {
+    display: flex;
+    gap: var(--gap4);
+    padding: var(--gap8) var(--gap12) 0;
+    border-bottom: 1px solid var(--border);
+    background: var(--panel);
+}
+
+.configuracion-tab {
+    padding: var(--gap8) var(--gap16);
+    background: transparent;
+    border: 1px solid transparent;
+    border-bottom: none;
+    border-radius: var(--r4) var(--r4) 0 0;
+    color: var(--text-soft);
+    font-size: var(--fs13);
+}
+
+.configuracion-tab:hover {
+    color: var(--text);
+}
+
+.configuracion-tab-activa {
+    background: var(--bg);
+    border-color: var(--border);
+    color: var(--text);
+    font-weight: 600;
+}
+
+/* ======================================================
+   CUERPO / PANELES
+   ====================================================== */
+
+.configuracion-cuerpo {
+    flex: 1;
+    overflow: hidden;
+    background: var(--bg);
+}
+
+.configuracion-panel {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    height: 100%;
+    padding: var(--gap16);
+    gap: var(--gap12);
+}
+
+.configuracion-panel.oculto {
+    display: none;
+}
+
+.configuracion-placeholder {
+    color: var(--text-disabled);
+    font-size: var(--fs13);
+    padding: var(--gap24);
+    text-align: center;
+}
+
+/* ======================================================
+   TABLA
+   ====================================================== */
+
+.configuracion-tabla {
+    flex: 1;
+    overflow-y: auto;
+    border-collapse: collapse;
+    width: 100%;
+    font-size: var(--fs13);
+}
+
+.configuracion-tabla thead th {
+    position: sticky;
+    top: 0;
+
+    background: var(--panel2);
+    color: var(--text-soft);
+    text-align: left;
+    font-size: var(--fs12);
+    font-weight: 600;
+    padding: var(--gap8);
+    border-bottom: 1px solid var(--border);
+}
+
+.configuracion-tabla tbody td {
+    padding: var(--gap8);
+    border-bottom: 1px solid var(--border);
+    vertical-align: middle;
+}
+
+.configuracion-tabla tbody tr:hover {
+    background: var(--row-hover-bg);
+}
+
+.configuracion-valor-defecto {
+    color: var(--text-soft);
+}
+
+.configuracion-valor-personalizado input {
+    width: 100%;
+}
+
+.configuracion-par {
+    display: flex;
+    align-items: center;
+    gap: var(--gap4);
+}
+
+.configuracion-par input {
+    width: 100%;
+    min-width: 0;
+}
+
+/* Fila con un campo editado, todavía sin guardar. */
+.configuracion-fila-editando .configuracion-valor-personalizado input {
+    border-color: var(--green);
+}
+
+/* Fila con un valor inválido, marcada al intentar guardar. */
+.configuracion-fila-error .configuracion-valor-personalizado input {
+    border-color: var(--red);
+}
+
+/* ======================================================
+   ERROR / ACCIONES / TOAST
+   ====================================================== */
+
+.configuracion-error {
+    color: var(--red);
+    font-size: var(--fs12);
+    background: rgba(198, 40, 40, 0.12);
+    border: 1px solid var(--red);
+    border-radius: var(--r4);
+    padding: var(--gap8);
+}
+
+.configuracion-error.oculto {
+    display: none;
+}
+
+.configuracion-acciones {
+    display: flex;
+    justify-content: flex-end;
+    gap: var(--gap8);
+}
+
+.configuracion-boton {
+    padding: var(--gap8) var(--gap16);
+    background: var(--button-bg);
+    border: 1px solid var(--border-light);
+    border-radius: var(--r4);
+    color: var(--text);
+    font-size: var(--fs13);
+}
+
+.configuracion-boton:hover {
+    border-color: var(--highlight);
+}
+
+.configuracion-boton:disabled {
+    opacity: 0.5;
+    cursor: default;
+}
+
+.configuracion-boton-primario {
+    background: var(--blue);
+    border-color: var(--blue);
+}
+
+.configuracion-toast {
+    position: fixed;
+    right: var(--gap16);
+    bottom: var(--gap16);
+
+    padding: var(--gap8) var(--gap16);
+    background: var(--green-dark);
+    border-radius: var(--r6);
+    color: var(--text);
+    font-size: var(--fs13);
+
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity var(--speed);
+}
+
+.configuracion-toast-visible {
+    opacity: 1;
+}
