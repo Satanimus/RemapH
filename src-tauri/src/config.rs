@@ -614,7 +614,7 @@ pub fn establecer_portapapeles_boton_grande(ancho: u64, alto: u64) {
 
 static TIEMPO_IGNORAR_CAMBIO_PORTAPAPELES: AtomicU64 = AtomicU64::new(600);
 static TIEMPO_ESPERA_PEGADO_GENERICO: AtomicU64 = AtomicU64::new(450);
-static DELAY_ENTRE_SCRIPTS_PHOTOSHOP: AtomicU64 = AtomicU64::new(1);
+static DELAY_ENTRE_SCRIPTS_PHOTOSHOP: AtomicU64 = AtomicU64::new(1300);
 
 pub fn tiempo_ignorar_cambio_portapapeles() -> u64 {
     TIEMPO_IGNORAR_CAMBIO_PORTAPAPELES.load(Ordering::Relaxed)

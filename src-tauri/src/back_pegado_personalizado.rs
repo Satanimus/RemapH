@@ -187,15 +187,18 @@ fn ruta_script_vacio() -> Option<PathBuf> {
 // ======================================================
 
 fn lanzar_script_photoshop(ruta_exe: &str, ruta_script: &std::path::Path) -> bool {
-    // .status() en vez de .spawn(): se espera a que el proceso que
-    // reenvía el script a la instancia de Photoshop ya abierta
-    // termine de verdad, en vez de devolver el control de inmediato.
-    match Command::new(ruta_exe).arg(ruta_script).status() {
-        Ok(estado) => {
-            println!(
-                "🎨 [diag] pegado personalizado: script de activación enviado a Photoshop, estado={}",
-                estado
-            );
+    // .spawn() en vez de .status(): no se espera a que el proceso
+    // mensajero (el que reenvía el script a la instancia de Photoshop
+    // ya abierta) termine de verdad — solo que arranque. El delay
+    // configurable (config::delay_entre_scripts_photoshop(), aplicado
+    // por el llamador antes del Ctrl+V) ya cumple el rol de "darle
+    // tiempo a Photoshop"; esperar ADEMÁS a que este proceso cierre
+    // era tiempo doble. Se pierde la confirmación de "estado=" en el
+    // log (ahora solo se sabe que arrancó, no que terminó bien), pero
+    // no afecta el pegado en sí.
+    match Command::new(ruta_exe).arg(ruta_script).spawn() {
+        Ok(_hijo) => {
+            println!("🎨 [diag] pegado personalizado: script de activación lanzado (sin esperar a que cierre)");
             true
         }
         Err(error) => {
