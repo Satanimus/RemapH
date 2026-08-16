@@ -688,6 +688,27 @@ fn ejecutar_click_coordenada(
     extra: Option<ExtraCache>,
     coordenada: CoordenadaCache,
 ) {
+    // [FIX] Mismo motivo que en ejecutar_extra_en_hilo: si hay Extra
+    // (Normal/Turbo/Mantener/etc.), esta ejecución necesita un id
+    // ÚNICO POR EJECUCIÓN para poder detenerse — generado ACÁ,
+    // síncrono, ANTES de spawnear el hilo, y encolado en GENERACIONES
+    // para que detener(id) (el Up físico) sepa a qué ejecución real
+    // apuntar.
+    //
+    // Antes esta función pasaba el id de FILA crudo a ejecutar_lineas(),
+    // sin pasar nunca por nueva_id_ejecucion(). Esa ejecución nunca
+    // quedaba anotada en GENERACIONES, así que cuando llegaba el Up y
+    // Cache mandaba Detener{id}, detener() buscaba una cola vacía en
+    // GENERACIONES para ese id de fila y cortaba en silencio sin tocar
+    // INSTANCIAS — la orden de detener se perdía siempre. El loop de
+    // REPETIR (Normal/Turbo) o el ESPERAR DETENER (Mantener) nunca se
+    // enteraban de que había que parar y quedaban repitiendo para
+    // siempre (bug: bucle de salida con Coordenada + Extra
+    // Normal/Turbo). Sin Extra no pasaba nada de esto (rama None de
+    // abajo no usa INSTANCIAS), y sin coordenada tampoco (ese camino
+    // va por ejecutar_extra_en_hilo, que sí generaba el id a tiempo).
+    let id_ejecucion = extra.as_ref().map(|_| nueva_id_ejecucion(&id));
+
     thread::spawn(move || {
         let origen = match coordenada.post_accion {
             PostAccionCache::Inicial => Some(back_coordenada::obtener_cursor()),
@@ -701,7 +722,10 @@ fn ejecutar_click_coordenada(
             Some(extra) => {
                 let lineas = runt_extra::obtener(&extra);
                 let lineas = sustituir_accion(lineas, &accion);
-                ejecutar_lineas(id, lineas);
+                ejecutar_lineas(
+                    id_ejecucion.expect("generado arriba cuando extra es Some"),
+                    lineas,
+                );
             }
 
             None => {
@@ -1777,9 +1801,35 @@ fn limpiar_instancia(id: String) {
 // ======================================================
 
 fn resolver_input(interno: &str) -> Option<InputId> {
+    // [FIX] Antes: `InputId::new(&pulsador.fuente, &pulsador.interception)`.
+    // Esta función reconstruye un InputId a partir del nombre INTERNO
+    // que viaja en las líneas del idioma Runtime (ver sustituir_accion:
+    // "DOWN {gatillo}", donde gatillo = InputId::control(), siempre un
+    // nombre interno). InputId::control() se usa después en
+    // back_teclas::convertir_salida(), que espera recibir justamente
+    // el nombre INTERNO ahí (llama a pulsadores::interno_a_interception()
+    // para traducirlo recién en ese punto) — armar acá el InputId ya
+    // con el nombre "interception" pisaba ese contrato: convertir_salida
+    // volvía a tratarlo como si fuera interno, buscaba un pulsador con
+    // ESE nombre en la columna interno (no existe) y descartaba el
+    // evento en silencio.
+    //
+    // Para la mayoría de las teclas (letras, números, F1-F12,
+    // modificadores) interno == interception, así que el bug quedaba
+    // invisible — el lookup fallido "acertaba" igual por coincidencia
+    // de nombres. Se notaba solo en las teclas donde difieren: los
+    // símbolos propios del layout español (Ñ/SemiColon, ¡/Equals,
+    // °/Grave, ´/Apostrophe, ç/BackSlash, +/RightBracket, etc.) —
+    // exactamente las que se perdían con Extra Normal/Mantenido/Turbo
+    // (que pasan por acá) pero no con Extra Simple (que emite el
+    // InputId ya armado por el compilador, sin pasar por acá).
+    //
+    // `interno` ya es el nombre interno correcto (así lo busca
+    // por_interno() ahí abajo) — no hace falta ir a buscar
+    // pulsador.interception, alcanza con reusarlo directo.
     let pulsador = crate::pulsadores::por_interno(interno)?;
 
-    Some(InputId::new(&pulsador.fuente, &pulsador.interception))
+    Some(InputId::new(&pulsador.fuente, interno))
 }
 
 // ======================================================

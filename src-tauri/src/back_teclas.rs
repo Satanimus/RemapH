@@ -282,7 +282,20 @@ pub fn convertir(code: ScanCode, es_extendida: bool, presionado: bool) -> Option
     let interception = nombre_interception(code, es_extendida);
 
     let Some(interno) = pulsadores::interception_a_interno(&interception) else {
-        println!("⚠️ Tecla de teclado no soportada: {}", interception);
+        // "PrintScreenFakeShift" es un caso esperado, no una tecla
+        // realmente no soportada: es el fake-shift (E0+LeftShift) que
+        // el propio teclado manda alrededor de Impr Pant, y también
+        // alrededor de TODO el bloque de navegación extendida (flechas,
+        // Inicio/Fin, Supr, RePág/AvPág) cuando NumLock está activado
+        // — mismo stroke crudo en los dos casos, ver TABLA_EXTENDIDA.
+        // A propósito no tiene fila en pulsadores.tsv (ver ese
+        // comentario), y back_interception::iniciar() ya lo traga sin
+        // reenviarlo — no hace falta advertir acá cada vez que se
+        // descarta correctamente. El resto de las teclas realmente no
+        // soportadas siguen logueando normal.
+        if interception != "PrintScreenFakeShift" {
+            println!("⚠️ Tecla de teclado no soportada: {}", interception);
+        }
 
         return None;
     };
