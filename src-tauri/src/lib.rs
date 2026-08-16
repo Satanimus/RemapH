@@ -25,6 +25,9 @@ mod config;
 mod configuracion_usuario;
 mod entrada;
 mod eventos;
+mod macro_json;
+mod macro_usuario;
+mod macros;
 mod perfil;
 mod perfil_cache;
 mod perfil_json;
@@ -89,6 +92,11 @@ pub fn run() {
             comandos::eliminar_perfil_actual,
             comandos::crear_perfil_nuevo,
             comandos::seleccionar_perfil,
+            comandos::macro_listar,
+            comandos::macro_nueva,
+            comandos::macro_clonar,
+            comandos::macro_abrir,
+            comandos::macro_guardar,
             comandos::listar_procesos_ventana,
             comandos::obtener_icono_programa,
             comandos::obtener_icono_ruta,

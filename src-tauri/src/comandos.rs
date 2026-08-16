@@ -136,6 +136,8 @@ use crate::captura_coordenada;
 use crate::compilador::ResultadoCompilacion;
 use crate::config;
 use crate::configuracion_usuario;
+use crate::macro_json::MacroArchivoJson;
+use crate::macros;
 use crate::perfil;
 use crate::perfil_ui::{
     convertir_perfil, FilaUI, ResultadoPerfil, ResultadoPerfilInicial, TriggerCapturaUI,
@@ -229,6 +231,42 @@ pub fn renombrar_perfil(nuevo_nombre: String) -> Result<ResultadoPerfil, String>
 #[tauri::command]
 pub fn eliminar_perfil_actual() -> Result<ResultadoPerfil, String> {
     perfil::eliminar_perfil_actual()
+}
+
+// ======================================================
+// 🧩 COMANDOS MACRO — Etapa 2
+// ------------------------------------------------------
+// Solo listar/crear/clonar/abrir/guardar el archivo (carpeta
+// /Macros) — nada de compilar ni de ejecutar todavía. El
+// editor (Etapa 5/6) reusa macro_guardar tal cual.
+// ======================================================
+
+#[tauri::command]
+pub fn macro_listar() -> Result<Vec<String>, String> {
+    macros::listar_macros()
+}
+
+#[tauri::command]
+pub fn macro_nueva(nombre: Option<String>) -> Result<MacroArchivoJson, String> {
+    macros::crear_macro_nueva(nombre)
+}
+
+#[tauri::command]
+pub fn macro_clonar(
+    nombre_origen: String,
+    nombre_nuevo: Option<String>,
+) -> Result<MacroArchivoJson, String> {
+    macros::clonar_macro(nombre_origen, nombre_nuevo)
+}
+
+#[tauri::command]
+pub fn macro_abrir(nombre: String) -> Result<MacroArchivoJson, String> {
+    macros::abrir_macro(nombre)
+}
+
+#[tauri::command]
+pub fn macro_guardar(macro_archivo: MacroArchivoJson) -> Result<(), String> {
+    macros::guardar_macro(macro_archivo)
 }
 
 #[tauri::command]
