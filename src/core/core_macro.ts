@@ -43,6 +43,19 @@ export function crearMacroArchivo(nombre: string): MacroArchivo {
 }
 
 // ======================================================
+// 📝 TEXTO ACCIÓN (columna Acción de la tabla)
+// ------------------------------------------------------
+// filaPerfil.accionReferencia guarda el nombre de la macro
+// asignada a la fila (ver comp_popup_macro_accion.ts) — mismo
+// campo genérico que ya usa "multimedia", mismo criterio de
+// texto que textoAccionMultimedia/textoMenuAccion.
+// ======================================================
+
+export function textoMacroAccion(accionReferencia: string | null): string {
+  return accionReferencia ? `🧩 ${accionReferencia}` : "🧩 Seleccionar macro";
+}
+
+// ======================================================
 // 🧱 TIPOS DE PASO
 // ======================================================
 

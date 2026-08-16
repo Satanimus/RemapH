@@ -12,6 +12,8 @@ import { textoMenuAccion } from "../../core/core_menu_express";
 
 import { textoPortapapelesAccion } from "../../core/core_portapapeles";
 
+import { textoMacroAccion } from "../../core/core_macro";
+
 export function crearAccionTeclado(): HTMLButtonElement {
   return crearBoton({
     texto: "Capturar",
@@ -40,9 +42,13 @@ export function crearAccionMenuExpress(
   });
 }
 
-export function crearAccionMacro(): HTMLButtonElement {
+// El menú real (Abrir/Clonar/Nueva) se conecta desde comp_accion.ts
+// — acá el botón solo muestra el nombre de la macro asignada (o el
+// default "🧩 Seleccionar macro"), mismo criterio que
+// crearAccionMultimedia().
+export function crearAccionMacro(filaPerfil: FilaPerfil): HTMLButtonElement {
   return crearBoton({
-    texto: "Macro",
+    texto: textoMacroAccion(filaPerfil.accionReferencia),
     clase: "capturador",
   });
 }

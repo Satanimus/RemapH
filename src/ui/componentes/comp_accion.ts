@@ -24,6 +24,8 @@ import { abrirEditorMenuExpress } from "./comp_popup_menu_express_editor";
 
 import { abrirEditorPortapapeles } from "./comp_popup_portapapeles_editor";
 
+import { abrirPopupMacroAccion } from "./comp_popup_macro_accion";
+
 // ======================================================
 // CREAR ACCIÓN
 // ======================================================
@@ -60,8 +62,17 @@ export function crearAccion(
       return boton;
     }
 
-    case "macro":
-      return crearAccionMacro();
+    // El clic abre el menú Abrir/Clonar/Nueva (asigna
+    // accionReferencia) — ver comp_popup_macro_accion.ts.
+    case "macro": {
+      const boton = crearAccionMacro(filaPerfil);
+
+      boton.addEventListener("click", (evento) => {
+        abrirPopupMacroAccion(evento, contexto, filaPerfil, alModificar);
+      });
+
+      return boton;
+    }
 
     // El clic abre el editor (solo Nombre de la ventana) — ver
     // comp_popup_portapapeles_editor.ts.

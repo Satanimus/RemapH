@@ -18,6 +18,8 @@ import { textoPortapapelesAccion } from "./core_portapapeles";
 
 import { textoAbrirAccion } from "./core_abrir";
 
+import { textoMacroAccion } from "./core_macro";
+
 // ======================================================
 // 📋 CLONAR FILA POR ID
 // ======================================================
@@ -116,6 +118,11 @@ export function moverFilaPorId(
 // core_abrir.ts): sin ruta elegida equivale a "Seleccionar..." en
 // la columna Acción, el mismo estado "vacío" que gatillo ausente
 // en el resto de los tipos.
+//
+// macro tampoco usa accion.gatillo — usa accionReferencia (mismo
+// campo genérico que "multimedia", ver core_perfil.ts): sin macro
+// asignada equivale a "Seleccionar macro" en la columna Acción,
+// mismo estado "vacío" que abrirAccion.ruta ausente.
 // ======================================================
 
 export function filaTieneAccion(filaPerfil: FilaPerfil): boolean {
@@ -129,6 +136,10 @@ export function filaTieneAccion(filaPerfil: FilaPerfil): boolean {
 
   if (filaPerfil.tipo === "abrir") {
     return !!filaPerfil.abrirAccion.ruta;
+  }
+
+  if (filaPerfil.tipo === "macro") {
+    return !!filaPerfil.accionReferencia;
   }
 
   return !!filaPerfil.accion?.gatillo;
@@ -153,7 +164,7 @@ export function textoAccionFila(filaPerfil: FilaPerfil): string {
       return textoMenuAccion(filaPerfil.menuAccion);
 
     case "macro":
-      return "Macro";
+      return textoMacroAccion(filaPerfil.accionReferencia);
 
     case "portapapeles":
       return textoPortapapelesAccion(filaPerfil.portapapelesAccion);
