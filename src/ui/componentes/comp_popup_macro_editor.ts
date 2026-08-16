@@ -459,13 +459,13 @@ function montarEditor(
 
     popup.className = "popup-extra popup-macro-editor";
 
-    // Columna Marcador: solo tiene sentido en un paso si existe AL
-    // MENOS UN Bucle en algún punto POSTERIOR de la macro (spec:
-    // "Solo los pasos anteriores a un Bucle pueden tomar su letra")
-    // — un paso ubicado después de todos los bucles nunca podría
-    // ser destino de ninguno, marcarlo no tendría efecto. Se
-    // precalcula por índice acá (en vez de un booleano global "hay
-    // algún bucle en la macro") para reflejar esto con precisión.
+    // hayBucle: si existe al menos un Bucle en la macro, determina
+    // si la columna Marcador existe/se reserva en TODAS las filas
+    // (spec: "la columna solo existe cuando hay al menos un paso
+    // Bucle"). hayBucleDespuesDe(indice): elegibilidad puntual de
+    // CADA paso para tomar una letra nueva — solo los anteriores a
+    // algún Bucle pueden hacerlo (spec sección 3) — pasada por fila
+    // a crearFilaPaso/crearControlMarcador más abajo.
     const hayBucle = macroArchivo.pasos.some((paso) => paso.tipo === "bucle");
 
     const hayBucleDespuesDe = (indice: number): boolean =>
@@ -510,6 +510,7 @@ function montarEditor(
           indice,
           macroArchivo,
           hayBucle,
+          hayBucleDespuesDe(indice),
           programaFiltroApp,
           idPasoExpandido,
           idMenuAbierto,
@@ -604,6 +605,7 @@ function crearFilaPaso(
   indice: number,
   macroArchivo: MacroArchivo,
   hayBucle: boolean,
+  elegiblePorMarcador: boolean,
   programaFiltroApp: string | null,
   idPasoExpandido: string | null,
   idMenuAbierto: string | null,
@@ -652,11 +654,23 @@ function crearFilaPaso(
 
   filaPrincipal.append(numero);
 
-  // Columna Marcador — solo visible si hay al menos un paso Bucle
-  // Y (este paso es anterior a algún Bucle) Y (ningún otro paso ya
-  // tiene una letra asignada, salvo que sea este mismo o el Bucle
-  // que lo referencia) — ver spec sección 3.
-  if (hayBucle && paso.tipo !== "bucle") {
+  // Columna Marcador — la columna existe (reserva espacio) en toda
+  // fila apenas hay algún Bucle en la macro, pero el control real
+  // (asignar/quitar letra) solo se ofrece en pasos que NO son Bucle
+  // y que tienen al menos un Bucle en algún punto POSTERIOR (spec:
+  // "solo los pasos anteriores a un Bucle pueden tomar su letra").
+  // Un paso ya marcado se sigue mostrando aunque un reordenamiento
+  // lo haya dejado sin ningún Bucle detrás — así el usuario puede
+  // verlo y quitarlo, en vez de que el marcador quede "invisible"
+  // pero todavía activo. Reglas 3-5 de la spec (letra estable al
+  // reordenar, múltiples letras simultáneas — A, B, C..., una por
+  // Bucle — soportado desde el modelo de datos vía
+  // letraMarcadorDisponible) no imponen un único marcador global.
+  if (
+    hayBucle &&
+    paso.tipo !== "bucle" &&
+    (elegiblePorMarcador || paso.marcador)
+  ) {
     filaPrincipal.append(
       crearControlMarcador(paso, macroArchivo, guardarYRedibujar),
     );
@@ -741,16 +755,21 @@ function crearFilaPaso(
 // 🔤 CONTROL DE MARCADOR (columna condicional)
 // ------------------------------------------------------
 // Reglas (spec sección 3):
-// - Solo asignable a un paso ANTERIOR a un Bucle existente.
-// - Al asignarse una letra, la columna se oculta para el
-//   resto (solo queda visible en ese paso y en el Bucle que
-//   lo referencia).
-// - Clic sobre "Marcar" asigna la próxima letra libre. Clic
-//   sobre la letra ya asignada la quita (vuelve el Bucle que
-//   la referenciaba a "sin destino" — ver crearMenuAsa/al
-//   borrar más abajo, mismo criterio aplicado acá también
-//   porque quitar el marcador equivale a "borrar el paso
-//   marcado" desde el punto de vista del Bucle).
+// - Solo asignable a un paso ANTERIOR a un Bucle existente
+//   (elegibilidad ya filtrada por el llamador — crearFilaPaso —
+//   antes de instanciar este control).
+// - Pueden coexistir varias letras a la vez en la misma macro
+//   (una por cada Bucle que las referencia — ver ejemplo de
+//   bucles anidados A/B en el plan, y letraMarcadorDisponible en
+//   core_macro.ts, diseñada explícitamente para A, B, C... sin
+//   límite). No hay "un solo marcador global": cada paso elegible
+//   ofrece su propio botón para tomar la próxima letra libre.
+// - Clic sobre "○" (sin marcar) asigna la próxima letra libre.
+//   Clic sobre la letra ya asignada la quita (vuelve cualquier
+//   Bucle que la referenciaba a "sin destino" — mismo criterio
+//   que crearMenuAsa al eliminar un paso marcado, porque quitar
+//   el marcador equivale a "borrar el paso marcado" desde el
+//   punto de vista del Bucle).
 // ======================================================
 
 function crearControlMarcador(
@@ -758,19 +777,6 @@ function crearControlMarcador(
   macroArchivo: MacroArchivo,
   guardarYRedibujar: () => void,
 ): HTMLElement {
-  const hayAlgunMarcador = macroArchivo.pasos.some((p) => p.marcador !== null);
-
-  // Si YA hay un marcador puesto en la macro y no es el de este
-  // paso, la columna se oculta para el resto (spec) — se retorna un
-  // espacio vacío para no romper la alineación de columnas.
-  if (hayAlgunMarcador && paso.marcador === null) {
-    const espacio = document.createElement("span");
-
-    espacio.className = "popup-macro-editor-marcador-espacio";
-
-    return espacio;
-  }
-
   const boton = document.createElement("button");
 
   boton.className = "ui-btn popup-macro-editor-marcador";

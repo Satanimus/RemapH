@@ -214,6 +214,17 @@ pub enum AccionCache {
     //               up.
     Emitir(Vec<InputId>, CondicionTrigger),
 
+    // Acción tipo "Macro" (encadenar pasos con pausas, ver
+    // core_macro.ts). El String es solo el NOMBRE de la macro
+    // (existencia ya verificada en compilador.rs::convertir_macro,
+    // mismo criterio que AbrirArchivo::ruta) — no el contenido/pasos
+    // ya resueltos. Decisión tomada en la Etapa 7: el archivo
+    // /Macros/<nombre>.json se lee y se interpreta recién acá en
+    // Runtime, al ejecutarse (Etapa 8), nunca en compilador.rs — una
+    // macro es un archivo propio editable en cualquier momento desde
+    // su popup (guardado directo, sin pasar por "recompilar el
+    // perfil"), así que incrustar su contenido en la cache la dejaría
+    // vieja hasta la próxima recompilación de cada perfil que la usa.
     Macro(String),
 
     // Acción tipo "Abrir Archivo/App". ruta es siempre absoluta y ya

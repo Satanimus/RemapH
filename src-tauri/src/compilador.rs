@@ -142,11 +142,31 @@
 //     este segundo caso además registra una AdvertenciaCompilacion
 //     con el número de fila, para que la UI pueda avisar "(Fila N)
 //     Archivo o programa no encontrado." y mostrar la fila OFF ⚠️.
+//
+// convertir_macro()
+//     Resuelve tipo == "macro" → Option<AccionCache::Macro>. Mismo
+//     criterio que convertir_abrir(): None sin advertencia si
+//     todavía no se eligió ninguna macro (dato faltante), None CON
+//     advertencia si se eligió una pero el archivo /Macros/<nombre>
+//     .json ya no existe (se borró/renombró desde afuera). A
+//     diferencia de AbrirArchivo, AccionCache::Macro solo guarda el
+//     NOMBRE (no el contenido/pasos ya resueltos) — el JSON de la
+//     macro se lee y se interpreta recién en Runtime, al ejecutarse
+//     (Etapa 8), no acá. Motivo: la macro es un archivo propio,
+//     editable en cualquier momento desde su propio popup (guardado
+//     directo, ver comp_popup_macro_editor.ts) sin pasar por
+//     "recompilar el perfil" — si el compilador incrustara el
+//     contenido en la cache, cualquier edición de la macro quedaría
+//     vieja hasta la próxima recompilación del perfil que la usa.
+//     Compilar solo confirma que la referencia sigue siendo válida,
+//     igual que Abrir confirma que la ruta sigue existiendo.
 // ------------------------------------------------------
 
 use crate::cache;
 
 use crate::eventos::InputId;
+
+use crate::macro_usuario;
 
 use crate::perfil_cache::{
     AccionCache, AlcanceMultimedia, AppCache, ColorBotonMenu, ComandoMultimedia,
@@ -415,7 +435,7 @@ fn convertir_accion(
             Some(AccionCache::Emitir(inputs, trigger.condicion.clone()))
         }
 
-        "macro" => Some(AccionCache::Macro(referencia(remapeo)?)),
+        "macro" => convertir_macro(numero_fila, remapeo, advertencias),
 
         "ui" => Some(AccionCache::Ui(referencia(remapeo)?)),
 
@@ -614,6 +634,38 @@ fn convertir_abrir(
         abrir_con: remapeo.abrir_extra.abrir_con.clone(),
         argumento: remapeo.abrir_extra.argumento.clone(),
     })
+}
+
+// ======================================================
+// 🧩 CONVERTIR MACRO
+// ------------------------------------------------------
+// Ver entrada en el índice de funciones más arriba. La ruta se
+// resuelve con macro_usuario::ruta_macro() — mismo módulo que ya
+// usan macros.rs/comandos.rs para leer/guardar macros — solo para
+// comprobar existencia, nunca se lee/parsea el contenido acá.
+// ======================================================
+
+fn convertir_macro(
+    numero_fila: usize,
+    remapeo: &RemapeoJson,
+    advertencias: &mut Vec<AdvertenciaCompilacion>,
+) -> Option<AccionCache> {
+    let nombre = referencia(remapeo)?;
+
+    let existe = macro_usuario::ruta_macro(&nombre)
+        .map(|ruta| ruta.exists())
+        .unwrap_or(false);
+
+    if !existe {
+        advertencias.push(AdvertenciaCompilacion {
+            fila: numero_fila,
+            mensaje: "La macro seleccionada ya no existe.".to_string(),
+        });
+
+        return None;
+    }
+
+    Some(AccionCache::Macro(nombre))
 }
 
 fn convertir_iniciar_ventana(valor: &str) -> IniciarVentana {
