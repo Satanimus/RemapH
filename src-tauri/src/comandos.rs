@@ -294,6 +294,21 @@ pub fn establecer_tiempo_doble(valor: u64) {
 }
 
 // ======================================================
+// ⟫🖱️ ARRASTRE DE FILAS — Etapa 4
+// ------------------------------------------------------
+// El umbral de "clic mantenido" que activa el modo "Mover"
+// (ver util_arrastrable.ts) reusa la misma variable global
+// que ya usa cache.rs para detectar Mantenido en el motor de
+// entrada — una sola fuente de verdad para "cuánto es
+// mantener presionado" en toda la app, UI incluida.
+// ======================================================
+
+#[tauri::command]
+pub fn obtener_tiempo_mantenido() -> u64 {
+    config::tiempo_mantenido()
+}
+
+// ======================================================
 // ⚡🪟 MENU EXPRESS — TAMAÑOS CONFIGURABLES
 // ------------------------------------------------------
 // Un solo comando de lectura combinada (no uno por valor, como

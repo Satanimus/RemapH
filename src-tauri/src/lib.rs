@@ -105,6 +105,7 @@ pub fn run() {
             comandos::obtener_programas_abrir_con,
             comandos::obtener_tiempo_doble,
             comandos::establecer_tiempo_doble,
+            comandos::obtener_tiempo_mantenido,
             comandos::abrir_selector_emoji,
             comandos::abrir_ventana_captura_coordenada,
             comandos::cerrar_ventana_captura_coordenada,

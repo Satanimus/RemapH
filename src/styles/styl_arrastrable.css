@@ -1,0 +1,103 @@
+/* ======================================================
+   styl_Arrastrable
+   ------------------------------------------------------
+   Estilos del componente genérico de arrastrar/soltar y
+   mover con flechas (ver src/ui/util/util_arrastrable.ts).
+   No conoce el contenido de la fila — solo aplica clases
+   sobre los elementos que el llamador ya registró.
+   ====================================================== */
+
+/* ==========================
+   Fila seleccionada (modo Mover)
+   ========================== */
+
+.arr-fila--seleccionada {
+    box-shadow: inset 0 0 0 2px var(--tag-cyan);
+}
+
+/* ==========================
+   Indicador ⁝⁝ junto al botón ⟫
+   ========================== */
+
+.arr-asa--activa {
+    display: inline-flex;
+    align-items: center;
+}
+
+.arr-asa--activa::before {
+    content: "⁝⁝";
+    margin-right: var(--gap4);
+    color: var(--tag-cyan);
+    font-weight: bold;
+    line-height: 1;
+}
+
+/* ==========================
+   Fila oculta mientras se arrastra
+   (el placeholder ocupa su lugar)
+   ========================== */
+
+.arr-fila--oculta-arrastre {
+    display: none;
+}
+
+/* ==========================
+   Contenedor en arrastre
+   ========================== */
+
+.arr-contenedor--arrastrando,
+.arr-contenedor--arrastrando * {
+    user-select: none;
+}
+
+/* ==========================
+   Fantasma (copia semitransparente que sigue el cursor)
+   ========================== */
+
+.arr-fantasma {
+    position: fixed;
+    top: 0;
+    left: 0;
+    z-index: 10000;
+    pointer-events: none;
+    opacity: 0.85;
+    border-radius: var(--r6);
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.5);
+    overflow: hidden;
+    will-change: transform, left, top;
+}
+
+.arr-fantasma-fila {
+    background: var(--panel2);
+    box-shadow: inset 0 0 0 2px var(--tag-cyan);
+    pointer-events: none;
+}
+
+.arr-fantasma-contador {
+    position: absolute;
+    top: -8px;
+    right: -8px;
+    min-width: 18px;
+    height: 18px;
+    padding: 0 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--tag-cyan);
+    color: var(--bg);
+    font-size: var(--fs11);
+    font-weight: bold;
+    border-radius: var(--r8);
+}
+
+/* ==========================
+   Placeholder (hueco de inserción)
+   ========================== */
+
+.arr-placeholder {
+    background: var(--cyan-dark);
+    opacity: 0.5;
+    border-radius: var(--r4);
+    margin: 2px 0;
+    box-sizing: border-box;
+}
