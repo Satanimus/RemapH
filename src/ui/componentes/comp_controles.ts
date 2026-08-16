@@ -32,6 +32,10 @@ import { abrirPopupExtraMenuExpress } from "./comp_popup_menu_express_extra";
 
 import { abrirPopupExtraPortapapeles } from "./comp_popup_portapapeles_extra";
 
+import { abrirEditorMacro } from "./comp_popup_macro_editor";
+
+import { textoMacroExtra } from "../../core/core_macro";
+
 import {
   textoMenuExtra,
   crearMenuAccion,
@@ -249,6 +253,59 @@ export function crearExtra(
         abrirPopupExtraAbrir(evento, contexto, filaPerfil);
       },
     });
+  }
+
+  // macro tiene su propio popup Extra: no es una opción a elegir
+  // (no hay "Extra" que aplicar sobre la fila) sino la puerta de
+  // entrada al editor completo de pasos (Etapa 5, ver
+  // comp_popup_macro_editor.ts). El texto solo resume la cantidad
+  // de pasos — el editor real se abre y se lee el archivo de macro
+  // asignado (filaPerfil.accionReferencia) recién al hacer clic,
+  // así que acá no se puede mostrar más que un placeholder mientras
+  // no se abrió ninguna macro todavía.
+  if (filaPerfil.tipo === "macro") {
+    let actualizarTexto: ((texto: string) => void) | null = null;
+
+    const boton = crearPopup({
+      texto: filaPerfil.accionReferencia
+        ? "✏️ Cargando..."
+        : "✏️ Elegí una macro primero",
+      onClick: (evento, actualizar) => {
+        actualizarTexto = actualizar;
+
+        if (!filaPerfil.accionReferencia) {
+          return;
+        }
+
+        abrirEditorMacro(evento, contexto, filaPerfil);
+      },
+    });
+
+    // La cantidad de pasos no vive en filaPerfil (solo el nombre de
+    // la macro asignada) — hay que leer el archivo para saberla.
+    // Mismo patrón asíncrono que el ícono de crearAccionAbrir(): el
+    // botón arranca con un texto provisorio y se actualiza solo al
+    // resolver, sin bloquear el resto del render de la fila. El
+    // callback "actualizar" de crearPopup todavía no existe hasta
+    // el primer click, así que se escribe directo con textContent
+    // acá (mismo formato " ▾" al final que agrega crearPopup).
+    if (filaPerfil.accionReferencia) {
+      invoke<{ pasos: unknown[] }>("macro_abrir", {
+        nombre: filaPerfil.accionReferencia,
+      })
+        .then((macroArchivo) => {
+          const nuevoTexto = textoMacroExtra(macroArchivo.pasos.length);
+
+          if (actualizarTexto) {
+            actualizarTexto(nuevoTexto);
+          } else {
+            boton.textContent = `${nuevoTexto} ▾`;
+          }
+        })
+        .catch(() => {});
+    }
+
+    return boton;
   }
 
   return crearPopup({

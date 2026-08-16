@@ -56,6 +56,25 @@ export function textoMacroAccion(accionReferencia: string | null): string {
 }
 
 // ======================================================
+// 📝 TEXTO EXTRA (columna Extra de la tabla)
+// ------------------------------------------------------
+// A diferencia de Tecla/Mouse o Multimedia, el "Extra" de una
+// fila Macro no es una opción a elegir — es la puerta de
+// entrada al editor completo (Etapa 5, ver
+// comp_popup_macro_editor.ts). El texto solo resume cuántos
+// pasos tiene la macro asignada, para que se note de un
+// vistazo si está vacía sin tener que abrir el editor.
+// ======================================================
+
+export function textoMacroExtra(cantidadPasos: number): string {
+  if (cantidadPasos === 0) {
+    return "✏️ Vacía";
+  }
+
+  return `✏️ ${cantidadPasos} paso${cantidadPasos === 1 ? "" : "s"}`;
+}
+
+// ======================================================
 // 🧱 TIPOS DE PASO
 // ======================================================
 
@@ -275,4 +294,73 @@ export function clonarPasoMacro(paso: PasoMacro): PasoMacro {
       modificadores: [...paso.teclaAccion.modificadores],
     },
   };
+}
+
+// ======================================================
+// 🏷️ TEXTO DE TIPO (columna Tipo del editor)
+// ======================================================
+
+export function textoTipoPasoMacro(tipo: TipoPasoMacro): string {
+  switch (tipo) {
+    case "tecla_mouse":
+      return "⌨️ Tecla/Mouse";
+
+    case "espera":
+      return "⏳ Espera";
+
+    case "bucle":
+      return "🔁 Bucle";
+
+    case "coordenada":
+      return "🖱️ Coordenada";
+
+    case "pegar":
+      return "📋 Pegar";
+
+    case "abrir":
+      return "📂 Abrir";
+
+    case "multimedia":
+      return "🎚️ Multimedia";
+  }
+}
+
+// ======================================================
+// 🔤 LETRAS DE MARCADOR DISPONIBLES
+// ------------------------------------------------------
+// A, B, C... — sin límite práctico (26 debería alcanzar de
+// sobra; si algún día no alcanza, se puede extender a AA/AB
+// sin romper nada de lo ya guardado, el campo es un string
+// libre). Usado tanto para ofrecer la próxima letra libre a un
+// paso Bucle nuevo como para el selector de la columna
+// Marcador (sección 3 de la spec).
+// ======================================================
+
+const ALFABETO_MARCADOR = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+
+export function letraMarcadorDisponible(pasos: PasoMacro[]): string {
+  const usadas = new Set(
+    pasos.map((paso) => paso.marcador).filter((m): m is string => m !== null),
+  );
+
+  for (const letra of ALFABETO_MARCADOR) {
+    if (!usadas.has(letra)) {
+      return letra;
+    }
+  }
+
+  // Casos extremos (>26 marcadores en una sola macro): se
+  // sigue con AA, AB... para no romper, aunque en la práctica
+  // no debería llegar a pasar nunca.
+  let indice = 0;
+
+  while (true) {
+    const letra = `${ALFABETO_MARCADOR[indice % 26]}${Math.floor(indice / 26) + 1}`;
+
+    if (!usadas.has(letra)) {
+      return letra;
+    }
+
+    indice++;
+  }
 }
