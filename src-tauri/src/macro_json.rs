@@ -47,14 +47,18 @@ impl MacroArchivoJson {
 //   posible en un paso anterior a un paso "bucle" existente),
 //   None si no está marcado.
 //
-// tecla_accion / tecla_extra / tecla_mantener_ms: solo
-//   cuando tipo == "tecla_mouse". tecla_extra es el mismo
-//   vocabulario que RemapeoJson.extra para tecla_mouse
-//   ("normal" | "" | "mantener" | "turbo", sin
-//   "repeticion_rueda" — no hay Rueda en una Macro).
-//   tecla_mantener_ms simula el Up que en una Macro no llega
-//   nunca físicamente (DOWN → ESPERAR → UP) cuando
-//   tecla_extra != "normal". None mientras no se configuró.
+// tecla_accion / tecla_extra / tecla_duracion_ms: solo
+//   cuando tipo == "tecla_mouse". Tras el rediseño de Extra,
+//   Simple/Doble/Triple/Mantenido ya no son valores de
+//   tecla_extra — se leen de tecla_accion.condicion (mismo
+//   criterio que RemapeoJson.trigger/accion_trigger). tecla_
+//   extra queda en "" (Ninguno) | "normal" | "turbo", sin
+//   "repeticion_rueda" (no hay Rueda en una Macro).
+//   tecla_duracion_ms simula lo que en una Macro no hay Up
+//   físico real para calcular: cuánto dura el DOWN sostenido
+//   (condicion == "mantenido" con Extra Ninguno) o cuánto dura
+//   el bucle de repetición (tecla_extra != ""). None mientras
+//   no se configuró.
 //
 // espera_ms: solo cuando tipo == "espera".
 //
@@ -96,7 +100,7 @@ pub struct PasoMacroJson {
 
     pub tecla_extra: String,
 
-    pub tecla_mantener_ms: Option<u64>,
+    pub tecla_duracion_ms: Option<u64>,
 
     pub espera_ms: u64,
 

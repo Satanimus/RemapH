@@ -87,10 +87,14 @@ export type TipoPasoMacro =
   | "abrir"
   | "multimedia";
 
-// Mismo vocabulario que filaPerfil.extra para tecla_mouse
-// (ver core_trigger.ts / comp_accion_contenido.ts), sin
-// "repeticion_rueda" — no hay Rueda dentro de una Macro.
-export type ExtraTeclaMouseMacro = "normal" | "" | "mantener" | "turbo";
+// Mismo vocabulario que filaPerfil.extra para tecla_mouse tras
+// el rediseño (ver core_trigger.ts / compilador.rs::
+// convertir_extra): Simple/Doble/Triple/Mantenido dejaron de
+// ser valores de Extra — se leen de teclaAccion.condicion (el
+// gatillo capturado). Extra queda en solo tres valores:
+// "" (Ninguno) | "normal" | "turbo". Sin "repeticion_rueda" —
+// no hay Rueda dentro de una Macro.
+export type ExtraTeclaMouseMacro = "" | "normal" | "turbo";
 
 // Mismo vocabulario que CoordenadaPerfil.ubicacion
 // (core_coordenada.ts), sin postAccion — ver nota de
@@ -151,11 +155,19 @@ export interface PasoMacro {
 
   teclaExtra: ExtraTeclaMouseMacro;
 
-  // Milisegundos que se mantiene presionado antes de soltar
-  // (DOWN → ESPERAR → UP) cuando teclaExtra !== "normal" — no
-  // hay Up físico real dentro de una Macro para Mantenido/
-  // Turbo, hay que simularlo. null mientras no se configuró.
-  teclaMantenerMs: number | null;
+  // Un solo campo de Duración (ms), con dos usos según
+  // contexto — no hay Up físico real dentro de una Macro, así
+  // que ambos casos hay que simularlos con tiempo fijo:
+  // • teclaAccion.condicion === "mantenido" (con Extra Ninguno)
+  //   → cuánto se mantiene abajo el DOWN antes del UP
+  //     (equivalente al tiempo que en el gatillo físico real
+  //     dura la pulsación sostenida).
+  // • teclaExtra !== "" (Normal/Turbo) → cuánto dura en total
+  //     el bucle de repetición (equivalente a cuánto tiempo se
+  //     mantendría apretado el gatillo físico real).
+  // Se muestra en el editor cuando aplica alguno de los dos
+  // casos; null mientras no se configuró.
+  teclaDuracionMs: number | null;
 
   // Solo relevante cuando tipo === "espera".
   esperaMs: number;
@@ -231,9 +243,9 @@ export function crearPasoMacro(tipo: TipoPasoMacro): PasoMacro {
 
     teclaAccion: crearTrigger(),
 
-    teclaExtra: "normal",
+    teclaExtra: "",
 
-    teclaMantenerMs: null,
+    teclaDuracionMs: null,
 
     esperaMs: 500,
 

@@ -1037,10 +1037,17 @@ function crearDetalleExpandido(
 // ⌨️ DETALLE — Tecla/Mouse
 // ------------------------------------------------------
 // Reusa el capturador de combos (capturarTeclaPaso, mismo
-// mecanismo de invoke que comp_capturador.ts). Si el Extra no
-// es "normal", agrega el control "Mantener por X tiempo" (no
-// hay Up físico real dentro de una macro, hay que simularlo —
-// spec, tipo de paso 1).
+// mecanismo de invoke que comp_capturador.ts) — la Condición
+// (Simple/Doble/Triple/Mantenido) viaja adentro del propio
+// Trigger capturado, ya no es parte de Extra (mismo rediseño
+// que la fila principal, ver core_trigger.ts/compilador.rs).
+// Extra queda en Ninguno/Normal/Turbo. El campo Duración
+// aparece cuando el DOWN necesita un tiempo simulado que en
+// una macro no llega de un Up físico real: condición
+// Mantenido con Extra Ninguno (dura el sostenido), o
+// cualquier condición con Extra Normal/Turbo (dura el bucle
+// de repetición) — ver comentario de teclaDuracionMs en
+// core_macro.ts.
 // ======================================================
 
 function crearDetalleTeclaMouse(
@@ -1090,13 +1097,14 @@ function crearDetalleTeclaMouse(
 
   contenedor.append(crearFilaPopup("Combo", botonCapturar));
 
-  // Extra: mismo vocabulario que Tecla/Mouse de la tabla principal,
-  // sin "repeticion_rueda" (no hay gatillo Rueda dentro de una
-  // Macro, ver core_macro.ts).
+  // Extra (Repetición): mismo vocabulario que Tecla/Mouse de la
+  // tabla principal tras el rediseño — Simple/Mantenido ya no son
+  // opciones acá, se leen de paso.teclaAccion.condicion (el
+  // gatillo capturado arriba). Sin "repeticion_rueda" (no hay
+  // gatillo Rueda dentro de una Macro, ver core_macro.ts).
   const extraOpciones: { texto: string; valor: ExtraTeclaMouseMacro }[] = [
+    { texto: "Ninguno", valor: "" },
     { texto: "Normal", valor: "normal" },
-    { texto: "Simple", valor: "" },
-    { texto: "Mantenido", valor: "mantener" },
     { texto: "Turbo", valor: "turbo" },
   ];
 
@@ -1104,8 +1112,8 @@ function crearDetalleTeclaMouse(
     crearFilaPopup(
       "Extra",
       crearGrupoOpciones(extraOpciones, paso.teclaExtra, (valor) => {
-        // No hace falta limpiar teclaMantenerMs al volver a "normal"
-        // — se conserva por si se vuelve a Mantenido/Turbo después,
+        // No hace falta limpiar teclaDuracionMs al cambiar de Extra
+        // — se conserva por si se vuelve a necesitar después,
         // simplemente deja de mostrarse/usarse mientras tanto.
         paso.teclaExtra = valor;
 
@@ -1114,15 +1122,22 @@ function crearDetalleTeclaMouse(
     ),
   );
 
-  // "Mantener por X tiempo" — solo si el Extra no es "normal" (no
-  // hay Up físico real en una macro para Mantenido/Turbo, hay que
-  // simularlo con DOWN → ESPERAR → UP, ver spec tipo de paso 1).
-  if (paso.teclaExtra !== "normal") {
+  // Duración (ms) — aparece cuando hace falta un tiempo simulado
+  // que en una macro no llega de un Up físico real: condición
+  // Mantenido con Extra Ninguno (dura el DOWN sostenido), o
+  // cualquier condición con Extra Normal/Turbo (dura el bucle de
+  // repetición). Con Extra Ninguno + Simple/Doble/Triple no hace
+  // falta — el combo se envía una sola vez, sin tiempo que
+  // configurar.
+  const necesitaDuracion =
+    paso.teclaExtra !== "" || paso.teclaAccion.condicion === "mantenido";
+
+  if (necesitaDuracion) {
     contenedor.append(
       crearFilaPopup(
-        "Mantener por (ms)",
-        crearCampoNumero(paso.teclaMantenerMs ?? 100, 1, (nuevoValor) => {
-          paso.teclaMantenerMs = nuevoValor;
+        "Duración (ms)",
+        crearCampoNumero(paso.teclaDuracionMs ?? 100, 1, (nuevoValor) => {
+          paso.teclaDuracionMs = nuevoValor;
 
           guardarYRedibujar();
         }),
