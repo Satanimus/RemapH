@@ -367,6 +367,8 @@ use crate::runt_extra;
 
 use std::collections::HashMap;
 
+use std::collections::HashSet;
+
 use std::collections::VecDeque;
 
 use std::path::Path;
@@ -1346,15 +1348,39 @@ fn emitir_combo_arriba(inputs: &[InputId]) {
     }
 }
 
+// ======================================================
+// 🛟 SALIDAS ABAJO (Etapa 8C — red de seguridad global)
+// ------------------------------------------------------
+// Qué salidas están físicamente abajo AHORA MISMO por acción del
+// motor. Se llena/vacía en los mismos dos puntos donde ya se emite
+// un Down/Up real (emitir_down_input/emitir_up_input, ver abajo) —
+// así cualquier camino de salida que exista hoy o se agregue después
+// (Emitir, runt_extra, runt_macro) queda cubierto automáticamente,
+// sin tener que tocarlo aparte. Usado únicamente por
+// detener_todo()/soltar_salidas_pendientes() más abajo.
+// ======================================================
+
+static SALIDAS_ABAJO: std::sync::LazyLock<Mutex<HashSet<InputId>>> =
+    std::sync::LazyLock::new(|| Mutex::new(HashSet::new()));
+
 // pub(crate) desde la Etapa 8B — ver nota en emitir_un_toque() más
-// arriba.
+// arriba. Desde la Etapa 8C también registra la salida en
+// SALIDAS_ABAJO (ver arriba) — insert() ANTES de emitir_evento(),
+// para que quede registrada incluso si el evento tarda en salir.
 pub(crate) fn emitir_down_input(input: InputId) {
+    SALIDAS_ABAJO.lock().unwrap().insert(input.clone());
+
     let evento = crate::eventos::InputEvent::down(input);
 
     emitir_evento(evento);
 }
 
+// Desde la Etapa 8C: saca la salida de SALIDAS_ABAJO — un Up real,
+// sea el normal del flujo o el forzado por detener_todo(), siempre
+// pasa por acá.
 pub(crate) fn emitir_up_input(input: InputId) {
+    SALIDAS_ABAJO.lock().unwrap().remove(&input);
+
     let evento = crate::eventos::InputEvent::up(input);
 
     emitir_evento(evento);
@@ -1718,6 +1744,63 @@ fn detener_ejecucion(id_ejecucion: &str) {
 
 pub(crate) fn debe_detenerse(id: &str) -> bool {
     INSTANCIAS.lock().unwrap().get(id).copied().unwrap_or(true)
+}
+
+// ======================================================
+// 🛑 DETENER TODO (Etapa 8C — red de seguridad global)
+// ------------------------------------------------------
+// Llamada por perfil.rs (junto a cada punto donde ya se llama
+// cache::borrar_cache() — activar/desactivar/guardar/clonar/
+// renombrar/eliminar/crear/seleccionar perfil) y por lib.rs (al
+// cierre del programa). Corta cualquier cosa en ejecución y suelta
+// cualquier tecla que haya quedado físicamente abajo por culpa del
+// motor, en este orden:
+//
+// 1) Marca como detenida cualquier ejecución activa del mecanismo
+//    general (INSTANCIAS) — Turbo/Normal/Mantener/ClickSostenido
+//    (vía runt_extra) y Macro con Comportamiento Tecla mantenida
+//    (Etapa 8B, que se anota acá mismo).
+// 2) Limpia el registro propio de runt_macro.rs de ejecuciones Una
+//    ejecución/Toggle (Etapa 8B) — independiente de INSTANCIAS.
+// 3) Despierta el mecanismo de espera interrumpible de runt_macro.rs
+//    (Etapa 8B) — para que cualquier hilo de Macro dormido (con
+//    cualquiera de los tres Comportamientos) se entere YA de las
+//    banderas puestas en 1) y 2), en vez de esperar a que venza su
+//    propio plazo.
+// 4) Recién al final, suelta (Up real) cualquier salida que haya
+//    quedado pendiente en SALIDAS_ABAJO — después de 1-3, para darle
+//    a cada hilo la chance de soltar sus propias teclas de forma
+//    ordenada antes de forzar lo que haya quedado.
+// ======================================================
+
+pub fn detener_todo() {
+    detener_todas_las_instancias();
+
+    crate::runt_macro::detener_todas_las_activas();
+
+    crate::runt_macro::notificar_todas();
+
+    soltar_salidas_pendientes();
+}
+
+fn detener_todas_las_instancias() {
+    let mut instancias = INSTANCIAS.lock().unwrap();
+
+    for detenida in instancias.values_mut() {
+        *detenida = true;
+    }
+}
+
+fn soltar_salidas_pendientes() {
+    // Se copia y vacía el registro con el lock tomado solo un
+    // instante — emitir_up_input() (que vuelve a pedir el lock para
+    // sacar cada una, ya redundante pero inofensivo) no debe correr
+    // con SALIDAS_ABAJO todavía tomado.
+    let pendientes: Vec<InputId> = SALIDAS_ABAJO.lock().unwrap().drain().collect();
+
+    for input in pendientes {
+        emitir_up_input(input);
+    }
 }
 
 // ======================================================

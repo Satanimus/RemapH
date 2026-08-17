@@ -165,6 +165,18 @@ pub fn run() {
             comandos::obtener_overrides_apariencia,
             comandos::configuracion_refrescar_ventanas_apariencia,
         ])
-        .run(tauri::generate_context!())
-        .expect("error al ejecutar Tauri");
+        .build(tauri::generate_context!())
+        .expect("error al construir Tauri")
+        // Etapa 8C: enganche al cierre del programa (antes no había
+        // ninguno) — ExitRequested se dispara apenas el programa
+        // empieza a cerrarse (con el proceso todavía completo), antes
+        // de que Tauri termine de desmontar nada, así que es el punto
+        // seguro para runtime::detener_todo() (soltar teclas que
+        // hayan quedado físicamente abajo, cortar ejecuciones activas
+        // — ver runtime.rs).
+        .run(|_app_handle, evento| {
+            if let tauri::RunEvent::ExitRequested { .. } = evento {
+                runtime::detener_todo();
+            }
+        });
 }

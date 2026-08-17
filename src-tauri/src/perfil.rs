@@ -9,7 +9,14 @@
 // - Captura eventos.
 // - Analiza triggers.
 // - Ejecuta acciones.
-// - Conoce Runtime.
+//
+// Excepción puntual (Etapa 8C): SÍ llama a runtime::detener_todo()
+// junto a cada punto donde ya vacía la cache (activar/desactivar/
+// guardar/clonar/renombrar/eliminar/crear/seleccionar perfil) — red
+// de seguridad para que cambiar de perfil corte cualquier ejecución
+// activa y suelte cualquier tecla que haya quedado físicamente abajo
+// por culpa del motor. No conoce nada más de Runtime más allá de esa
+// única función.
 //
 // Responsabilidad:
 //
@@ -104,6 +111,7 @@
 use crate::cache;
 use crate::compilador;
 use crate::perfil_json::perfil_json;
+use crate::runtime;
 use crate::usuario;
 use std::collections::HashMap;
 use std::fs;
@@ -127,6 +135,9 @@ pub fn activar_perfil() -> Result<ResultadoCompilacion, String> {
 
     let perfil = cargar_desde_disco(&ruta)?;
 
+    // Etapa 8C: ver excepción documentada en el header del archivo.
+    runtime::detener_todo();
+
     Ok(compilador::compilar(&perfil))
 }
 
@@ -135,6 +146,9 @@ pub fn activar_perfil() -> Result<ResultadoCompilacion, String> {
 // ======================================================
 
 pub fn desactivar_perfil() {
+    // Etapa 8C: ver excepción documentada en el header del archivo.
+    runtime::detener_todo();
+
     cache::borrar_cache();
 }
 
@@ -180,6 +194,9 @@ pub fn guardar_perfil(perfil: perfil_json) -> Result<ResultadoCompilacion, Strin
     let ruta = usuario::perfil_actual()?;
 
     guardar_en_disco(&perfil, &ruta)?;
+
+    // Etapa 8C: ver excepción documentada en el header del archivo.
+    runtime::detener_todo();
 
     Ok(compilador::compilar(&perfil))
 }
@@ -244,6 +261,9 @@ pub fn clonar_perfil(perfil: perfil_json) -> Result<ResultadoPerfil, String> {
 
     let nombre = siguiente_nombre(&nombre_actual)?;
 
+    // Etapa 8C: ver excepción documentada en el header del archivo.
+    runtime::detener_todo();
+
     cache::borrar_cache();
 
     let ruta = usuario::ruta_perfil(&nombre)?;
@@ -278,6 +298,9 @@ pub fn renombrar_perfil(nuevo_nombre: String) -> Result<ResultadoPerfil, String>
 
     let nueva_ruta = usuario::ruta_perfil(&nuevo_nombre)?;
 
+    // Etapa 8C: ver excepción documentada en el header del archivo.
+    runtime::detener_todo();
+
     cache::borrar_cache();
 
     fs::rename(&ruta_actual, &nueva_ruta).map_err(|error| error.to_string())?;
@@ -295,6 +318,9 @@ pub fn renombrar_perfil(nuevo_nombre: String) -> Result<ResultadoPerfil, String>
 
 pub fn eliminar_perfil_actual() -> Result<ResultadoPerfil, String> {
     let ruta_actual = usuario::perfil_actual()?;
+
+    // Etapa 8C: ver excepción documentada en el header del archivo.
+    runtime::detener_todo();
 
     cache::borrar_cache();
 
@@ -332,6 +358,9 @@ pub fn eliminar_perfil_actual() -> Result<ResultadoPerfil, String> {
 // ======================================================
 
 pub fn crear_perfil_nuevo() -> Result<ResultadoPerfil, String> {
+    // Etapa 8C: ver excepción documentada en el header del archivo.
+    runtime::detener_todo();
+
     cache::borrar_cache();
 
     let nombre = siguiente_nombre("Default")?;
@@ -355,6 +384,9 @@ pub fn seleccionar_perfil(nombre: String) -> Result<ResultadoPerfil, String> {
     if !ruta.exists() {
         return Err("El perfil seleccionado no existe".into());
     }
+
+    // Etapa 8C: ver excepción documentada en el header del archivo.
+    runtime::detener_todo();
 
     cache::borrar_cache();
 
