@@ -13,7 +13,8 @@
 
 use crate::eventos::{InputEvent, InputId, InputState};
 use crate::perfil_cache::{
-    AccionCache, AppCache, CondicionTrigger, CoordenadaCache, ExtraCache, RemapeoCache,
+    AccionCache, AppCache, ComportamientoMacro, CondicionTrigger, CoordenadaCache, ExtraCache,
+    RemapeoCache,
 };
 use crate::{config, entrada, perfil_ui, runtime};
 use std::collections::HashMap;
@@ -679,10 +680,32 @@ fn resolver_match(remapeo: RemapeoCache, entrada: Vec<InputId>, _id: u64, restan
         runtime.presionadas.contains(g)
     });
 
-    let diferido = remapeo
+    // Etapa 8B: una fila Macro nunca tiene ExtraCache propio (Extra
+    // ahí es Comportamiento, no un molde de Turbo/Mantener), así que
+    // requiere_up_real() de arriba nunca la detecta. Comportamiento
+    // "Tecla mantenida" necesita el mismo tratamiento diferido
+    // (Iniciar en el Down real, Detener en el Up real) — se suma acá
+    // como segunda condición, mirando accion directo en vez de
+    // extra. "Una ejecución"/"Toggle" NO son diferidas por este
+    // mecanismo: su propio registro de arranque/parada vive en
+    // runt_macro.rs, independiente de este camino (ver comentario
+    // ahí) — el Iniciar+Detener inmediato que sigue yendo por la
+    // rama de abajo es, para esos dos, un no-op en el lado de
+    // Runtime (runt_macro::detener() ignora un Detener sin registro
+    // propio previo).
+    let macro_tecla_mantenida = matches!(
+        &remapeo.accion,
+        AccionCache::Macro {
+            comportamiento: ComportamientoMacro::TeclaMantenida,
+            ..
+        }
+    );
+
+    let diferido = (remapeo
         .extra
         .as_ref()
         .is_some_and(|extra| extra.requiere_up_real())
+        || macro_tecla_mantenida)
         && gatillo_presionado;
 
     if diferido {

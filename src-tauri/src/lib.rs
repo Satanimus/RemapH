@@ -34,6 +34,7 @@ mod perfil_json;
 mod perfil_ui;
 mod pulsadores;
 mod runt_extra;
+mod runt_macro;
 mod runtime;
 mod usuario;
 
