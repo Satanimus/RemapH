@@ -56,22 +56,49 @@ export function textoMacroAccion(accionReferencia: string | null): string {
 }
 
 // ======================================================
-// 📝 TEXTO EXTRA (columna Extra de la tabla)
+// 🎚️ COMPORTAMIENTO (columna Extra de la tabla) — Etapa 8A
 // ------------------------------------------------------
-// A diferencia de Tecla/Mouse o Multimedia, el "Extra" de una
-// fila Macro no es una opción a elegir — es la puerta de
-// entrada al editor completo (Etapa 5, ver
-// comp_popup_macro_editor.ts). El texto solo resume cuántos
-// pasos tiene la macro asignada, para que se note de un
-// vistazo si está vacía sin tener que abrir el editor.
+// Reemplaza el viejo textoMacroExtra (mostraba "cantidad de
+// pasos" — ya no aplica: Extra deja de ser la puerta al
+// editor, ver comp_popup_macro_accion.ts). Ahora Extra es
+// simplemente el selector de Comportamiento, mismo espíritu
+// que abrirExtra/portapapelesExtra: una opción persistente a
+// elegir, no una acción a ejecutar.
+//
+// "unaEjecucion" y "toggle" comparten mecanismo en Runtime
+// (Etapa 8B) — la diferencia es solo de etiqueta acá. Solo
+// "teclaMantenida" es mecánicamente distinta (depende de
+// Down/Up físico real).
 // ======================================================
 
-export function textoMacroExtra(cantidadPasos: number): string {
-  if (cantidadPasos === 0) {
-    return "✏️ Vacía";
-  }
+export type ComportamientoMacro =
+  | "una_ejecucion"
+  | "toggle"
+  | "tecla_mantenida";
 
-  return `✏️ ${cantidadPasos} paso${cantidadPasos === 1 ? "" : "s"}`;
+export interface MacroExtraPerfil {
+  comportamiento: ComportamientoMacro;
+}
+
+export function crearMacroExtra(): MacroExtraPerfil {
+  return {
+    comportamiento: "una_ejecucion",
+  };
+}
+
+export function textoComportamientoMacro(
+  comportamiento: ComportamientoMacro,
+): string {
+  switch (comportamiento) {
+    case "toggle":
+      return "🔁 Toggle";
+
+    case "tecla_mantenida":
+      return "⏱️ Tecla mantenida";
+
+    default:
+      return "▶️ Una ejecución";
+  }
 }
 
 // ======================================================
@@ -134,8 +161,6 @@ export type ComandoPasoMacro =
 // propio acá — ver spec, sección Multimedia.
 export type AlcancePasoMacro = "global" | "en_app";
 
-export type ModoBucleMacro = "con_fin" | "sin_fin";
-
 // ======================================================
 // 📄 PASO
 // ------------------------------------------------------
@@ -174,17 +199,14 @@ export interface PasoMacro {
 
   // Solo relevantes cuando tipo === "bucle". marcadorDestino
   // es la letra de Marcador a la que vuelve (null hasta
-  // elegir un paso anterior). veces resta 1 en cada visita
-  // cuando modo === "con_fin" (al llegar a 0 el bucle queda
-  // inactivo el resto de la ejecución); en "sin_fin" el
-  // contador se reinicia cada vez que la ejecución vuelve a
-  // pasar por marcadorDestino desde un bucle externo (permite
-  // bucles anidados, ver spec).
+  // elegir un paso anterior). Un solo algoritmo (sin distinción
+  // con_fin/sin_fin, ver Etapa 8B): resta 1 en cada visita: al
+  // llegar a 0, resetea al valor programado y sigue de largo
+  // — listo para una próxima visita si está anidado dentro de
+  // otro bucle (permite bucles anidados, ver spec).
   bucleMarcadorDestino: string | null;
 
   bucleVeces: number;
-
-  bucleModo: ModoBucleMacro;
 
   // Solo relevantes cuando tipo === "coordenada". Solo mueve
   // el mouse, no hace click (eso es un paso "tecla_mouse"
@@ -252,8 +274,6 @@ export function crearPasoMacro(tipo: TipoPasoMacro): PasoMacro {
     bucleMarcadorDestino: null,
 
     bucleVeces: 1,
-
-    bucleModo: "con_fin",
 
     coordPosicionInicial: false,
 

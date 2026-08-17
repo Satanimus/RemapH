@@ -269,6 +269,23 @@ pub fn macro_guardar(macro_archivo: MacroArchivoJson) -> Result<(), String> {
     macros::guardar_macro(macro_archivo)
 }
 
+// ======================================================
+// 🧩 COMANDOS MACRO — Etapa 8A
+// ------------------------------------------------------
+// Renombrar/eliminar el archivo — sin chequear filas del perfil que
+// la referencien (ver macros.rs::renombrar_macro/eliminar_macro).
+// ======================================================
+
+#[tauri::command]
+pub fn macro_renombrar(nombre_actual: String, nombre_nuevo: String) -> Result<String, String> {
+    macros::renombrar_macro(nombre_actual, nombre_nuevo)
+}
+
+#[tauri::command]
+pub fn macro_eliminar(nombre: String) -> Result<(), String> {
+    macros::eliminar_macro(nombre)
+}
+
 #[tauri::command]
 pub fn compilar_perfil(filas: Vec<FilaUI>) -> Result<ResultadoCompilacion, String> {
     let perfil = convertir_perfil(filas);

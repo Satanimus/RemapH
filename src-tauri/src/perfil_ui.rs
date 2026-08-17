@@ -127,8 +127,9 @@ use serde::{Deserialize, Serialize};
 use crate::compilador::AdvertenciaCompilacion;
 
 use crate::perfil_json::{
-    perfil_json, AbrirAccionJson, AbrirExtraJson, AppJson, CoordenadaJson, MenuAccionJson,
-    MenuExpressExtraJson, PortapapelesAccionJson, PortapapelesExtraJson, RemapeoJson, TriggerJson,
+    perfil_json, AbrirAccionJson, AbrirExtraJson, AppJson, CoordenadaJson, MacroExtraJson,
+    MenuAccionJson, MenuExpressExtraJson, PortapapelesAccionJson, PortapapelesExtraJson,
+    RemapeoJson, TriggerJson,
 };
 
 // ======================================================
@@ -207,6 +208,12 @@ pub struct FilaUI {
 
     #[serde(rename = "abrirExtra", default)]
     pub abrir_extra: AbrirExtraJson,
+
+    // Solo relevante cuando tipo == "macro" (columna Extra — ver
+    // MacroExtraJson en perfil_json.rs). #[serde(default)] mismo
+    // criterio que abrir_accion/abrir_extra.
+    #[serde(rename = "macroExtra", default)]
+    pub macro_extra: MacroExtraJson,
 
     pub color: String,
 
@@ -374,6 +381,8 @@ fn convertir_fila(fila: FilaUI) -> RemapeoJson {
         abrir_accion: fila.abrir_accion,
 
         abrir_extra: fila.abrir_extra,
+
+        macro_extra: fila.macro_extra,
 
         color: fila.color,
 

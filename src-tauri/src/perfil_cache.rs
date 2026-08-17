@@ -215,17 +215,33 @@ pub enum AccionCache {
     Emitir(Vec<InputId>, CondicionTrigger),
 
     // Acción tipo "Macro" (encadenar pasos con pausas, ver
-    // core_macro.ts). El String es solo el NOMBRE de la macro
-    // (existencia ya verificada en compilador.rs::convertir_macro,
-    // mismo criterio que AbrirArchivo::ruta) — no el contenido/pasos
-    // ya resueltos. Decisión tomada en la Etapa 7: el archivo
-    // /Macros/<nombre>.json se lee y se interpreta recién acá en
-    // Runtime, al ejecutarse (Etapa 8), nunca en compilador.rs — una
-    // macro es un archivo propio editable en cualquier momento desde
-    // su popup (guardado directo, sin pasar por "recompilar el
-    // perfil"), así que incrustar su contenido en la cache la dejaría
-    // vieja hasta la próxima recompilación de cada perfil que la usa.
-    Macro(String),
+    // core_macro.ts). nombre es el NOMBRE de la macro (existencia ya
+    // verificada en compilador.rs::convertir_macro, mismo criterio
+    // que AbrirArchivo::ruta) — no el contenido/pasos ya resueltos.
+    // Decisión tomada en la Etapa 7: el archivo /Macros/<nombre>.json
+    // se lee y se interpreta recién acá en Runtime, al ejecutarse
+    // (Etapa 8), nunca en compilador.rs — una macro es un archivo
+    // propio editable en cualquier momento desde su popup (guardado
+    // directo, sin pasar por "recompilar el perfil"), así que
+    // incrustar su contenido en la cache la dejaría vieja hasta la
+    // próxima recompilación de cada perfil que la usa.
+    //
+    // Ampliado en la Etapa 8A con dos campos más, ya resueltos en
+    // compilación (compilador.rs::convertir_macro):
+    // • programa: el programa del Filtro de App de ESTA FILA (no de
+    //   la macro), para que el paso Multimedia "En App" dentro de la
+    //   macro (Etapa 8B, runt_macro.rs) tenga de dónde sacarlo sin
+    //   volver a mirar TriggerCache — mismo criterio que
+    //   AlcanceMultimedia::EnApp::programa. None si la fila es
+    //   global (sin Filtro de App).
+    // • comportamiento: Una ejecución/Toggle/Tecla mantenida, ya
+    //   resuelto a enum (ComportamientoMacro) en vez de viajar como
+    //   String suelto — ver RemapeoJson::macro_extra.
+    Macro {
+        nombre: String,
+        programa: Option<String>,
+        comportamiento: ComportamientoMacro,
+    },
 
     // Acción tipo "Abrir Archivo/App". ruta es siempre absoluta y ya
     // fue verificada en compilador.rs (Path::exists()) — si no
@@ -549,6 +565,45 @@ impl InstanciasAbrir {
             InstanciasAbrir::Unica => "unica",
             InstanciasAbrir::Multiple => "multiple",
         }
+    }
+}
+
+// ======================================================
+// 🧩 COMPORTAMIENTO MACRO
+// ------------------------------------------------------
+// Espejo de MacroExtraJson.comportamiento (Rust) / macroExtra.
+// comportamiento (TS, core_macro.ts). UnaEjecucion y Toggle
+// comparten mecanismo en Runtime (Etapa 8B) — el enum los distingue
+// igual porque siguen siendo dos opciones separadas en la UI/perfil,
+// aunque el código de runt_macro.rs que decide arrancar/parar sea
+// el mismo para las dos. TeclaMantenida es la única mecánicamente
+// distinta (requiere Down/Up físico real, ver cache.rs::
+// resolver_match en la Etapa 8B).
+// ======================================================
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum ComportamientoMacro {
+    UnaEjecucion,
+    Toggle,
+    TeclaMantenida,
+}
+
+impl ComportamientoMacro {
+    pub fn como_str(&self) -> &'static str {
+        match self {
+            ComportamientoMacro::UnaEjecucion => "una_ejecucion",
+            ComportamientoMacro::Toggle => "toggle",
+            ComportamientoMacro::TeclaMantenida => "tecla_mantenida",
+        }
+    }
+
+    /// true si este Comportamiento necesita que cache.rs::
+    /// resolver_match trate la fila como "diferida" (Iniciar en el
+    /// Down real, Detener en el Up real) — ver ExtraCache::
+    /// requiere_up_real(), mismo concepto aplicado a Macro en vez de
+    /// a un ExtraCache (una fila Macro nunca tiene ExtraCache propio).
+    pub fn requiere_up_real(&self) -> bool {
+        matches!(self, ComportamientoMacro::TeclaMantenida)
     }
 }
 

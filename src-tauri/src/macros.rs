@@ -14,6 +14,8 @@
 // - Clonar una macro existente.
 // - Abrir (cargar) una macro.
 // - Guardar una macro editada.
+// - Renombrar una macro (Etapa 8A).
+// - Eliminar una macro (Etapa 8A).
 //
 // Flujo:
 // UI
@@ -123,6 +125,69 @@ pub fn guardar_macro(macro_archivo: MacroArchivoJson) -> Result<(), String> {
     let ruta = macro_usuario::ruta_macro(&macro_archivo.nombre)?;
 
     guardar_en_disco(&macro_archivo, &ruta)
+}
+
+// ======================================================
+// ✏️ RENOMBRAR MACRO — Etapa 8A
+// ------------------------------------------------------
+// Mismo patrón que perfil.rs::renombrar_perfil (nombre_disponible +
+// fs::rename), pero SIN el chequeo de "¿alguna fila la referencia?"
+// — decisión del usuario: renombrar/eliminar una macro referenciada
+// se trata igual que una fila "abrir" cuya ruta ya no existe (aviso
+// amarillo en la próxima compilación, vía convertir_macro en
+// compilador.rs), no un error duro que bloquee la operación. Las
+// filas que ya apuntaban al nombre viejo quedan apuntando al nombre
+// viejo — el usuario las reasigna a mano si hace falta.
+// ======================================================
+
+pub fn renombrar_macro(nombre_actual: String, nombre_nuevo: String) -> Result<String, String> {
+    let nombre_nuevo = nombre_nuevo.trim();
+
+    if nombre_nuevo.is_empty() {
+        return Err("El nombre de la macro está vacío".to_string());
+    }
+
+    if nombre_nuevo == nombre_actual {
+        return Err("La macro ya tiene ese nombre".to_string());
+    }
+
+    let ruta_actual = macro_usuario::ruta_macro(&nombre_actual)?;
+
+    if !ruta_actual.exists() {
+        return Err("La macro seleccionada no existe".to_string());
+    }
+
+    let nombre_nuevo = macro_usuario::nombre_disponible(nombre_nuevo)?;
+
+    let ruta_nueva = macro_usuario::ruta_macro(&nombre_nuevo)?;
+
+    fs::rename(&ruta_actual, &ruta_nueva).map_err(|error| error.to_string())?;
+
+    let mut macro_archivo = cargar_desde_disco(&ruta_nueva)?;
+
+    macro_archivo.nombre = nombre_nuevo.clone();
+
+    guardar_en_disco(&macro_archivo, &ruta_nueva)?;
+
+    Ok(nombre_nuevo)
+}
+
+// ======================================================
+// 🗑️ ELIMINAR MACRO — Etapa 8A
+// ------------------------------------------------------
+// Mismo criterio "no bloquear" que renombrar_macro — ver comentario
+// arriba. Borra el archivo sin comprobar si alguna fila del perfil
+// activo la referencia.
+// ======================================================
+
+pub fn eliminar_macro(nombre: String) -> Result<(), String> {
+    let ruta = macro_usuario::ruta_macro(&nombre)?;
+
+    if !ruta.exists() {
+        return Err("La macro seleccionada no existe".to_string());
+    }
+
+    fs::remove_file(&ruta).map_err(|error| error.to_string())
 }
 
 // ======================================================

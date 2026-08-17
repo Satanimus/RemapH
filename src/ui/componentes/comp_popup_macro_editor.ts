@@ -58,7 +58,6 @@ import type {
   InstanciasPasoMacro,
   ComandoPasoMacro,
   AlcancePasoMacro,
-  ModoBucleMacro,
 } from "../../core/core_macro";
 
 import {
@@ -1231,21 +1230,10 @@ function crearDetalleBucle(
     ),
   );
 
-  const modoOpciones: { texto: string; valor: ModoBucleMacro }[] = [
-    { texto: "Con fin", valor: "con_fin" },
-    { texto: "Sin fin", valor: "sin_fin" },
-  ];
-
-  contenedor.append(
-    crearFilaPopup(
-      "Modo",
-      crearGrupoOpciones(modoOpciones, paso.bucleModo, (valor) => {
-        paso.bucleModo = valor;
-
-        guardarYRedibujar();
-      }),
-    ),
-  );
+  // "Modo" (Con fin/Sin fin) se sacó en la Etapa 8A: el Bucle pasa a
+  // un solo algoritmo (resta 1 en cada visita, resetea al llegar a
+  // 0 y sigue de largo — listo para una próxima visita si está
+  // anidado dentro de otro bucle, ver core_macro.ts / Etapa 8B).
 
   return contenedor;
 }

@@ -576,8 +576,15 @@ fn ejecutar_accion(
             let _ = COLA_SALIDA.lock().unwrap().send((inputs, condicion));
         }
 
-        AccionCache::Macro(ruta) => {
-            ejecutar_macro_en_hilo(id, ruta);
+        // Etapa 8A: AccionCache::Macro ahora trae programa/
+        // comportamiento además del nombre — el ejecutor nuevo que
+        // los usa de verdad (pasos, Bucle/Marcador, Comportamiento)
+        // es trabajo de la Etapa 8B (runt_macro.rs). Por ahora se
+        // sigue llamando al ejecutor de texto plano viejo con el
+        // nombre, ignorando programa/comportamiento, para no romper
+        // la compilación mientras 8B no está implementada todavía.
+        AccionCache::Macro { nombre, .. } => {
+            ejecutar_macro_en_hilo(id, nombre);
         }
 
         AccionCache::AbrirArchivo {

@@ -62,8 +62,8 @@ export function crearAccion(
       return boton;
     }
 
-    // El clic abre el menú Abrir/Clonar/Nueva (asigna
-    // accionReferencia) — ver comp_popup_macro_accion.ts.
+    // El clic abre el menú completo (Editar/Renombrar/Nueva/Abrir/
+    // Clonar/Eliminar) — ver comp_popup_macro_accion.ts.
     case "macro": {
       const boton = crearAccionMacro(filaPerfil);
 

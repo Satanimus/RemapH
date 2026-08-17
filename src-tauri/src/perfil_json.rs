@@ -181,6 +181,19 @@ pub struct RemapeoJson {
     pub abrir_accion: AbrirAccionJson,
     #[serde(default)]
     pub abrir_extra: AbrirExtraJson,
+    // Solo relevante cuando tipo == "macro". A diferencia de
+    // abrir_accion/menu_accion no hay struct propia para la columna
+    // Acción: el nombre de la macro asignada sigue viajando en
+    // accion_referencia (mismo campo genérico que ya usa Multimedia),
+    // sin duplicarlo acá. macro_extra es la columna Extra — desde la
+    // Etapa 8A deja de ser la puerta al editor y pasa a guardar
+    // únicamente el Comportamiento de disparo (Una ejecución/Toggle/
+    // Tecla mantenida). #[serde(default)] mismo criterio que
+    // abrir_accion/abrir_extra, para que perfiles guardados antes de
+    // esta feature sigan cargando sin romper. Ver MacroExtraJson más
+    // abajo.
+    #[serde(default)]
+    pub macro_extra: MacroExtraJson,
     pub color: String,
     pub nota: String,
 }
@@ -498,6 +511,37 @@ impl Default for AbrirExtraJson {
             instancias: "multiple".to_string(),
             abrir_con: None,
             argumento: String::new(),
+        }
+    }
+}
+
+// ======================================================
+// 🧩 MACRO — EXTRA
+// ------------------------------------------------------
+// Datos del tipo "macro" (columna Extra únicamente — ver nota en
+// RemapeoJson.macro_extra sobre por qué no hay MacroAccionJson).
+//
+// comportamiento: "una_ejecucion" (default) | "toggle" |
+//   "tecla_mantenida". Decide en Runtime cómo arranca/corta la
+//   ejecución de la macro (ver runt_macro.rs, Etapa 8B):
+//   • "una_ejecucion" y "toggle" comparten mecanismo (registro
+//     fila → ejecución activa) — la diferencia entre ambos es solo
+//     de etiqueta/UX, no de código.
+//   • "tecla_mantenida" es mecánicamente distinta: depende de
+//     Down/Up físico real (cache.rs::resolver_match la trata como
+//     "diferida", igual que Mantener/ClickSostenido).
+// ======================================================
+
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MacroExtraJson {
+    pub comportamiento: String,
+}
+
+impl Default for MacroExtraJson {
+    fn default() -> Self {
+        Self {
+            comportamiento: "una_ejecucion".to_string(),
         }
     }
 }

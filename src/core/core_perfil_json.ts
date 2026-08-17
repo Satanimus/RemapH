@@ -42,6 +42,8 @@ import type {
 
 import type { AbrirAccionPerfil, AbrirExtraPerfil } from "./core_abrir";
 
+import type { MacroExtraPerfil } from "./core_macro";
+
 import { traducirLote } from "./core_traductor";
 
 // ======================================================
@@ -109,6 +111,11 @@ interface RemapeoJson {
   abrir_accion: AbrirAccionPerfil;
 
   abrir_extra: AbrirExtraPerfil;
+
+  // Snake_case a propósito, mismo criterio que abrir_accion/
+  // abrir_extra: el nombre viaja igual en el JSON sin traducción
+  // adicional. Ver core_macro.ts / perfil_json.rs::MacroExtraJson.
+  macro_extra: MacroExtraPerfil;
 
   color: string;
 
@@ -250,6 +257,8 @@ function convertirRemapeo(
     abrirAccion: remapeo.abrir_accion,
 
     abrirExtra: remapeo.abrir_extra,
+
+    macroExtra: remapeo.macro_extra,
 
     color: remapeo.color,
 

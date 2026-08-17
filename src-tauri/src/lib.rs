@@ -97,6 +97,8 @@ pub fn run() {
             comandos::macro_clonar,
             comandos::macro_abrir,
             comandos::macro_guardar,
+            comandos::macro_renombrar,
+            comandos::macro_eliminar,
             comandos::listar_procesos_ventana,
             comandos::obtener_icono_programa,
             comandos::obtener_icono_ruta,

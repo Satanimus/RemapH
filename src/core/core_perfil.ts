@@ -28,6 +28,9 @@ import {
 import type { AbrirAccionPerfil, AbrirExtraPerfil } from "./core_abrir";
 import { crearAbrirAccion, crearAbrirExtra } from "./core_abrir";
 
+import type { MacroExtraPerfil } from "./core_macro";
+import { crearMacroExtra } from "./core_macro";
+
 // ======================================================
 // 👤 PERFIL
 // ======================================================
@@ -106,6 +109,13 @@ export interface FilaPerfil {
 
   abrirExtra: AbrirExtraPerfil;
 
+  // Solo relevante cuando tipo === "macro" (columna Extra — desde
+  // la Etapa 8A guarda el Comportamiento de disparo, ya no la
+  // cantidad de pasos). El nombre de la macro asignada sigue
+  // viajando en accionReferencia (columna Acción, sin cambios acá).
+  // Ver core_macro.ts.
+  macroExtra: MacroExtraPerfil;
+
   app: AppPerfil;
 
   color: string;
@@ -150,6 +160,8 @@ export function crearFila(): FilaPerfil {
     abrirAccion: crearAbrirAccion(),
 
     abrirExtra: crearAbrirExtra(),
+
+    macroExtra: crearMacroExtra(),
 
     app: {
       programa: null,
@@ -232,5 +244,10 @@ export function clonarFila(fila: FilaPerfil): FilaPerfil {
     abrirAccion: { ...fila.abrirAccion },
 
     abrirExtra: { ...fila.abrirExtra },
+
+    // Misma razón que abrirAccion/abrirExtra arriba: objeto nuevo
+    // para que editar la fila clonada no mute la original (único
+    // campo, sin arrays anidados, alcanza con copia superficial).
+    macroExtra: { ...fila.macroExtra },
   };
 }

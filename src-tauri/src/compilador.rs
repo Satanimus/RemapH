@@ -159,7 +159,11 @@
 //     contenido en la cache, cualquier edición de la macro quedaría
 //     vieja hasta la próxima recompilación del perfil que la usa.
 //     Compilar solo confirma que la referencia sigue siendo válida,
-//     igual que Abrir confirma que la ruta sigue existiendo.
+//     igual que Abrir confirma que la ruta sigue existiendo. Desde
+//     la Etapa 8A también resuelve el programa del Filtro de App de
+//     la fila (para el paso Multimedia "En App" dentro de la macro)
+//     y el Comportamiento (remapeo.macro_extra.comportamiento, ya
+//     convertido a enum vía convertir_comportamiento_macro()).
 // ------------------------------------------------------
 
 use crate::cache;
@@ -170,9 +174,10 @@ use crate::macro_usuario;
 
 use crate::perfil_cache::{
     AccionCache, AlcanceMultimedia, AppCache, ColorBotonMenu, ComandoMultimedia,
-    ComportamientoMenu, CondicionTrigger, CoordenadaCache, ExtraCache, FormaMenu, IniciarVentana,
-    InstanciasAbrir, MenuBotonCache, PostAccionCache, PuntoReferenciaCache, RemapeoCache,
-    TamanoBotonPortapapeles, TamanoMenu, TriggerCache, UbicacionCache, UbicacionMenu,
+    ComportamientoMacro, ComportamientoMenu, CondicionTrigger, CoordenadaCache, ExtraCache,
+    FormaMenu, IniciarVentana, InstanciasAbrir, MenuBotonCache, PostAccionCache,
+    PuntoReferenciaCache, RemapeoCache, TamanoBotonPortapapeles, TamanoMenu, TriggerCache,
+    UbicacionCache, UbicacionMenu,
 };
 
 use crate::perfil_json::{perfil_json, AppJson, CoordenadaJson, RemapeoJson};
@@ -688,7 +693,19 @@ fn convertir_macro(
         return None;
     }
 
-    Some(AccionCache::Macro(nombre))
+    Some(AccionCache::Macro {
+        nombre,
+        programa: remapeo.app.programa.clone(),
+        comportamiento: convertir_comportamiento_macro(&remapeo.macro_extra.comportamiento),
+    })
+}
+
+fn convertir_comportamiento_macro(valor: &str) -> ComportamientoMacro {
+    match valor {
+        "toggle" => ComportamientoMacro::Toggle,
+        "tecla_mantenida" => ComportamientoMacro::TeclaMantenida,
+        _ => ComportamientoMacro::UnaEjecucion,
+    }
 }
 
 fn convertir_iniciar_ventana(valor: &str) -> IniciarVentana {

@@ -62,12 +62,12 @@ impl MacroArchivoJson {
 //
 // espera_ms: solo cuando tipo == "espera".
 //
-// bucle_marcador_destino / bucle_veces / bucle_modo: solo
-//   cuando tipo == "bucle". bucle_modo == "con_fin" resta 1
-//   en cada visita y queda inactivo al llegar a 0;
-//   "sin_fin" reinicia el contador cada vez que la ejecución
-//   vuelve a pasar por bucle_marcador_destino desde un bucle
-//   externo (bucles anidados).
+// bucle_marcador_destino / bucle_veces: solo cuando tipo ==
+//   "bucle". Un solo algoritmo (sin distinción con_fin/
+//   sin_fin, ver Etapa 8B): resta 1 en cada visita; al llegar
+//   a 0, resetea al valor programado y sigue de largo — listo
+//   para una próxima visita si está anidado dentro de otro
+//   bucle (bucles anidados).
 //
 // coord_*: solo cuando tipo == "coordenada". Solo mueve el
 //   mouse (sin click). coord_posicion_inicial es única y
@@ -107,8 +107,6 @@ pub struct PasoMacroJson {
     pub bucle_marcador_destino: Option<String>,
 
     pub bucle_veces: u32,
-
-    pub bucle_modo: String,
 
     pub coord_posicion_inicial: bool,
 
