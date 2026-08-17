@@ -170,9 +170,9 @@ use crate::macro_usuario;
 
 use crate::perfil_cache::{
     AccionCache, AlcanceMultimedia, AppCache, ColorBotonMenu, ComandoMultimedia,
-    ComportamientoMenu, CoordenadaCache, ExtraCache, FormaMenu, IniciarVentana, InstanciasAbrir,
-    MenuBotonCache, PostAccionCache, PuntoReferenciaCache, RemapeoCache, TamanoBotonPortapapeles,
-    TamanoMenu, TriggerCache, UbicacionCache, UbicacionMenu,
+    ComportamientoMenu, CondicionTrigger, CoordenadaCache, ExtraCache, FormaMenu, IniciarVentana,
+    InstanciasAbrir, MenuBotonCache, PostAccionCache, PuntoReferenciaCache, RemapeoCache,
+    TamanoBotonPortapapeles, TamanoMenu, TriggerCache, UbicacionCache, UbicacionMenu,
 };
 
 use crate::perfil_json::{perfil_json, AppJson, CoordenadaJson, RemapeoJson};
@@ -291,30 +291,33 @@ fn compilar_remapeo(
     // una tecla física) — ver runt_extra.rs::obtener() y
     // runtime.rs::sustituir_accion(), que deja las líneas del molde
     // intactas (sin sustituir nada) para cualquier Acción que no sea
-    // Emitir. Para menu_express, portapapeles, multimedia y abrir esto
-    // es un problema real, no solo un desperdicio: ejecutar_accion()
-    // en runtime.rs desvía CUALQUIER fila con `extra: Some(_)` hacia
-    // ese molde ANTES de llegar al match que ejecuta la acción real
-    // (abrir_o_alternar / back_multimedia::ejecutar / abrir_archivo),
-    // así que una fila de cualquiera de estos cuatro tipos cuyo
-    // `filaPerfil.extra` haya quedado en "normal" (default de fila
-    // nueva, ver crearFila() en core_perfil.ts — ninguno de los
-    // cuatro ofrece configurar Extra genérico, así que ese default
-    // nunca se sobreescribe) terminaba ejecutando un molde de no-ops
-    // en vez del comando real: la tecla se consumía (el match sí
-    // ocurre) pero no salía nada — mismo bug reportado para
-    // Multimedia ("consume la tecla pero no genera ninguna acción"),
-    // reproducido acá para "abrir" (no abría carpeta/archivo/exe pese
-    // a estar bien configurado). Se fuerza a None sin importar qué
-    // haya guardado remapeo.extra.
+    // Emitir. Para menu_express, portapapeles, multimedia, abrir y
+    // macro esto es un problema real, no solo un desperdicio:
+    // ejecutar_accion() en runtime.rs desvía CUALQUIER fila con
+    // `extra: Some(_)` hacia ese molde ANTES de llegar al match que
+    // ejecuta la acción real (abrir_o_alternar / back_multimedia::
+    // ejecutar / abrir_archivo / runt_macro::ejecutar), así que una
+    // fila de cualquiera de estos cinco tipos cuyo `filaPerfil.extra`
+    // haya quedado en "normal" (default de fila nueva, ver
+    // crearFila() en core_perfil.ts — ninguno de los cinco ofrece
+    // configurar Extra genérico, así que ese default nunca se
+    // sobreescribe) terminaba ejecutando un molde de no-ops en vez
+    // del comando real: la tecla se consumía (el match sí ocurre)
+    // pero no salía nada — mismo bug reportado para Multimedia
+    // ("consume la tecla pero no genera ninguna acción"), reproducido
+    // acá para "abrir" (no abría carpeta/archivo/exe pese a estar
+    // bien configurado) y, sin este agregado, hubiera pasado igual
+    // con "macro" en cuanto tuviera ejecutor propio. Se fuerza a None
+    // sin importar qué haya guardado remapeo.extra.
     let extra = if remapeo.tipo == "menu_express"
         || remapeo.tipo == "portapapeles"
         || remapeo.tipo == "multimedia"
         || remapeo.tipo == "abrir"
+        || remapeo.tipo == "macro"
     {
         None
     } else {
-        convertir_extra(&remapeo.extra)
+        convertir_extra(&remapeo.extra, &remapeo.trigger.condicion)
     };
 
     // Coordenada ya no depende de un tipo aparte: es un extra
@@ -749,9 +752,32 @@ fn referencia(remapeo: &RemapeoJson) -> Option<String> {
 // 🧩 CONVERTIR EXTRA
 // ======================================================
 
-fn convertir_extra(extra: &str) -> Option<ExtraCache> {
+// ======================================================
+// 🔁 CONVERTIR EXTRA (Repetición: Ninguno/Normal/Turbo)
+// ------------------------------------------------------
+// "Ninguno" (extra == "") ya no es sinónimo fijo de "sin
+// Extra" (None): con condición Mantenido, ejecutar la Acción
+// una sola vez SIN Extra significa quedar apretado hasta un
+// sleep fijo, no hasta el Up físico real — por eso acá se
+// deriva a Some(ExtraCache::Mantener), el mismo molde de
+// runt_extra.rs ([ACCION_DOWN] ESPERAR DETENER [ACCION_UP])
+// que ya usa Mantener/ClickSostenido para esperar el Up real.
+// Con cualquier otra condición (Simple/Doble/Triple), "Ninguno"
+// sigue siendo None (un solo toque, sin repetición).
+//
+// "mantener" se mantiene reconocido acá por compatibilidad con
+// perfiles guardados antes de este cambio — la UI ya no ofrece
+// esa opción (ver comp_popup_coordenada.ts), el nuevo camino
+// para llegar a ExtraCache::Mantener es "Ninguno"+Mantenido.
+// ======================================================
+
+fn convertir_extra(extra: &str, condicion: &CondicionTrigger) -> Option<ExtraCache> {
     match extra {
-        "" => None,
+        "" => match condicion {
+            CondicionTrigger::Mantenido => Some(ExtraCache::Mantener),
+
+            _ => None,
+        },
 
         "normal" => Some(ExtraCache::Normal),
 

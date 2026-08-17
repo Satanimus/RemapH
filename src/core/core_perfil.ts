@@ -131,7 +131,7 @@ export function crearFila(): FilaPerfil {
 
     condicion: "Normal",
 
-    extra: "normal",
+    extra: "",
 
     accionReferencia: null,
 

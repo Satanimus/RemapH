@@ -8,10 +8,13 @@
 // capa), en vez de cerrarlo. Todo vive en UN solo popup que
 // se extiende hacia abajo — no hay sub-popups laterales.
 //
-// NIVEL 1 — Normal / Simple / Mantenido / Turbo (sobre
-//          filaPerfil.extra, mismo vocabulario "normal" | "" |
-//          "mantener" | "turbo" que usa compilador.rs vía
-//          convertir_extra())
+// NIVEL 1 — Repetición: Ninguno / Normal / Turbo (sobre
+//          filaPerfil.extra, mismo vocabulario "" | "normal" |
+//          "turbo" que usa compilador.rs vía convertir_extra()
+//          — "Ninguno" ya no es sinónimo fijo de "sin Extra":
+//          con condición Mantenido se resuelve del lado de
+//          Rust a ExtraCache::Mantener, para depender del Up
+//          físico real en vez de un tiempo fijo)
 // INTERRUPTOR — Coordenada (sobre filaPerfil.coordenada.activa).
 //          No excluyente con el nivel de arriba: se puede
 //          combinar cualquier repetición con Coordenada. Al
@@ -63,7 +66,7 @@ import {
 } from "../../core/core_trigger";
 
 // ======================================================
-// 🧭 VOCABULARIO Normal / Simple / Mantenido / Turbo / Repetición
+// 🧭 VOCABULARIO Ninguno / Normal / Turbo / Repetición
 // ------------------------------------------------------
 // Mismos valores que EXTRA_OPCIONES de comp_popup_abrir.ts
 // (comparten filaPerfil.extra y convertir_extra() del lado
@@ -83,9 +86,8 @@ import {
 // ======================================================
 
 const EXTRA_TECLA_MOUSE_OPCIONES: { texto: string; valor: string }[] = [
+  { texto: "Ninguno", valor: "" },
   { texto: "Normal", valor: "normal" },
-  { texto: "Simple", valor: "" },
-  { texto: "Mantenido", valor: "mantener" },
   { texto: "Turbo", valor: "turbo" },
   { texto: "Repetición", valor: "repeticion_rueda" },
 ];
@@ -303,15 +305,17 @@ export function abrirPopupExtraTeclaMouse(
     abrirPopupExtraTeclaMouse(evento, contexto, filaPerfil);
 
   // ----------------------------------
-  // NIVEL 1 — Normal / Simple / Mantenido / Turbo / Repetición
+  // NIVEL 1 — Repetición: Ninguno / Normal / Turbo / Repetición
+  //          (rueda)
   // ------------------------------------------------------
   // La lista de opciones se filtra según gatillo/condición del
   // Trigger (ver extrasPermitidosTeclaMouse en core_trigger.ts).
   // Si el valor guardado quedó fuera del set permitido (p. ej. la
   // fila tenía Turbo y se recapturó el gatillo como Rueda, o tenía
   // Repetición y la Condición pasó a Mantenido), se corrige acá
-  // mismo a "normal" antes de dibujar — mismo criterio que "resetear
-  // Extra a Normal al recapturar el gatillo como rueda" del plan.
+  // mismo a "normal" antes de dibujar — es el único valor presente
+  // en las 3 variantes de permitidos (no-rueda, rueda-simple,
+  // rueda-otro); "" no siempre lo está (rueda no la ofrece).
   // ----------------------------------
 
   const permitidos = extrasPermitidosTeclaMouse(filaPerfil.trigger);
@@ -332,12 +336,15 @@ export function abrirPopupExtraTeclaMouse(
   }));
 
   popup.append(
-    crearGrupoOpciones(opcionesExtra, filaPerfil.extra, (valor) => {
-      filaPerfil.extra = valor;
+    crearFilaPopup(
+      "Repetición",
+      crearGrupoOpciones(opcionesExtra, filaPerfil.extra, (valor) => {
+        filaPerfil.extra = valor;
 
-      reconstruirFila(contexto.id);
-      redibujar();
-    }),
+        reconstruirFila(contexto.id);
+        redibujar();
+      }),
+    ),
   );
 
   popup.append(crearSeparador());

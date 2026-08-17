@@ -111,10 +111,12 @@
 //     RepeticionRueda (un pulso de rueda = una salida encolada) —
 //     ver PLAN_RUEDA_REPETICION.md.
 //
-// tiempo_salida_mantenido()
-// establecer_tiempo_salida_mantenido()
-//     Cuánto queda abajo la tecla/botón de salida cuando la Acción
-//     capturada tiene condición Mantenido, antes de soltarse sola.
+// tiempo_simple_teclas()
+// establecer_tiempo_simple_teclas()
+//     Pausa entre el DOWN y el UP de un toque de tecla/botón (todo
+//     "toque" pasa por acá: Simple, cada repetición de Doble/Triple,
+//     y cada ciclo de Normal/Turbo). 0ms por defecto — existe lista
+//     para el caso de una app que necesite un mínimo de detección.
 //
 // delta_volumen()
 // establecer_delta_volumen()
@@ -422,17 +424,17 @@ pub fn establecer_delay_rueda_repeticion(valor: u64) {
 }
 
 // ======================================================
-// ⏳ TIEMPO SALIDA MANTENIDO (Acción con condición Mantenido)
+// ⏱️ TIEMPO SIMPLE TECLAS (pausa entre DOWN y UP de un toque)
 // ======================================================
 
-static TIEMPO_SALIDA_MANTENIDO: AtomicU64 = AtomicU64::new(300);
+static TIEMPO_SIMPLE_TECLAS: AtomicU64 = AtomicU64::new(0);
 
-pub fn tiempo_salida_mantenido() -> u64 {
-    TIEMPO_SALIDA_MANTENIDO.load(Ordering::Relaxed)
+pub fn tiempo_simple_teclas() -> u64 {
+    TIEMPO_SIMPLE_TECLAS.load(Ordering::Relaxed)
 }
 
-pub fn establecer_tiempo_salida_mantenido(valor: u64) {
-    TIEMPO_SALIDA_MANTENIDO.store(valor, Ordering::Relaxed);
+pub fn establecer_tiempo_simple_teclas(valor: u64) {
+    TIEMPO_SIMPLE_TECLAS.store(valor, Ordering::Relaxed);
 }
 
 // ======================================================

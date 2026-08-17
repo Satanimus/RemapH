@@ -436,9 +436,7 @@ pub fn aplicar_valor(clave: &str, valor: &str) -> Result<(), String> {
             config::establecer_delay_rueda_repeticion(parsear_numero(valor)?)
         }
 
-        "tiempo_salida_mantenido" => {
-            config::establecer_tiempo_salida_mantenido(parsear_numero(valor)?)
-        }
+        "tiempo_simple_teclas" => config::establecer_tiempo_simple_teclas(parsear_numero(valor)?),
 
         "delta_volumen" => config::establecer_delta_volumen(parsear_numero(valor)?),
 

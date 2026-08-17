@@ -201,22 +201,25 @@
 //     puede convertirse en varias líneas.
 // ejecutar_emitir(inputs, condicion)
 //     Despacha un Emitir directo (sin Extra) según su
-//     condición: Simple → emitir_combo() una vez. Doble →
-//     emitir_combo() dos veces, separadas por
-//     config::delay_entre_salida_doble(). Mantenido →
-//     emitir_combo_abajo(), espera
-//     config::tiempo_salida_mantenido(), emitir_combo_arriba().
-// emitir_combo(inputs) / emitir_combo_abajo(inputs) /
-// emitir_combo_arriba(inputs)
-//     Ejecuta (o solo la mitad de) un combo: DOWN de los
-//     mods en orden, DOWN+UP del gatillo, UP de los mods en
-//     orden inverso.
+//     condición: Simple → un toque (DOWN, espera
+//     config::tiempo_simple_teclas(), UP). Doble/Triple →
+//     mods abajo UNA sola vez, el gatillo se golpea 2/3
+//     veces (cada golpe con tiempo_simple_teclas entre su
+//     DOWN y su UP, config::delay_entre_salida_doble() entre
+//     golpes), mods arriba al final. Mantenido →
+//     emitir_combo_abajo(), espera config::tiempo_mantenido(),
+//     emitir_combo_arriba().
+// emitir_combo_abajo(inputs) / emitir_combo_arriba(inputs)
+//     Ejecuta solo la mitad de un combo completo (mods+gatillo
+//     juntos): DOWN de los mods en orden + DOWN del gatillo, o
+//     UP del gatillo + UP de los mods en orden inverso. Usado
+//     por Mantenido (abajo/arriba del bloque entero) y por
+//     lineas_abajo/lineas_arriba del lado del Idioma Runtime.
 // emitir_ctrl_v()
 //     Atajo público de conveniencia: arma [LeftControl, V]
-//     como InputId y los ENCOLA en COLA_SALIDA (no llama
-//     emitir_combo() directo) — mismo camino real, mismo
-//     hilo dedicado, que un Emitir configurado por el
-//     usuario. Usado por back_portapapeles::pegar() para el
+//     como InputId y los ENCOLA en COLA_SALIDA — mismo camino
+//     real, mismo hilo dedicado, que un Emitir configurado por
+//     el usuario. Usado por back_portapapeles::pegar() para el
 //     pegado automático.
 // ejecutar_macro_en_hilo(id, ruta)
 //     Lee un archivo de macro de usuario, lo corre en un
@@ -1130,52 +1133,38 @@ fn emitir(input: InputId) {
 // ------------------------------------------------------
 // Único lugar que decide, para un Emitir sin Extra, cómo
 // ejecutar el combo según la condición capturada en la
-// Acción (ver perfil_cache.rs / compilador.rs — antes esto
-// se descartaba y todo se ejecutaba como Simple):
-// • Simple    → un combo completo (down+up).
-// • Doble     → un combo completo, espera
-//               config::delay_entre_salida_doble(), y
-//               repite el combo completo.
-// • Triple    → un combo completo, espera
-//               config::delay_entre_salida_doble(), repite,
-//               espera de nuevo el mismo delay, y repite una
-//               tercera vez (reusa el delay de Doble, sin
-//               campo propio en config.rs).
+// Acción (ver perfil_cache.rs / compilador.rs):
+// • Simple    → mods abajo, DOWN+espera tiempo_simple_teclas+UP
+//               del gatillo, mods arriba.
+// • Doble     → mods abajo UNA sola vez, el gatillo golpea 2
+//               veces (delay_entre_salida_doble entre golpes),
+//               mods arriba al final — no repite el combo
+//               completo (los mods no vuelven a soltarse ni
+//               apretarse entre golpes).
+// • Triple    → igual que Doble, 3 golpes de gatillo.
 // • Mantenido → solo el DOWN del combo, espera
-//               config::tiempo_salida_mantenido(), y recién
-//               ahí manda el UP.
+//               config::tiempo_mantenido(), y recién ahí manda
+//               el UP.
 // Llamado tanto desde el hilo de salida dedicado
 // (COLA_SALIDA) como desde Click en coordenada sin Extra.
 // ======================================================
 
 fn ejecutar_emitir(inputs: &[InputId], condicion: &CondicionTrigger) {
+    let Some((gatillo, mods)) = inputs.split_last() else {
+        return;
+    };
+
     match condicion {
-        CondicionTrigger::Simple => emitir_combo(inputs),
+        CondicionTrigger::Simple => emitir_un_toque(mods, gatillo),
 
-        CondicionTrigger::Doble => {
-            emitir_combo(inputs);
+        CondicionTrigger::Doble => emitir_multiples_toques(mods, gatillo, 2),
 
-            thread::sleep(Duration::from_millis(config::delay_entre_salida_doble()));
-
-            emitir_combo(inputs);
-        }
-
-        CondicionTrigger::Triple => {
-            emitir_combo(inputs);
-
-            thread::sleep(Duration::from_millis(config::delay_entre_salida_doble()));
-
-            emitir_combo(inputs);
-
-            thread::sleep(Duration::from_millis(config::delay_entre_salida_doble()));
-
-            emitir_combo(inputs);
-        }
+        CondicionTrigger::Triple => emitir_multiples_toques(mods, gatillo, 3),
 
         CondicionTrigger::Mantenido => {
             emitir_combo_abajo(inputs);
 
-            thread::sleep(Duration::from_millis(config::tiempo_salida_mantenido()));
+            thread::sleep(Duration::from_millis(config::tiempo_mantenido()));
 
             emitir_combo_arriba(inputs);
         }
@@ -1183,18 +1172,67 @@ fn ejecutar_emitir(inputs: &[InputId], condicion: &CondicionTrigger) {
 }
 
 // ======================================================
-// 📤 EMITIR COMBO (Emitir directo, sin Extra)
+// 👆 EMITIR UN TOQUE (mods + un DOWN/UP de gatillo)
 // ------------------------------------------------------
-// inputs = [mod1, mod2, ..., gatillo] (último = gatillo,
-// ver perfil_cache.rs). DOWN de los mods en orden → DOWN+UP
-// del gatillo → UP de los mods en orden inverso. Con un solo
-// elemento (sin modificadores) es equivalente a un pulse.
+// DOWN mods → DOWN gatillo → espera tiempo_simple_teclas()
+// → UP gatillo → UP mods en orden inverso.
 // ======================================================
 
-fn emitir_combo(inputs: &[InputId]) {
-    emitir_combo_abajo(inputs);
-    emitir_combo_arriba(inputs);
+fn emitir_un_toque(mods: &[InputId], gatillo: &InputId) {
+    for modificador in mods {
+        emitir_down_input(modificador.clone());
+    }
+
+    emitir_down_input(gatillo.clone());
+
+    thread::sleep(Duration::from_millis(config::tiempo_simple_teclas()));
+
+    emitir_up_input(gatillo.clone());
+
+    for modificador in mods.iter().rev() {
+        emitir_up_input(modificador.clone());
+    }
 }
+
+// ======================================================
+// 👆👆 EMITIR MÚLTIPLES TOQUES (Doble/Triple)
+// ------------------------------------------------------
+// Mods abajo UNA sola vez, el gatillo se golpea n veces
+// (tiempo_simple_teclas entre el DOWN y el UP de cada
+// golpe, delay_entre_salida_doble entre golpes), mods
+// arriba al final. Antes repetía el combo completo n
+// veces (mods incluidos) — bug: "Q+Wx2" salía "qwqw" en
+// vez de "qww".
+// ======================================================
+
+fn emitir_multiples_toques(mods: &[InputId], gatillo: &InputId, n: u8) {
+    for modificador in mods {
+        emitir_down_input(modificador.clone());
+    }
+
+    for indice in 0..n {
+        if indice > 0 {
+            thread::sleep(Duration::from_millis(config::delay_entre_salida_doble()));
+        }
+
+        emitir_down_input(gatillo.clone());
+
+        thread::sleep(Duration::from_millis(config::tiempo_simple_teclas()));
+
+        emitir_up_input(gatillo.clone());
+    }
+
+    for modificador in mods.iter().rev() {
+        emitir_up_input(modificador.clone());
+    }
+}
+
+// ======================================================
+// 📤 EMITIR COMBO ABAJO/ARRIBA (mitades, para Mantenido)
+// ------------------------------------------------------
+// inputs = [mod1, mod2, ..., gatillo] (último = gatillo,
+// ver perfil_cache.rs).
+// ======================================================
 
 /// Emite Ctrl+V por el mismo camino que un combo de Emitir real
 /// (back_interception, nivel driver) — NO SendInput/WinAPI. Usado
@@ -1411,34 +1449,42 @@ fn expandir_placeholder(
 // ======================================================
 // 🔁 [ACCION] / [ACCION_DOWN] / [ACCION_UP] — condición-aware
 // ------------------------------------------------------
-// Un "toque" es un DOWN+UP completo del combo. La condición decide
+// Un "toque" es un DOWN+UP del gatillo. La condición decide
 // cuántos toques hacen falta antes de la mitad final:
-// • Simple           → 1 toque.
-// • Doble            → 2 toques.
-// • Triple           → 3 toques.
+// • Simple           → 1 toque, con mods incluidos (down antes,
+//                       up después, todo en el mismo toque).
+// • Doble            → 2 toques de gatillo, mods abajo UNA sola
+//                       vez antes del primero y arriba UNA sola
+//                       vez después del último — no se sueltan
+//                       entre toque y toque.
+// • Triple           → igual que Doble, 3 toques de gatillo.
 // • Mantenido        → no tiene "toques": es DOWN, sostenido, UP.
+// Todo DOWN/UP de gatillo espera tiempo_simple_teclas() entre
+// medio; entre toques de Doble/Triple se espera
+// delay_entre_salida_doble().
 //
 // [ACCION] (unidad completa, la usan Normal/Turbo en su bucle):
-// todos los toques completos, separados por
-// delay_entre_salida_doble; para Mantenido, DOWN + espera
-// tiempo_salida_mantenido + UP (sostenido artificial, igual que
-// ejecutar_emitir sin Extra).
+// para Mantenido, DOWN + espera tiempo_mantenido() + UP
+// (sostenido artificial, igual que ejecutar_emitir sin Extra).
 //
 // [ACCION_DOWN]/[ACCION_UP] (mitades separadas, las usan Mantener/
 // Click Sostenido para sostener hasta el Up físico real):
-// [ACCION_DOWN] manda todos los toques salvo el último completos,
-// y deja el último solo con su DOWN (sostenido) — ej. Triple:
-// toque, espera, toque, espera, DOWN. [ACCION_UP] siempre es
+// [ACCION_DOWN] manda mods abajo una sola vez, todos los toques
+// de gatillo salvo el último completos, y deja el último toque
+// solo con su DOWN (sostenido) — ej. Triple: DOWN mods, toque,
+// espera, toque, espera, DOWN gatillo. [ACCION_UP] siempre es
 // solamente la mitad de arriba (UP gatillo + UP mods en reversa):
 // no importa la condición, lo único que queda pendiente cuando
 // llega el Up físico real es soltar ese último DOWN sostenido.
-// Para Mantenido, [ACCION_DOWN] es solo DOWN — su propio
-// tiempo_salida_mantenido no aplica acá: el sostenido real que
-// pide el Extra (ESPERAR DETENER) ya lo reemplaza.
+// Para Mantenido, [ACCION_DOWN] es solo DOWN mods+gatillo — el
+// sostenido real que pide el Extra (ESPERAR DETENER) reemplaza
+// cualquier espera fija acá.
 // ======================================================
 
 fn lineas_un_toque(mods: &[&str], gatillo: &str) -> Vec<String> {
     let mut pasos = lineas_abajo(mods, gatillo);
+
+    pasos.push(format!("ESPERAR {}", config::tiempo_simple_teclas()));
 
     pasos.extend(lineas_arriba(mods, gatillo));
 
@@ -1453,14 +1499,14 @@ fn lineas_accion_completa(
     match condicion {
         CondicionTrigger::Simple => lineas_un_toque(mods, gatillo),
 
-        CondicionTrigger::Doble => lineas_n_toques(mods, gatillo, 2),
+        CondicionTrigger::Doble => lineas_multiples_toques_gatillo(mods, gatillo, 2),
 
-        CondicionTrigger::Triple => lineas_n_toques(mods, gatillo, 3),
+        CondicionTrigger::Triple => lineas_multiples_toques_gatillo(mods, gatillo, 3),
 
         CondicionTrigger::Mantenido => {
             let mut pasos = lineas_abajo(mods, gatillo);
 
-            pasos.push(format!("ESPERAR {}", config::tiempo_salida_mantenido()));
+            pasos.push(format!("ESPERAR {}", config::tiempo_mantenido()));
 
             pasos.extend(lineas_arriba(mods, gatillo));
 
@@ -1469,16 +1515,27 @@ fn lineas_accion_completa(
     }
 }
 
-fn lineas_n_toques(mods: &[&str], gatillo: &str, n: u8) -> Vec<String> {
-    let mut pasos = Vec::new();
+// Mods abajo una sola vez, el gatillo golpea n veces
+// (tiempo_simple_teclas entre el DOWN y el UP de cada golpe,
+// delay_entre_salida_doble entre golpes), mods arriba al
+// final. Antes repetía lineas_un_toque n veces completo (mods
+// incluidos) — bug: "Q+Wx2" salía "qwqw" en vez de "qww".
+fn lineas_multiples_toques_gatillo(mods: &[&str], gatillo: &str, n: u8) -> Vec<String> {
+    let mut pasos = lineas_down_mods(mods);
 
     for indice in 0..n {
         if indice > 0 {
             pasos.push(format!("ESPERAR {}", config::delay_entre_salida_doble()));
         }
 
-        pasos.extend(lineas_un_toque(mods, gatillo));
+        pasos.push(format!("DOWN {gatillo}"));
+
+        pasos.push(format!("ESPERAR {}", config::tiempo_simple_teclas()));
+
+        pasos.push(format!("UP {gatillo}"));
     }
+
+    pasos.extend(lineas_up_mods(mods));
 
     pasos
 }
@@ -1492,15 +1549,19 @@ fn lineas_accion_down(mods: &[&str], gatillo: &str, condicion: &CondicionTrigger
         CondicionTrigger::Triple => 2,
     };
 
-    let mut pasos = Vec::new();
+    let mut pasos = lineas_down_mods(mods);
 
     for _ in 0..toques_previos {
-        pasos.extend(lineas_un_toque(mods, gatillo));
+        pasos.push(format!("DOWN {gatillo}"));
+
+        pasos.push(format!("ESPERAR {}", config::tiempo_simple_teclas()));
+
+        pasos.push(format!("UP {gatillo}"));
 
         pasos.push(format!("ESPERAR {}", config::delay_entre_salida_doble()));
     }
 
-    pasos.extend(lineas_abajo(mods, gatillo));
+    pasos.push(format!("DOWN {gatillo}"));
 
     pasos
 }
@@ -1509,21 +1570,33 @@ fn lineas_accion_up(mods: &[&str], gatillo: &str) -> Vec<String> {
     lineas_arriba(mods, gatillo)
 }
 
-fn lineas_abajo(mods: &[&str], gatillo: &str) -> Vec<String> {
+fn lineas_down_mods(mods: &[&str]) -> Vec<String> {
     mods.iter()
         .map(|modificador| format!("DOWN {modificador}"))
-        .chain(std::iter::once(format!("DOWN {gatillo}")))
         .collect()
 }
 
-fn lineas_arriba(mods: &[&str], gatillo: &str) -> Vec<String> {
-    std::iter::once(format!("UP {gatillo}"))
-        .chain(
-            mods.iter()
-                .rev()
-                .map(|modificador| format!("UP {modificador}")),
-        )
+fn lineas_up_mods(mods: &[&str]) -> Vec<String> {
+    mods.iter()
+        .rev()
+        .map(|modificador| format!("UP {modificador}"))
         .collect()
+}
+
+fn lineas_abajo(mods: &[&str], gatillo: &str) -> Vec<String> {
+    let mut pasos = lineas_down_mods(mods);
+
+    pasos.push(format!("DOWN {gatillo}"));
+
+    pasos
+}
+
+fn lineas_arriba(mods: &[&str], gatillo: &str) -> Vec<String> {
+    let mut pasos = vec![format!("UP {gatillo}")];
+
+    pasos.extend(lineas_up_mods(mods));
+
+    pasos
 }
 
 // ======================================================

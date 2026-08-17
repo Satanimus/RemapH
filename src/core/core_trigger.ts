@@ -64,7 +64,7 @@ export function esGatilloRueda(trigger: Trigger): boolean {
 
 export function extrasPermitidosTeclaMouse(trigger: Trigger): string[] {
   if (!esGatilloRueda(trigger)) {
-    return ["normal", "", "mantener", "turbo"];
+    return ["normal", "", "turbo"];
   }
 
   if (trigger.condicion === "simple") {
