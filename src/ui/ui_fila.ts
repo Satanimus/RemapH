@@ -30,8 +30,7 @@ import { crearAccion } from "./componentes/comp_accion";
 
 export function crearFila(
   filaPerfil: FilaPerfil,
-  numero: number,
-  total: number,
+  esUltima: boolean,
   alModificar: () => void = () => {},
 ): HTMLElement {
   const contexto = crearContextoFila(filaPerfil.id);
@@ -61,9 +60,7 @@ export function crearFila(
 
     switch (col.id) {
       case "numero":
-        celda.append(
-          crearNumero(contexto, filaPerfil, numero, total, alModificar),
-        );
+        celda.append(crearNumero(contexto, filaPerfil, esUltima, alModificar));
 
         break;
 

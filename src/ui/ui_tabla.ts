@@ -68,6 +68,53 @@ export function crearTabla(alModificar: () => void): HTMLElement {
   filas.className = "filas";
 
   // ==================================================
+  // 🔢 CARRIL DE NÚMEROS (Etapa 9B)
+  // ------------------------------------------------------
+  // Fuera de .viewport a propósito: la numeración no es una
+  // columna más de la fila, es un indicador de fondo fuera
+  // de la tabla que arrastra/soltar (spec: "no pertenece a
+  // la fila, no se mueve con ella"). Un espaciador imita la
+  // altura de la cabecera (que sí scrollea dentro de
+  // .viewport, no tiene position:sticky) para que el número
+  // 1 quede a la altura de la primera fila. La sincronía de
+  // scroll es un simple espejo de scrollTop — el contenido
+  // total (espaciador + N filas de --row-height) mide lo
+  // mismo en los dos lados porque usan las mismas variables
+  // de alto que .cabecera/.fila.
+  // ==================================================
+
+  const carrilNumeros = document.createElement("div");
+
+  carrilNumeros.className = "carril-numeros";
+
+  const carrilEspaciador = document.createElement("div");
+
+  carrilEspaciador.className = "carril-numeros-espaciador";
+
+  const carrilLista = document.createElement("div");
+
+  carrilLista.className = "carril-numeros-lista";
+
+  carrilNumeros.append(carrilEspaciador, carrilLista);
+
+  const reconstruirCarrilNumeros = (total: number): void => {
+    carrilLista.replaceChildren();
+
+    for (let i = 1; i <= total; i++) {
+      const item = document.createElement("div");
+
+      item.className = "carril-numero";
+      item.textContent = String(i);
+
+      carrilLista.append(item);
+    }
+  };
+
+  viewport.addEventListener("scroll", () => {
+    carrilNumeros.scrollTop = viewport.scrollTop;
+  });
+
+  // ==================================================
   // ⁝⁝ ARRASTRAR Y SOLTAR (util_arrastrable.ts, Etapa 9)
   // ------------------------------------------------------
   // El controlador vive una sola vez para toda la vida de
@@ -99,7 +146,7 @@ export function crearTabla(alModificar: () => void): HTMLElement {
   registrarSalirModoMover(() => controladorArrastre.salirModoMover());
 
   // Registra una fila ya insertada en el DOM (asa = botón
-  // "N ▾", ver comp_numero.ts::crearNumero).
+  // "▾", ver comp_numero.ts::crearNumero).
   const registrarFilaArrastrable = (filaElemento: HTMLElement): void => {
     const id = filaElemento.dataset.id;
 
@@ -126,8 +173,7 @@ export function crearTabla(alModificar: () => void): HTMLElement {
     perfil.filas.forEach((fila, indice) => {
       const filaElemento = crearFila(
         fila,
-        indice + 1,
-        perfil.filas.length,
+        indice === perfil.filas.length - 1,
         alModificar,
       );
 
@@ -135,6 +181,8 @@ export function crearTabla(alModificar: () => void): HTMLElement {
 
       registrarFilaArrastrable(filaElemento);
     });
+
+    reconstruirCarrilNumeros(perfil.filas.length);
   };
 
   reconstruirTabla();
@@ -160,8 +208,7 @@ export function crearTabla(alModificar: () => void): HTMLElement {
 
     const filaNueva = crearFila(
       perfil.filas[indice],
-      indice + 1,
-      perfil.filas.length,
+      indice === perfil.filas.length - 1,
       alModificar,
     );
 
@@ -200,7 +247,7 @@ export function crearTabla(alModificar: () => void): HTMLElement {
 
   viewport.append(cabecera, filas);
 
-  tabla.append(viewport);
+  tabla.append(carrilNumeros, viewport);
 
   registrarReconstruccion(reconstruirTabla, reconstruirFila);
 

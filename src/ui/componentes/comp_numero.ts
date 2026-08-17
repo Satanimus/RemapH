@@ -1,10 +1,13 @@
 // ======================================================
 // 🔢 comp_Numero
 // ------------------------------------------------------
-// Columna número: botón "N ▾" con popup (Clonar/Eliminar).
-// Sirve también de asa para el componente de arrastre
-// (util_arrastrable.ts, ver ui_tabla.ts): clic corto abre
-// este popup, clic mantenido lo maneja el componente por su
+// Columna "asa": botón "▾" con popup (Clonar/Eliminar). El
+// número ordinal ya NO se muestra acá — vive en el carril
+// fijo a la izquierda de la tabla (ver ui_tabla.ts, Etapa
+// 9B), sincronizado con el scroll pero indiferente a esta
+// fila. Este botón sirve también de asa para el componente
+// de arrastre (util_arrastrable.ts): clic corto abre este
+// popup, clic mantenido lo maneja el componente por su
 // cuenta (misma clase "numero-asa" usada para ubicar el
 // botón vía querySelector tras cada render).
 // ======================================================
@@ -20,8 +23,7 @@ import { reconstruirTabla } from "../ui_tabla_control";
 export function crearNumero(
   contexto: ContextoFila,
   filaPerfil: FilaPerfil,
-  numero: number,
-  total: number,
+  esUltima: boolean,
   alModificar: () => void,
 ): HTMLElement {
   const contenedor = document.createElement("div");
@@ -29,7 +31,7 @@ export function crearNumero(
   contenedor.className = "numero-celda";
 
   const boton = crearBoton({
-    texto: `${numero} ▾`,
+    texto: "▾",
     titulo: "Opciones de fila",
     clase: "numero-asa",
   });
@@ -44,7 +46,7 @@ export function crearNumero(
   // ➕ AGREGAR FILA (solo debajo de la última fila)
   // ==================================================
 
-  if (numero === total) {
+  if (esUltima) {
     const botonAgregar = document.createElement("button");
 
     botonAgregar.className = "btn-agregar-fila";

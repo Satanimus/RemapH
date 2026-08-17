@@ -574,7 +574,7 @@ export function crearControladorArrastre(
 
     const placeholder = crearPlaceholder(rectPrimero.width);
 
-    placeholder.style.height = `${rectPrimero.height / 3}px`;
+    placeholder.style.height = `${rectPrimero.height}px`;
 
     idsGrupo.forEach((id) => {
       filas.get(id)?.elemento.classList.add(CLASE_FILA_OCULTA);

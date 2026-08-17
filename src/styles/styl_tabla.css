@@ -5,6 +5,8 @@
 
 .tabla {
 
+    display: flex;
+
     flex: 1;
 
     overflow: hidden;
@@ -12,11 +14,64 @@
 
 .viewport {
 
-    width: 100%;
+    flex: 1;
+
+    min-width: 0;
 
     height: 100%;
 
     overflow: auto;
+}
+
+
+/* ======================================================
+   🔢 CARRIL DE NÚMEROS (Etapa 9B)
+   ------------------------------------------------------
+   Fuera de .viewport: no es una columna de la fila, es un
+   indicador de fondo que no se mueve con el arrastre. El
+   espaciador imita la altura de .cabecera (que scrollea
+   dentro de .viewport, no tiene position:sticky) para que
+   el número 1 quede a la altura de la primera fila. La
+   sincronía de scroll (ver ui_tabla.ts) es un espejo de
+   scrollTop — mismo contenido total en los dos lados porque
+   usan las mismas variables de alto que .cabecera/.fila.
+   ====================================================== */
+
+.carril-numeros {
+
+    width: var(--col-num);
+
+    flex-shrink: 0;
+
+    overflow: hidden;
+
+    background: var(--panel2);
+
+    border-right: 1px solid var(--border);
+}
+
+.carril-numeros-espaciador {
+
+    height: var(--header-height);
+}
+
+.carril-numero {
+
+    height: var(--row-height);
+
+    display: flex;
+
+    align-items: center;
+
+    justify-content: center;
+
+    box-sizing: border-box;
+
+    border-bottom: 1px solid var(--border);
+
+    color: var(--text-disabled);
+
+    font-size: var(--fs12);
 }
 
 
@@ -261,7 +316,7 @@
     font-family: "Segoe UI Symbol", "Segoe UI", "Segoe UI Emoji", sans-serif;
     font-size: 15px;
     color: var(--text-disabled);
-    
+
     line-height: 22px;
 
     cursor: pointer;
