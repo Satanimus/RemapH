@@ -317,7 +317,27 @@ fn compilar_remapeo(
     {
         None
     } else {
-        convertir_extra(&remapeo.extra, &remapeo.trigger.condicion)
+        // [FIX] La promoción "Ninguno"+Mantenido→ExtraCache::Mantener
+        // (ver convertir_extra) tiene que mirar la condición del
+        // GATILLO DE SALIDA (accion_trigger, el que decide cómo se
+        // emite la Acción — ej. el Click de "tecla_mouse"), no la
+        // condición del trigger de ENTRADA (cómo se detecta Q). Antes
+        // se pasaba remapeo.trigger.condicion acá: una fila "Q simple
+        // → Click Mantenido, Extra Ninguno" nunca promovía a Mantener
+        // porque el trigger de entrada era Simple, no Mantenido — el
+        // Click se emitía con el sleep fijo de ejecutar_emitir en vez
+        // de sostenerse hasta el Up real de Q. Ahora se usa la
+        // condición que de verdad viaja en la Acción (AccionCache::
+        // Emitir(_, condicion), la única que tiene ese concepto);
+        // para el resto de las Acciones (Ui, etc., sin condición
+        // propia) se neutraliza con Simple, mismo resultado que antes
+        // (no promueve).
+        let condicion_salida = match &accion {
+            AccionCache::Emitir(_, condicion) => condicion,
+            _ => &CondicionTrigger::Simple,
+        };
+
+        convertir_extra(&remapeo.extra, condicion_salida)
     };
 
     // Coordenada ya no depende de un tipo aparte: es un extra
@@ -756,10 +776,13 @@ fn referencia(remapeo: &RemapeoJson) -> Option<String> {
 // 🔁 CONVERTIR EXTRA (Repetición: Ninguno/Normal/Turbo)
 // ------------------------------------------------------
 // "Ninguno" (extra == "") ya no es sinónimo fijo de "sin
-// Extra" (None): con condición Mantenido, ejecutar la Acción
-// una sola vez SIN Extra significa quedar apretado hasta un
-// sleep fijo, no hasta el Up físico real — por eso acá se
-// deriva a Some(ExtraCache::Mantener), el mismo molde de
+// Extra" (None): con condición Mantenido en el GATILLO DE
+// SALIDA (la condición que viaja en AccionCache::Emitir, no
+// la del trigger de entrada — ver el llamado en
+// compilar_remapeo), ejecutar la Acción una sola vez SIN
+// Extra significa quedar apretado hasta un sleep fijo, no
+// hasta el Up físico real — por eso acá se deriva a
+// Some(ExtraCache::Mantener), el mismo molde de
 // runt_extra.rs ([ACCION_DOWN] ESPERAR DETENER [ACCION_UP])
 // que ya usa Mantener/ClickSostenido para esperar el Up real.
 // Con cualquier otra condición (Simple/Doble/Triple), "Ninguno"
