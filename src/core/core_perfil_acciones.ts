@@ -66,37 +66,6 @@ export function eliminarFilaPorId(id: string): void {
 }
 
 // ======================================================
-// ↕️ MOVER FILA POR ID
-// ------------------------------------------------------
-// Intercambia la fila con su vecina inmediata. No hace
-// nada si ya está en el borde correspondiente.
-// ======================================================
-
-export function moverFilaPorId(
-  id: string,
-
-  direccion: "arriba" | "abajo",
-): void {
-  const perfil = obtenerPerfilUi();
-
-  const indice = perfil.filas.findIndex((fila) => fila.id === id);
-
-  if (indice < 0) {
-    return;
-  }
-
-  const destino = direccion === "arriba" ? indice - 1 : indice + 1;
-
-  if (destino < 0 || destino >= perfil.filas.length) {
-    return;
-  }
-
-  const filas = perfil.filas;
-
-  [filas[indice], filas[destino]] = [filas[destino], filas[indice]];
-}
-
-// ======================================================
 // 🔍 ¿LA FILA TIENE ALGO EN ACCIÓN?
 // ------------------------------------------------------
 // tecla_mouse/coordenada: hay algo capturado en Acción

@@ -15,7 +15,6 @@ import { crearEntrada } from "../../core/core_entrada";
 import { crearTrigger } from "../../core/core_trigger";
 import { reconstruirFila } from "../ui_tabla_control";
 import { reconstruirTabla } from "../ui_tabla_control";
-import { activarModoMover } from "../ui_tabla_control";
 
 function crearLista(
   opciones: string[],
@@ -175,9 +174,13 @@ export function abrirPopupEstado(
 // ======================================================
 // 🔢 POPUP NÚMERO DE FILA
 // ------------------------------------------------------
-// Mover / Clonar / Eliminar. No usa abrirLista porque
-// Eliminar necesita doble confirmación in-place, y las
-// tres acciones modifican el perfil (marcan editado).
+// Clonar / Eliminar. "Mover" no es una opción de este menú
+// — se activa con clic MANTENIDO sobre el mismo botón,
+// resuelto enteramente por util_arrastrable.ts (ver
+// registrarFila en ui_tabla.ts). Acá solo se atiende el
+// clic CORTO. No usa abrirLista porque Eliminar necesita
+// doble confirmación in-place, y ambas acciones modifican
+// el perfil (marcan editado).
 // ======================================================
 
 export function abrirPopupNumero(
@@ -189,22 +192,6 @@ export function abrirPopupNumero(
   const lista = document.createElement("div");
 
   lista.className = "popup-lista";
-
-  // ----------------------------------
-  // ↕️ MOVER
-  // ----------------------------------
-
-  const botonMover = document.createElement("button");
-
-  botonMover.className = "ui-btn";
-  botonMover.textContent = "Mover";
-
-  botonMover.addEventListener("click", () => {
-    activarModoMover();
-    alModificar();
-    reconstruirTabla();
-    ocultarPopup();
-  });
 
   // ----------------------------------
   // 📋 CLONAR
@@ -248,7 +235,7 @@ export function abrirPopupNumero(
     ocultarPopup();
   });
 
-  lista.append(botonMover, botonClonar, botonEliminar);
+  lista.append(botonClonar, botonEliminar);
 
   mostrarPopup(lista, evento.clientX, evento.clientY);
 }

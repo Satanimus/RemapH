@@ -31,7 +31,7 @@ import {
   type ResultadoCompilacion,
 } from "../core/core_advertencias_compilacion";
 
-import { reconstruirTabla, desactivarModoMover } from "./ui_tabla_control";
+import { reconstruirTabla, salirModoMoverTabla } from "./ui_tabla_control";
 
 import {
   crearIndicador,
@@ -159,7 +159,7 @@ export function crearToolbar(alGuardar: () => Promise<void>): HTMLElement {
       if (estadoActual === "editado") {
         await alGuardar();
 
-        desactivarModoMover();
+        salirModoMoverTabla();
 
         reconstruirTabla();
 

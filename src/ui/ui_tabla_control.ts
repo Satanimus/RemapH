@@ -127,19 +127,22 @@ function actualizarMapaConflictos(): void {
 }
 
 // ======================================================
-// ↕️ MODO MOVER
+// ↕️ SALIR DEL MODO MOVER (tabla principal)
+// ------------------------------------------------------
+// El estado del modo Mover en sí vive dentro del
+// controlador de util_arrastrable.ts (crearControladorArrastre),
+// creado adentro de ui_tabla.ts. Este registro es solo el
+// puente para que otros módulos (ui_toolbar.ts, al pulsar
+// Guardar) puedan pedirle que salga, sin importar ui_tabla.ts
+// directamente — mismo patrón que registrarReconstruccion.
 // ======================================================
 
-let modoMover = false;
+let salirModoMoverCallback: (() => void) | null = null;
 
-export function estaEnModoMover(): boolean {
-  return modoMover;
+export function registrarSalirModoMover(callback: () => void): void {
+  salirModoMoverCallback = callback;
 }
 
-export function activarModoMover(): void {
-  modoMover = true;
-}
-
-export function desactivarModoMover(): void {
-  modoMover = false;
+export function salirModoMoverTabla(): void {
+  salirModoMoverCallback?.();
 }
