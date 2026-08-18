@@ -810,7 +810,7 @@ pub fn renombrar(ruta: &Path, nuevo_nombre: &str) -> Result<(), String> {
 }
 
 // ======================================================
-// 📝 EDITAR TEXTO
+// 📋 EDITAR TEXTO
 // ------------------------------------------------------
 // Sobrescribe el contenido de un elemento de texto. No cambia su
 // nombre físico — fs::write ya actualiza la fecha de modificación

@@ -86,7 +86,7 @@ export function textoAccionMultimedia(comando: string | null): string {
   const opcion = TODOS.find((item) => item.valor === comando);
 
   if (!opcion) {
-    return "🎵 Seleccionar";
+    return "Seleccionar";
   }
 
   return `${opcion.icono} ${opcion.texto}`;

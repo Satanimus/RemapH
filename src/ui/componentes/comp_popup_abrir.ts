@@ -17,6 +17,18 @@ import { reconstruirFila } from "../ui_tabla_control";
 import { reconstruirTabla } from "../ui_tabla_control";
 import { activarModoMoverTabla } from "../ui_tabla_control";
 
+// ======================================================
+// ➖ SEPARADOR (mismo estilo que el resto de los popups)
+// ======================================================
+
+function crearSeparador(): HTMLElement {
+  const separador = document.createElement("div");
+
+  separador.className = "app-popup-separador";
+
+  return separador;
+}
+
 function crearLista(
   opciones: string[],
   seleccion?: (valor: string) => void,
@@ -111,16 +123,24 @@ function abrirListaConValor(
 // 🧭 VOCABULARIO tipo / extra
 // ------------------------------------------------------
 // Única fuente de verdad para las opciones y sus valores
-// reales (los que espera Rust — ver compilador.rs).
+// reales (los que espera Rust — ver compilador.rs). El
+// ícono de cada tipo es el mismo que ya usa por defecto la
+// columna Acción para ese tipo (ver textoAccionMultimedia
+// en core_multimedia.ts, textoMenuAccion en
+// core_menu_express.ts, textoMacroAccion en core_macro.ts,
+// textoPortapapelesAccion en core_portapapeles.ts, y el
+// ícono de carpeta de comp_popup_abrir_accion.ts) — acá se
+// repite como texto plano porque este popup no depende de
+// ninguno de esos módulos.
 // ======================================================
 
-const TIPO_OPCIONES: { texto: string; valor: string }[] = [
-  { texto: "Tecla/Mouse", valor: "tecla_mouse" },
-  { texto: "Multimedia", valor: "multimedia" },
-  { texto: "MenuExpress", valor: "menu_express" },
-  { texto: "Macro", valor: "macro" },
-  { texto: "Portapapeles", valor: "portapapeles" },
-  { texto: "Abrir Archivo/App", valor: "abrir" },
+const TIPO_OPCIONES: { texto: string; icono: string; valor: string }[] = [
+  { texto: "Teclado - Mouse", icono: "🔠", valor: "tecla_mouse" },
+  { texto: "Multimedia", icono: "🎵", valor: "multimedia" },
+  { texto: "MenuExpress", icono: "⚡", valor: "menu_express" },
+  { texto: "Macro", icono: "🧩", valor: "macro" },
+  { texto: "Portapapeles", icono: "📋", valor: "portapapeles" },
+  { texto: "Abrir Archivo/App", icono: "📂", valor: "abrir" },
 ];
 
 const EXTRA_OPCIONES: { texto: string; valor: string }[] = [
@@ -130,7 +150,13 @@ const EXTRA_OPCIONES: { texto: string; valor: string }[] = [
 ];
 
 export function tipoATexto(valor: string): string {
-  return TIPO_OPCIONES.find((opcion) => opcion.valor === valor)?.texto ?? valor;
+  const opcion = TIPO_OPCIONES.find((opcion) => opcion.valor === valor);
+
+  return opcion ? `${opcion.texto}` : valor;
+}
+
+export function iconoDeTipo(valor: string): string {
+  return TIPO_OPCIONES.find((opcion) => opcion.valor === valor)?.icono ?? "";
 }
 
 export function extraATexto(valor: string): string {
@@ -146,12 +172,63 @@ export function abrirPopupCondicion(
   abrirLista(evento, ["Normal", "Mantener pulsado", "Doble toque"], actualizar);
 }
 
+// ======================================================
+// 🔤🎵⚡🧩📋📂 POPUP TIPO — lista con ícono al lado del nombre
+// ------------------------------------------------------
+// Variante de crearListaConValor() que antepone el ícono del
+// tipo (TIPO_OPCIONES.icono) a cada botón — el resto de las
+// listas con valor (abrirListaConValor, usada por Extra)
+// sigue solo con texto, sin tocar.
+// ======================================================
+
+function crearListaTipo(
+  opciones: { texto: string; icono: string; valor: string }[],
+  seleccion?: (valor: string) => void,
+): HTMLElement {
+  const lista = document.createElement("div");
+
+  lista.className = "popup-lista";
+
+  opciones.forEach((opcion) => {
+    const boton = document.createElement("button");
+
+    boton.className = "ui-btn popup-tipo-item";
+
+    const icono = document.createElement("span");
+
+    icono.className = "popup-tipo-icono";
+    icono.textContent = opcion.icono;
+
+    const texto = document.createElement("span");
+
+    texto.textContent = opcion.texto;
+
+    boton.append(icono, texto);
+
+    boton.addEventListener("click", () => {
+      if (seleccion) {
+        seleccion(opcion.valor);
+      }
+
+      ocultarPopup();
+    });
+
+    lista.append(boton);
+  });
+
+  return lista;
+}
+
 export function abrirPopupTipo(
   evento: MouseEvent,
   actualizar: (valor: string) => void,
   _contexto: ContextoFila,
 ): void {
-  abrirListaConValor(evento, TIPO_OPCIONES, actualizar);
+  mostrarPopup(
+    crearListaTipo(TIPO_OPCIONES, actualizar),
+    evento.clientX,
+    evento.clientY,
+  );
 }
 
 export function abrirPopupEstado(
@@ -343,14 +420,18 @@ export function abrirPopupColor(
 // ------------------------------------------------------
 // Reemplaza a abrirPopupNumero como menú principal de la
 // fila (ver comp_opciones.ts, Etapa D del plan). "Color" no
-// abre un popup nuevo: vacía y vuelve a llenar este MISMO
-// div "lista" con la paleta (llenarListaColor) en vez de
-// crear un elemento nuevo — así conserva el position:fixed
-// + left/top que mostrarPopup ya le puso inline según el
-// click original, y el popup no salta de lugar. "Mover"
+// abre un popup nuevo: expande una caja interna (misma clase
+// popup-caja-interna que usa, por ejemplo, "Relativa a
+// Ventana" dentro del popup Extra de Coordenada) justo debajo
+// del botón, dentro de ESTE MISMO popup — nunca crea un
+// elemento de popup aparte, así conserva el position:fixed +
+// left/top que mostrarPopup ya le puso inline según el click
+// original, y el popup no salta de lugar. dibujar() se llama
+// a sí misma en cada redibujado para que colorExpandido
+// sobreviva mientras el popup sigue abierto (mismo patrón que
+// abrirConExpandido en comp_popup_abrir_extra.ts). "Mover"
 // activa el modo mover del componente de arrastre
-// (util_arrastrable.ts) — queda pendiente hasta la Etapa E
-// del plan; por ahora solo cierra el popup.
+// (util_arrastrable.ts).
 // ======================================================
 
 export function abrirPopupOpciones(
@@ -359,108 +440,131 @@ export function abrirPopupOpciones(
   filaPerfil: FilaPerfil,
   alModificar: () => void,
 ): void {
-  const lista = document.createElement("div");
+  let colorExpandido = false;
 
-  lista.className = "popup-lista";
+  const dibujar = (): void => {
+    const lista = document.createElement("div");
 
-  // ----------------------------------
-  // 🎨 COLOR (se expande en el mismo popup)
-  // ----------------------------------
+    lista.className = "popup-lista";
 
-  const botonColor = document.createElement("button");
+    // ----------------------------------
+    // 🎨 COLOR (se expande en una caja interna)
+    // ----------------------------------
 
-  botonColor.className = "ui-btn";
+    const botonColor = document.createElement("button");
 
-  if (filaPerfil.color) {
-    const opcion = COLOR_OPCIONES.find((o) => o.valor === filaPerfil.color);
+    botonColor.className = "ui-btn";
 
-    const muestra = document.createElement("span");
+    if (filaPerfil.color) {
+      botonColor.classList.add("popup-color-item");
 
-    muestra.className = "popup-color-muestra";
-    muestra.style.background = `var(--tag-${filaPerfil.color})`;
+      const opcion = COLOR_OPCIONES.find((o) => o.valor === filaPerfil.color);
 
-    const texto = document.createElement("span");
+      const muestra = document.createElement("span");
 
-    texto.textContent = `Color ${opcion?.texto ?? filaPerfil.color}`;
+      muestra.className = "popup-color-muestra";
+      muestra.style.background = `var(--tag-${filaPerfil.color})`;
 
-    botonColor.append(muestra, texto);
-  } else {
-    botonColor.textContent = "🎨 Color";
-  }
+      const texto = document.createElement("span");
 
-  botonColor.addEventListener("click", () => {
-    llenarListaColor(lista, contexto, filaPerfil, () => {
-      alModificar();
-      ocultarPopup();
-    });
-  });
+      texto.textContent = `Color ${opcion?.texto ?? filaPerfil.color}`;
 
-  // ----------------------------------
-  // 📋 CLONAR
-  // ----------------------------------
-
-  const botonClonar = document.createElement("button");
-
-  botonClonar.className = "ui-btn";
-  botonClonar.textContent = "Clonar";
-
-  botonClonar.addEventListener("click", () => {
-    clonarFilaPorId(contexto.id);
-    alModificar();
-    reconstruirTabla();
-    ocultarPopup();
-  });
-
-  // ----------------------------------
-  // ⁝⁝ MOVER
-  // ------------------------------------------------------
-  // Activa el modo mover del controlador de arrastre para
-  // esta fila (ver activarModoMoverTabla en ui_tabla_control.ts
-  // → registrarActivarModoMover en ui_tabla.ts → activarModoMoverPara
-  // en util_arrastrable.ts). A partir de acá el usuario arrastra
-  // con el mouse o mueve con las flechas, igual que con el
-  // clic mantenido sobre el asa.
-  // ----------------------------------
-
-  const botonMover = document.createElement("button");
-
-  botonMover.className = "ui-btn";
-  botonMover.textContent = "Mover";
-
-  botonMover.addEventListener("click", () => {
-    activarModoMoverTabla(contexto.id);
-    ocultarPopup();
-  });
-
-  // ----------------------------------
-  // 🗑️ ELIMINAR
-  // ----------------------------------
-
-  const botonEliminar = document.createElement("button");
-
-  botonEliminar.className = "ui-btn popup-perfil-eliminar";
-  botonEliminar.textContent = "Eliminar";
-
-  let confirmando = false;
-
-  botonEliminar.addEventListener("click", () => {
-    if (filaTieneAccion(filaPerfil) && !confirmando) {
-      confirmando = true;
-
-      botonEliminar.textContent = "⚠️ Confirmar eliminación";
-
-      return;
+      botonColor.append(muestra, texto);
+    } else {
+      botonColor.textContent = "🎨 Color";
     }
 
-    eliminarFilaPorId(contexto.id);
-    alModificar();
-    reconstruirTabla();
-    ocultarPopup();
-  });
+    botonColor.addEventListener("click", () => {
+      colorExpandido = !colorExpandido;
+      dibujar();
+    });
 
-  lista.append(botonColor, botonClonar, botonMover, botonEliminar);
+    lista.append(botonColor);
 
-  mostrarPopup(lista, evento.clientX, evento.clientY);
+    if (colorExpandido) {
+      const caja = document.createElement("div");
+
+      caja.className = "popup-caja-interna";
+
+      llenarListaColor(caja, contexto, filaPerfil, () => {
+        alModificar();
+        ocultarPopup();
+      });
+
+      lista.append(caja);
+    }
+
+    lista.append(crearSeparador());
+
+    // ----------------------------------
+    // 📋 CLONAR
+    // ----------------------------------
+
+    const botonClonar = document.createElement("button");
+
+    botonClonar.className = "ui-btn";
+    botonClonar.textContent = "Clonar";
+
+    botonClonar.addEventListener("click", () => {
+      clonarFilaPorId(contexto.id);
+      alModificar();
+      reconstruirTabla();
+      ocultarPopup();
+    });
+
+    // ----------------------------------
+    // ⁝⁝ MOVER
+    // ------------------------------------------------------
+    // Activa el modo mover del controlador de arrastre para
+    // esta fila (ver activarModoMoverTabla en ui_tabla_control.ts
+    // → registrarActivarModoMover en ui_tabla.ts → activarModoMoverPara
+    // en util_arrastrable.ts). A partir de acá el usuario arrastra
+    // con el mouse o mueve con las flechas, igual que con el
+    // clic mantenido sobre el asa.
+    // ----------------------------------
+
+    const botonMover = document.createElement("button");
+
+    botonMover.className = "ui-btn";
+    botonMover.textContent = "Mover";
+
+    botonMover.addEventListener("click", () => {
+      activarModoMoverTabla(contexto.id);
+      ocultarPopup();
+    });
+
+    // ----------------------------------
+    // 🗑️ ELIMINAR
+    // ----------------------------------
+
+    const botonEliminar = document.createElement("button");
+
+    botonEliminar.className = "ui-btn popup-perfil-eliminar";
+    botonEliminar.textContent = "Eliminar";
+
+    let confirmando = false;
+
+    botonEliminar.addEventListener("click", () => {
+      if (filaTieneAccion(filaPerfil) && !confirmando) {
+        confirmando = true;
+
+        botonEliminar.textContent = "⚠️ Confirmar eliminación";
+
+        return;
+      }
+
+      eliminarFilaPorId(contexto.id);
+      alModificar();
+      reconstruirTabla();
+      ocultarPopup();
+    });
+
+    lista.append(botonClonar, botonMover, botonEliminar);
+
+    mostrarPopup(lista, evento.clientX, evento.clientY);
+  };
+
+  dibujar();
 }
 
 export function abrirPopupExtra(

@@ -282,6 +282,14 @@
 .nota-contenedor {
     position: relative;
     width: 100%;
+    border: 1px solid transparent;
+    border-radius: var(--r4);
+    padding-left: var(--gap4);
+    transition: border-color var(--speed);
+}
+
+.nota-contenedor:focus-within {
+    border-color: var(--highlight);
 }
 
 .nota-contenedor .nota {

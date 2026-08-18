@@ -122,12 +122,14 @@ export function crearMenuExtra(): MenuExpressExtraPerfil {
 // ======================================================
 // 📝 TEXTO ACCIÓN (columna Acción de la tabla)
 // ------------------------------------------------------
-// Default "⚡ Editar" hasta que el menú tenga
-// nombre — a partir de ahí, rayo + nombre (ver spec).
+// Default "Editar" hasta que el menú tenga nombre — a partir
+// de ahí, solo el nombre (sin ícono: los íconos de columna
+// Acción se sacaron de la ventana principal, quedan solo en
+// el popup de Tipo, ver comp_popup_abrir.ts).
 // ======================================================
 
 export function textoMenuAccion(menuAccion: MenuAccionPerfil): string {
-  return menuAccion.nombre ? `⚡ ${menuAccion.nombre}` : "⚡ Editar";
+  return menuAccion.nombre ? menuAccion.nombre : "Editar";
 }
 
 // ======================================================

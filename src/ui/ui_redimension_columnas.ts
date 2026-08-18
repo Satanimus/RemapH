@@ -12,7 +12,7 @@ export const ANCHOS_DEFAULT = {
   app: 52,
   trigger: 150,
 
-  tipo: 150,
+  tipo: 60,
   accion: 150,
   extra: 150,
 

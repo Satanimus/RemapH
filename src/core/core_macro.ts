@@ -52,7 +52,7 @@ export function crearMacroArchivo(nombre: string): MacroArchivo {
 // ======================================================
 
 export function textoMacroAccion(accionReferencia: string | null): string {
-  return accionReferencia ? `🧩 ${accionReferencia}` : "🧩 Seleccionar macro";
+  return accionReferencia ? accionReferencia : "Seleccionar macro";
 }
 
 // ======================================================

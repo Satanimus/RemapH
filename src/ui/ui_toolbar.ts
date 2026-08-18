@@ -24,7 +24,7 @@ import type { ResultadoPerfil } from "./componentes/comp_popup_perfil";
 
 import { convertirperfil_json } from "../core/core_perfil_json";
 
-import { establecerPerfilUi } from "../core/core_perfil_ui";
+import { establecerPerfilUi, obtenerPerfilUi } from "../core/core_perfil_ui";
 
 import {
   establecerAdvertenciasCompilacion,
@@ -32,6 +32,8 @@ import {
 } from "../core/core_advertencias_compilacion";
 
 import { reconstruirTabla, salirModoMoverTabla } from "./ui_tabla_control";
+
+import { crearFila as crearFilaPerfil } from "../core/core_perfil";
 
 import {
   crearIndicador,
@@ -54,6 +56,14 @@ export function crearToolbar(alGuardar: () => Promise<void>): HTMLElement {
             <div class="titulo">
                 RemapH
             </div>
+
+            <button
+                class="btn-agregar-fila"
+                type="button"
+                title="Agregar fila"
+            >
+                <span>+ Fila</span>
+            </button>
 
         </div>
 
@@ -212,6 +222,27 @@ export function crearToolbar(alGuardar: () => Promise<void>): HTMLElement {
         void aplicarResultadoPerfil(toolbar, nombrePerfil, cacheDot, resultado);
       },
     );
+  });
+
+  // ==================================================
+  // ➕ AGREGAR FILA
+  // ------------------------------------------------------
+  // Antes vivía debajo de la última fila de la tabla (ver
+  // comp_opciones.ts) — se movió acá, a la barra superior,
+  // junto al título.
+  // ==================================================
+
+  const botonAgregarFila = toolbar.querySelector(
+    ".btn-agregar-fila",
+  ) as HTMLButtonElement | null;
+
+  botonAgregarFila?.addEventListener("click", () => {
+    const perfil = obtenerPerfilUi();
+
+    perfil.filas.push(crearFilaPerfil());
+
+    marcarPerfilEditado(toolbar);
+    reconstruirTabla();
   });
 
   // ==================================================

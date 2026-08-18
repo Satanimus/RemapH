@@ -106,23 +106,22 @@ export function crearPortapapelesExtra(): PortapapelesExtraPerfil {
 }
 
 // ======================================================
-// 📝 TEXTO ACCIÓN (columna Acción de la tabla)
+// 📋 TEXTO ACCIÓN (columna Acción de la tabla)
 // ------------------------------------------------------
-// Default "📋 Editar" hasta que tenga nombre — a partir de ahí,
-// portapapeles + nombre (mismo criterio que textoMenuAccion en
-// core_menu_express.ts).
+// Default "Editar" hasta que tenga nombre — a partir de ahí,
+// solo el nombre (sin ícono: los íconos de columna Acción se
+// sacaron de la ventana principal, quedan solo en el popup de
+// Tipo, ver comp_popup_abrir.ts).
 // ======================================================
 
 export function textoPortapapelesAccion(
   portapapelesAccion: PortapapelesAccionPerfil,
 ): string {
-  return portapapelesAccion.nombre
-    ? `📋 ${portapapelesAccion.nombre}`
-    : "📋 Editar";
+  return portapapelesAccion.nombre ? portapapelesAccion.nombre : "Editar";
 }
 
 // ======================================================
-// 📝 TEXTO EXTRA (columna Extra de la tabla)
+// 📋 TEXTO EXTRA (columna Extra de la tabla)
 // ======================================================
 
 export function textoPortapapelesExtra(

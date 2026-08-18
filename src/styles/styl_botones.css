@@ -750,23 +750,12 @@
 /* ======================================================
    ➕ AGREGAR FILA
    ------------------------------------------------------
-   Círculo con "+" anclado debajo del número de la última
-   fila de la tabla.
+   Botón "+ Fila" en la barra superior, a la derecha del
+   título "RemapH" (antes era un círculo con "+" anclado
+   debajo de la última fila de la tabla).
    ====================================================== */
 
 .btn-agregar-fila {
-
-    position: absolute;
-
-    top: 100%;
-
-    left: 50%;
-
-    transform: translate(-50%, var(--gap8));
-
-    width: 22px;
-
-    height: 22px;
 
     display: flex;
 
@@ -774,9 +763,11 @@
 
     justify-content: center;
 
+    height: 28px;
+
     margin: 0;
 
-    padding: 0;
+    padding: 0 var(--gap12);
 
     background: var(--button-bg);
 
@@ -784,28 +775,17 @@
 
     border: 1px solid var(--border-light);
 
-    border-radius: 50%;
+    border-radius: var(--r4);
 
     font-family: var(--font);
 
-    font-size: var(--fs14);
-
-    line-height: 0;
+    font-size: var(--fs13);
 
     cursor: pointer;
-
-    z-index: 1;
 
     transition:
         border-color .12s ease,
         color .12s ease;
-}
-
-.btn-agregar-fila span {
-
-    display: block;
-
-    transform: translateY(-1px);
 }
 
 .btn-agregar-fila:hover {
@@ -813,4 +793,48 @@
     border-color: var(--highlight);
 
     color: var(--highlight);
+}
+
+/* ======================================================
+   🔤🎵⚡🧩�📂 COLUMNA TIPO — botón solo ícono (ventana principal)
+   ------------------------------------------------------
+   Antes mostraba "texto ▾" (ver comp_popup.ts). Ahora solo el
+   ícono del tipo, centrado, sin flecha — el nombre completo
+   queda como tooltip (title). El popup que abre (ver
+   comp_popup_abrir.ts) sí muestra ícono + nombre.
+   ====================================================== */
+
+.tipo-control {
+
+    font-size: var(--fs16);
+
+    line-height: 1;
+}
+
+/* ======================================================
+   🔤🎵⚡🧩�📂 POPUP TIPO — ícono al lado del nombre
+   ====================================================== */
+
+.popup-tipo-item {
+
+    display: flex;
+
+    align-items: center;
+
+    gap: var(--gap8);
+}
+
+.popup-tipo-icono {
+
+    display: inline-flex;
+
+    align-items: center;
+
+    justify-content: center;
+
+    width: 18px;
+
+    flex: none;
+
+    font-size: var(--fs14);
 }

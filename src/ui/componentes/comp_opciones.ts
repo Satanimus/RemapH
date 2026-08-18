@@ -16,16 +16,13 @@
 
 import type { ContextoFila } from "../../core/core_contexto_fila";
 import type { FilaPerfil } from "../../core/core_perfil";
-import { crearFila } from "../../core/core_perfil";
 import { crearBoton } from "./comp_boton";
 import { abrirPopupOpciones } from "./comp_popup_abrir";
-import { obtenerPerfilUi } from "../../core/core_perfil_ui";
-import { reconstruirTabla } from "../ui_tabla_control";
 
 export function crearOpciones(
   contexto: ContextoFila,
   filaPerfil: FilaPerfil,
-  esUltima: boolean,
+  _esUltima: boolean,
   alModificar: () => void,
 ): HTMLElement {
   const contenedor = document.createElement("div");
@@ -43,37 +40,6 @@ export function crearOpciones(
   });
 
   contenedor.append(boton);
-
-  // ==================================================
-  // ➕ AGREGAR FILA (solo debajo de la última fila)
-  // ==================================================
-
-  if (esUltima) {
-    const botonAgregar = document.createElement("button");
-
-    botonAgregar.className = "btn-agregar-fila";
-    botonAgregar.type = "button";
-    botonAgregar.title = "Agregar fila";
-
-    const simbolo = document.createElement("span");
-
-    simbolo.textContent = "+";
-
-    botonAgregar.append(simbolo);
-
-    botonAgregar.addEventListener("click", (evento) => {
-      evento.stopPropagation();
-
-      const perfil = obtenerPerfilUi();
-
-      perfil.filas.push(crearFila());
-
-      alModificar();
-      reconstruirTabla();
-    });
-
-    contenedor.append(botonAgregar);
-  }
 
   return contenedor;
 }

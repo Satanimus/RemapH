@@ -57,6 +57,8 @@
 .toolbar-left {
 
     justify-content: flex-start;
+
+    gap: var(--gap12);
 }
 
 .toolbar-center {
@@ -486,7 +488,7 @@
 }
 
 /* ======================================================
-   ⚡📝 EDITOR DE MENUEXPRESS (seleccionados/disponibles)
+   ⚡📋 EDITOR DE MENUEXPRESS (seleccionados/disponibles)
    ====================================================== */
 
 .popup-menu-editor {
@@ -940,7 +942,7 @@
 }
 
 /* ======================================================
-   🧩📝 EDITOR DE MACRO (Etapa 5)
+   🧩📋 EDITOR DE MACRO (Etapa 5)
    ------------------------------------------------------
    Mismo espíritu visual que .popup-menu-editor (lista con
    scroll + ítems en fila), pero cada ítem es una fila-paso

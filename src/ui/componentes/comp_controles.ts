@@ -5,6 +5,7 @@
 import type { ContextoFila } from "../../core/core_contexto_fila";
 import type { FilaPerfil } from "../../core/core_perfil";
 import { crearPopup } from "./comp_popup";
+import { crearBoton } from "./comp_boton";
 import { reconstruirFila } from "../ui_tabla_control";
 import { invoke } from "@tauri-apps/api/core";
 
@@ -12,6 +13,7 @@ import {
   abrirPopupTipo,
   abrirPopupColor,
   abrirPopupExtra,
+  iconoDeTipo,
   tipoATexto,
   extraATexto,
 } from "./comp_popup_abrir";
@@ -147,51 +149,56 @@ export function crearTipo(
   contexto: ContextoFila,
   filaPerfil: FilaPerfil,
 ): HTMLButtonElement {
-  return crearPopup({
-    texto: tipoATexto(filaPerfil.tipo),
-    onClick: (evento) => {
-      abrirPopupTipo(
-        evento,
-        (valor) => {
-          if (valor === filaPerfil.tipo) {
-            return;
-          }
-
-          // Si esta fila tenía Coordenada activa y deja de ser
-          // tecla_mouse, ya no tiene sentido — no puede quedar una
-          // ventana de captura calculando para una fila que ya no
-          // puede usar ese extra.
-          if (filaPerfil.coordenada.activa && valor !== "tecla_mouse") {
-            cerrarVentanaCapturaCoordenada();
-          }
-
-          // Al cambiar de Tipo, Acción y Extra dejan de tener sentido
-          // para el Tipo anterior: se resetean TODOS los campos de
-          // ambas columnas (de todos los tipos) a su valor por
-          // defecto, para que no quede guardado ningún dato que ya
-          // no está vigente.
-          filaPerfil.accion = null;
-          filaPerfil.accionReferencia = null;
-          filaPerfil.menuAccion = crearMenuAccion();
-          filaPerfil.portapapelesAccion = crearPortapapelesAccion();
-          filaPerfil.abrirAccion = crearAbrirAccion();
-
-          filaPerfil.condicion = "Normal";
-          filaPerfil.coordenada = crearCoordenada();
-          filaPerfil.menuExtra = crearMenuExtra();
-          filaPerfil.portapapelesExtra = crearPortapapelesExtra();
-          filaPerfil.abrirExtra = crearAbrirExtra();
-          filaPerfil.macroExtra = crearMacroExtra();
-          filaPerfil.extra = "normal";
-
-          filaPerfil.tipo = valor;
-
-          reconstruirFila(contexto.id);
-        },
-        contexto,
-      );
-    },
+  const boton = crearBoton({
+    texto: iconoDeTipo(filaPerfil.tipo),
+    titulo: tipoATexto(filaPerfil.tipo),
+    clase: "tipo-control",
   });
+
+  boton.addEventListener("click", (evento) => {
+    abrirPopupTipo(
+      evento,
+      (valor) => {
+        if (valor === filaPerfil.tipo) {
+          return;
+        }
+
+        // Si esta fila tenía Coordenada activa y deja de ser
+        // tecla_mouse, ya no tiene sentido — no puede quedar una
+        // ventana de captura calculando para una fila que ya no
+        // puede usar ese extra.
+        if (filaPerfil.coordenada.activa && valor !== "tecla_mouse") {
+          cerrarVentanaCapturaCoordenada();
+        }
+
+        // Al cambiar de Tipo, Acción y Extra dejan de tener sentido
+        // para el Tipo anterior: se resetean TODOS los campos de
+        // ambas columnas (de todos los tipos) a su valor por
+        // defecto, para que no quede guardado ningún dato que ya
+        // no está vigente.
+        filaPerfil.accion = null;
+        filaPerfil.accionReferencia = null;
+        filaPerfil.menuAccion = crearMenuAccion();
+        filaPerfil.portapapelesAccion = crearPortapapelesAccion();
+        filaPerfil.abrirAccion = crearAbrirAccion();
+
+        filaPerfil.condicion = "Normal";
+        filaPerfil.coordenada = crearCoordenada();
+        filaPerfil.menuExtra = crearMenuExtra();
+        filaPerfil.portapapelesExtra = crearPortapapelesExtra();
+        filaPerfil.abrirExtra = crearAbrirExtra();
+        filaPerfil.macroExtra = crearMacroExtra();
+        filaPerfil.extra = "normal";
+
+        filaPerfil.tipo = valor;
+
+        reconstruirFila(contexto.id);
+      },
+      contexto,
+    );
+  });
+
+  return boton;
 }
 
 export function crearExtra(
