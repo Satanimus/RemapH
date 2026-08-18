@@ -15,6 +15,7 @@ import { crearEntrada } from "../../core/core_entrada";
 import { crearTrigger } from "../../core/core_trigger";
 import { reconstruirFila } from "../ui_tabla_control";
 import { reconstruirTabla } from "../ui_tabla_control";
+import { activarModoMoverTabla } from "../ui_tabla_control";
 
 function crearLista(
   opciones: string[],
@@ -241,12 +242,17 @@ export function abrirPopupNumero(
 }
 
 // ======================================================
-// 🎨 PALETA DE COLORES DE FILA
+// 🎨 PALETA DE COLORES DE FILA (lista reutilizable)
 // ------------------------------------------------------
 // El valor guardado (`valor`) es la clave usada para armar
 // la variable CSS --tag-<valor> (ver styl_variables.css).
 // No es un color literal: así el estilo queda editable
-// desde un solo lugar sin tocar este archivo.
+// desde un solo lugar sin tocar este archivo. Se usa tanto
+// en el popup de Color "suelto" (abrirPopupColor, hoy sin
+// uso desde que la columna Color se sacó de la tabla) como
+// dentro del popup de Opciones (abrirPopupOpciones), donde
+// se muestra expandida en el mismo popup en vez de abrir
+// uno nuevo.
 // ======================================================
 
 const COLOR_OPCIONES: { texto: string; valor: string }[] = [
@@ -261,14 +267,13 @@ const COLOR_OPCIONES: { texto: string; valor: string }[] = [
   { texto: "Gris", valor: "gray" },
 ];
 
-export function abrirPopupColor(
-  evento: MouseEvent,
+function llenarListaColor(
+  contenedor: HTMLElement,
   contexto: ContextoFila,
   filaPerfil: FilaPerfil,
+  alSeleccionar: () => void,
 ): void {
-  const lista = document.createElement("div");
-
-  lista.className = "popup-lista";
+  contenedor.replaceChildren();
 
   // ----------------------------------
   // 🎨 LIMPIAR
@@ -283,10 +288,10 @@ export function abrirPopupColor(
     filaPerfil.color = "";
 
     reconstruirFila(contexto.id);
-    ocultarPopup();
+    alSeleccionar();
   });
 
-  lista.append(botonLimpiar);
+  contenedor.append(botonLimpiar);
 
   // ----------------------------------
   // 🎨 OPCIONES DE COLOR
@@ -312,11 +317,148 @@ export function abrirPopupColor(
       filaPerfil.color = opcion.valor;
 
       reconstruirFila(contexto.id);
-      ocultarPopup();
+      alSeleccionar();
     });
 
-    lista.append(boton);
+    contenedor.append(boton);
   });
+}
+
+export function abrirPopupColor(
+  evento: MouseEvent,
+  contexto: ContextoFila,
+  filaPerfil: FilaPerfil,
+): void {
+  const lista = document.createElement("div");
+
+  lista.className = "popup-lista";
+
+  llenarListaColor(lista, contexto, filaPerfil, ocultarPopup);
+
+  mostrarPopup(lista, evento.clientX, evento.clientY);
+}
+
+// ======================================================
+// ⁝ POPUP OPCIONES DE FILA
+// ------------------------------------------------------
+// Reemplaza a abrirPopupNumero como menú principal de la
+// fila (ver comp_opciones.ts, Etapa D del plan). "Color" no
+// abre un popup nuevo: vacía y vuelve a llenar este MISMO
+// div "lista" con la paleta (llenarListaColor) en vez de
+// crear un elemento nuevo — así conserva el position:fixed
+// + left/top que mostrarPopup ya le puso inline según el
+// click original, y el popup no salta de lugar. "Mover"
+// activa el modo mover del componente de arrastre
+// (util_arrastrable.ts) — queda pendiente hasta la Etapa E
+// del plan; por ahora solo cierra el popup.
+// ======================================================
+
+export function abrirPopupOpciones(
+  evento: MouseEvent,
+  contexto: ContextoFila,
+  filaPerfil: FilaPerfil,
+  alModificar: () => void,
+): void {
+  const lista = document.createElement("div");
+
+  lista.className = "popup-lista";
+
+  // ----------------------------------
+  // 🎨 COLOR (se expande en el mismo popup)
+  // ----------------------------------
+
+  const botonColor = document.createElement("button");
+
+  botonColor.className = "ui-btn";
+
+  if (filaPerfil.color) {
+    const opcion = COLOR_OPCIONES.find((o) => o.valor === filaPerfil.color);
+
+    const muestra = document.createElement("span");
+
+    muestra.className = "popup-color-muestra";
+    muestra.style.background = `var(--tag-${filaPerfil.color})`;
+
+    const texto = document.createElement("span");
+
+    texto.textContent = `Color ${opcion?.texto ?? filaPerfil.color}`;
+
+    botonColor.append(muestra, texto);
+  } else {
+    botonColor.textContent = "🎨 Color";
+  }
+
+  botonColor.addEventListener("click", () => {
+    llenarListaColor(lista, contexto, filaPerfil, () => {
+      alModificar();
+      ocultarPopup();
+    });
+  });
+
+  // ----------------------------------
+  // 📋 CLONAR
+  // ----------------------------------
+
+  const botonClonar = document.createElement("button");
+
+  botonClonar.className = "ui-btn";
+  botonClonar.textContent = "Clonar";
+
+  botonClonar.addEventListener("click", () => {
+    clonarFilaPorId(contexto.id);
+    alModificar();
+    reconstruirTabla();
+    ocultarPopup();
+  });
+
+  // ----------------------------------
+  // ⁝⁝ MOVER
+  // ------------------------------------------------------
+  // Activa el modo mover del controlador de arrastre para
+  // esta fila (ver activarModoMoverTabla en ui_tabla_control.ts
+  // → registrarActivarModoMover en ui_tabla.ts → activarModoMoverPara
+  // en util_arrastrable.ts). A partir de acá el usuario arrastra
+  // con el mouse o mueve con las flechas, igual que con el
+  // clic mantenido sobre el asa.
+  // ----------------------------------
+
+  const botonMover = document.createElement("button");
+
+  botonMover.className = "ui-btn";
+  botonMover.textContent = "Mover";
+
+  botonMover.addEventListener("click", () => {
+    activarModoMoverTabla(contexto.id);
+    ocultarPopup();
+  });
+
+  // ----------------------------------
+  // 🗑️ ELIMINAR
+  // ----------------------------------
+
+  const botonEliminar = document.createElement("button");
+
+  botonEliminar.className = "ui-btn popup-perfil-eliminar";
+  botonEliminar.textContent = "Eliminar";
+
+  let confirmando = false;
+
+  botonEliminar.addEventListener("click", () => {
+    if (filaTieneAccion(filaPerfil) && !confirmando) {
+      confirmando = true;
+
+      botonEliminar.textContent = "⚠️ Confirmar eliminación";
+
+      return;
+    }
+
+    eliminarFilaPorId(contexto.id);
+    alModificar();
+    reconstruirTabla();
+    ocultarPopup();
+  });
+
+  lista.append(botonColor, botonClonar, botonMover, botonEliminar);
 
   mostrarPopup(lista, evento.clientX, evento.clientY);
 }

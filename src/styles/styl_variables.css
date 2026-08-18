@@ -20,210 +20,223 @@
 
 :root {
 
-    /* ==========================
+   /* ==========================
        Tipografía
        ========================== */
 
-    --font: "Segoe UI", sans-serif;
+   --font: "Segoe UI", sans-serif;
 
-    --fs10: 10px;
-    --fs11: 11px;
-    --fs12: 12px;
-    --fs13: 13px;
-    --fs14: 14px;
-    --fs16: 16px;
+   --fs10: 10px;
+   --fs11: 11px;
+   --fs12: 12px;
+   --fs13: 13px;
+   --fs14: 14px;
+   --fs16: 16px;
 
-    /* ==========================
+   /* ==========================
       Colores interactivos
       ========================== */
 
-    --highlight: #00D9FF;
-    --highlight-red: #C62828;
+   --highlight: #00D9FF;
+   --highlight-red: #C62828;
 
-    /* ==========================
+   /* ==========================
          Estados de perfil
          ========================== */
 
-    --green-dark: #2E6F32;
-    --red-dark: #8F2525;
-    --yellow-dark: #A77F1C;
+   --green-dark: #2E6F32;
+   --red-dark: #8F2525;
+   --yellow-dark: #A77F1C;
 
-    /* ==========================
+   /* ==========================
        Fondos
        ========================== */
 
-    --bg: #181818;
+   --bg: #181818;
 
-    --panel: #222222;
+   --panel: #222222;
 
-    --panel2: #2B2B2B;
+   --panel2: #2B2B2B;
 
-    --panel3: #333333;
+   --panel3: #333333;
 
 
-    /* ==========================
+   /* ==========================
        Bordes
        ========================== */
 
-    --border: #404040;
+   --border: #404040;
 
-    --border-light: #555555;
+   --border-light: #555555;
 
 
-    /* ==========================
+   /* ==========================
        Texto
        ========================== */
 
-    --text: #F2F2F2;
+   --text: #F2F2F2;
 
-    --text-soft: #BDBDBD;
+   --text-soft: #BDBDBD;
 
-    --text-disabled: #777777;
+   --text-disabled: #777777;
 
 
-    /* ==========================
+   /* ==========================
        Colores principales
        ========================== */
 
-    --green: #388E3C;
+   --green: #388E3C;
 
-    --green-dark: #2E7D32;
+   --green-dark: #2E7D32;
 
-    --yellow: #D8A628;
+   --yellow: #D8A628;
 
-    --red: #C62828;
+   --red: #C62828;
 
-    --blue: #1976D2;
+   --blue: #1976D2;
 
-    --gray: #555555;
+   --gray: #555555;
 
 
-    /* ==========================
+   /* ==========================
        🎨 COLOR DE RESALTADO UI
        ========================== */
 
-    --highlight: #03A9F4;
+   --highlight: #03A9F4;
 
-    /* ==========================
+   /* ==========================
        🎨 Color fila y file resaltada
        ========================== */
 
-    --row-bg: #202020;
-    --row-hover-bg: #0400ff3c;
+   --row-bg: #202020;
+   --row-hover-bg: #0400ff3c;
 
-    /* ==========================
+   /* ==========================
      🎨 COLOR fondo boton
      ========================== */
-    --button-bg: #1a1a1a;
+   --button-bg: #1a1a1a;
 
-    /* ==========================
+   /* ==========================
        Colores de filas
        ========================== */
 
-    --tag-none: transparent;
+   --tag-none: transparent;
 
-    --tag-red: #D32F2F;
+   --tag-red: #D32F2F;
 
-    --tag-orange: #F57C00;
+   --tag-orange: #F57C00;
 
-    --tag-yellow: #FBC02D;
+   --tag-yellow: #FBC02D;
 
-    --tag-green: #388E3C;
+   --tag-green: #388E3C;
 
-    --tag-cyan: #03A9F4;
+   --tag-cyan: #03A9F4;
 
-    --cyan-dark: #0B7285;
+   --cyan-dark: #0B7285;
 
-    --tag-blue: #1976D2;
+   --tag-blue: #1976D2;
 
-    --tag-purple: #7B1FA2;
+   --tag-purple: #7B1FA2;
 
-    --tag-pink: #C2185B;
+   --tag-pink: #C2185B;
 
-    --tag-gray: #616161;
+   --tag-gray: #616161;
 
 
-    /* ==========================
+   /* ==========================
        Color símbolos capturador
        ========================== */
 
-    --color-trigger-sintaxis: #1976D2;
+   --color-trigger-sintaxis: #1976D2;
 
 
-    /* ==========================
+   /* ==========================
        Radios
        ========================== */
 
-    --r4: 4px;
+   --r4: 4px;
 
-    --r6: 6px;
+   --r6: 6px;
 
-    --r8: 8px;
+   --r8: 8px;
 
 
-    /* ==========================
+   /* ==========================
        Espaciados
        ========================== */
 
-    --gap4: 4px;
+   --gap4: 4px;
 
-    --gap8: 8px;
+   --gap8: 8px;
 
-    --gap12: 12px;
+   --gap12: 12px;
 
-    --gap16: 16px;
+   --gap16: 16px;
 
-    --gap24: 24px;
+   --gap24: 24px;
 
 
-    /* ==========================
+   /* ==========================
        Alturas
        ========================== */
 
-    --toolbar-height: 48px;
+   --toolbar-height: 48px;
 
-    --header-height: 34px;
+   --header-height: 34px;
 
-    --row-height: 40px;
+   --row-height: 40px;
 
-    --status-height: 26px;
+   --status-height: 26px;
 
 
-    /* ==========================
+   /* ==========================
        Columnas
        ========================== */
 
-    --col-min-width: 52px;
+   --col-min-width: 52px;
 
-    --col-num: 42px;
+   --col-num: 42px;
 
-    --col-state: 58px;
+   /* Ancho fijo del carril de números (fuera de la tabla,
+       ver .carril-numeros en styl_tabla.css). Antes compartía
+       --col-num con la columna "#" de la tabla y cambiaba de
+       tamaño junto a ella; ahora es independiente. Se elimina
+       cuando la columna "#" desaparezca (Etapa B). */
+   --col-carril-numeros: 28px;
 
-    --col-app: 52px;
+   --col-state: 58px;
 
-    --col-trigger: 150px;
+   --col-app: 52px;
 
-    --col-type: 150px;
+   --col-trigger: 150px;
 
-    --col-action: 150px;
+   --col-type: 150px;
 
-    --col-behavior: 150px;
+   --col-action: 150px;
 
-    --col-color: 52px;
+   --col-behavior: 150px;
 
-    --col-note: 220px;
+   --col-color: 52px;
+
+   /* Ancho de la futura columna "Opciones" (⁝), Etapa C/D.
+       Se define ya para no volver a tocar este archivo en
+       esa etapa. --col-color se elimina cuando la columna
+       Color desaparezca de la tabla (Etapa B). */
+   --col-options: 42px;
+
+   --col-note: 220px;
 
 
-    /* ==========================
+   /* ==========================
        Mínimos columnas
        ========================== */
 
-    --col-min: 52px;
+   --col-min: 52px;
 
 
-    /* ==========================
+   /* ==========================
        Animaciones
        ========================== */
 
-    --speed: .15s;
+   --speed: .15s;
 }

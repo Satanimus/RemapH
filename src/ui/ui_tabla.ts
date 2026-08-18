@@ -14,6 +14,7 @@ import type { FilaPerfil } from "../core/core_perfil";
 import {
   registrarReconstruccion,
   registrarSalirModoMover,
+  registrarActivarModoMover,
 } from "./ui_tabla_control";
 
 import { activarRedimensionColumnas } from "./ui_redimension_columnas";
@@ -145,8 +146,12 @@ export function crearTabla(alModificar: () => void): HTMLElement {
 
   registrarSalirModoMover(() => controladorArrastre.salirModoMover());
 
+  registrarActivarModoMover((id) =>
+    controladorArrastre.activarModoMoverPara(id),
+  );
+
   // Registra una fila ya insertada en el DOM (asa = botón
-  // "▾", ver comp_numero.ts::crearNumero).
+  // "⁝", ver comp_opciones.ts::crearOpciones).
   const registrarFilaArrastrable = (filaElemento: HTMLElement): void => {
     const id = filaElemento.dataset.id;
 
@@ -154,7 +159,7 @@ export function crearTabla(alModificar: () => void): HTMLElement {
       return;
     }
 
-    const asa = filaElemento.querySelector<HTMLElement>(".numero-asa");
+    const asa = filaElemento.querySelector<HTMLElement>(".opciones-asa");
 
     if (asa) {
       controladorArrastre.registrarFila(id, filaElemento, asa);
@@ -221,10 +226,10 @@ export function crearTabla(alModificar: () => void): HTMLElement {
   // ✏️ CAMBIO VISUAL EN FILA
   // ------------------------------------------------------
   // Un clic sobre un control de cualquier columna que NO
-  // sea el asa (número) tiene prioridad y saca del modo
+  // sea el asa (Opciones) tiene prioridad y saca del modo
   // Mover (spec Etapa 9, punto 3) — el propio asa maneja
-  // su clic corto/mantenido por separado (ver comp_numero.ts
-  // + util_arrastrable.ts).
+  // su clic corto/mantenido por separado (ver
+  // comp_opciones.ts + util_arrastrable.ts).
   // ==================================================
 
   filas.addEventListener("click", (evento) => {
@@ -238,7 +243,7 @@ export function crearTabla(alModificar: () => void): HTMLElement {
 
     const celda = objetivo.closest<HTMLElement>(".celda");
 
-    if (celda?.dataset.columna !== "numero") {
+    if (celda?.dataset.columna !== "opciones") {
       controladorArrastre.salirModoMover();
     }
 

@@ -19,17 +19,17 @@ export interface Columna {
 
 export const COLUMNAS: Columna[] = [
   {
-    id: "numero",
-    titulo: "#",
-    grupo: "general",
-    ancho: "var(--col-num)",
-  },
-
-  {
     id: "estado",
     titulo: "Estado",
     grupo: "general",
     ancho: "var(--col-state)",
+  },
+
+  {
+    id: "opciones",
+    titulo: "⁝",
+    grupo: "general",
+    ancho: "var(--col-options)",
   },
 
   {
@@ -65,13 +65,6 @@ export const COLUMNAS: Columna[] = [
     titulo: "Extra",
     grupo: "respuesta",
     ancho: "var(--col-behavior)",
-  },
-
-  {
-    id: "color",
-    titulo: "Color",
-    grupo: "personalizacion",
-    ancho: "var(--col-color)",
   },
 
   {

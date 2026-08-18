@@ -32,7 +32,10 @@ import { abrirPopupExtraMenuExpress } from "./comp_popup_menu_express_extra";
 
 import { abrirPopupExtraPortapapeles } from "./comp_popup_portapapeles_extra";
 
-import { textoComportamientoMacro, crearMacroExtra } from "../../core/core_macro";
+import {
+  textoComportamientoMacro,
+  crearMacroExtra,
+} from "../../core/core_macro";
 
 import { abrirPopupExtraMacro } from "./comp_popup_macro_extra";
 
@@ -428,7 +431,7 @@ export function crearNota(filaPerfil: FilaPerfil): HTMLDivElement {
 
   const input = document.createElement("input");
   input.className = "nota";
-  input.placeholder = "Nota...";
+  input.placeholder = "...";
   input.value = filaPerfil.nota;
 
   input.addEventListener("input", () => {

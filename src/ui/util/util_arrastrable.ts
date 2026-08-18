@@ -142,6 +142,15 @@ export interface ControladorArrastre {
 
   salirModoMover(): void;
 
+  // Activa el modo Mover para una fila puntual sin pasar por
+  // el clic mantenido sobre el asa — usado por el ítem "Mover"
+  // del popup de Opciones (ver comp_popup_abrir.ts). Selecciona
+  // solo esa fila (reemplaza cualquier selección previa), igual
+  // que el mantenido cuando no hay Ctrl. No inicia un arrastre
+  // por sí sola: a partir de acá el usuario arrastra con el
+  // mouse desde el fondo de la fila, o mueve con las flechas.
+  activarModoMoverPara(id: string): void;
+
   // No pedido en la interfaz original — agregado porque este
   // controlador engancha listeners en `document` (clic afuera,
   // flechas) que viven mientras exista el controlador. Un
@@ -935,11 +944,24 @@ export function crearControladorArrastre(
     document.removeEventListener("keydown", manejarTeclado);
   }
 
+  // ======================================================
+  // ↕️ ACTIVAR MODO MOVER DESDE EL MENÚ (sin mantenido)
+  // ------------------------------------------------------
+  // Ver interfaz pública ControladorArrastre.activarModoMoverPara.
+  // ======================================================
+
+  function activarModoMoverPara(id: string): void {
+    if (!filas.has(id)) return;
+
+    reemplazarSeleccionPor(id);
+  }
+
   return {
     registrarFila,
     estaSeleccionada: (id: string) => seleccionadas.has(id),
     estaEnModoMover: () => seleccionadas.size > 0,
     salirModoMover,
+    activarModoMoverPara,
     destruir,
   };
 }

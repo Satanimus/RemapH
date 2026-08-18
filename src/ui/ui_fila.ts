@@ -9,7 +9,7 @@ import { COLUMNAS } from "./ui_columnas";
 
 import { crearCapturador } from "./componentes/comp_capturador";
 
-import { crearNumero } from "./componentes/comp_numero";
+import { crearOpciones } from "./componentes/comp_opciones";
 
 import type { FilaPerfil } from "../core/core_perfil";
 
@@ -18,7 +18,6 @@ import {
   crearTipo,
   crearExtra,
   crearApp,
-  crearColor,
   crearNota,
 } from "./componentes/comp_controles";
 
@@ -59,13 +58,15 @@ export function crearFila(
     celda.style.flexBasis = col.ancho;
 
     switch (col.id) {
-      case "numero":
-        celda.append(crearNumero(contexto, filaPerfil, esUltima, alModificar));
+      case "estado":
+        celda.append(crearEstado(contexto, filaPerfil));
 
         break;
 
-      case "estado":
-        celda.append(crearEstado(contexto, filaPerfil));
+      case "opciones":
+        celda.append(
+          crearOpciones(contexto, filaPerfil, esUltima, alModificar),
+        );
 
         break;
 
@@ -97,11 +98,6 @@ export function crearFila(
         celda.dataset.control = "extra";
 
         celda.append(crearExtra(contexto, filaPerfil));
-
-        break;
-
-      case "color":
-        celda.append(crearColor(contexto, filaPerfil));
 
         break;
 

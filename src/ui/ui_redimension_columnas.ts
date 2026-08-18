@@ -6,8 +6,8 @@ import { COLUMNAS } from "./ui_columnas";
 
 export const ANCHOS_DEFAULT = {
   //Ancho default al doble click en mover separador
-  numero: 42,
   estado: 58,
+  opciones: 42,
 
   app: 52,
   trigger: 150,
@@ -16,7 +16,6 @@ export const ANCHOS_DEFAULT = {
   accion: 150,
   extra: 150,
 
-  color: 52,
   nota: 220,
 };
 

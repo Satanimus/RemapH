@@ -39,15 +39,13 @@
 
 .carril-numeros {
 
-    width: var(--col-num);
+    width: var(--col-carril-numeros);
 
     flex-shrink: 0;
 
     overflow: hidden;
 
-    background: var(--panel2);
-
-    border-right: 1px solid var(--border);
+    background: transparent;
 }
 
 .carril-numeros-espaciador {
@@ -66,8 +64,6 @@
     justify-content: center;
 
     box-sizing: border-box;
-
-    border-bottom: 1px solid var(--border);
 
     color: var(--text-disabled);
 
@@ -109,8 +105,6 @@
     height: var(--row-height);
 
     background: var(--row-bg);
-
-    border-bottom: 1px solid var(--border);
 
     transition: background var(--speed);
 }
@@ -165,8 +159,8 @@
 }
 
 /* Permite que el botón "+" de agregar fila sobresalga
-   por debajo del número, sin quedar recortado. */
-.celda[data-columna="numero"] {
+   por debajo del botón de Opciones, sin quedar recortado. */
+.celda[data-columna="opciones"] {
 
     overflow: visible;
 }
@@ -203,6 +197,8 @@
     flex: 1;
 
     background: transparent;
+
+    border: none;
 }
 
 

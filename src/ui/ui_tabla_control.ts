@@ -146,3 +146,26 @@ export function registrarSalirModoMover(callback: () => void): void {
 export function salirModoMoverTabla(): void {
   salirModoMoverCallback?.();
 }
+
+// ======================================================
+// ↕️ ACTIVAR MODO MOVER PARA UNA FILA (ítem "Mover" del
+// popup de Opciones, ver comp_popup_abrir.ts)
+// ------------------------------------------------------
+// Mismo puente que registrarSalirModoMover/salirModoMoverTabla,
+// en la dirección contraria: comp_popup_abrir.ts no conoce el
+// controlador de arrastre (vive dentro de ui_tabla.ts), así
+// que pide acá y ui_tabla.ts resuelve contra el controlador
+// real al registrarse.
+// ======================================================
+
+let activarModoMoverCallback: ((id: string) => void) | null = null;
+
+export function registrarActivarModoMover(
+  callback: (id: string) => void,
+): void {
+  activarModoMoverCallback = callback;
+}
+
+export function activarModoMoverTabla(id: string): void {
+  activarModoMoverCallback?.(id);
+}
