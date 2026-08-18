@@ -707,6 +707,13 @@
     background: var(--red);
 }
 
+.estado-toggle.estado-grupo-mixto {
+
+    color: var(--text-disabled);
+
+    border-color: var(--text-disabled);
+}
+
 .estado-alerta {
 
     margin-left: var(--gap4);

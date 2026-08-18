@@ -175,3 +175,29 @@ export function construirPlanVisual(perfil: Perfil): ItemVisualTabla[] {
 
   return plan;
 }
+
+// ======================================================
+// 🔴🟢 ESTADO VIGENTE DEL GRUPO
+// ------------------------------------------------------
+// Compara el estado guardado del grupo contra el estado real
+// de sus filas contenidas. Usado por comp_grupo_estado.ts
+// para decidir si mostrar el indicador gris (mixto).
+// ======================================================
+
+export function estadoGrupoVigente(
+  grupo: AgrupacionPerfil,
+  filas: FilaPerfil[],
+  rango: RangoGrupo,
+): "on" | "off" | "mixto" {
+  if (rango.inicio === rango.fin) {
+    return grupo.estado === "ON" ? "on" : "off";
+  }
+
+  for (let i = rango.inicio; i < rango.fin; i++) {
+    if (filas[i].estado !== grupo.estado) {
+      return "mixto";
+    }
+  }
+
+  return grupo.estado === "ON" ? "on" : "off";
+}

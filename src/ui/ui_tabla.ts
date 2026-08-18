@@ -15,7 +15,7 @@ import { obtenerPerfilUi } from "../core/core_perfil_ui";
 
 import type { FilaPerfil } from "../core/core_perfil";
 
-import { construirPlanVisual } from "../core/core_agrupacion";
+import { construirPlanVisual, recalcularGrupos } from "../core/core_agrupacion";
 
 import {
   registrarReconstruccion,
@@ -122,19 +122,35 @@ export function crearTabla(alModificar: () => void): HTMLElement {
   const controladorArrastre = crearControladorArrastre({
     contenedor: filas,
 
-    obtenerOrdenIds: () => obtenerPerfilUi().filas.map((fila) => fila.id),
+    obtenerOrdenIds: () => {
+      const plan = construirPlanVisual(obtenerPerfilUi());
+
+      return plan
+        .filter((item) => item.tipo === "fila" || item.tipo === "grupo")
+        .map((item) =>
+          item.tipo === "grupo" ? item.grupo.id : (item as any).fila.id,
+        );
+    },
 
     onReordenar: (nuevoOrden) => {
       const perfil = obtenerPerfilUi();
 
-      const porId = new Map(perfil.filas.map((fila) => [fila.id, fila]));
+      const idsGrupos = new Set(perfil.grupos.map((g) => g.id));
 
-      perfil.filas = nuevoOrden
-        .map((id) => porId.get(id))
-        .filter((fila): fila is FilaPerfil => !!fila);
+      const idsFilasNuevo = nuevoOrden.filter((id) => !idsGrupos.has(id));
+
+      const porIdFila = new Map(perfil.filas.map((f) => [f.id, f]));
+
+      perfil.filas = idsFilasNuevo
+        .map((id) => porIdFila.get(id))
+        .filter((f): f is FilaPerfil => !!f);
+
+      perfil.grupos = recalcularGrupos(perfil.grupos, nuevoOrden);
 
       alModificar();
     },
+
+    obtenerIdsGrupos: () => obtenerPerfilUi().grupos.map((g) => g.id),
   });
 
   registrarSalirModoMover(() => controladorArrastre.salirModoMover());
@@ -192,13 +208,23 @@ export function crearTabla(alModificar: () => void): HTMLElement {
 
         carrilLista.append(numero);
       } else if (item.tipo === "grupo") {
-        // El header todavía no participa del arrastre (Etapa D):
-        // no se llama registrarFilaArrastrable sobre él.
         const headerElemento = crearGrupoHeader(item.grupo, alModificar);
 
         filas.append(headerElemento);
 
         carrilLista.append(crearExpandirGrupo(item.grupo, alModificar));
+
+        const botonOpciones = headerElemento.querySelector(
+          ".opciones-asa",
+        ) as HTMLElement | null;
+
+        if (botonOpciones) {
+          controladorArrastre.registrarFila(
+            item.grupo.id,
+            headerElemento,
+            botonOpciones,
+          );
+        }
       } else {
         const placeholder = document.createElement("div");
 

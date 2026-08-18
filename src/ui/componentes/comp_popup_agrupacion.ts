@@ -26,7 +26,7 @@ import {
 
 import { COLOR_OPCIONES } from "./comp_popup_abrir";
 
-import { reconstruirTabla } from "../ui_tabla_control";
+import { reconstruirTabla, activarModoMoverTabla } from "../ui_tabla_control";
 
 // ======================================================
 // ➖ SEPARADOR (mismo estilo que el resto de los popups)
@@ -190,7 +190,10 @@ export function abrirPopupAgrupacion(
     botonMover.className = "ui-btn";
     botonMover.textContent = "Mover";
 
-    botonMover.addEventListener("click", () => {});
+    botonMover.addEventListener("click", () => {
+      activarModoMoverTabla(grupo.id);
+      ocultarPopup();
+    });
 
     lista.append(botonClonar, botonMover);
 
