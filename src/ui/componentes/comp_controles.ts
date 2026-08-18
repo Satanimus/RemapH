@@ -317,14 +317,6 @@ export function crearApp(
     boton.append(indicador);
   }
 
-  const flecha = document.createElement("span");
-
-  flecha.className = "app-flecha";
-
-  flecha.textContent = "▾";
-
-  boton.append(flecha);
-
   if (filaPerfil.app.programa) {
     invoke<{
       ancho: number;

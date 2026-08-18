@@ -333,13 +333,6 @@
     white-space: nowrap;
 }
 
-.perfil-selector-flecha {
-
-    color: var(--text-soft);
-
-    font-size: 11px;
-}
-
 /* ======================================================
    ● INDICADORES
    ====================================================== */
@@ -796,7 +789,7 @@
 }
 
 /* ======================================================
-   🔤🎵⚡🧩�📂 COLUMNA TIPO — botón solo ícono (ventana principal)
+   🔤🎵⚡🧩📝📂 COLUMNA TIPO — botón solo ícono (ventana principal)
    ------------------------------------------------------
    Antes mostraba "texto ▾" (ver comp_popup.ts). Ahora solo el
    ícono del tipo, centrado, sin flecha — el nombre completo
@@ -812,7 +805,7 @@
 }
 
 /* ======================================================
-   🔤🎵⚡🧩�📂 POPUP TIPO — ícono al lado del nombre
+   🔤🎵⚡🧩📝📂 POPUP TIPO — ícono al lado del nombre
    ====================================================== */
 
 .popup-tipo-item {

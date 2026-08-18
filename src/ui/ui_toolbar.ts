@@ -120,13 +120,7 @@ export function crearToolbar(alGuardar: () => Promise<void>): HTMLElement {
 
   nombrePerfil.className = "perfil-selector-nombre";
 
-  const flecha = document.createElement("span");
-
-  flecha.className = "perfil-selector-flecha";
-
-  flecha.textContent = "▾";
-
-  botonSelector.append(nombrePerfil, flecha);
+  botonSelector.append(nombrePerfil);
 
   // ==================================================
   // 📄 PERFIL ACTUAL

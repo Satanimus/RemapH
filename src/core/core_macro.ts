@@ -91,13 +91,13 @@ export function textoComportamientoMacro(
 ): string {
   switch (comportamiento) {
     case "toggle":
-      return "🔁 Toggle";
+      return "Toggle";
 
     case "tecla_mantenida":
-      return "⏱️ Tecla mantenida";
+      return "Tecla mantenida";
 
     default:
-      return "▶️ Una ejecución";
+      return "Una ejecución";
   }
 }
 

@@ -147,13 +147,6 @@
     max-width: 220px;
 }
 
-.perfil-selector-flecha {
-
-    color: var(--text-soft);
-
-    font-size: 12px;
-}
-
 
 /* ======================================================
    🟢🔴 INDICADOR DEL PERFIL
@@ -488,7 +481,7 @@
 }
 
 /* ======================================================
-   ⚡📋 EDITOR DE MENUEXPRESS (seleccionados/disponibles)
+   ⚡📝 EDITOR DE MENUEXPRESS (seleccionados/disponibles)
    ====================================================== */
 
 .popup-menu-editor {
@@ -917,12 +910,6 @@
     line-height: 1;
 }
 
-.app-flecha {
-    color: var(--text-soft);
-    font-size: var(--fs11);
-    line-height: 1;
-}
-
 /* ======================================================
    🖥️ ALINEACIÓN POPUP APP
    ====================================================== */
@@ -942,7 +929,7 @@
 }
 
 /* ======================================================
-   🧩📋 EDITOR DE MACRO (Etapa 5)
+   🧩📝 EDITOR DE MACRO (Etapa 5)
    ------------------------------------------------------
    Mismo espíritu visual que .popup-menu-editor (lista con
    scroll + ítems en fila), pero cada ítem es una fila-paso
