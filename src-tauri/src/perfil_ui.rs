@@ -127,9 +127,9 @@ use serde::{Deserialize, Serialize};
 use crate::compilador::AdvertenciaCompilacion;
 
 use crate::perfil_json::{
-    perfil_json, AbrirAccionJson, AbrirExtraJson, AppJson, CoordenadaJson, MacroExtraJson,
-    MenuAccionJson, MenuExpressExtraJson, PortapapelesAccionJson, PortapapelesExtraJson,
-    RemapeoJson, TriggerJson,
+    perfil_json, AbrirAccionJson, AbrirExtraJson, AgrupacionJson, AppJson, CoordenadaJson,
+    MacroExtraJson, MenuAccionJson, MenuExpressExtraJson, PortapapelesAccionJson,
+    PortapapelesExtraJson, RemapeoJson, TriggerJson,
 };
 
 // ======================================================
@@ -335,15 +335,10 @@ pub struct EstadoCachePerfil {
 // 🔄 CONVERTIR PERFIL
 // ======================================================
 
-pub fn convertir_perfil(filas: Vec<FilaUI>) -> perfil_json {
+pub fn convertir_perfil(filas: Vec<FilaUI>, grupos: Vec<AgrupacionJson>) -> perfil_json {
     let remapeos = filas.into_iter().map(convertir_fila).collect();
 
-    // Placeholder: la carga real de grupos se conecta en la Etapa F
-    // (persistencia). Acá es solo para no romper el tipo.
-    perfil_json {
-        remapeos,
-        grupos: Vec::new(),
-    }
+    perfil_json { remapeos, grupos }
 }
 
 // ======================================================

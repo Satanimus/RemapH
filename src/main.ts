@@ -46,6 +46,7 @@ async function guardarPerfil(): Promise<void> {
 
   const resultado = await invoke<ResultadoCompilacion>("compilar_perfil", {
     filas: perfil.filas,
+    grupos: perfil.grupos,
   });
 
   establecerAdvertenciasCompilacion(resultado.advertencias);
