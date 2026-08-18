@@ -114,6 +114,7 @@ impl Input {
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct perfil_json {
     pub remapeos: Vec<RemapeoJson>,
+    pub grupos: Vec<AgrupacionJson>,
 }
 
 // ======================================================
@@ -219,8 +220,23 @@ impl perfil_json {
     pub fn nuevo() -> Self {
         Self {
             remapeos: Vec::new(),
+            grupos: Vec::new(),
         }
     }
+}
+
+// ======================================================
+// 🗂️ AGRUPACION JSON
+// ======================================================
+
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct AgrupacionJson {
+    pub id: String,
+    pub estado: String,
+    pub nota: String,
+    pub color: String,
+    pub expandido: bool,
+    pub num_filas: usize,
 }
 
 // ======================================================

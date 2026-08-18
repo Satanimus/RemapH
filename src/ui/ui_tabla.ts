@@ -7,9 +7,15 @@ import { COLUMNAS } from "./ui_columnas";
 
 import { crearFila } from "./ui_fila";
 
+import { crearGrupoHeader } from "./ui_grupo";
+
+import { crearExpandirGrupo } from "./componentes/comp_grupo_expandir";
+
 import { obtenerPerfilUi } from "../core/core_perfil_ui";
 
 import type { FilaPerfil } from "../core/core_perfil";
+
+import { construirPlanVisual } from "../core/core_agrupacion";
 
 import {
   registrarReconstruccion,
@@ -98,19 +104,6 @@ export function crearTabla(alModificar: () => void): HTMLElement {
 
   carrilNumeros.append(carrilEspaciador, carrilLista);
 
-  const reconstruirCarrilNumeros = (total: number): void => {
-    carrilLista.replaceChildren();
-
-    for (let i = 1; i <= total; i++) {
-      const item = document.createElement("div");
-
-      item.className = "carril-numero";
-      item.textContent = String(i);
-
-      carrilLista.append(item);
-    }
-  };
-
   viewport.addEventListener("scroll", () => {
     carrilNumeros.scrollTop = viewport.scrollTop;
   });
@@ -173,21 +166,40 @@ export function crearTabla(alModificar: () => void): HTMLElement {
   const reconstruirTabla = (): void => {
     filas.replaceChildren();
 
+    carrilLista.replaceChildren();
+
     const perfil = obtenerPerfilUi();
 
-    perfil.filas.forEach((fila, indice) => {
-      const filaElemento = crearFila(
-        fila,
-        indice === perfil.filas.length - 1,
-        alModificar,
-      );
+    const plan = construirPlanVisual(perfil);
 
-      filas.append(filaElemento);
+    plan.forEach((item) => {
+      if (item.tipo === "fila") {
+        const filaElemento = crearFila(
+          item.fila,
+          item.indiceAbsoluto === perfil.filas.length - 1,
+          alModificar,
+        );
 
-      registrarFilaArrastrable(filaElemento);
+        filas.append(filaElemento);
+
+        registrarFilaArrastrable(filaElemento);
+
+        const numero = document.createElement("div");
+
+        numero.className = "carril-numero";
+        numero.textContent = String(item.indiceAbsoluto + 1);
+
+        carrilLista.append(numero);
+      } else {
+        // El header todavía no participa del arrastre (Etapa D):
+        // no se llama registrarFilaArrastrable sobre él.
+        const headerElemento = crearGrupoHeader(item.grupo, alModificar);
+
+        filas.append(headerElemento);
+
+        carrilLista.append(crearExpandirGrupo(item.grupo, alModificar));
+      }
     });
-
-    reconstruirCarrilNumeros(perfil.filas.length);
   };
 
   reconstruirTabla();

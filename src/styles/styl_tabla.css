@@ -70,6 +70,40 @@
     font-size: var(--fs12);
 }
 
+.carril-expandir {
+
+    height: var(--row-height);
+
+    width: 100%;
+
+    min-width: 0;
+
+    display: flex;
+
+    align-items: center;
+
+    justify-content: center;
+
+    box-sizing: border-box;
+
+    padding: 0;
+
+    background: transparent;
+
+    border: none;
+
+    color: var(--text-disabled);
+
+    cursor: pointer;
+
+    transition: color var(--speed);
+}
+
+.carril-expandir:hover {
+
+    color: var(--tag-cyan);
+}
+
 
 /* ======================================================
    CABECERA Y FILAS
@@ -114,6 +148,21 @@
     background: var(--row-hover-bg);
 }
 
+.fila-grupo {
+
+    display: flex;
+
+    align-items: center;
+
+    width: 100%;
+
+    height: var(--row-height);
+
+    box-sizing: border-box;
+
+    background: var(--grupo-color, var(--panel2));
+}
+
 
 /* ======================================================
    CELDAS
@@ -156,6 +205,11 @@
 .celda:not(:last-child) {
 
     border-right: 1px solid rgba(255, 255, 255, .025);
+}
+
+.celda.nota-grupo {
+
+    flex: 1;
 }
 
 /* Permite que el botón "+" de agregar fila sobresalga

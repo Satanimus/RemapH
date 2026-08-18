@@ -176,6 +176,11 @@ export async function convertirperfil_json(
     activo: true,
 
     filas: filas.length > 0 ? filas : [crearFila()],
+
+    // Placeholder: la carga real desde perfil_json.grupos (Rust) se
+    // conecta recién en la Etapa F (persistencia). Acá es solo para
+    // no romper el tipo `Perfil`.
+    grupos: [],
   };
 }
 

@@ -424,17 +424,17 @@ export function crearColor(
   return boton;
 }
 
-export function crearNota(filaPerfil: FilaPerfil): HTMLDivElement {
+export function crearNota(objetivo: { nota: string }): HTMLDivElement {
   const contenedor = document.createElement("div");
   contenedor.className = "nota-contenedor";
 
   const input = document.createElement("input");
   input.className = "nota";
   input.placeholder = "...";
-  input.value = filaPerfil.nota;
+  input.value = objetivo.nota;
 
   input.addEventListener("input", () => {
-    filaPerfil.nota = input.value;
+    objetivo.nota = input.value;
   });
 
   const btnEmoji = document.createElement("button");

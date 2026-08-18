@@ -338,7 +338,12 @@ pub struct EstadoCachePerfil {
 pub fn convertir_perfil(filas: Vec<FilaUI>) -> perfil_json {
     let remapeos = filas.into_iter().map(convertir_fila).collect();
 
-    perfil_json { remapeos }
+    // Placeholder: la carga real de grupos se conecta en la Etapa F
+    // (persistencia). Acá es solo para no romper el tipo.
+    perfil_json {
+        remapeos,
+        grupos: Vec::new(),
+    }
 }
 
 // ======================================================

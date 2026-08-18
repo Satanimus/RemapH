@@ -39,6 +39,8 @@ export interface Perfil {
   activo: boolean;
 
   filas: FilaPerfil[];
+
+  grupos: AgrupacionPerfil[];
 }
 
 // ======================================================
@@ -176,6 +178,58 @@ export function crearFila(): FilaPerfil {
 }
 
 // ======================================================
+// 🗂️ AGRUPACION
+// ======================================================
+
+export interface AgrupacionPerfil {
+  id: string;
+
+  estado: string;
+
+  nota: string;
+
+  color: string;
+
+  expandido: boolean;
+
+  numFilas: number;
+}
+
+// ======================================================
+// 🗂️ CREAR AGRUPACION
+// ======================================================
+
+export function crearAgrupacion(): AgrupacionPerfil {
+  return {
+    id: crypto.randomUUID(),
+
+    estado: "ON",
+
+    nota: "",
+
+    color: "",
+
+    expandido: true,
+
+    numFilas: 0,
+  };
+}
+
+// ======================================================
+// 🗂️ CLONAR AGRUPACION
+// ======================================================
+
+export function clonarAgrupacion(
+  agrupacion: AgrupacionPerfil,
+): AgrupacionPerfil {
+  return {
+    ...agrupacion,
+
+    id: crypto.randomUUID(),
+  };
+}
+
+// ======================================================
 // 👤 CREAR PERFIL
 // ======================================================
 
@@ -184,6 +238,8 @@ export function crearPerfil(): Perfil {
     activo: true,
 
     filas: [crearFila()],
+
+    grupos: [],
   };
 }
 
