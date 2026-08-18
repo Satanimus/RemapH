@@ -332,7 +332,7 @@ export function abrirPopupNumero(
 // uno nuevo.
 // ======================================================
 
-const COLOR_OPCIONES: { texto: string; valor: string }[] = [
+export const COLOR_OPCIONES: { texto: string; valor: string }[] = [
   { texto: "Rojo", valor: "red" },
   { texto: "Naranja", valor: "orange" },
   { texto: "Amarillo", valor: "yellow" },

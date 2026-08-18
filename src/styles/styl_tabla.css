@@ -148,6 +148,32 @@
     background: var(--row-hover-bg);
 }
 
+.fila.en-grupo {
+
+    background: color-mix(in srgb, var(--grupo-color) 18%, var(--row-bg));
+
+    border-left: 1px solid var(--grupo-color);
+
+    border-right: 1px solid var(--grupo-color);
+
+    box-sizing: border-box;
+}
+
+.fila.en-grupo:hover {
+
+    background: color-mix(in srgb, var(--grupo-color) 30%, var(--row-bg));
+}
+
+.fila.primera-del-grupo {
+
+    border-top: 1px solid var(--grupo-color);
+}
+
+.fila.ultima-del-grupo {
+
+    border-bottom: 1px solid var(--grupo-color);
+}
+
 .fila-grupo {
 
     display: flex;
@@ -161,6 +187,27 @@
     box-sizing: border-box;
 
     background: var(--grupo-color, var(--panel2));
+}
+
+.fila-grupo-placeholder {
+
+    display: flex;
+
+    align-items: center;
+
+    justify-content: center;
+
+    width: 100%;
+
+    height: var(--row-height);
+
+    box-sizing: border-box;
+
+    border: 1px dashed var(--border-light);
+
+    font-style: italic;
+
+    color: var(--text-disabled);
 }
 
 

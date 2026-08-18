@@ -116,7 +116,13 @@ export function recalcularGrupos(
 
 export type ItemVisualTabla =
   | { tipo: "grupo"; grupo: AgrupacionPerfil }
-  | { tipo: "fila"; fila: FilaPerfil; indiceAbsoluto: number };
+  | {
+      tipo: "fila";
+      fila: FilaPerfil;
+      indiceAbsoluto: number;
+      grupo?: { color: string; primera: boolean; ultima: boolean };
+    }
+  | { tipo: "placeholder"; grupo: AgrupacionPerfil };
 
 export function construirPlanVisual(perfil: Perfil): ItemVisualTabla[] {
   const { filaAGrupo, rangoPorGrupo } = calcularPertenencia(
@@ -139,8 +145,25 @@ export function construirPlanVisual(perfil: Perfil): ItemVisualTabla[] {
       continue;
     }
 
+    if (rango.fin === rango.inicio) {
+      plan.push({ tipo: "placeholder", grupo });
+
+      continue;
+    }
+
     for (let i = rango.inicio; i < rango.fin; i++) {
-      plan.push({ tipo: "fila", fila: perfil.filas[i], indiceAbsoluto: i });
+      plan.push({
+        tipo: "fila",
+        fila: perfil.filas[i],
+        indiceAbsoluto: i,
+        grupo: grupo.color
+          ? {
+              color: grupo.color,
+              primera: i === rango.inicio,
+              ultima: i === rango.fin - 1,
+            }
+          : undefined,
+      });
     }
   }
 

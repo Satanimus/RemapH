@@ -178,6 +178,7 @@ export function crearTabla(alModificar: () => void): HTMLElement {
           item.fila,
           item.indiceAbsoluto === perfil.filas.length - 1,
           alModificar,
+          item.grupo,
         );
 
         filas.append(filaElemento);
@@ -190,7 +191,7 @@ export function crearTabla(alModificar: () => void): HTMLElement {
         numero.textContent = String(item.indiceAbsoluto + 1);
 
         carrilLista.append(numero);
-      } else {
+      } else if (item.tipo === "grupo") {
         // El header todavía no participa del arrastre (Etapa D):
         // no se llama registrarFilaArrastrable sobre él.
         const headerElemento = crearGrupoHeader(item.grupo, alModificar);
@@ -198,6 +199,19 @@ export function crearTabla(alModificar: () => void): HTMLElement {
         filas.append(headerElemento);
 
         carrilLista.append(crearExpandirGrupo(item.grupo, alModificar));
+      } else {
+        const placeholder = document.createElement("div");
+
+        placeholder.className = "fila-grupo-placeholder";
+        placeholder.textContent = "Arrastra tus filas aquí...";
+
+        filas.append(placeholder);
+
+        const numeroVacio = document.createElement("div");
+
+        numeroVacio.className = "carril-numero";
+
+        carrilLista.append(numeroVacio);
       }
     });
   };

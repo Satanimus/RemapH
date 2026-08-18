@@ -35,6 +35,8 @@ import { reconstruirTabla, salirModoMoverTabla } from "./ui_tabla_control";
 
 import { crearFila as crearFilaPerfil } from "../core/core_perfil";
 
+import { agregarAgrupacion } from "../core/core_perfil_acciones";
+
 import {
   crearIndicador,
   actualizarIndicador,
@@ -63,6 +65,14 @@ export function crearToolbar(alGuardar: () => Promise<void>): HTMLElement {
                 title="Agregar fila"
             >
                 <span>+ Fila</span>
+            </button>
+
+            <button
+                class="btn-agregar-grupo"
+                type="button"
+                title="Agregar grupo"
+            >
+                <span>+ Grupo</span>
             </button>
 
         </div>
@@ -234,6 +244,17 @@ export function crearToolbar(alGuardar: () => Promise<void>): HTMLElement {
     const perfil = obtenerPerfilUi();
 
     perfil.filas.push(crearFilaPerfil());
+
+    marcarPerfilEditado(toolbar);
+    reconstruirTabla();
+  });
+
+  const botonAgregarGrupo = toolbar.querySelector(
+    ".btn-agregar-grupo",
+  ) as HTMLButtonElement | null;
+
+  botonAgregarGrupo?.addEventListener("click", () => {
+    agregarAgrupacion();
 
     marcarPerfilEditado(toolbar);
     reconstruirTabla();

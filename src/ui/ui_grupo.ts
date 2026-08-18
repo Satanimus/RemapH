@@ -13,6 +13,7 @@ import type { AgrupacionPerfil } from "../core/core_perfil";
 import { crearEstadoGrupo } from "./componentes/comp_grupo_estado";
 import { crearBoton } from "./componentes/comp_boton";
 import { crearNota } from "./componentes/comp_controles";
+import { abrirPopupAgrupacion } from "./componentes/comp_popup_agrupacion";
 
 export function crearGrupoHeader(
   grupo: AgrupacionPerfil,
@@ -46,9 +47,9 @@ export function crearGrupoHeader(
     clase: "opciones-asa",
   });
 
-  // El popup real (Color / Clonar / Eliminar) se conecta en la
-  // Etapa C. Por ahora el clic no hace nada.
-  botonOpciones.addEventListener("click", () => {});
+  botonOpciones.addEventListener("click", (evento) => {
+    abrirPopupAgrupacion(evento, grupo, alModificar);
+  });
 
   celdaOpciones.append(botonOpciones);
 

@@ -31,6 +31,7 @@ export function crearFila(
   filaPerfil: FilaPerfil,
   esUltima: boolean,
   alModificar: () => void = () => {},
+  infoGrupo?: { color: string; primera: boolean; ultima: boolean },
 ): HTMLElement {
   const contexto = crearContextoFila(filaPerfil.id);
 
@@ -44,6 +45,22 @@ export function crearFila(
     fila.style.setProperty("--fila-color", `var(--tag-${filaPerfil.color})`);
   } else {
     fila.style.removeProperty("--fila-color");
+  }
+
+  if (infoGrupo) {
+    fila.style.setProperty("--grupo-color", `var(--tag-${infoGrupo.color})`);
+
+    fila.classList.add("en-grupo");
+
+    if (infoGrupo.primera) {
+      fila.classList.add("primera-del-grupo");
+    }
+
+    if (infoGrupo.ultima) {
+      fila.classList.add("ultima-del-grupo");
+    }
+  } else {
+    fila.style.removeProperty("--grupo-color");
   }
 
   COLUMNAS.forEach((col) => {
