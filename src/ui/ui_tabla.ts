@@ -141,7 +141,7 @@ export function crearTabla(alModificar: () => void): HTMLElement {
         );
     },
 
-    onReordenar: (nuevoOrden) => {
+    onReordenar: (nuevoOrden, idsMovidos) => {
       const perfil = obtenerPerfilUi();
 
       const idsGrupos = new Set(perfil.grupos.map((g) => g.id));
@@ -171,6 +171,7 @@ export function crearTabla(alModificar: () => void): HTMLElement {
         perfil.grupos,
         nuevoOrden,
         filaAGrupoAntes,
+        new Set(idsMovidos),
       );
 
       alModificar();

@@ -76,45 +76,42 @@ export function calcularPertenencia(
 //
 // `filaAGrupoAntes` es la pertenencia (id de fila -> id de grupo
 // anterior, o null si estaba suelta) DE ANTES de este reordenamiento.
-// Hace falta porque una fila suelta que quedó, por cualquier otro
-// arrastre ajeno al último grupo, justo después de él en
-// `ordenVisual` es indistinguible -por posición- de una fila que el
-// usuario sí arrastró adentro: sin esta pista, el último grupo se
-// come todas las filas sueltas que queden por debajo (bug: "el
-// grupo inferior se expande y toma todas las filas sueltas"). Las
-// filas sueltas que mantienen su orden relativo de antes (subsecuencia
-// común más larga contra el orden viejo) se consideran "no tocadas"
-// y no pasan a ningún grupo; las que rompen ese orden relativo se
-// interpretan como recién arrastradas y sí se cuentan.
+// `idsMovidos` son los ids que el usuario realmente arrastró/movió
+// en esta operación (el resto solo cambió de posición relativa como
+// efecto secundario, si acaso).
+//
+// Recorriendo `ordenVisual`, una fila se cuenta para el grupo actual
+// si: (a) fue movida y el grupo sigue "abierto", o (b) no fue movida
+// y ya pertenecía a ese mismo grupo antes. En cuanto aparece una fila
+// SIN mover que no pertenecía a este grupo (sea porque estaba suelta,
+// sea porque era de otro grupo), el grupo se da por "cerrado": ninguna
+// fila posterior puede volver a sumarse a él, ni siquiera si fue
+// movida y quedó pegada ahí por coincidencia de posición. Esto evita
+// dos bugs relacionados: el grupo de abajo "comiéndose" filas sueltas
+// que no se tocaron, y — el que motivó este cambio — que la fila que
+// el usuario acaba de SACAR de un grupo quede contada igual porque el
+// recorrido no distinguía "salir del grupo" de "entrar al grupo".
 export function recalcularGrupos(
   grupos: AgrupacionPerfil[],
   ordenVisual: string[],
   filaAGrupoAntes: Map<string, string | null>,
+  idsMovidos: Set<string>,
 ): AgrupacionPerfil[] {
   const grupoPorId = new Map(grupos.map((g) => [g.id, g]));
-
-  const sueltasAntes = [...filaAGrupoAntes.entries()]
-    .filter(([, g]) => g === null)
-    .map(([id]) => id);
-
-  const colaSueltasCandidatas = ordenVisual.filter(
-    (id) => !grupoPorId.has(id) && filaAGrupoAntes.get(id) === null,
-  );
-
-  const siguenSueltas = idsQueMantienenOrdenRelativo(
-    colaSueltasCandidatas,
-    sueltasAntes,
-  );
 
   const resultado: AgrupacionPerfil[] = [];
 
   let grupoActual: AgrupacionPerfil | null = null;
+
+  let grupoAbierto = false;
 
   for (const id of ordenVisual) {
     const grupo = grupoPorId.get(id);
 
     if (grupo) {
       grupoActual = { ...grupo, numFilas: 0 };
+
+      grupoAbierto = true;
 
       resultado.push(grupoActual);
 
@@ -126,61 +123,24 @@ export function recalcularGrupos(
       continue;
     }
 
-    if (siguenSueltas.has(id)) {
-      // Suelta de antes que no cambió de orden relativo respecto a
-      // las demás sueltas: sigue suelta, no se une al grupo actual.
+    const eraDeEsteGrupo = filaAGrupoAntes.get(id) === grupoActual.id;
+
+    if (!idsMovidos.has(id) && !eraDeEsteGrupo) {
+      // Fila sin tocar que no era de este grupo (estaba suelta o en
+      // otro grupo): corta la racha, el grupo actual queda cerrado.
+      grupoAbierto = false;
+
+      continue;
+    }
+
+    if (!grupoAbierto) {
+      // El grupo ya se cerró por una fila ajena de por medio: esta
+      // fila, aunque haya sido movida, no puede "saltar" el hueco y
+      // reengancharse.
       continue;
     }
 
     grupoActual.numFilas += 1;
-  }
-
-  return resultado;
-}
-
-// Subsecuencia común más larga (por identidad de id, no de valor)
-// entre `nuevoOrden` y `ordenAnterior`: los ids que la integran son
-// los que NO cambiaron de posición relativa entre sí. Se resuelve
-// como longest-increasing-subsequence sobre los índices de
-// `nuevoOrden` dentro de `ordenAnterior`.
-function idsQueMantienenOrdenRelativo(
-  nuevoOrden: string[],
-  ordenAnterior: string[],
-): Set<string> {
-  const posicionAnterior = new Map(ordenAnterior.map((id, i) => [id, i]));
-
-  const indices = nuevoOrden.map((id) => posicionAnterior.get(id)!);
-
-  const n = indices.length;
-
-  const largoHasta = new Array<number>(n).fill(1);
-
-  const anteriorEnCadena = new Array<number>(n).fill(-1);
-
-  let mejorFinal = -1;
-
-  for (let i = 0; i < n; i++) {
-    for (let j = 0; j < i; j++) {
-      if (indices[j] < indices[i] && largoHasta[j] + 1 > largoHasta[i]) {
-        largoHasta[i] = largoHasta[j] + 1;
-
-        anteriorEnCadena[i] = j;
-      }
-    }
-
-    if (mejorFinal === -1 || largoHasta[i] > largoHasta[mejorFinal]) {
-      mejorFinal = i;
-    }
-  }
-
-  const resultado = new Set<string>();
-
-  let cursor = mejorFinal;
-
-  while (cursor !== -1) {
-    resultado.add(nuevoOrden[cursor]);
-
-    cursor = anteriorEnCadena[cursor];
   }
 
   return resultado;

@@ -124,7 +124,7 @@ export interface OpcionesArrastrable {
 
   obtenerOrdenIds: () => string[];
 
-  onReordenar: (nuevoOrden: string[]) => void;
+  onReordenar: (nuevoOrden: string[], idsMovidos: string[]) => void;
 
   onSalirModoMover?: () => void;
 
@@ -465,7 +465,9 @@ export function crearControladorArrastre(
       }
     }
 
-    aplicarNuevoOrden(arr, DURACION_ANIMACION_TECLADO_MS);
+    aplicarNuevoOrden(arr, DURACION_ANIMACION_TECLADO_MS, undefined, [
+      ...seleccionadas,
+    ]);
   }
 
   function manejarTeclado(evento: KeyboardEvent): void {
@@ -502,6 +504,7 @@ export function crearControladorArrastre(
     nuevoOrden: string[],
     duracionMs: number,
     rectosOrigenPorId?: Map<string, DOMRect>,
+    idsMovidos?: string[],
   ): void {
     const rectosAntes = new Map<string, DOMRect>();
 
@@ -515,7 +518,7 @@ export function crearControladorArrastre(
       if (registro) contenedor.appendChild(registro.elemento);
     });
 
-    onReordenar(nuevoOrden);
+    onReordenar(nuevoOrden, idsMovidos ?? []);
 
     nuevoOrden.forEach((id) => {
       const registro = filas.get(id);
@@ -852,6 +855,7 @@ export function crearControladorArrastre(
       nuevoOrden,
       duracionAnimacionArrastreMs(contenedor),
       origenesGrupo,
+      idsGrupo,
     );
 
     arrastreActual = null;
