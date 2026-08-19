@@ -8,6 +8,14 @@ let reconstruirFilaCallback: ((id: string) => void) | null = null;
 
 let actualizarConflictosCallback: (() => void) | null = null;
 
+// Actualiza el botón estado de los separadores que contienen las filas
+// afectadas, sin reconstruir la tabla entera. Se llama desde
+// reconstruirFila() para que el separador refleje inmediatamente el
+// estado de alerta de sus filas (bug 2).
+let actualizarSeparadoresDeFilasCallback:
+  | ((idsFilas: string[]) => void)
+  | null = null;
+
 let conflictosAnteriores = new Map<string, Set<string>>();
 
 import { obtenerConflictos } from "../core/core_conflictos";
@@ -26,10 +34,14 @@ export function registrarReconstruccion(
   tabla: () => void,
 
   fila: (id: string) => void,
+
+  actualizarSeparadores: (idsFilas: string[]) => void,
 ): void {
   reconstruirTablaCallback = tabla;
 
   reconstruirFilaCallback = fila;
+
+  actualizarSeparadoresDeFilasCallback = actualizarSeparadores;
 }
 
 // ======================================================
@@ -78,6 +90,10 @@ export function reconstruirFila(id: string): void {
   afectados.forEach((filaId) => {
     reconstruirFilaCallback?.(filaId);
   });
+
+  // Actualiza el botón estado de los separadores que contienen
+  // alguna de las filas afectadas — sin reconstruir la tabla entera.
+  actualizarSeparadoresDeFilasCallback?.([...afectados]);
 
   conflictosAnteriores = conflictosActuales;
 

@@ -202,14 +202,6 @@
     box-shadow: var(--separador-sombra);
 }
 
-.grupo-opciones .opciones-asa {
-
-    width: fit-content;
-
-    flex-shrink: 0;
-
-}
-
 .fila-grupo-placeholder {
 
     display: flex;
@@ -315,6 +307,17 @@
     width: 100%;
 
     max-width: 100%;
+}
+
+/* El botón Opciones del separador no debe estirarse con la columna:
+   el ancho lo da el contenido (igual que en la fila normal, donde
+   el div.opciones-celda actúa como contenedor que se contrae). */
+.celda.grupo-opciones .ui-btn {
+
+    width: fit-content;
+
+    flex-shrink: 0;
+
 }
 
 .nota {

@@ -9,6 +9,8 @@ import { crearFila } from "./ui_fila";
 
 import { crearSeparadorHeader } from "./ui_grupo";
 
+import { crearEstadoGrupo } from "./componentes/comp_grupo_estado";
+
 import { crearExpandirGrupo } from "./componentes/comp_grupo_expandir";
 
 import { obtenerPerfilUi } from "../core/core_perfil_ui";
@@ -19,7 +21,7 @@ import {
   obtenerTramoDeSeparador,
 } from "../core/core_agrupacion";
 
-import type { ItemFilaPerfil } from "../core/core_perfil";
+import type { ItemFilaPerfil, SeparadorPerfil } from "../core/core_perfil";
 
 import {
   registrarReconstruccion,
@@ -421,7 +423,71 @@ export function crearTabla(alModificar: () => void): HTMLElement {
 
   tabla.append(carrilNumeros, viewport);
 
-  registrarReconstruccion(reconstruirTabla, reconstruirFila);
+  // Actualiza el botón estado de los separadores que contienen alguna
+  // de las filas afectadas, sin reconstruir la tabla entera (bug 2).
+  const actualizarSeparadoresDeFilas = (idsFilas: string[]): void => {
+    const perfil = obtenerPerfilUi();
+
+    const separadoresActualizados = new Set<string>();
+
+    for (const idFila of idsFilas) {
+      // Buscar el separador padre de esta fila en el modelo
+      let separadorPadre: SeparadorPerfil | null = null;
+
+      for (let i = 0; i < perfil.filas.length; i++) {
+        const item = perfil.filas[i];
+
+        if (esSeparador(item)) {
+          const tramo = obtenerTramoDeSeparador(perfil.filas, i);
+
+          if (tramo.some((f) => f.id === idFila)) {
+            separadorPadre = item;
+
+            break;
+          }
+        }
+      }
+
+      if (!separadorPadre || separadoresActualizados.has(separadorPadre.id)) {
+        continue;
+      }
+
+      separadoresActualizados.add(separadorPadre.id);
+
+      // Buscar el header del separador en el DOM y reemplazar solo su botón estado
+      const headerEl = filas.querySelector<HTMLElement>(
+        `.fila-grupo[data-id="${separadorPadre.id}"]`,
+      );
+
+      if (!headerEl) {
+        continue;
+      }
+
+      const celdaEstado = headerEl.querySelector<HTMLElement>(
+        ".celda.grupo-estado",
+      );
+
+      if (!celdaEstado) {
+        continue;
+      }
+
+      const botonViejo = celdaEstado.querySelector("button");
+
+      const botonNuevo = crearEstadoGrupo(separadorPadre, alModificar);
+
+      if (botonViejo) {
+        celdaEstado.replaceChild(botonNuevo, botonViejo);
+      } else {
+        celdaEstado.append(botonNuevo);
+      }
+    }
+  };
+
+  registrarReconstruccion(
+    reconstruirTabla,
+    reconstruirFila,
+    actualizarSeparadoresDeFilas,
+  );
 
   return tabla;
 }
