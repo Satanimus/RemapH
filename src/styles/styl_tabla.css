@@ -202,6 +202,14 @@
     box-shadow: var(--separador-sombra);
 }
 
+.grupo-opciones .opciones-asa {
+
+    width: fit-content;
+
+    flex-shrink: 0;
+
+}
+
 .fila-grupo-placeholder {
 
     display: flex;

@@ -54,13 +54,13 @@ export function crearEstadoGrupo(
 
   boton.className = "ui-btn estado-toggle";
 
-  boton.dataset.estado = separador.estado === "ON" ? "on" : "off";
-
   const hayAlerta = tramoTieneAlerta(separador);
+  const esMixto = !hayAlerta && separador.estadoVisual === "mixto";
+
+  boton.dataset.estado = separador.estado === "ON" ? "on" : "off";
+  boton.dataset.conflicto = hayAlerta ? "true" : "false";
 
   if (hayAlerta) {
-    boton.dataset.conflicto = "true";
-
     const alerta = document.createElement("span");
 
     alerta.className = "estado-alerta";
@@ -68,14 +68,18 @@ export function crearEstadoGrupo(
     alerta.textContent = "⚠";
 
     boton.append(alerta);
-  } else {
-    if (separador.estadoVisual === "mixto") {
-      boton.classList.add("estado-grupo-mixto");
-    }
+  } else if (esMixto) {
+    boton.classList.add("estado-grupo-mixto");
 
     const texto = document.createElement("span");
 
-    texto.textContent = separador.estado;
+    texto.textContent = "⨂";
+
+    boton.append(texto);
+  } else {
+    const texto = document.createElement("span");
+
+    texto.textContent = separador.estado === "ON" ? "◉" : "⨉";
 
     boton.append(texto);
   }

@@ -717,9 +717,16 @@
 
 .estado-toggle.estado-grupo-mixto {
 
-    color: var(--text-disabled);
+    background: var(--text-disabled);
 
-    border-color: var(--text-disabled);
+    color: var(--text);
+
+    border-color: #000;
+}
+
+.estado-toggle.estado-grupo-mixto:hover {
+
+    background: var(--text-soft);
 }
 
 .estado-alerta {

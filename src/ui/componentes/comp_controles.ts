@@ -111,12 +111,6 @@ export function crearEstado(
 
   boton.dataset.conflicto = apagadaPorAviso ? "true" : "false";
 
-  const texto = document.createElement("span");
-
-  texto.textContent = apagadaPorAviso ? "OFF" : filaPerfil.estado;
-
-  boton.append(texto);
-
   if (apagadaPorAviso) {
     const alerta = document.createElement("span");
 
@@ -125,6 +119,12 @@ export function crearEstado(
     alerta.textContent = "⚠";
 
     boton.append(alerta);
+  } else {
+    const texto = document.createElement("span");
+
+    texto.textContent = filaPerfil.estado === "ON" ? "◉" : "⨉";
+
+    boton.append(texto);
   }
 
   boton.addEventListener(

@@ -54,3 +54,5 @@ row-height	Alto de fila	40px	pixeles
 r6	Radio de bordes	6px	pixeles
 gap8	Espaciado estándar	8px	pixeles
 gap16	Espaciado grande	16px	pixeles
+separador-sombra	Sombra interna del separador de grupo	inset 0 0 14px rgba(0, 0, 0, .3)	texto
+separador-nota-fuente	Fuente del texto de separador de grupo	600 13px "Segoe UI", sans-serif	texto

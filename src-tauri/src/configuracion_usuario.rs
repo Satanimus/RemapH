@@ -754,6 +754,7 @@ pub fn guardar_lote_pulsadores(cambios: &[(String, String)]) -> Result<(), Vec<(
 pub enum TipoValorCss {
     Color,
     Pixeles,
+    Texto,
 }
 
 #[derive(Clone, Debug)]
@@ -821,6 +822,7 @@ pub fn cargar_catalogo_css() -> &'static Vec<EntradaCatalogoCss> {
             let tipo = match tipo_texto {
                 "color" => TipoValorCss::Color,
                 "pixeles" => TipoValorCss::Pixeles,
+                "texto" => TipoValorCss::Texto,
                 _ => panic!(
                     "❌ Tipo desconocido \"{}\" en apariencia.tsv. Línea {}",
                     tipo_texto,
@@ -905,6 +907,14 @@ fn validar_css_segun_tipo(tipo: &TipoValorCss, valor: &str) -> Result<(), String
                 .parse::<u64>()
                 .map(|_| ())
                 .map_err(|_| format!("Debe ser un tamaño en píxeles, ej. \"16px\": \"{}\"", valor))
+        }
+
+        TipoValorCss::Texto => {
+            if valor.trim().is_empty() {
+                Err("El valor no puede estar vacío".to_string())
+            } else {
+                Ok(())
+            }
         }
     }
 }

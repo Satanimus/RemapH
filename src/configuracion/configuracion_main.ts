@@ -899,7 +899,9 @@ interface FilaCssCruda {
 }
 
 function grupoApariencia(tipo: string): string {
-  return tipo === "color" ? "Colores" : "Tamaños";
+  if (tipo === "color") return "Colores";
+  if (tipo === "texto") return "Texto libre";
+  return "Tamaños";
 }
 
 // aplicarOverridesApariencia() actualiza ESTA ventana (la Ventana de
