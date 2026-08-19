@@ -1193,7 +1193,7 @@
     text-align: center;
 }
 
-.popup-macro-editor-marcador,
+.ui-btn.popup-macro-editor-marcador,
 .popup-macro-editor-marcador-espacio {
     flex: 0 0 auto;
     min-width: 22px;
@@ -1203,13 +1203,13 @@
     text-align: center;
 }
 
-.popup-macro-editor-marcador {
+.ui-btn.popup-macro-editor-marcador {
     border-radius: 50%;
     font-size: var(--fs11);
     font-weight: 700;
 }
 
-.popup-macro-editor-marcador[data-activo="true"] {
+.ui-btn.popup-macro-editor-marcador[data-activo="true"] {
     color: var(--bg);
     background: var(--tag-cyan);
     border-color: var(--tag-cyan);
