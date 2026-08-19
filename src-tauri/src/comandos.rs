@@ -265,7 +265,8 @@ pub fn macro_guardar(nombre: String) -> Result<(), String> {
 
 #[tauri::command]
 pub fn macro_guardar_paso(macro_archivo: MacroArchivoJson) {
-    macro_cache::escribir_cache(&macro_archivo.nombre, macro_archivo);
+    let nombre = macro_archivo.nombre.clone();
+    macro_cache::escribir_cache(&nombre, macro_archivo);
 }
 
 #[tauri::command]
@@ -714,7 +715,7 @@ pub async fn abrir_ventana_captura_coordenada(
     // consultarla apenas termina de cargar, sin carrera posible.
     captura_coordenada::activar(ubicacion, modo_ventana, punto_referencia);
 
-    let ventana = WebviewWindowBuilder::new(
+    WebviewWindowBuilder::new(
         &app,
         VENTANA_CAPTURA_COORDENADA,
         WebviewUrl::App("captura.html".into()),
@@ -731,13 +732,6 @@ pub async fn abrir_ventana_captura_coordenada(
     .devtools(true)
     .build()
     .map_err(|error| error.to_string())?;
-
-    // Abre las devtools de ESTA ventana automáticamente en debug — ya
-    // cumplió su propósito de diagnóstico (confirmó el deadlock de
-    // WebviewWindowBuilder en comando síncrono). Comentado por ahora;
-    // descomentar si hace falta diagnosticar algo de nuevo.
-    // #[cfg(debug_assertions)]
-    // ventana.open_devtools();
 
     Ok(())
 }

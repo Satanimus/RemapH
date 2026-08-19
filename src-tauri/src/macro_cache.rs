@@ -25,13 +25,14 @@ use crate::macro_json::MacroArchivoJson;
 use crate::macro_usuario;
 use std::collections::HashMap;
 use std::fs;
-use std::sync::Mutex;
+use std::sync::{LazyLock, Mutex};
 
 // ======================================================
 // 🗂️ ESTADO GLOBAL
 // ======================================================
 
-static CACHE: Mutex<HashMap<String, MacroArchivoJson>> = Mutex::new(HashMap::new());
+static CACHE: LazyLock<Mutex<HashMap<String, MacroArchivoJson>>> =
+    LazyLock::new(|| Mutex::new(HashMap::new()));
 
 // ======================================================
 // ✍️ ESCRIBIR EN CACHE

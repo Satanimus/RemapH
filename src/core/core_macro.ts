@@ -342,7 +342,7 @@ export function clonarPasoMacro(paso: PasoMacro): PasoMacro {
 export function textoTipoPasoMacro(tipo: TipoPasoMacro): string {
   switch (tipo) {
     case "tecla_mouse":
-      return "⌨️ Tecla/Mouse";
+      return "🔠 Tecla/Mouse";
 
     case "espera":
       return "⏳ Espera";
@@ -351,7 +351,7 @@ export function textoTipoPasoMacro(tipo: TipoPasoMacro): string {
       return "🔁 Bucle";
 
     case "coordenada":
-      return "🖱️ Coordenada";
+      return "📌 Coordenada";
 
     case "pegar":
       return "📋 Pegar";
@@ -360,7 +360,7 @@ export function textoTipoPasoMacro(tipo: TipoPasoMacro): string {
       return "📂 Abrir";
 
     case "multimedia":
-      return "🎚️ Multimedia";
+      return "🎵 Multimedia";
   }
 }
 
@@ -374,7 +374,7 @@ export function textoTipoPasoMacro(tipo: TipoPasoMacro): string {
 export function iconoTipoPasoMacro(tipo: TipoPasoMacro): string {
   switch (tipo) {
     case "tecla_mouse":
-      return "⌨️";
+      return "🔠";
 
     case "espera":
       return "⏳";
@@ -383,7 +383,7 @@ export function iconoTipoPasoMacro(tipo: TipoPasoMacro): string {
       return "🔁";
 
     case "coordenada":
-      return "🖱️";
+      return "📌";
 
     case "pegar":
       return "📋";
@@ -392,7 +392,7 @@ export function iconoTipoPasoMacro(tipo: TipoPasoMacro): string {
       return "📂";
 
     case "multimedia":
-      return "🎚️";
+      return "🎵";
   }
 }
 

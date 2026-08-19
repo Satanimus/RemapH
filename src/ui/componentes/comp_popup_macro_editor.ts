@@ -492,6 +492,18 @@ function montarEditor(
   ): void {
     eventoInicial.preventDefault();
 
+    // La posición real en pantalla puede no coincidir con
+    // posicionX/posicionY: si el popup no entraba en la ventana al
+    // abrirse, mostrarPopupFijo (vía ajustarPosicionDentroDeVentana)
+    // lo reubicó usando right/bottom en vez de left/top, sin
+    // actualizar estas variables. Usar el valor viejo acá producía el
+    // salto en el primer arrastre — se recalcula desde la posición
+    // real de pantalla en cada inicio de arrastre.
+    const rect = contenedorPopup.getBoundingClientRect();
+
+    posicionX = rect.left;
+    posicionY = rect.top;
+
     const offsetX = eventoInicial.clientX - posicionX;
     const offsetY = eventoInicial.clientY - posicionY;
 
@@ -602,7 +614,7 @@ function montarEditor(
     const nombre = document.createElement("span");
 
     nombre.className = "popup-macro-barra-nombre";
-    nombre.textContent = macroArchivo.nombre;
+    nombre.textContent = `🧩 ${macroArchivo.nombre}`;
 
     const botonRenombrar = crearBoton({
       texto: "...",
@@ -990,20 +1002,19 @@ function montarEditor(
 }
 
 // ======================================================
-// 📐 ENCABEZADO DE COLUMNAS (⁝ · # · Tipo · Extra · Nota)
+// 📐 ENCABEZADO DE COLUMNAS (# · ⁝ · Tipo · Extra · Nota)
 // ------------------------------------------------------
-// Fila fija arriba de la lista de pasos (spec punto 10), con un
-// separador arrastrable entre cada celda (spec punto 10: "solo
-// visible en el encabezado, el listado de abajo se mantiene sin
-// separador visible"). Cada resizer ajusta la variable CSS
-// --col-<nombre>-width en columnaDerecha (contenedor del editor,
-// ver F3) — las celdas de cada fila de paso leen esa misma
-// variable, así el ancho queda sincronizado sin duplicarlo.
+// Fila fija arriba de la lista de pasos (spec punto 10). Único
+// separador arrastrable: entre Extra y Nota (spec: "las demás
+// columnas tendrán ancho fijo", "la flexible será la columna
+// Extra"). Arrastrarlo ajusta --col-nota-width — Extra (flex:1
+// en CSS) se acomoda sola al espacio que sobra, sin variable
+// propia.
 // ======================================================
 
 const COLUMNAS_ENCABEZADO: { nombre: string; etiqueta: string }[] = [
-  { nombre: "asa", etiqueta: "⁝" },
   { nombre: "numero", etiqueta: "#" },
+  { nombre: "asa", etiqueta: "⁝" },
   { nombre: "tipo", etiqueta: "Tipo" },
   { nombre: "extra", etiqueta: "Extra" },
   { nombre: "nota", etiqueta: "Nota" },
@@ -1014,7 +1025,7 @@ function crearEncabezadoColumnas(columnaDerecha: HTMLElement): HTMLElement {
 
   encabezado.className = "popup-macro-editor-header";
 
-  COLUMNAS_ENCABEZADO.forEach((columna, indice) => {
+  COLUMNAS_ENCABEZADO.forEach((columna) => {
     const celda = document.createElement("div");
 
     celda.className = "popup-macro-col-header";
@@ -1023,25 +1034,22 @@ function crearEncabezadoColumnas(columnaDerecha: HTMLElement): HTMLElement {
 
     encabezado.append(celda);
 
-    // Sin resizer después de la última celda (Nota) — no hay
-    // columna siguiente que ajustar contra ella.
-    if (indice < COLUMNAS_ENCABEZADO.length - 1) {
-      encabezado.append(crearResizerColumna(columnaDerecha, columna.nombre));
+    // Único separador visible: entre Extra y Nota (spec punto 7).
+    // El resto de las columnas tiene ancho fijo, sin resizer.
+    if (columna.nombre === "extra") {
+      encabezado.append(crearResizerColumna(columnaDerecha));
     }
   });
 
   return encabezado;
 }
 
-function crearResizerColumna(
-  columnaDerecha: HTMLElement,
-  nombreColumna: string,
-): HTMLElement {
+function crearResizerColumna(columnaDerecha: HTMLElement): HTMLElement {
   const resizer = document.createElement("div");
 
   resizer.className = "popup-macro-col-resizer";
 
-  const variable = `--col-${nombreColumna}-width`;
+  const variable = "--col-nota-width";
 
   resizer.addEventListener("mousedown", (eventoInicial) => {
     eventoInicial.preventDefault();
@@ -1053,9 +1061,12 @@ function crearResizerColumna(
     const xInicial = eventoInicial.clientX;
 
     const alMover = (eventoMover: MouseEvent): void => {
+      // El resizer queda a la izquierda de Nota: arrastrar hacia la
+      // derecha corre el límite hacia la derecha (Extra gana
+      // espacio, Nota lo cede), así que el delta se resta.
       const delta = eventoMover.clientX - xInicial;
 
-      const nuevoAncho = Math.max(20, anchoInicial + delta);
+      const nuevoAncho = Math.max(20, anchoInicial - delta);
 
       columnaDerecha.style.setProperty(variable, `${nuevoAncho}px`);
     };
@@ -1100,12 +1111,24 @@ function crearFilaPaso(
   contenedor.dataset.pasoId = idPaso;
 
   // ----------------------------------
-  // FILA PRINCIPAL (⁝, #, Tipo, Extra [marcador + acción], Nota)
+  // FILA PRINCIPAL (#, ⁝, Tipo, Extra [marcador + acción], Nota)
   // ----------------------------------
 
   const filaPrincipal = document.createElement("div");
 
   filaPrincipal.className = "popup-macro-editor-paso-fila";
+
+  // # — fuera del elemento arrastrable (mismo patrón que el carril
+  // de números de la tabla principal en ui_tabla.ts, spec punto
+  // G5/11): puramente visual, no se guarda ni se selecciona/edita,
+  // y no se mueve junto con el resto de la fila al arrastrarla. Va
+  // primero, a la izquierda de ⁝ (spec bug 6).
+  const numero = document.createElement("span");
+
+  numero.className = "popup-macro-editor-numero";
+  numero.textContent = `#${indice + 1}`;
+
+  filaPrincipal.append(numero);
 
   // ⁝ Asa — reusa el mismo botón de opciones de fila de ventana
   // principal (mismo comportamiento de arrastre, con su marcador de
@@ -1123,17 +1146,6 @@ function crearFilaPaso(
   });
 
   filaPrincipal.append(asa);
-
-  // # — fuera del elemento arrastrable (mismo patrón que el carril
-  // de números de la tabla principal en ui_tabla.ts, spec punto
-  // G5/11): puramente visual, no se guarda ni se selecciona/edita,
-  // y no se mueve junto con el resto de la fila al arrastrarla.
-  const numero = document.createElement("span");
-
-  numero.className = "popup-macro-editor-numero";
-  numero.textContent = `#${indice + 1}`;
-
-  filaPrincipal.append(numero);
 
   // Tipo — SOLO ÍCONO (spec punto 11/G3). Clic despliega la lista
   // vertical de los 7 tipos in-place (mismo look que abrirPopupTipo
@@ -1591,13 +1603,13 @@ function crearDetalleExpandido(
   // ----------------------------------
 
   const tipos: { texto: string; valor: TipoPasoMacro }[] = [
-    { texto: "⌨️ Tecla/Mouse", valor: "tecla_mouse" },
+    { texto: "🔠 Tecla/Mouse", valor: "tecla_mouse" },
     { texto: "⏳ Espera", valor: "espera" },
     { texto: "🔁 Bucle", valor: "bucle" },
-    { texto: "🖱️ Coordenada", valor: "coordenada" },
+    { texto: "📌 Coordenada", valor: "coordenada" },
     { texto: "📋 Pegar", valor: "pegar" },
     { texto: "📂 Abrir", valor: "abrir" },
-    { texto: "🎚️ Multimedia", valor: "multimedia" },
+    { texto: "🎵 Multimedia", valor: "multimedia" },
   ];
 
   detalle.append(

@@ -29,8 +29,6 @@ import { crearBoton } from "./comp_boton";
 
 import { reconstruirFila } from "../ui_tabla_control";
 
-import { confirmarPopup } from "./comp_popup_confirmar";
-
 import { abrirEditorMacro } from "./comp_popup_macro_editor";
 
 import type { ContextoFila } from "../../core/core_contexto_fila";
@@ -176,6 +174,12 @@ function crearMenuPrincipal(
   menu.append(botonAbrir);
 
   // ---------- Eliminar (solo si hay macro asignada) ----------
+  // Doble verificación mediante el propio botón (mismo patrón que
+  // "Eliminar perfil"): el primer click solo cambia el texto a
+  // confirmación, el segundo ejecuta. El comportamiento de "la fila
+  // que la tenía asignada queda en OFF con aviso" se mantiene tal
+  // cual (ver macro_eliminar/compilador.rs), pero ya no se avisa
+  // de eso en un popup de mensaje.
   if (nombreActual) {
     const botonEliminar = crearBoton({
       texto: "Eliminar",
@@ -183,13 +187,14 @@ function crearMenuPrincipal(
 
     botonEliminar.classList.add("popup-btn-peligro");
 
-    botonEliminar.addEventListener("click", async (eventoClick) => {
-      const confirmado = await confirmarPopup(
-        `¿Eliminar la macro "${nombreActual}"? Si alguna fila la tiene asignada, quedará en OFF con aviso hasta que se le asigne otra.`,
-        eventoClick,
-      );
+    let confirmando = false;
 
-      if (!confirmado) {
+    botonEliminar.addEventListener("click", async () => {
+      if (!confirmando) {
+        confirmando = true;
+
+        botonEliminar.textContent = "⚠️ Confirmar eliminación";
+
         return;
       }
 

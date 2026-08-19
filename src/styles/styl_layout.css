@@ -938,8 +938,10 @@
    ====================================================== */
 
 .popup-macro-editor {
-    min-width: 360px;
-    max-width: 440px;
+    min-width: 640px;
+    max-width: 1100px;
+    resize: horizontal;
+    overflow: auto;
 }
 
 .popup-macro-editor-titulo {
@@ -947,6 +949,208 @@
     color: var(--text);
     font-weight: 600;
 }
+
+/* ======================================================
+   🚫 BOTÓN "PELIGRO" (Eliminar — Etapa H1)
+   ------------------------------------------------------
+   Letra roja en reposo, borde rojo al pasar el mouse. Usado por
+   Eliminar en el popup Acción de ventana principal y en el menú
+   del asa ⁝ de cada paso del editor.
+   ====================================================== */
+
+.ui-btn.popup-btn-peligro {
+    color: var(--highlight-red);
+}
+
+.ui-btn.popup-btn-peligro:hover {
+    border-color: var(--highlight-red);
+}
+
+/* ======================================================
+   🏷️ BARRA DE TÍTULO ARRASTRABLE (Etapa H2 / D3-D4)
+   ====================================================== */
+
+.popup-macro-barra {
+    display: flex;
+    align-items: center;
+    gap: var(--gap8);
+    margin: calc(var(--gap8) * -1) calc(var(--gap8) * -1) 0;
+    padding: var(--gap8);
+    background: var(--panel2);
+    border-radius: var(--r4) var(--r4) 0 0;
+    cursor: move;
+}
+
+.popup-macro-barra-nombre {
+    flex: 1;
+    min-width: 0;
+    color: var(--text);
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    cursor: default;
+}
+
+.popup-macro-barra-boton {
+    flex: 0 0 auto;
+}
+
+.popup-macro-barra-input {
+    flex: 1;
+    min-width: 0;
+}
+
+/* ======================================================
+   🔚 PIE DE BOTONES (Cancelar / Guardar como / Guardar — Etapa H2 / D5)
+   ====================================================== */
+
+.popup-macro-editor-pie {
+    display: flex;
+    justify-content: flex-end;
+    gap: var(--gap8);
+}
+
+/* ======================================================
+   ✏️ OVERLAY "GUARDAR COMO" (Etapa H2 / D5)
+   ------------------------------------------------------
+   El popup fijo no puede abrir otro popup anidado (ver cabecera
+   de comp_popup_macro_editor.ts), así que "Guardar como" se
+   resuelve como una caja centrada encima del propio editor.
+   ====================================================== */
+
+.popup-macro-guardarcomo-overlay {
+    position: absolute;
+    inset: 0;
+    z-index: 10;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.45);
+    border-radius: var(--r4);
+}
+
+.popup-macro-guardarcomo-caja {
+    width: 88%;
+    max-width: 280px;
+    display: flex;
+    flex-direction: column;
+    gap: var(--gap8);
+    padding: var(--gap12);
+    background: var(--panel);
+    border: 1px solid var(--border-light);
+    border-radius: var(--r6);
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.5);
+}
+
+/* ======================================================
+   🧱 CUERPO EN DOS COLUMNAS (Etapa H3 / E1)
+   ====================================================== */
+
+.popup-macro-editor-cuerpo {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--gap12);
+}
+
+.popup-macro-editor-columna-derecha {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: var(--gap4);
+}
+
+.popup-macro-funciones {
+    flex: 0 0 auto;
+    width: 120px;
+    display: flex;
+    flex-direction: column;
+    gap: var(--gap8);
+    padding-right: var(--gap8);
+    border-right: 1px solid var(--border-light);
+}
+
+.popup-macro-funciones-titulo {
+    color: var(--text-soft);
+    font-size: var(--fs11);
+    text-transform: uppercase;
+    letter-spacing: .04em;
+}
+
+.popup-macro-funciones .popup-macro-editor-agregar {
+    flex-direction: column;
+}
+
+.popup-macro-editor-agregar .ui-btn {
+    width: 100%;
+    justify-content: flex-start;
+    text-align: left;
+}
+
+/* ======================================================
+   📐 ENCABEZADO DE COLUMNAS (Etapa H4 / F1-F3)
+   ------------------------------------------------------
+   Los anchos son variables CSS (--col-<nombre>-width) fijadas
+   en .popup-macro-editor-columna-derecha al montar el editor y
+   ajustadas en vivo por cada resizer — encabezado y filas de
+   paso leen la misma variable, así quedan siempre sincronizados.
+   ====================================================== */
+
+.popup-macro-editor-header {
+    display: flex;
+    align-items: center;
+    padding: 0 var(--gap4);
+    color: var(--text-soft);
+    font-size: var(--fs11);
+    font-weight: 600;
+}
+
+.popup-macro-col-header {
+    text-align: center;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.popup-macro-col-header[data-columna="asa"] {
+    width: var(--col-asa-width);
+}
+
+.popup-macro-col-header[data-columna="numero"] {
+    width: var(--col-numero-width);
+}
+
+.popup-macro-col-header[data-columna="tipo"] {
+    width: var(--col-tipo-width);
+}
+
+.popup-macro-col-header[data-columna="extra"] {
+    flex: 1;
+    min-width: 0;
+    text-align: left;
+}
+
+.popup-macro-col-header[data-columna="nota"] {
+    width: var(--col-nota-width);
+}
+
+.popup-macro-col-resizer {
+    flex: 0 0 auto;
+    width: 4px;
+    margin: 0 2px;
+    align-self: stretch;
+    cursor: col-resize;
+    border-radius: var(--r4);
+}
+
+.popup-macro-col-resizer:hover {
+    background: var(--border-light);
+}
+
+/* ======================================================
+   📋 LISTA Y FILAS DE PASOS (Etapa H4/H5 — anchos de columna)
+   ====================================================== */
 
 .popup-macro-editor-lista {
     display: flex;
@@ -976,14 +1180,14 @@
 
 .popup-macro-editor-asa {
     flex: 0 0 auto;
-    min-width: 24px;
-    padding: 0 4px;
+    width: var(--col-asa-width);
+    padding: 0;
     cursor: grab;
 }
 
 .popup-macro-editor-numero {
     flex: 0 0 auto;
-    min-width: 24px;
+    width: var(--col-numero-width);
     font-size: var(--fs11);
     color: var(--text-soft);
     text-align: center;
@@ -1013,10 +1217,17 @@
 
 .popup-macro-editor-tipo {
     flex: 0 0 auto;
-    max-width: 130px;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    width: var(--col-tipo-width);
+    padding: 0;
+    font-size: var(--fs16);
+}
+
+.popup-macro-editor-extra {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: var(--gap4);
 }
 
 .popup-macro-editor-accion {
@@ -1031,7 +1242,7 @@
 
 .popup-macro-editor-menu-asa {
     align-self: flex-start;
-    margin-left: 24px;
+    margin-left: var(--col-asa-width);
 }
 
 .popup-macro-editor-eliminar {
@@ -1044,7 +1255,7 @@
 }
 
 .popup-macro-editor-detalle {
-    margin-left: 24px;
+    margin-left: calc(var(--col-asa-width) + var(--col-numero-width));
     display: flex;
     flex-direction: column;
     gap: var(--gap8);
@@ -1054,16 +1265,41 @@
     min-width: 140px;
 }
 
-.popup-macro-editor-agregar {
-    flex-wrap: wrap;
-}
-
-.popup-macro-editor-agregar .ui-btn {
-    flex: 1 1 auto;
-    white-space: nowrap;
-}
-
 .popup-macro-editor-ruta-lista,
 .popup-macro-editor-abrircon-lista {
     margin-top: var(--gap4);
+}
+
+/* ======================================================
+   📝 NOTA DE PASO (Etapa H5 / G4)
+   ------------------------------------------------------
+   Texto plano, no se envía al ejecutar — letra gris para
+   diferenciarla del resto de los campos.
+   ====================================================== */
+
+.popup-macro-nota {
+    width: var(--col-nota-width);
+    flex: 0 0 auto;
+    height: 28px;
+    padding: 0 var(--gap8);
+    background: transparent;
+    color: var(--text-soft);
+    font-style: italic;
+    border: 1px solid transparent;
+    border-radius: var(--r4);
+}
+
+.popup-macro-nota:hover,
+.popup-macro-nota:focus {
+    background: var(--panel2);
+    border-color: var(--border);
+}
+
+.popup-macro-nota:focus {
+    outline: none;
+    border-color: var(--highlight);
+}
+
+.popup-macro-nota::placeholder {
+    color: var(--text-disabled);
 }
