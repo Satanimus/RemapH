@@ -139,9 +139,9 @@ use crate::configuracion_usuario;
 use crate::macro_json::MacroArchivoJson;
 use crate::macros;
 use crate::perfil;
-use crate::perfil_json::AgrupacionJson;
 use crate::perfil_ui::{
-    convertir_perfil, FilaUI, ResultadoPerfil, ResultadoPerfilInicial, TriggerCapturaUI,
+    convertir_perfil, AgrupacionUI, FilaUI, ResultadoPerfil, ResultadoPerfilInicial,
+    TriggerCapturaUI,
 };
 use crate::pulsadores;
 
@@ -290,7 +290,7 @@ pub fn macro_eliminar(nombre: String) -> Result<(), String> {
 #[tauri::command]
 pub fn compilar_perfil(
     filas: Vec<FilaUI>,
-    grupos: Vec<AgrupacionJson>,
+    grupos: Vec<AgrupacionUI>,
 ) -> Result<ResultadoCompilacion, String> {
     let perfil = convertir_perfil(filas, grupos);
 

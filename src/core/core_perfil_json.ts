@@ -16,7 +16,7 @@
 // La UI lo representa visualmente.
 // ======================================================
 
-import type { Perfil, FilaPerfil } from "./core_perfil";
+import type { Perfil, FilaPerfil, AgrupacionPerfil } from "./core_perfil";
 
 import { crearFila } from "./core_perfil";
 
@@ -52,6 +52,8 @@ import { traducirLote } from "./core_traductor";
 
 export interface perfil_json {
   remapeos: RemapeoJson[];
+
+  grupos: AgrupacionJson[];
 }
 
 // ======================================================
@@ -122,6 +124,27 @@ interface RemapeoJson {
   nota: string;
 }
 
+// ======================================================
+// AGRUPACION JSON
+// ------------------------------------------------------
+// Nombres de campo tal cual los serializa Rust (snake_case,
+// sin #[serde(rename)]) — mismo criterio que RemapeoJson.
+// ======================================================
+
+interface AgrupacionJson {
+  id: string;
+
+  estado: string;
+
+  nota: string;
+
+  color: string;
+
+  expandido: boolean;
+
+  num_filas: number;
+}
+
 interface TriggerJson {
   modificadores: InputJson[];
 
@@ -177,10 +200,27 @@ export async function convertirperfil_json(
 
     filas: filas.length > 0 ? filas : [crearFila()],
 
-    // Placeholder: la carga real desde perfil_json.grupos (Rust) se
-    // conecta recién en la Etapa F (persistencia). Acá es solo para
-    // no romper el tipo `Perfil`.
-    grupos: [],
+    grupos: perfil_json.grupos.map(convertirAgrupacion),
+  };
+}
+
+// ======================================================
+// 🗂️ CONVERTIR AGRUPACION
+// ======================================================
+
+function convertirAgrupacion(grupo: AgrupacionJson): AgrupacionPerfil {
+  return {
+    id: grupo.id,
+
+    estado: grupo.estado,
+
+    nota: grupo.nota,
+
+    color: grupo.color,
+
+    expandido: grupo.expandido,
+
+    numFilas: grupo.num_filas,
   };
 }
 

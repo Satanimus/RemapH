@@ -114,9 +114,14 @@ export function crearTabla(alModificar: () => void): HTMLElement {
   // El controlador vive una sola vez para toda la vida de
   // la tabla (a diferencia del editor de Macro, que la crea
   // y destruye por cada apertura de popup) — no hace falta
-  // llamar destruir(). onReordenar solo sincroniza el
-  // array del perfil: el reordenamiento visual del DOM ya
-  // lo hizo el componente antes de llamarlo.
+  // llamar destruir(). onReordenar sincroniza el array del
+  // perfil y ADEMÁS reconstruye la tabla entera: el
+  // reordenamiento visual que ya hizo el componente es solo
+  // un swap de posición de los nodos existentes, no vuelve a
+  // calcular pertenencia a grupo — sin este reconstruirTabla()
+  // el carril de números/expandir y los colores/bordes de
+  // grupo de cada fila quedan con los valores de ANTES del
+  // movimiento (ver bugs de sincronía y de color de fondo).
   // ==================================================
 
   const controladorArrastre = crearControladorArrastre({
@@ -148,6 +153,8 @@ export function crearTabla(alModificar: () => void): HTMLElement {
       perfil.grupos = recalcularGrupos(perfil.grupos, nuevoOrden);
 
       alModificar();
+
+      reconstruirTabla();
     },
 
     obtenerIdsGrupos: () => obtenerPerfilUi().grupos.map((g) => g.id),

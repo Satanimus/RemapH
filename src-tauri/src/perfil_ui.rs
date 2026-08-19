@@ -332,13 +332,55 @@ pub struct EstadoCachePerfil {
 }
 
 // ======================================================
+// 🗂️ AGRUPACION UI
+// ======================================================
+
+#[derive(Deserialize)]
+pub struct AgrupacionUI {
+    pub id: String,
+
+    pub estado: String,
+
+    pub nota: String,
+
+    pub color: String,
+
+    pub expandido: bool,
+
+    #[serde(rename = "numFilas")]
+    pub num_filas: usize,
+}
+
+// ======================================================
 // 🔄 CONVERTIR PERFIL
 // ======================================================
 
-pub fn convertir_perfil(filas: Vec<FilaUI>, grupos: Vec<AgrupacionJson>) -> perfil_json {
+pub fn convertir_perfil(filas: Vec<FilaUI>, grupos: Vec<AgrupacionUI>) -> perfil_json {
     let remapeos = filas.into_iter().map(convertir_fila).collect();
 
+    let grupos = grupos.into_iter().map(convertir_agrupacion).collect();
+
     perfil_json { remapeos, grupos }
+}
+
+// ======================================================
+// 🗂️ CONVERTIR AGRUPACION
+// ======================================================
+
+fn convertir_agrupacion(grupo: AgrupacionUI) -> AgrupacionJson {
+    AgrupacionJson {
+        id: grupo.id,
+
+        estado: grupo.estado,
+
+        nota: grupo.nota,
+
+        color: grupo.color,
+
+        expandido: grupo.expandido,
+
+        num_filas: grupo.num_filas,
+    }
 }
 
 // ======================================================
