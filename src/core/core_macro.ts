@@ -251,6 +251,11 @@ export interface PasoMacro {
   multimediaComando: ComandoPasoMacro | null;
 
   multimediaAlcance: AlcancePasoMacro;
+
+  // Nota de texto plano, independiente del tipo — no se envía
+  // al ejecutar la macro (columna Nota del editor, spec punto
+  // 11). "" cuando no tiene nota.
+  nota: string;
 }
 
 // ======================================================
@@ -302,6 +307,8 @@ export function crearPasoMacro(tipo: TipoPasoMacro): PasoMacro {
     multimediaComando: null,
 
     multimediaAlcance: "global",
+
+    nota: "",
   };
 }
 
@@ -329,7 +336,7 @@ export function clonarPasoMacro(paso: PasoMacro): PasoMacro {
 }
 
 // ======================================================
-// 🏷️ TEXTO DE TIPO (columna Tipo del editor)
+// 🏷️ TEXTO DE TIPO (panel Funciones, resúmenes)
 // ======================================================
 
 export function textoTipoPasoMacro(tipo: TipoPasoMacro): string {
@@ -354,6 +361,38 @@ export function textoTipoPasoMacro(tipo: TipoPasoMacro): string {
 
     case "multimedia":
       return "🎚️ Multimedia";
+  }
+}
+
+// ======================================================
+// 🔣 ÍCONO DE TIPO (columna Tipo del editor — solo ícono)
+// ------------------------------------------------------
+// Mismo emoji que textoTipoPasoMacro, sin el texto — la celda
+// Tipo de cada fila de paso (Etapa 7) muestra solo esto.
+// ======================================================
+
+export function iconoTipoPasoMacro(tipo: TipoPasoMacro): string {
+  switch (tipo) {
+    case "tecla_mouse":
+      return "⌨️";
+
+    case "espera":
+      return "⏳";
+
+    case "bucle":
+      return "🔁";
+
+    case "coordenada":
+      return "🖱️";
+
+    case "pegar":
+      return "📋";
+
+    case "abrir":
+      return "📂";
+
+    case "multimedia":
+      return "🎚️";
   }
 }
 

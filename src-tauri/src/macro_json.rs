@@ -87,6 +87,10 @@ impl MacroArchivoJson {
 // multimedia_comando / multimedia_alcance: solo cuando
 //   tipo == "multimedia". "en_app" reusa el Filtro de App de
 //   la fila Macro contenedora (no tiene programa propio acá).
+//
+// nota: texto plano independiente del tipo, no se envía al
+//   ejecutar la macro (columna Nota del editor). "" cuando no
+//   tiene nota.
 // ======================================================
 
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -135,4 +139,6 @@ pub struct PasoMacroJson {
     pub multimedia_comando: Option<String>,
 
     pub multimedia_alcance: String,
+
+    pub nota: String,
 }

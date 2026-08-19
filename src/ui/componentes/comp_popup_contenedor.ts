@@ -4,11 +4,14 @@
 // Capa compartida por TODOS los popups.
 //
 // Cierra solo con click en el fondo, nunca por burbujeo
-// desde el contenido (inputs, botones, etc).
+// desde el contenido (inputs, botones, etc), salvo los
+// popups montados con mostrarPopupFijo() (ver más abajo),
+// que directamente ignoran el click en el fondo.
 // ======================================================
 
 let capaPopup: HTMLElement | null = null;
 let alCerrarActual: (() => void) | null = null;
+let popupFijoActual = false;
 
 export function crearContenedorPopup(): HTMLElement {
   if (capaPopup) {
@@ -20,6 +23,10 @@ export function crearContenedorPopup(): HTMLElement {
   capaPopup.className = "popup-capa";
 
   capaPopup.addEventListener("click", (evento) => {
+    if (popupFijoActual) {
+      return;
+    }
+
     if (evento.target === capaPopup) {
       ocultarPopup();
     }
@@ -34,6 +41,35 @@ export function mostrarPopup(
   y?: number,
   alCerrar?: () => void,
 ): void {
+  mostrarPopupInterno(contenido, x, y, alCerrar, false);
+}
+
+// ======================================================
+// 📌 POPUP FIJO
+// ------------------------------------------------------
+// Mismo montaje que mostrarPopup(), pero el click en el fondo
+// de la capa NO lo cierra (el popup solo se cierra mediante
+// una acción explícita del propio contenido, p. ej. un botón
+// Cancelar/Guardar). Usado por el editor de Macro
+// (comp_popup_macro_editor.ts), que además es arrastrable.
+// ======================================================
+
+export function mostrarPopupFijo(
+  contenido: HTMLElement,
+  x?: number,
+  y?: number,
+  alCerrar?: () => void,
+): void {
+  mostrarPopupInterno(contenido, x, y, alCerrar, true);
+}
+
+function mostrarPopupInterno(
+  contenido: HTMLElement,
+  x: number | undefined,
+  y: number | undefined,
+  alCerrar: (() => void) | undefined,
+  fijo: boolean,
+): void {
   if (!capaPopup) {
     return;
   }
@@ -45,6 +81,8 @@ export function mostrarPopup(
   capaPopup.style.display = "block";
 
   alCerrarActual = alCerrar ?? null;
+
+  popupFijoActual = fijo;
 
   if (x !== undefined && y !== undefined) {
     contenido.style.position = "fixed";
@@ -103,6 +141,8 @@ export function ocultarPopup(): void {
   }
 
   capaPopup.style.display = "none";
+
+  popupFijoActual = false;
 
   const alCerrar = alCerrarActual;
 

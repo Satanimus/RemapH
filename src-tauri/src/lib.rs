@@ -25,6 +25,7 @@ mod config;
 mod configuracion_usuario;
 mod entrada;
 mod eventos;
+mod macro_cache;
 mod macro_json;
 mod macro_usuario;
 mod macros;
@@ -95,9 +96,11 @@ pub fn run() {
             comandos::seleccionar_perfil,
             comandos::macro_listar,
             comandos::macro_nueva,
-            comandos::macro_clonar,
             comandos::macro_abrir,
             comandos::macro_guardar,
+            comandos::macro_guardar_paso,
+            comandos::macro_cancelar,
+            comandos::macro_guardar_como,
             comandos::macro_renombrar,
             comandos::macro_eliminar,
             comandos::listar_procesos_ventana,

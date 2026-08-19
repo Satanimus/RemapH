@@ -11,7 +11,6 @@
 // Responsabilidad:
 // - Listar macros guardadas.
 // - Crear una macro nueva (vacía).
-// - Clonar una macro existente.
 // - Abrir (cargar) una macro.
 // - Guardar una macro editada.
 // - Renombrar una macro (Etapa 8A).
@@ -33,6 +32,7 @@
 use std::fs;
 use std::path::Path;
 
+use crate::macro_cache;
 use crate::macro_json::MacroArchivoJson;
 use crate::macro_usuario;
 
@@ -70,31 +70,17 @@ pub fn crear_macro_nueva(nombre: Option<String>) -> Result<MacroArchivoJson, Str
 }
 
 // ======================================================
-// 📋 CLONAR MACRO
+// 🆕 CREAR MACRO NUEVA → CACHE
 // ------------------------------------------------------
-// nombre_nuevo: None o "" → usa el nombre de origen como base
-// (mismo criterio de colisión que arriba).
+// Igual que crear_macro_nueva (crea el archivo de usuario
+// vacío en disco), pero además escribe la copia inicial en
+// CACHE_MACROS para que el editor trabaje sobre ella.
 // ======================================================
 
-pub fn clonar_macro(
-    nombre_origen: String,
-    nombre_nuevo: Option<String>,
-) -> Result<MacroArchivoJson, String> {
-    let ruta_origen = macro_usuario::ruta_macro(&nombre_origen)?;
+pub fn crear_macro_nueva_a_cache(nombre: Option<String>) -> Result<MacroArchivoJson, String> {
+    let macro_archivo = crear_macro_nueva(nombre)?;
 
-    let mut macro_archivo = cargar_desde_disco(&ruta_origen)?;
-
-    let base = match nombre_nuevo.as_deref().map(str::trim) {
-        Some(nombre) if !nombre.is_empty() => nombre,
-        _ => &nombre_origen,
-    };
-
-    macro_archivo.nombre = macro_usuario::nombre_disponible(base)?;
-
-    guardar_en_disco(
-        &macro_archivo,
-        &macro_usuario::ruta_macro(&macro_archivo.nombre)?,
-    )?;
+    macro_cache::escribir_cache(&macro_archivo.nombre, macro_archivo.clone());
 
     Ok(macro_archivo)
 }
@@ -114,6 +100,21 @@ pub fn abrir_macro(nombre: String) -> Result<MacroArchivoJson, String> {
 }
 
 // ======================================================
+// 📂 ABRIR MACRO → CACHE
+// ------------------------------------------------------
+// Carga la macro desde disco y escribe la copia en
+// CACHE_MACROS para que el editor trabaje sobre ella.
+// ======================================================
+
+pub fn abrir_macro_a_cache(nombre: String) -> Result<MacroArchivoJson, String> {
+    let macro_archivo = abrir_macro(nombre)?;
+
+    macro_cache::escribir_cache(&macro_archivo.nombre, macro_archivo.clone());
+
+    Ok(macro_archivo)
+}
+
+// ======================================================
 // 💾 GUARDAR MACRO
 // ------------------------------------------------------
 // Guarda bajo macro_archivo.nombre tal cual viene — sin
@@ -125,6 +126,28 @@ pub fn guardar_macro(macro_archivo: MacroArchivoJson) -> Result<(), String> {
     let ruta = macro_usuario::ruta_macro(&macro_archivo.nombre)?;
 
     guardar_en_disco(&macro_archivo, &ruta)
+}
+
+// ======================================================
+// 💾 GUARDAR DESDE CACHE
+// ------------------------------------------------------
+// Promueve la copia en cache al archivo de usuario (botón
+// "Guardar" del editor). Delega en macro_cache::promover_cache.
+// ======================================================
+
+pub fn guardar_desde_cache(nombre: &str) -> Result<(), String> {
+    macro_cache::promover_cache(nombre)
+}
+
+// ======================================================
+// 🗑️ DESCARTAR CACHE (Cancelar)
+// ------------------------------------------------------
+// Descarta la copia en cache sin tocar el archivo de usuario
+// (botón "Cancelar" del editor). Delega en macro_cache::descartar_cache.
+// ======================================================
+
+pub fn descartar_cache_macro(nombre: &str) {
+    macro_cache::descartar_cache(nombre);
 }
 
 // ======================================================

@@ -2,24 +2,31 @@
 // 🧩📝 comp_Popup_Macro_Editor
 // ------------------------------------------------------
 // Editor completo de una Macro (popup Tipo/Acción/Extra por
-// paso), abierto desde el botón Extra de una fila tipo ===
-// "macro" (ver crearExtra() en comp_controles.ts). Distinto
-// de comp_popup_macro_accion.ts (que solo decide A CUÁL
-// macro apunta la fila) — acá se editan los PASOS de la
-// macro ya elegida (filaPerfil.accionReferencia).
+// paso), abierto desde el popup Acción de una fila tipo ===
+// "macro" (ver comp_popup_macro_accion.ts). Distinto de ese
+// archivo (que solo decide A CUÁL macro apunta la fila) — acá
+// se editan los PASOS de la macro ya elegida
+// (filaPerfil.accionReferencia).
 //
-// Mismo patrón persistente que el resto de popups Extra
-// (menu_express/portapapeles/abrir): cada interacción
-// actualiza el estado en memoria y redibuja el mismo popup en
-// el lugar. A diferencia de esos, acá el guardado NO es
-// instantáneo por campo — se guarda con un debounce corto vía
-// macro_guardar (ver guardarConDebounce más abajo), porque
-// escribir a disco en cada tecla de un input de texto sería
-// excesivo. Al cerrar el popup (clic afuera) se fuerza un
-// guardado final sin esperar el debounce.
+// Ciclo de vida vía CACHE (ver macro_cache.rs): al abrir se
+// trabaja siempre sobre una copia en cache, nunca directo
+// sobre el archivo de usuario. Los cambios "en vivo" del
+// editor (agregar/mover/editar pasos) se escriben con
+// debounce corto en la cache (macro_guardar_paso, ver más
+// abajo) — el archivo de usuario solo se reescribe al hacer
+// click en "Guardar" (macro_guardar, promueve cache → disco).
+// "Cancelar" descarta la cache sin tocar el disco
+// (macro_cancelar). "Guardar como" clona la cache actual a un
+// archivo de usuario nuevo (macro_guardar_como).
 //
-// mostrarPopup() reemplaza TODA la capa global de popups, así
-// que este editor no puede abrir sub-popups anidados sin
+// El popup se monta con mostrarPopupFijo() (no mostrarPopup):
+// no se cierra con click afuera — solo con Cancelar/Guardar,
+// que son las únicas acciones que definen qué pasa con la
+// cache. Es arrastrable mediante una barra de título propia
+// (ver crearBarraTitulo).
+//
+// mostrarPopupFijo() reemplaza TODA la capa global de popups,
+// así que este editor no puede abrir sub-popups anidados sin
 // destruirse a sí mismo (perdería el estado de arrastre, los
 // pasos expandidos, etc.). Por eso todo despliegue de opciones
 // por paso (elegir Tipo, capturar tecla, elegir comando
@@ -38,7 +45,9 @@
 
 import { invoke } from "@tauri-apps/api/core";
 
-import { mostrarPopup } from "./comp_popup_contenedor";
+import { mostrarPopupFijo, ocultarPopup } from "./comp_popup_contenedor";
+
+import { crearBoton } from "./comp_boton";
 
 import { reconstruirFila } from "../ui_tabla_control";
 
@@ -64,6 +73,7 @@ import {
   crearPasoMacro,
   clonarPasoMacro,
   textoTipoPasoMacro,
+  iconoTipoPasoMacro,
   letraMarcadorDisponible,
 } from "../../core/core_macro";
 
@@ -153,17 +163,16 @@ function crearSeparador(): HTMLElement {
 }
 
 // ======================================================
-// 💾 GUARDADO CON DEBOUNCE
+// 💾 GUARDADO EN CACHE (con debounce)
 // ------------------------------------------------------
-// macro_guardar ya existe en el backend (ver comandos.rs,
-// nota "el editor Etapa 5/6 reusa macro_guardar tal cual") —
-// el estado del popup ES el modelo de datos (sin traducción
-// intermedia, spec sección 1), así que guardar es enviar
-// macroArchivo tal cual. Debounce corto para no escribir a
-// disco en cada tecla de un input de texto (nombre, argumento,
-// ruta de Pegar); guardarAhora() fuerza el guardado inmediato
-// para el cierre del popup y para cambios "discretos" (elegir
-// una opción de un grupo, no un input de texto en vivo).
+// macro_guardar_paso escribe SOLO en la copia de cache
+// (ver macro_cache.rs / macros::guardar_desde_cache) — el
+// archivo de usuario en disco no se toca hasta que el botón
+// "Guardar" del popup invoque macro_guardar. Debounce corto
+// para no escribir en cada tecla de un input de texto
+// (nombre, argumento, ruta de Pegar); guardarAhora() fuerza
+// el guardado inmediato para cambios "discretos" (elegir una
+// opción de un grupo, no un input de texto en vivo).
 // ======================================================
 
 const DEBOUNCE_GUARDADO_MS = 400;
@@ -182,9 +191,9 @@ async function guardarAhora(macroArchivo: MacroArchivo): Promise<void> {
   cancelarDebounceGuardado();
 
   try {
-    await invoke("macro_guardar", { macroArchivo });
+    await invoke("macro_guardar_paso", { macroArchivo });
   } catch (error) {
-    console.error("❌ No se pudo guardar la macro:", error);
+    console.error("❌ No se pudo guardar la macro en cache:", error);
   }
 }
 
@@ -401,7 +410,7 @@ export function abrirEditorMacro(
     .then((macroArchivo) => {
       idsPasosActual = new WeakMap();
 
-      montarEditor(evento, contexto, macroArchivo, filaPerfil.app.programa);
+      montarEditor(evento, contexto, macroArchivo, filaPerfil);
     })
     .catch((error) => {
       console.error("❌ No se pudo abrir la macro:", error);
@@ -415,19 +424,40 @@ export function abrirEditorMacro(
 function montarEditor(
   evento: MouseEvent,
   contexto: ContextoFila,
-  macroArchivo: MacroArchivo,
-  programaFiltroApp: string | null,
+  macroArchivoInicial: MacroArchivo,
+  filaPerfil: FilaPerfil,
 ): void {
+  const programaFiltroApp = filaPerfil.app.programa;
+
+  // El nombre viaja en el propio macroArchivo, pero además se guarda
+  // acá aparte: es la CLAVE de cache (macro_cache::CACHE_MACROS), la
+  // que hay que usar en macro_guardar_paso/macro_guardar/macro_cancelar
+  // incluso si el usuario renombra en el medio (ver alConfirmarRenombrar).
+  let nombreCache = macroArchivoInicial.nombre;
+
+  let macroArchivo = macroArchivoInicial;
+
+  // Posición del popup — se fija en la apertura y la mueve el
+  // arrastre de la barra de título (crearBarraTitulo). Un redibujado
+  // (dibujar()) NO debe volver a centrarlo en el mouse.
+  let posicionX = evento.clientX;
+  let posicionY = evento.clientY;
+
   // Índice del paso actualmente expandido (mostrando su Acción/Extra
   // en detalle) — null si ninguno. Puramente visual, no se guarda.
   // Se guarda el ID sintético (no el índice) para sobrevivir a un
   // reordenamiento por arrastre mientras sigue expandido.
   let idPasoExpandido: string | null = null;
 
-  // Menú de opciones (Mover/Eliminar/Duplicar) del botón ⟫ de un
+  // Menú de opciones (Mover/Eliminar/Duplicar) del botón ⋮ de un
   // paso — igual criterio que idPasoExpandido, solo un menú abierto
   // a la vez.
   let idMenuAbierto: string | null = null;
+
+  // Formulario inline de renombrar (botón [...] de la barra) — solo
+  // uno puede estar abierto a la vez, y reemplaza el nombre de la
+  // barra mientras dure.
+  let renombrando = false;
 
   let controladorArrastre: ControladorArrastre | null = null;
 
@@ -446,6 +476,326 @@ function montarEditor(
   const guardarSinRedibujar = (): void => {
     guardarConDebounce(macroArchivo);
   };
+
+  // ----------------------------------
+  // 🖱️ ARRASTRE DE LA BARRA DE TITULO
+  // ------------------------------------------------------
+  // mousedown en la barra → mousemove reposiciona el popup dentro de
+  // la ventana → mouseup libera. No usa crearControladorArrastre (ese
+  // es para reordenar filas, no para mover ventanas) — patrón simple
+  // propio, análogo al de comp_popup_col_resizer más adelante.
+  // ----------------------------------
+
+  function iniciarArrastrePopup(
+    eventoInicial: MouseEvent,
+    contenedorPopup: HTMLElement,
+  ): void {
+    eventoInicial.preventDefault();
+
+    const offsetX = eventoInicial.clientX - posicionX;
+    const offsetY = eventoInicial.clientY - posicionY;
+
+    const alMover = (eventoMover: MouseEvent): void => {
+      posicionX = eventoMover.clientX - offsetX;
+      posicionY = eventoMover.clientY - offsetY;
+
+      contenedorPopup.style.left = `${posicionX}px`;
+      contenedorPopup.style.top = `${posicionY}px`;
+      contenedorPopup.style.right = "";
+      contenedorPopup.style.bottom = "";
+    };
+
+    const alSoltar = (): void => {
+      document.removeEventListener("mousemove", alMover);
+      document.removeEventListener("mouseup", alSoltar);
+    };
+
+    document.addEventListener("mousemove", alMover);
+    document.addEventListener("mouseup", alSoltar);
+  }
+
+  // ----------------------------------
+  // 🏷️ BARRA DE TÍTULO (arrastrable, con [...] Renombrar)
+  // ----------------------------------
+
+  function crearBarraTitulo(contenedorPopup: HTMLElement): HTMLElement {
+    const barra = document.createElement("div");
+
+    barra.className = "popup-macro-barra";
+
+    if (renombrando) {
+      const input = document.createElement("input");
+
+      input.className = "popup-input popup-macro-barra-input";
+      input.type = "text";
+      input.value = nombreCache;
+
+      const confirmarRenombre = async (): Promise<void> => {
+        const nuevoNombre = input.value.trim();
+
+        if (!nuevoNombre || nuevoNombre === nombreCache) {
+          renombrando = false;
+
+          redibujar();
+
+          return;
+        }
+
+        try {
+          const nombreFinal = await invoke<string>("macro_renombrar", {
+            nombreActual: nombreCache,
+            nombreNuevo: nuevoNombre,
+          });
+
+          nombreCache = nombreFinal;
+          macroArchivo.nombre = nombreFinal;
+
+          filaPerfil.accionReferencia = nombreFinal;
+
+          reconstruirFila(contexto.id);
+        } catch (error) {
+          console.error("❌ No se pudo renombrar la macro:", error);
+        }
+
+        renombrando = false;
+
+        redibujar();
+      };
+
+      input.addEventListener("keydown", (eventoTecla) => {
+        if (eventoTecla.key === "Enter") {
+          confirmarRenombre();
+        }
+
+        if (eventoTecla.key === "Escape") {
+          renombrando = false;
+
+          redibujar();
+        }
+      });
+
+      const botonConfirmar = crearBoton({ texto: "✓", titulo: "Confirmar" });
+
+      botonConfirmar.addEventListener("click", confirmarRenombre);
+
+      const botonCancelarRenombre = crearBoton({
+        texto: "✕",
+        titulo: "Cancelar",
+      });
+
+      botonCancelarRenombre.addEventListener("click", () => {
+        renombrando = false;
+
+        redibujar();
+      });
+
+      barra.append(input, botonConfirmar, botonCancelarRenombre);
+
+      requestAnimationFrame(() => {
+        input.focus();
+        input.select();
+      });
+
+      return barra;
+    }
+
+    const nombre = document.createElement("span");
+
+    nombre.className = "popup-macro-barra-nombre";
+    nombre.textContent = macroArchivo.nombre;
+
+    const botonRenombrar = crearBoton({
+      texto: "...",
+      titulo: "Renombrar",
+    });
+
+    botonRenombrar.classList.add("popup-macro-barra-boton");
+
+    botonRenombrar.addEventListener("click", (eventoClick) => {
+      eventoClick.stopPropagation();
+
+      renombrando = true;
+
+      redibujar();
+    });
+
+    barra.append(nombre, botonRenombrar);
+
+    barra.addEventListener("mousedown", (eventoDown) => {
+      // Ignora el mousedown que empieza en el botón [...] — ese
+      // clic es para renombrar, no para arrastrar.
+      if ((eventoDown.target as HTMLElement).closest("button")) {
+        return;
+      }
+
+      iniciarArrastrePopup(eventoDown, contenedorPopup);
+    });
+
+    return barra;
+  }
+
+  // ----------------------------------
+  // 🔚 ZONA INFERIOR (Cancelar / Guardar como / Guardar)
+  // ----------------------------------
+
+  function crearPieBotones(): HTMLElement {
+    const pie = document.createElement("div");
+
+    pie.className = "popup-macro-editor-pie";
+
+    const botonCancelar = crearBoton({ texto: "Cancelar" });
+
+    botonCancelar.addEventListener("click", () => {
+      invoke("macro_cancelar", { nombre: nombreCache }).catch((error) => {
+        console.error("❌ No se pudo cancelar la edición de la macro:", error);
+      });
+
+      cerrarEditor();
+    });
+
+    const botonGuardarComo = crearBoton({ texto: "Guardar como" });
+
+    botonGuardarComo.addEventListener("click", () => {
+      abrirFormularioGuardarComo();
+    });
+
+    const botonGuardar = crearBoton({ texto: "Guardar" });
+
+    botonGuardar.addEventListener("click", async () => {
+      cancelarDebounceGuardado();
+
+      try {
+        await invoke("macro_guardar_paso", { macroArchivo });
+
+        await invoke("macro_guardar", { nombre: nombreCache });
+      } catch (error) {
+        console.error("❌ No se pudo guardar la macro:", error);
+
+        return;
+      }
+
+      cerrarEditor();
+    });
+
+    pie.append(botonCancelar, botonGuardarComo, botonGuardar);
+
+    return pie;
+  }
+
+  // ----------------------------------
+  // ✏️ FORMULARIO "GUARDAR COMO"
+  // ------------------------------------------------------
+  // Mismo patrón visual que abrirFormularioNombre() en
+  // comp_popup_macro_accion.ts, pero inline dentro del mismo popup
+  // fijo (no puede abrir otro popup — ver nota de cabecera del
+  // archivo). Al confirmar, la fila pasa a apuntar a la macro nueva
+  // y el editor sigue abierto sobre ELLA (no sobre el origen).
+  // ----------------------------------
+
+  function abrirFormularioGuardarComo(): void {
+    const overlay = document.createElement("div");
+
+    overlay.className = "popup-macro-guardarcomo-overlay";
+
+    const caja = document.createElement("div");
+
+    caja.className = "popup-macro-guardarcomo-caja";
+
+    const input = document.createElement("input");
+
+    input.className = "popup-input";
+    input.type = "text";
+    input.value = `${macroArchivo.nombre} (copia)`;
+    input.placeholder = "Nombre de la macro";
+
+    const botones = document.createElement("div");
+
+    botones.className = "popup-confirmar-botones";
+
+    const botonCancelar = crearBoton({ texto: "Cancelar" });
+
+    botonCancelar.addEventListener("click", () => {
+      overlay.remove();
+    });
+
+    const botonConfirmar = crearBoton({ texto: "Guardar como" });
+
+    const confirmar = async (): Promise<void> => {
+      cancelarDebounceGuardado();
+
+      try {
+        await invoke("macro_guardar_paso", { macroArchivo });
+
+        const resultado = await invoke<MacroArchivo>("macro_guardar_como", {
+          nombreOrigen: nombreCache,
+          nombreNuevo: input.value.trim() || null,
+        });
+
+        nombreCache = resultado.nombre;
+        macroArchivo = resultado;
+
+        filaPerfil.accionReferencia = resultado.nombre;
+
+        reconstruirFila(contexto.id);
+      } catch (error) {
+        console.error("❌ No se pudo guardar como nueva macro:", error);
+
+        overlay.remove();
+
+        return;
+      }
+
+      overlay.remove();
+
+      redibujar();
+    };
+
+    botonConfirmar.addEventListener("click", confirmar);
+
+    input.addEventListener("keydown", (eventoTecla) => {
+      if (eventoTecla.key === "Enter") {
+        confirmar();
+      }
+
+      if (eventoTecla.key === "Escape") {
+        overlay.remove();
+      }
+    });
+
+    botones.append(botonCancelar, botonConfirmar);
+
+    caja.append(input, botones);
+
+    overlay.append(caja);
+
+    document.querySelector(".popup-macro-editor")?.appendChild(overlay);
+
+    requestAnimationFrame(() => {
+      input.focus();
+      input.select();
+    });
+  }
+
+  // ----------------------------------
+  // 🚪 CIERRE DEL EDITOR
+  // ------------------------------------------------------
+  // Ya NO se dispara por click afuera (el popup es fijo, ver
+  // mostrarPopupFijo) — solo por Cancelar o Guardar, cada uno
+  // decide antes qué pasa con la cache. Acá solo se libera el
+  // componente de arrastre de filas y se oculta el popup.
+  // ----------------------------------
+
+  function cerrarEditor(): void {
+    if (controladorArrastre) {
+      controladorArrastre.destruir();
+
+      controladorArrastre = null;
+    }
+
+    ocultarPopup();
+
+    reconstruirFila(contexto.id);
+  }
 
   function dibujar(): void {
     if (controladorArrastre) {
@@ -473,20 +823,45 @@ function montarEditor(
         .some((paso) => paso.tipo === "bucle");
 
     // ----------------------------------
-    // 🏷️ TÍTULO
+    // 🏷️ BARRA DE TÍTULO ARRASTRABLE
     // ----------------------------------
 
-    const titulo = document.createElement("div");
+    popup.append(crearBarraTitulo(popup));
 
-    titulo.className = "popup-fila-label popup-macro-editor-titulo";
+    // ----------------------------------
+    // 🧱 CUERPO EN DOS COLUMNAS
+    // ------------------------------------------------------
+    // Izquierda: panel fijo "Funciones" (los 7 tipos de paso, ver
+    // crearPanelFunciones). Derecha: lista de pasos. La barra de
+    // título y el pie de botones quedan FUERA de este bloque, como
+    // franjas horizontales completas arriba/abajo de las columnas.
+    // ----------------------------------
 
-    titulo.textContent = `🧩 ${macroArchivo.nombre}`;
+    const cuerpo = document.createElement("div");
 
-    popup.append(titulo);
+    cuerpo.className = "popup-macro-editor-cuerpo";
+
+    cuerpo.append(crearPanelFunciones(macroArchivo, guardarYRedibujar));
 
     // ----------------------------------
     // 📋 LISTA DE PASOS
     // ----------------------------------
+
+    const columnaDerecha = document.createElement("div");
+
+    columnaDerecha.className = "popup-macro-editor-columna-derecha";
+
+    // Anchos iniciales de columna como variables CSS en el contenedor
+    // del editor (spec F3) — los resizers del encabezado (F2) y las
+    // celdas de cada fila de paso (Etapa 7) leen las mismas variables,
+    // así quedan sincronizados sin duplicar el ancho en dos lugares.
+    columnaDerecha.style.setProperty("--col-asa-width", "28px");
+    columnaDerecha.style.setProperty("--col-numero-width", "32px");
+    columnaDerecha.style.setProperty("--col-tipo-width", "40px");
+    columnaDerecha.style.setProperty("--col-extra-width", "260px");
+    columnaDerecha.style.setProperty("--col-nota-width", "140px");
+
+    columnaDerecha.append(crearEncabezadoColumnas(columnaDerecha));
 
     const lista = document.createElement("div");
 
@@ -527,39 +902,36 @@ function montarEditor(
           guardarYRedibujar,
           guardarSinRedibujar,
           redibujar,
+          (idPasoAMover) => {
+            idMenuAbierto = null;
+
+            // El controlador se reasigna en cada dibujar() — se lee
+            // en el momento del click (no se captura antes), porque
+            // para entonces ya está montado y registrado más abajo.
+            controladorArrastre?.activarModoMoverPara(idPasoAMover);
+          },
         ),
       );
     });
 
-    popup.append(lista);
+    columnaDerecha.append(lista);
+
+    cuerpo.append(columnaDerecha);
+
+    popup.append(cuerpo);
 
     // ----------------------------------
-    // ➕ AGREGAR PASO
+    // 🔚 CANCELAR / GUARDAR COMO / GUARDAR
     // ----------------------------------
 
     popup.append(crearSeparador());
 
-    popup.append(crearMenuAgregarPaso(macroArchivo, guardarYRedibujar));
+    popup.append(crearPieBotones());
 
-    mostrarPopup(popup, evento.clientX, evento.clientY, () => {
-      // Cierre del popup (clic afuera): fuerza el guardado final sin
-      // esperar el debounce, y libera los listeners del componente
-      // de arrastre (ver destruir() en util_arrastrable.ts) — si no
-      // se llamara, quedarían escuchando document de una instancia
-      // que ya no existe.
-      guardarAhora(macroArchivo);
-
-      if (controladorArrastre) {
-        controladorArrastre.destruir();
-
-        controladorArrastre = null;
-      }
-
-      reconstruirFila(contexto.id);
-    });
+    mostrarPopupFijo(popup, posicionX, posicionY);
 
     // El componente de arrastre necesita el contenedor YA en el DOM
-    // (mostrarPopup ya lo insertó arriba) para poder registrar cada
+    // (mostrarPopupFijo ya lo insertó arriba) para poder registrar cada
     // fila-paso y medir sus posiciones.
     controladorArrastre = crearControladorArrastre({
       contenedor: lista,
@@ -596,6 +968,89 @@ function montarEditor(
 }
 
 // ======================================================
+// 📐 ENCABEZADO DE COLUMNAS (⁝ · # · Tipo · Extra · Nota)
+// ------------------------------------------------------
+// Fila fija arriba de la lista de pasos (spec punto 10), con un
+// separador arrastrable entre cada celda (spec punto 10: "solo
+// visible en el encabezado, el listado de abajo se mantiene sin
+// separador visible"). Cada resizer ajusta la variable CSS
+// --col-<nombre>-width en columnaDerecha (contenedor del editor,
+// ver F3) — las celdas de cada fila de paso leen esa misma
+// variable, así el ancho queda sincronizado sin duplicarlo.
+// ======================================================
+
+const COLUMNAS_ENCABEZADO: { nombre: string; etiqueta: string }[] = [
+  { nombre: "asa", etiqueta: "⁝" },
+  { nombre: "numero", etiqueta: "#" },
+  { nombre: "tipo", etiqueta: "Tipo" },
+  { nombre: "extra", etiqueta: "Extra" },
+  { nombre: "nota", etiqueta: "Nota" },
+];
+
+function crearEncabezadoColumnas(columnaDerecha: HTMLElement): HTMLElement {
+  const encabezado = document.createElement("div");
+
+  encabezado.className = "popup-macro-editor-header";
+
+  COLUMNAS_ENCABEZADO.forEach((columna, indice) => {
+    const celda = document.createElement("div");
+
+    celda.className = "popup-macro-col-header";
+    celda.dataset.columna = columna.nombre;
+    celda.textContent = columna.etiqueta;
+
+    encabezado.append(celda);
+
+    // Sin resizer después de la última celda (Nota) — no hay
+    // columna siguiente que ajustar contra ella.
+    if (indice < COLUMNAS_ENCABEZADO.length - 1) {
+      encabezado.append(crearResizerColumna(columnaDerecha, columna.nombre));
+    }
+  });
+
+  return encabezado;
+}
+
+function crearResizerColumna(
+  columnaDerecha: HTMLElement,
+  nombreColumna: string,
+): HTMLElement {
+  const resizer = document.createElement("div");
+
+  resizer.className = "popup-macro-col-resizer";
+
+  const variable = `--col-${nombreColumna}-width`;
+
+  resizer.addEventListener("mousedown", (eventoInicial) => {
+    eventoInicial.preventDefault();
+
+    const anchoInicial = parseFloat(
+      getComputedStyle(columnaDerecha).getPropertyValue(variable),
+    );
+
+    const xInicial = eventoInicial.clientX;
+
+    const alMover = (eventoMover: MouseEvent): void => {
+      const delta = eventoMover.clientX - xInicial;
+
+      const nuevoAncho = Math.max(20, anchoInicial + delta);
+
+      columnaDerecha.style.setProperty(variable, `${nuevoAncho}px`);
+    };
+
+    const alSoltar = (): void => {
+      document.removeEventListener("mousemove", alMover);
+      document.removeEventListener("mouseup", alSoltar);
+    };
+
+    document.addEventListener("mousemove", alMover);
+    document.addEventListener("mouseup", alSoltar);
+  });
+
+  return resizer;
+}
+
+// ======================================================
 // 📄 FILA DE UN PASO (cerrada o expandida)
 // ======================================================
 
@@ -613,6 +1068,7 @@ function crearFilaPaso(
   guardarYRedibujar: () => void,
   guardarSinRedibujar: () => void,
   redibujar: () => void,
+  activarModoMover: (idPaso: string) => void,
 ): HTMLElement {
   const idPaso = idDePaso(paso);
 
@@ -622,21 +1078,23 @@ function crearFilaPaso(
   contenedor.dataset.pasoId = idPaso;
 
   // ----------------------------------
-  // FILA PRINCIPAL (asa, #, marcador, tipo, acción)
+  // FILA PRINCIPAL (⁝, #, Tipo, Extra [marcador + acción], Nota)
   // ----------------------------------
 
   const filaPrincipal = document.createElement("div");
 
   filaPrincipal.className = "popup-macro-editor-paso-fila";
 
-  // ⟫ Asa — clic corto abre el menú Mover/Eliminar/Duplicar (ver
-  // crearMenuAsa), clic mantenido lo maneja util_arrastrable.ts
+  // ⁝ Asa — reusa el mismo botón de opciones de fila de ventana
+  // principal (mismo comportamiento de arrastre, con su marcador de
+  // 6 puntos): clic corto abre el popup Mover/Duplicar/Eliminar
+  // (ver crearMenuAsa), clic mantenido lo maneja util_arrastrable.ts
   // directamente sobre este mismo botón.
   const asa = document.createElement("button");
 
   asa.className = "ui-btn popup-macro-editor-asa";
-  asa.textContent = "⟫";
-  asa.title = "Mover / opciones";
+  asa.textContent = "⁝";
+  asa.title = "Opciones";
 
   asa.addEventListener("click", () => {
     alternarMenu(idPaso);
@@ -644,8 +1102,10 @@ function crearFilaPaso(
 
   filaPrincipal.append(asa);
 
-  // # — puramente visual, número de fondo (spec sección 3), no es
-  // un dato guardado ni se selecciona/edita.
+  // # — fuera del elemento arrastrable (mismo patrón que el carril
+  // de números de la tabla principal en ui_tabla.ts, spec punto
+  // G5/11): puramente visual, no se guarda ni se selecciona/edita,
+  // y no se mueve junto con el resto de la fila al arrastrarla.
   const numero = document.createElement("span");
 
   numero.className = "popup-macro-editor-numero";
@@ -653,56 +1113,62 @@ function crearFilaPaso(
 
   filaPrincipal.append(numero);
 
-  // Columna Marcador — la columna existe (reserva espacio) en toda
-  // fila apenas hay algún Bucle en la macro, pero el control real
-  // (asignar/quitar letra) solo se ofrece en pasos que NO son Bucle
-  // y que tienen al menos un Bucle en algún punto POSTERIOR (spec:
-  // "solo los pasos anteriores a un Bucle pueden tomar su letra").
-  // Un paso ya marcado se sigue mostrando aunque un reordenamiento
-  // lo haya dejado sin ningún Bucle detrás — así el usuario puede
-  // verlo y quitarlo, en vez de que el marcador quede "invisible"
-  // pero todavía activo. Reglas 3-5 de la spec (letra estable al
-  // reordenar, múltiples letras simultáneas — A, B, C..., una por
-  // Bucle — soportado desde el modelo de datos vía
-  // letraMarcadorDisponible) no imponen un único marcador global.
-  if (
-    hayBucle &&
-    paso.tipo !== "bucle" &&
-    (elegiblePorMarcador || paso.marcador)
-  ) {
-    filaPrincipal.append(
-      crearControlMarcador(paso, macroArchivo, guardarYRedibujar),
-    );
-  } else if (hayBucle) {
-    // Paso Bucle: espacio reservado sin control, para que el resto
-    // de las columnas se sigan alineando con las filas que sí
-    // muestran el selector de Marcador.
-    const espacio = document.createElement("span");
+  // Tipo — SOLO ÍCONO (spec punto 11/G3). Clic despliega la lista
+  // vertical de los 7 tipos in-place (mismo look que abrirPopupTipo
+  // de ventana principal — comp_popup_abrir.ts — pero expandida
+  // dentro de la propia fila, porque el editor de Macro no puede
+  // abrir un popup anidado sin destruirse — ver nota de cabecera).
+  const tipoAbierto = idMenuAbierto === `tipo:${idPaso}`;
 
-    espacio.className = "popup-macro-editor-marcador-espacio";
-
-    filaPrincipal.append(espacio);
-  }
-
-  // Tipo — botón que despliega el selector de los 7 tipos, en el
-  // lugar (mismo patrón que abrirConExpandido).
   const botonTipo = document.createElement("button");
 
   botonTipo.className = "ui-btn popup-macro-editor-tipo";
-  botonTipo.textContent = textoTipoPasoMacro(paso.tipo);
+  botonTipo.textContent = iconoTipoPasoMacro(paso.tipo);
+  botonTipo.title = textoTipoPasoMacro(paso.tipo);
 
   const expandido = idPasoExpandido === idPaso;
 
   botonTipo.addEventListener("click", (eventoClick) => {
     eventoClick.stopPropagation();
 
-    alternarExpandido(idPaso);
+    alternarMenu(`tipo:${idPaso}`);
   });
 
   filaPrincipal.append(botonTipo);
 
-  // Acción — resumen de una línea del paso (cerrado) o "editando"
-  // mientras está expandido (el detalle real va debajo).
+  // Extra — sin el listado de Tipos (spec punto 11): el resumen de
+  // una línea del paso (cerrado) o "editando" mientras está
+  // expandido (el detalle real va debajo). La columna Marcador
+  // (asignar/quitar letra de Bucle) vive al principio de esta
+  // celda cuando corresponde — no tiene columna propia en el
+  // encabezado ⁝/#/Tipo/Extra/Nota.
+  const extra = document.createElement("div");
+
+  extra.className = "popup-macro-editor-extra";
+
+  // Columna Marcador — reserva espacio en toda fila apenas hay
+  // algún Bucle en la macro, pero el control real (asignar/quitar
+  // letra) solo se ofrece en pasos que NO son Bucle y que tienen al
+  // menos un Bucle en algún punto POSTERIOR (spec: "solo los pasos
+  // anteriores a un Bucle pueden tomar su letra"). Un paso ya
+  // marcado se sigue mostrando aunque un reordenamiento lo haya
+  // dejado sin ningún Bucle detrás — así el usuario puede verlo y
+  // quitarlo, en vez de que el marcador quede "invisible" pero
+  // todavía activo.
+  if (
+    hayBucle &&
+    paso.tipo !== "bucle" &&
+    (elegiblePorMarcador || paso.marcador)
+  ) {
+    extra.append(crearControlMarcador(paso, macroArchivo, guardarYRedibujar));
+  } else if (hayBucle) {
+    const espacio = document.createElement("span");
+
+    espacio.className = "popup-macro-editor-marcador-espacio";
+
+    extra.append(espacio);
+  }
+
   const accion = document.createElement("button");
 
   accion.className = "ui-btn popup-macro-editor-accion";
@@ -714,18 +1180,57 @@ function crearFilaPaso(
     alternarExpandido(idPaso);
   });
 
-  filaPrincipal.append(accion);
+  extra.append(accion);
+
+  filaPrincipal.append(extra);
+
+  // Nota — input de texto plano, letra gris, no se envía al
+  // ejecutar (spec punto 11/G4). Guarda con debounce, sin
+  // redibujar todo el popup (perdería el foco), mismo criterio que
+  // el resto de inputs de texto en vivo del editor.
+  const inputNota = document.createElement("input");
+
+  inputNota.className = "popup-macro-nota";
+  inputNota.type = "text";
+  inputNota.placeholder = "Nota...";
+  inputNota.value = paso.nota;
+
+  inputNota.addEventListener("click", (eventoClick) => {
+    eventoClick.stopPropagation();
+  });
+
+  inputNota.addEventListener("input", () => {
+    paso.nota = inputNota.value;
+
+    guardarSinRedibujar();
+  });
+
+  filaPrincipal.append(inputNota);
 
   contenedor.append(filaPrincipal);
 
   // ----------------------------------
-  // MENÚ ⟫ (Mover ya lo activa util_arrastrable.ts con clic
-  // mantenido — acá solo Eliminar / Duplicar, clic corto)
+  // ⁝ MENÚ DEL BOTÓN DE OPCIONES (Mover / Duplicar / Eliminar)
+  // Y LISTA VERTICAL DE TIPOS — comparten idMenuAbierto (uno solo
+  // desplegado a la vez), distinguidos por prefijo de id.
   // ----------------------------------
 
   if (idMenuAbierto === idPaso) {
     contenedor.append(
-      crearMenuAsa(paso, indice, macroArchivo, guardarYRedibujar),
+      crearMenuAsa(
+        paso,
+        indice,
+        idPaso,
+        macroArchivo,
+        guardarYRedibujar,
+        activarModoMover,
+      ),
+    );
+  }
+
+  if (tipoAbierto) {
+    contenedor.append(
+      crearListaTipoPaso(paso, macroArchivo, guardarYRedibujar),
     );
   }
 
@@ -817,28 +1322,45 @@ function crearControlMarcador(
 }
 
 // ======================================================
-// ⟫ MENÚ DEL ASA (Eliminar / Duplicar)
+// ⁝ MENÚ DEL BOTÓN DE OPCIONES (Mover / Duplicar / Eliminar)
 // ------------------------------------------------------
-// "Mover" no es una opción de este menú — se activa con clic
-// MANTENIDO sobre el mismo botón ⟫, resuelto enteramente por
-// util_arrastrable.ts (ver registrarFila en montarEditor). Acá
-// solo se atiende el clic CORTO.
+// Reusa el mismo patrón que el popup de Opciones de fila de
+// ventana principal (comp_popup_abrir.ts): "Mover" activa el modo
+// mover del controlador de arrastre para este paso puntual (sin
+// pasar por el clic mantenido sobre el asa) — a partir de ahí el
+// usuario arrastra con el mouse o mueve con las flechas, igual
+// que con el mantenido. Sin íconos en los botones. "Eliminar" con
+// letra roja y borde rojo al pasar el mouse (clase
+// popup-btn-peligro, Etapa 8).
 // ======================================================
 
 function crearMenuAsa(
   paso: PasoMacro,
   indice: number,
+  idPaso: string,
   macroArchivo: MacroArchivo,
   guardarYRedibujar: () => void,
+  activarModoMover: (idPaso: string) => void,
 ): HTMLElement {
   const menu = document.createElement("div");
 
   menu.className = "popup-lista popup-macro-editor-menu-asa";
 
+  const botonMover = document.createElement("button");
+
+  botonMover.className = "ui-btn";
+  botonMover.textContent = "Mover";
+
+  botonMover.addEventListener("click", () => {
+    activarModoMover(idPaso);
+  });
+
+  menu.append(botonMover);
+
   const botonDuplicar = document.createElement("button");
 
   botonDuplicar.className = "ui-btn";
-  botonDuplicar.textContent = "📋 Duplicar";
+  botonDuplicar.textContent = "Duplicar";
 
   botonDuplicar.addEventListener("click", () => {
     macroArchivo.pasos.splice(indice + 1, 0, clonarPasoMacro(paso));
@@ -850,8 +1372,8 @@ function crearMenuAsa(
 
   const botonEliminar = document.createElement("button");
 
-  botonEliminar.className = "ui-btn popup-macro-editor-eliminar";
-  botonEliminar.textContent = "🗑️ Eliminar";
+  botonEliminar.className = "ui-btn popup-btn-peligro";
+  botonEliminar.textContent = "Eliminar";
 
   botonEliminar.addEventListener("click", () => {
     // Si este paso estaba marcado, cualquier Bucle que apuntara acá
@@ -879,13 +1401,103 @@ function crearMenuAsa(
 }
 
 // ======================================================
-// ➕ MENÚ "AGREGAR PASO" (7 tipos)
+// 🔽 LISTA VERTICAL DE TIPOS (celda Tipo, expandida in-place)
+// ------------------------------------------------------
+// Mismo look que abrirPopupTipo/crearListaTipo de ventana
+// principal (comp_popup_abrir.ts: clases popup-lista/
+// popup-tipo-item/popup-tipo-icono con ícono + texto), pero
+// montada dentro de la propia fila en vez de vía mostrarPopup —
+// el editor de Macro no puede abrir un popup anidado sin
+// destruirse (ver nota de cabecera del archivo).
+//
+// Al seleccionar un tipo DIFERENTE del actual, resetea los datos
+// de Extra del paso (spec punto 11): se reconstruye el paso desde
+// crearPasoMacro(nuevoTipo), preservando únicamente lo que es
+// independiente del tipo — marcador y nota.
 // ======================================================
 
-function crearMenuAgregarPaso(
+const TIPOS_PASO_MACRO: TipoPasoMacro[] = [
+  "tecla_mouse",
+  "espera",
+  "bucle",
+  "coordenada",
+  "pegar",
+  "abrir",
+  "multimedia",
+];
+
+function crearListaTipoPaso(
+  paso: PasoMacro,
   macroArchivo: MacroArchivo,
   guardarYRedibujar: () => void,
 ): HTMLElement {
+  const lista = document.createElement("div");
+
+  lista.className = "popup-lista popup-macro-editor-menu-asa";
+
+  TIPOS_PASO_MACRO.forEach((tipo) => {
+    const boton = document.createElement("button");
+
+    boton.className = "ui-btn popup-tipo-item";
+
+    const icono = document.createElement("span");
+
+    icono.className = "popup-tipo-icono";
+    icono.textContent = iconoTipoPasoMacro(tipo);
+
+    const texto = document.createElement("span");
+
+    texto.textContent = textoTipoPasoMacro(tipo).replace(/^\S+\s/, "");
+
+    boton.append(icono, texto);
+
+    boton.addEventListener("click", () => {
+      if (tipo !== paso.tipo) {
+        const nuevoPaso = crearPasoMacro(tipo);
+
+        nuevoPaso.marcador = paso.marcador;
+        nuevoPaso.nota = paso.nota;
+
+        Object.assign(paso, nuevoPaso);
+      }
+
+      guardarYRedibujar();
+    });
+
+    lista.append(boton);
+  });
+
+  return lista;
+}
+
+// ======================================================
+// ➕ MENÚ "AGREGAR PASO" (7 tipos)
+// ======================================================
+
+// ======================================================
+// 📌 PANEL "FUNCIONES" (columna izquierda fija, 7 tipos)
+// ------------------------------------------------------
+// Antes vivía al pie del popup (crearMenuAgregarPaso); desde la
+// Etapa 5 pasa a ser la columna izquierda fija del editor, con
+// subtítulo "Funciones" (spec punto 8). Sin el prefijo "+ " que
+// tenía cada botón.
+// ======================================================
+
+function crearPanelFunciones(
+  macroArchivo: MacroArchivo,
+  guardarYRedibujar: () => void,
+): HTMLElement {
+  const panel = document.createElement("div");
+
+  panel.className = "popup-macro-funciones";
+
+  const subtitulo = document.createElement("span");
+
+  subtitulo.className = "popup-macro-funciones-titulo";
+  subtitulo.textContent = "Funciones";
+
+  panel.append(subtitulo);
+
   const tipos: TipoPasoMacro[] = [
     "tecla_mouse",
     "espera",
@@ -904,7 +1516,7 @@ function crearMenuAgregarPaso(
     const boton = document.createElement("button");
 
     boton.className = "ui-btn popup-opcion";
-    boton.textContent = `+ ${textoTipoPasoMacro(tipo)}`;
+    boton.textContent = textoTipoPasoMacro(tipo);
 
     boton.addEventListener("click", () => {
       macroArchivo.pasos.push(crearPasoMacro(tipo));
@@ -915,7 +1527,9 @@ function crearMenuAgregarPaso(
     grupo.append(boton);
   });
 
-  return grupo;
+  panel.append(grupo);
+
+  return panel;
 }
 
 // ======================================================

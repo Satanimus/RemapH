@@ -22,10 +22,15 @@
 // Funciones del archivo
 // carpeta()
 //     Resuelve (y crea si no existe) la carpeta Macros.
+// carpeta_cache()
+//     Resuelve (y crea si no existe) la carpeta MacrosCache.
 // macros()
 //     Lista los nombres de todas las macros guardadas.
 // ruta_macro()
 //     Arma la ruta de una macro a partir de su nombre.
+// ruta_cache()
+//     Arma la ruta de la copia en cache de una macro a partir
+//     de su nombre.
 // nombre_disponible()
 //     Nombre libre a partir de uno pedido, agregando
 //     " (2)", " (3)"... si ya existe (mismo criterio que
@@ -139,6 +144,39 @@ pub fn nombre_disponible(base: &str) -> Result<String, String> {
 
         numero += 1;
     }
+}
+
+// ======================================================
+// 📁 OBTENER CARPETA MACROSCACHE
+// ======================================================
+
+pub fn carpeta_cache() -> Result<PathBuf, String> {
+    let appdata = std::env::var("APPDATA").map_err(|error| error.to_string())?;
+
+    let carpeta = PathBuf::from(appdata)
+        .join("RemapH")
+        .join("Usuario")
+        .join("MacrosCache");
+
+    fs::create_dir_all(&carpeta).map_err(|error| error.to_string())?;
+
+    Ok(carpeta)
+}
+
+// ======================================================
+// 📍 RUTA DE CACHE POR NOMBRE
+// ======================================================
+
+pub fn ruta_cache(nombre: &str) -> Result<PathBuf, String> {
+    if nombre.trim().is_empty() {
+        return Err("El nombre de la macro está vacío".to_string());
+    }
+
+    if nombre.contains('/') || nombre.contains('\\') || nombre == "." || nombre == ".." {
+        return Err("Nombre de macro inválido".to_string());
+    }
+
+    Ok(carpeta_cache()?.join(format!("{}.json", nombre)))
 }
 
 // ======================================================

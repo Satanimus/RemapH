@@ -136,7 +136,9 @@ use crate::captura_coordenada;
 use crate::compilador::ResultadoCompilacion;
 use crate::config;
 use crate::configuracion_usuario;
+use crate::macro_cache;
 use crate::macro_json::MacroArchivoJson;
+use crate::macro_usuario;
 use crate::macros;
 use crate::perfil;
 use crate::perfil_ui::{
@@ -248,25 +250,52 @@ pub fn macro_listar() -> Result<Vec<String>, String> {
 
 #[tauri::command]
 pub fn macro_nueva(nombre: Option<String>) -> Result<MacroArchivoJson, String> {
-    macros::crear_macro_nueva(nombre)
-}
-
-#[tauri::command]
-pub fn macro_clonar(
-    nombre_origen: String,
-    nombre_nuevo: Option<String>,
-) -> Result<MacroArchivoJson, String> {
-    macros::clonar_macro(nombre_origen, nombre_nuevo)
+    macros::crear_macro_nueva_a_cache(nombre)
 }
 
 #[tauri::command]
 pub fn macro_abrir(nombre: String) -> Result<MacroArchivoJson, String> {
-    macros::abrir_macro(nombre)
+    macros::abrir_macro_a_cache(nombre)
 }
 
 #[tauri::command]
-pub fn macro_guardar(macro_archivo: MacroArchivoJson) -> Result<(), String> {
-    macros::guardar_macro(macro_archivo)
+pub fn macro_guardar(nombre: String) -> Result<(), String> {
+    macros::guardar_desde_cache(&nombre)
+}
+
+#[tauri::command]
+pub fn macro_guardar_paso(macro_archivo: MacroArchivoJson) {
+    macro_cache::escribir_cache(&macro_archivo.nombre, macro_archivo);
+}
+
+#[tauri::command]
+pub fn macro_cancelar(nombre: String) {
+    macros::descartar_cache_macro(&nombre);
+}
+
+#[tauri::command]
+pub fn macro_guardar_como(
+    nombre_origen: String,
+    nombre_nuevo: Option<String>,
+) -> Result<MacroArchivoJson, String> {
+    let macro_archivo = macro_cache::leer_cache(&nombre_origen)
+        .ok_or_else(|| format!("No hay cache para la macro \"{}\"", nombre_origen))?;
+
+    let base = match nombre_nuevo.as_deref().map(str::trim) {
+        Some(nombre) if !nombre.is_empty() => nombre,
+        _ => &nombre_origen,
+    };
+
+    let nombre_final = macro_usuario::nombre_disponible(base)?;
+
+    let mut macro_final = macro_archivo;
+    macro_final.nombre = nombre_final.clone();
+
+    macros::guardar_macro(macro_final.clone())?;
+
+    macro_cache::escribir_cache(&nombre_final, macro_final.clone());
+
+    Ok(macro_final)
 }
 
 // ======================================================

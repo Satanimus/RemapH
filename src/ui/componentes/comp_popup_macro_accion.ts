@@ -2,22 +2,20 @@
 // 🧩 comp_Popup_Macro_Accion
 // ------------------------------------------------------
 // Menú de la columna Acción del tipo "Macro" (filaPerfil.tipo ===
-// "macro"), conectado desde comp_accion.ts. Desde la Etapa 8A
-// concentra TODO lo que es "elegir/editar/administrar QUÉ macro" —
-// antes Extra tenía "Editar" (abrir el editor); ahora vive acá,
-// junto con Renombrar/Eliminar (nuevos) y Nueva/Abrir/Clonar (ya
-// existían, ver Etapa 2/3). El único popup que sigue siendo aparte
-// es Extra, que desde 8A pasa a ser solo el selector de
-// Comportamiento (ver comp_popup_macro_extra.ts).
+// "macro"), conectado desde comp_accion.ts.
 //
-// Orden del menú (spec): Editar · Renombrar · Nueva · Abrir ·
-// Clonar · Eliminar.
+// Estado sin macro asignada: solo "Nueva" y "Abrir".
+// "Nueva" crea directo (sin formulario de nombre previo) y abre
+// el editor. "Abrir" despliega un box anidado (mismo patrón que
+// el botón Color en opciones de fila / comp_popup_abrir.ts, clase
+// popup-caja-interna) con el listado de macros guardadas.
 //
-// "Abrir" despliega el listado de macros guardadas (redibuja el
-// mismo popup en el lugar, mismo patrón persistente que
-// comp_popup_abrir_extra.ts) — clic en un nombre asigna y cierra.
-// "Clonar" clona la macro ACTUALMENTE ASIGNADA a la fila (si no hay
-// ninguna, no tiene sentido — el botón queda deshabilitado).
+// Estado con macro asignada: "Editar", "Nueva", "Abrir",
+// "Eliminar" (letra roja, borde rojo al hover). Renombrar y
+// Clonar ya no viven acá — Renombrar pasó al popup del editor
+// (comp_popup_macro_editor.ts) y Clonar fue reemplazado por
+// "Guardar como" dentro del editor.
+//
 // filaPerfil.accionReferencia sigue siendo el único dato que esta
 // fila guarda sobre la macro elegida (mismo campo genérico que ya
 // usa Multimedia) — nombre, no contenido.
@@ -40,7 +38,7 @@ import type { ContextoFila } from "../../core/core_contexto_fila";
 import type { FilaPerfil } from "../../core/core_perfil";
 
 // ======================================================
-// 📦 RESULTADO DE macro_nueva / macro_clonar
+// 📦 RESULTADO DE macro_nueva
 // ------------------------------------------------------
 // Espejo de MacroArchivoJson (macro_json.rs) — acá solo
 // importa `nombre`, el resto (pasos) lo consume el editor.
@@ -84,14 +82,18 @@ export function abrirPopupMacroAccion(
     );
 
     if (listaAbiertaExpandida) {
-      contenedor.append(crearSeparador());
+      const caja = document.createElement("div");
 
-      contenedor.append(
+      caja.className = "popup-caja-interna";
+
+      caja.append(
         crearListaMacros(filaPerfil, contexto, alModificar, () => {
           listaAbiertaExpandida = false;
           dibujar();
         }),
       );
+
+      contenedor.append(caja);
     }
 
     mostrarPopup(contenedor, evento.clientX, evento.clientY);
@@ -101,8 +103,10 @@ export function abrirPopupMacroAccion(
 }
 
 // ======================================================
-// 📋 MENÚ PRINCIPAL — Editar / Renombrar / Nueva / Abrir /
-//     Clonar / Eliminar
+// 📋 MENÚ PRINCIPAL
+// ------------------------------------------------------
+// Sin macro: Nueva · Abrir.
+// Con macro: Editar · Nueva · Abrir · Eliminar.
 // ======================================================
 
 function crearMenuPrincipal(
@@ -118,160 +122,94 @@ function crearMenuPrincipal(
 
   const nombreActual = filaPerfil.accionReferencia;
 
-  // ---------- Editar ----------
-  const botonEditar = crearBoton({
-    texto: "✏️ Editar",
-    titulo: nombreActual
-      ? undefined
-      : "Elegí una macro primero (Abrir o Nueva)",
-  });
+  // ---------- Editar (solo si hay macro asignada) ----------
+  if (nombreActual) {
+    const botonEditar = crearBoton({
+      texto: "Editar",
+    });
 
-  botonEditar.disabled = !nombreActual;
+    botonEditar.addEventListener("click", (eventoClick) => {
+      ocultarPopup();
 
-  botonEditar.addEventListener("click", (eventoClick) => {
-    ocultarPopup();
-
-    if (nombreActual) {
       abrirEditorMacro(eventoClick, contexto, filaPerfil);
-    }
-  });
+    });
 
-  // ---------- Renombrar ----------
-  const botonRenombrar = crearBoton({
-    texto: "🏷️ Renombrar",
-    titulo: nombreActual
-      ? undefined
-      : "Elegí una macro primero (Abrir o Nueva)",
-  });
-
-  botonRenombrar.disabled = !nombreActual;
-
-  botonRenombrar.addEventListener("click", (eventoClick) => {
-    if (!nombreActual) {
-      return;
-    }
-
-    abrirFormularioNombre(
-      nombreActual,
-      eventoClick,
-      async (nuevoNombre) => {
-        const resultado = await invoke<string>("macro_renombrar", {
-          nombreActual,
-          nombreNuevo: nuevoNombre,
-        });
-
-        asignarMacro(resultado, filaPerfil, contexto, alModificar);
-      },
-      "❌ No se pudo renombrar la macro:",
-    );
-  });
+    menu.append(botonEditar);
+  }
 
   // ---------- Nueva ----------
   const botonNueva = crearBoton({
-    texto: "🆕 Nueva",
+    texto: "Nueva",
   });
 
-  botonNueva.addEventListener("click", (eventoClick) => {
-    abrirFormularioNombre(
-      "",
-      eventoClick,
-      async (nombre) => {
-        const resultado = await invoke<MacroArchivoResultado>("macro_nueva", {
-          nombre: nombre || null,
-        });
+  botonNueva.addEventListener("click", async (eventoClick) => {
+    ocultarPopup();
 
-        asignarMacro(resultado.nombre, filaPerfil, contexto, alModificar);
-      },
-      "❌ No se pudo crear la macro:",
-    );
+    try {
+      const resultado = await invoke<MacroArchivoResultado>("macro_nueva", {
+        nombre: null,
+      });
+
+      filaPerfil.accionReferencia = resultado.nombre;
+
+      reconstruirFila(contexto.id);
+
+      alModificar();
+
+      abrirEditorMacro(eventoClick, contexto, filaPerfil);
+    } catch (error) {
+      console.error("❌ No se pudo crear la macro:", error);
+    }
   });
+
+  menu.append(botonNueva);
 
   // ---------- Abrir ----------
   const botonAbrir = crearBoton({
-    texto: `📂 Abrir ${listaAbierta ? "▴" : "▾"}`,
+    texto: `Abrir ${listaAbierta ? "▴" : "▾"}`,
   });
 
   botonAbrir.addEventListener("click", () => {
     alternarLista();
   });
 
-  // ---------- Clonar ----------
-  const botonClonar = crearBoton({
-    texto: "📋 Clonar",
-    titulo: nombreActual ? undefined : "Elegí una macro primero para clonarla",
-  });
+  menu.append(botonAbrir);
 
-  botonClonar.disabled = !nombreActual;
+  // ---------- Eliminar (solo si hay macro asignada) ----------
+  if (nombreActual) {
+    const botonEliminar = crearBoton({
+      texto: "Eliminar",
+    });
 
-  botonClonar.addEventListener("click", (eventoClick) => {
-    if (!nombreActual) {
-      return;
-    }
+    botonEliminar.classList.add("popup-btn-peligro");
 
-    abrirFormularioNombre(
-      `${nombreActual} (copia)`,
-      eventoClick,
-      async (nuevoNombre) => {
-        const resultado = await invoke<MacroArchivoResultado>(
-          "macro_clonar",
-          {
-            nombreOrigen: nombreActual,
+    botonEliminar.addEventListener("click", async (eventoClick) => {
+      const confirmado = await confirmarPopup(
+        `¿Eliminar la macro "${nombreActual}"? Si alguna fila la tiene asignada, quedará en OFF con aviso hasta que se le asigne otra.`,
+        eventoClick,
+      );
 
-            nombreNuevo: nuevoNombre,
-          },
-        );
+      if (!confirmado) {
+        return;
+      }
 
-        asignarMacro(resultado.nombre, filaPerfil, contexto, alModificar);
-      },
-      "❌ No se pudo clonar la macro:",
-    );
-  });
+      try {
+        await invoke("macro_eliminar", { nombre: nombreActual });
+      } catch (error) {
+        console.error("❌ No se pudo eliminar la macro:", error);
 
-  // ---------- Eliminar ----------
-  const botonEliminar = crearBoton({
-    texto: "🗑️ Eliminar",
-    titulo: nombreActual ? undefined : "Elegí una macro primero",
-  });
+        return;
+      }
 
-  botonEliminar.disabled = !nombreActual;
+      filaPerfil.accionReferencia = null;
 
-  botonEliminar.addEventListener("click", async (eventoClick) => {
-    if (!nombreActual) {
-      return;
-    }
+      reconstruirFila(contexto.id);
 
-    const confirmado = await confirmarPopup(
-      `¿Eliminar la macro "${nombreActual}"? Si alguna fila la tiene asignada, quedará en OFF con aviso hasta que se le asigne otra.`,
-      eventoClick,
-    );
+      alModificar();
+    });
 
-    if (!confirmado) {
-      return;
-    }
-
-    try {
-      await invoke("macro_eliminar", { nombre: nombreActual });
-    } catch (error) {
-      console.error("❌ No se pudo eliminar la macro:", error);
-
-      return;
-    }
-
-    filaPerfil.accionReferencia = null;
-
-    reconstruirFila(contexto.id);
-
-    alModificar();
-  });
-
-  menu.append(
-    botonEditar,
-    botonRenombrar,
-    botonNueva,
-    botonAbrir,
-    botonClonar,
-    botonEliminar,
-  );
+    menu.append(botonEliminar);
+  }
 
   return menu;
 }
@@ -340,84 +278,6 @@ function crearListaMacros(
 }
 
 // ======================================================
-// ✏️ FORMULARIO DE NOMBRE
-// ------------------------------------------------------
-// Compartido entre Renombrar / Nueva / Clonar — mismo patrón que
-// abrirFormularioRenombrar() en comp_popup_perfil.ts.
-// ======================================================
-
-function abrirFormularioNombre(
-  valorInicial: string,
-  evento: MouseEvent,
-  confirmar: (nombre: string) => Promise<void>,
-  mensajeError: string,
-): void {
-  const contenedor = document.createElement("div");
-
-  contenedor.className = "popup-perfil-renombrar";
-
-  const input = document.createElement("input");
-
-  input.className = "popup-input";
-
-  input.type = "text";
-
-  input.value = valorInicial;
-
-  input.placeholder = "macro_001";
-
-  const botones = document.createElement("div");
-
-  botones.className = "popup-confirmar-botones";
-
-  const botonCancelar = crearBoton({
-    texto: "Cancelar",
-  });
-
-  const botonGuardar = crearBoton({
-    texto: "Guardar",
-  });
-
-  const aceptar = async (): Promise<void> => {
-    try {
-      await confirmar(input.value.trim());
-    } catch (error) {
-      console.error(mensajeError, error);
-
-      return;
-    } finally {
-      ocultarPopup();
-    }
-  };
-
-  botonGuardar.addEventListener("click", aceptar);
-
-  botonCancelar.addEventListener("click", () => {
-    ocultarPopup();
-  });
-
-  input.addEventListener("keydown", (evento) => {
-    if (evento.key === "Enter") {
-      aceptar();
-    }
-
-    if (evento.key === "Escape") {
-      ocultarPopup();
-    }
-  });
-
-  botones.append(botonCancelar, botonGuardar);
-
-  contenedor.append(input, botones);
-
-  mostrarPopup(contenedor, evento.clientX, evento.clientY);
-
-  input.focus();
-
-  input.select();
-}
-
-// ======================================================
 // 🔗 ASIGNAR MACRO A LA FILA
 // ------------------------------------------------------
 // filaPerfil.accionReferencia es el mismo campo genérico que ya lee
@@ -436,16 +296,4 @@ function asignarMacro(
   reconstruirFila(contexto.id);
 
   alModificar();
-}
-
-// ======================================================
-// SEPARADOR
-// ======================================================
-
-function crearSeparador(): HTMLElement {
-  const separador = document.createElement("div");
-
-  separador.className = "popup-perfil-separador";
-
-  return separador;
 }
