@@ -15,7 +15,11 @@ import { obtenerPerfilUi } from "../core/core_perfil_ui";
 
 import type { FilaPerfil } from "../core/core_perfil";
 
-import { construirPlanVisual, recalcularGrupos } from "../core/core_agrupacion";
+import {
+  construirPlanVisual,
+  recalcularGrupos,
+  calcularPertenencia,
+} from "../core/core_agrupacion";
 
 import {
   registrarReconstruccion,
@@ -142,6 +146,19 @@ export function crearTabla(alModificar: () => void): HTMLElement {
 
       const idsGrupos = new Set(perfil.grupos.map((g) => g.id));
 
+      // Pertenencia DE ANTES de este reordenamiento (por id, no por
+      // índice: perfil.filas está a punto de reasignarse). La usa
+      // recalcularGrupos para no confundir filas sueltas sin tocar
+      // con filas recién arrastradas dentro del último grupo.
+      const { filaAGrupo } = calcularPertenencia(
+        perfil.grupos,
+        perfil.filas.length,
+      );
+
+      const filaAGrupoAntes = new Map<string, string | null>(
+        perfil.filas.map((f, i) => [f.id, filaAGrupo[i]]),
+      );
+
       const idsFilasNuevo = nuevoOrden.filter((id) => !idsGrupos.has(id));
 
       const porIdFila = new Map(perfil.filas.map((f) => [f.id, f]));
@@ -150,7 +167,11 @@ export function crearTabla(alModificar: () => void): HTMLElement {
         .map((id) => porIdFila.get(id))
         .filter((f): f is FilaPerfil => !!f);
 
-      perfil.grupos = recalcularGrupos(perfil.grupos, nuevoOrden);
+      perfil.grupos = recalcularGrupos(
+        perfil.grupos,
+        nuevoOrden,
+        filaAGrupoAntes,
+      );
 
       alModificar();
 

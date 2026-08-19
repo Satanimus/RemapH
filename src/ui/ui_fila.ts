@@ -48,7 +48,10 @@ export function crearFila(
   }
 
   if (infoGrupo) {
-    fila.style.setProperty("--grupo-color", `var(--tag-${infoGrupo.color})`);
+    fila.style.setProperty(
+      "--grupo-color",
+      infoGrupo.color ? `var(--tag-${infoGrupo.color})` : "var(--border-light)",
+    );
 
     fila.classList.add("en-grupo");
 

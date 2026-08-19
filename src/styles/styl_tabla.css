@@ -70,13 +70,11 @@
     font-size: var(--fs12);
 }
 
-.carril-expandir {
+.carril-expandir-slot {
 
     height: var(--row-height);
 
     width: 100%;
-
-    min-width: 0;
 
     display: flex;
 
@@ -85,18 +83,23 @@
     justify-content: center;
 
     box-sizing: border-box;
+}
+
+.carril-expandir {
+
+    min-width: 0;
 
     padding: 0;
 
     background: transparent;
 
-    border: none;
+    border: 1px solid var(--grupo-color, var(--border-light));
 
     color: var(--text-disabled);
 
     cursor: pointer;
 
-    transition: color var(--speed);
+    transition: color var(--speed), border-color var(--speed);
 }
 
 .carril-expandir:hover {
