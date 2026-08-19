@@ -57,7 +57,7 @@ export function crearEstadoGrupo(
   const hayAlerta = tramoTieneAlerta(separador);
   const esMixto = !hayAlerta && separador.estadoVisual === "mixto";
 
-  boton.dataset.estado = separador.estado === "ON" ? "on" : "off";
+  boton.dataset.estado = separador.estadoVisual === "on" ? "on" : "off";
   boton.dataset.conflicto = hayAlerta ? "true" : "false";
 
   if (hayAlerta) {
@@ -79,7 +79,7 @@ export function crearEstadoGrupo(
   } else {
     const texto = document.createElement("span");
 
-    texto.textContent = separador.estado === "ON" ? "◉" : "⨉";
+    texto.textContent = separador.estadoVisual === "on" ? "◉" : "⨉";
 
     boton.append(texto);
   }
