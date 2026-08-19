@@ -73,6 +73,16 @@
     pointer-events: none;
 }
 
+/* El fantasma es un clon completo de la fila (ver crearFantasma en
+   util_arrastrable.ts) — acá se oculta puntualmente el número del
+   editor de Macro dentro de ese clon, para no sugerir que el número
+   "viaja" con el contenido mientras se arrastra (spec punto 11). No
+   afecta al número real de la fila (solo existe dentro del fantasma),
+   ni a la tabla principal (usa su propio carril, sin esta clase). */
+.arr-fantasma-fila .popup-macro-editor-numero {
+    visibility: hidden;
+}
+
 .arr-fantasma-contador {
     position: absolute;
     top: -8px;

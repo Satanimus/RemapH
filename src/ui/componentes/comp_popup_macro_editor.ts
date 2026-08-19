@@ -946,6 +946,28 @@ function montarEditor(
           .filter((paso): paso is PasoMacro => !!paso);
 
         guardarConDebounce(macroArchivo);
+
+        // aplicarNuevoOrden (util_arrastrable.ts) ya reordenó
+        // físicamente los nodos en `lista` antes de llamar a este
+        // callback — solo falta refrescar el texto de cada número
+        // para que la numeración quede secuencial tras soltar (spec
+        // punto 11: el # es puramente visual/derivado, no debe poder
+        // quedar desordenado). Un redibujar() completo acá cortaría
+        // de raíz la animación de acomodo que arranca justo después
+        // de este callback, así que se ajusta solo el texto.
+        nuevoOrden.forEach((id, indice) => {
+          const fila = lista.querySelector<HTMLElement>(
+            `[data-paso-id="${id}"]`,
+          );
+
+          const numero = fila?.querySelector<HTMLElement>(
+            ".popup-macro-editor-numero",
+          );
+
+          if (numero) {
+            numero.textContent = `#${indice + 1}`;
+          }
+        });
       },
       onSalirModoMover: () => {
         // No hace falta redibujar acá — salirModoMover ya limpió las
@@ -1216,21 +1238,29 @@ function crearFilaPaso(
   // ----------------------------------
 
   if (idMenuAbierto === idPaso) {
-    contenedor.append(
-      crearMenuAsa(
-        paso,
-        indice,
-        idPaso,
-        macroArchivo,
-        guardarYRedibujar,
-        activarModoMover,
-      ),
+    // elementoMenu se referencia dentro de cerrarMenuLigero antes de
+    // quedar asignado — seguro porque ese callback solo se invoca
+    // desde un click posterior (ver comentario en crearMenuAsa).
+    let elementoMenu: HTMLElement | undefined;
+
+    elementoMenu = crearMenuAsa(
+      paso,
+      indice,
+      idPaso,
+      macroArchivo,
+      () => alternarMenu(idPaso),
+      () => elementoMenu?.remove(),
+      activarModoMover,
     );
+
+    contenedor.append(elementoMenu);
   }
 
   if (tipoAbierto) {
     contenedor.append(
-      crearListaTipoPaso(paso, macroArchivo, guardarYRedibujar),
+      crearListaTipoPaso(paso, macroArchivo, () =>
+        alternarMenu(`tipo:${idPaso}`),
+      ),
     );
   }
 
@@ -1339,13 +1369,20 @@ function crearMenuAsa(
   indice: number,
   idPaso: string,
   macroArchivo: MacroArchivo,
-  guardarYRedibujar: () => void,
+  cerrarMenu: () => void,
+  cerrarMenuLigero: () => void,
   activarModoMover: (idPaso: string) => void,
 ): HTMLElement {
   const menu = document.createElement("div");
 
   menu.className = "popup-lista popup-macro-editor-menu-asa";
 
+  // "Mover" NO puede cerrar el menú con un redibujado completo: eso
+  // destruiría y recrearía el controladorArrastre recién activado
+  // (dibujar() lo destruye/reconstruye siempre, ver montarEditor),
+  // perdiendo la selección que activarModoMoverPara acaba de aplicar.
+  // Por eso usa cerrarMenuLigero (solo saca este menú del DOM) en vez
+  // de cerrarMenu (que sí redibuja completo).
   const botonMover = document.createElement("button");
 
   botonMover.className = "ui-btn";
@@ -1353,6 +1390,7 @@ function crearMenuAsa(
 
   botonMover.addEventListener("click", () => {
     activarModoMover(idPaso);
+    cerrarMenuLigero();
   });
 
   menu.append(botonMover);
@@ -1365,7 +1403,8 @@ function crearMenuAsa(
   botonDuplicar.addEventListener("click", () => {
     macroArchivo.pasos.splice(indice + 1, 0, clonarPasoMacro(paso));
 
-    guardarYRedibujar();
+    guardarConDebounce(macroArchivo);
+    cerrarMenu();
   });
 
   menu.append(botonDuplicar);
@@ -1392,7 +1431,8 @@ function crearMenuAsa(
 
     macroArchivo.pasos.splice(indice, 1);
 
-    guardarYRedibujar();
+    guardarConDebounce(macroArchivo);
+    cerrarMenu();
   });
 
   menu.append(botonEliminar);
@@ -1429,7 +1469,7 @@ const TIPOS_PASO_MACRO: TipoPasoMacro[] = [
 function crearListaTipoPaso(
   paso: PasoMacro,
   macroArchivo: MacroArchivo,
-  guardarYRedibujar: () => void,
+  cerrarMenu: () => void,
 ): HTMLElement {
   const lista = document.createElement("div");
 
@@ -1461,7 +1501,8 @@ function crearListaTipoPaso(
         Object.assign(paso, nuevoPaso);
       }
 
-      guardarYRedibujar();
+      guardarConDebounce(macroArchivo);
+      cerrarMenu();
     });
 
     lista.append(boton);
@@ -1469,10 +1510,6 @@ function crearListaTipoPaso(
 
   return lista;
 }
-
-// ======================================================
-// ➕ MENÚ "AGREGAR PASO" (7 tipos)
-// ======================================================
 
 // ======================================================
 // 📌 PANEL "FUNCIONES" (columna izquierda fija, 7 tipos)
