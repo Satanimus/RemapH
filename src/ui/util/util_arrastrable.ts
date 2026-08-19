@@ -124,11 +124,11 @@ export interface OpcionesArrastrable {
 
   obtenerOrdenIds: () => string[];
 
-  onReordenar: (nuevoOrden: string[], idsMovidos: string[]) => void;
+  onReordenar: (nuevoOrden: string[]) => void;
 
   onSalirModoMover?: () => void;
 
-  obtenerIdsGrupos?: () => string[];
+  obtenerIdsSeparadores?: () => string[];
 }
 
 export interface ControladorArrastre {
@@ -176,7 +176,7 @@ export function crearControladorArrastre(
     obtenerOrdenIds,
     onReordenar,
     onSalirModoMover,
-    obtenerIdsGrupos,
+    obtenerIdsSeparadores,
   } = opciones;
 
   // id → elementos registrados por el llamador. Se puede
@@ -237,72 +237,6 @@ export function crearControladorArrastre(
   let arrastreActual: EstadoArrastre | null = null;
 
   // ======================================================
-  // 🔗 EXPANSIÓN DE SELECCIÓN CON GRUPOS
-  // ------------------------------------------------------
-  // Dado un conjunto de ids a seleccionar, agrega los ids de
-  // filas que pertenecen a cualquier header incluido, y
-  // viceversa: si todas las filas de un grupo están
-  // seleccionadas, incluye su header. La pertenencia se calcula
-  // por posición sobre el orden visual actual (mismo criterio
-  // que calcularPertenencia), sin importar perfil.
-  // ======================================================
-
-  function expandirSeleccionConGrupos(ids: string[]): string[] {
-    const idsGrupos = obtenerIdsGrupos?.();
-
-    if (!idsGrupos || idsGrupos.length === 0) return ids;
-
-    const setGrupos = new Set(idsGrupos);
-
-    const orden = obtenerOrdenIds();
-
-    // Calcular tramo de cada grupo por posición en el orden visual.
-    // grupoDeFilas[idFila] = idGrupo
-    const grupoDeFilas = new Map<string, string>();
-
-    // filasDeGrupo[idGrupo] = [idFila, ...]
-    const filasDeGrupo = new Map<string, string[]>();
-
-    let grupoActual: string | null = null;
-
-    for (const id of orden) {
-      if (setGrupos.has(id)) {
-        grupoActual = id;
-
-        if (!filasDeGrupo.has(id)) filasDeGrupo.set(id, []);
-      } else if (grupoActual) {
-        grupoDeFilas.set(id, grupoActual);
-
-        filasDeGrupo.get(grupoActual)!.push(id);
-      }
-    }
-
-    const resultado = new Set(ids);
-
-    // Si hay headers en la selección, agregar sus filas.
-    for (const id of ids) {
-      if (setGrupos.has(id)) {
-        for (const fila of filasDeGrupo.get(id) ?? []) {
-          resultado.add(fila);
-        }
-      }
-    }
-
-    // Si todas las filas de un grupo están en la selección,
-    // agregar el header.
-    for (const [idGrupo, filas_] of filasDeGrupo) {
-      if (filas_.length > 0 && filas_.every((id) => resultado.has(id))) {
-        resultado.add(idGrupo);
-      }
-    }
-
-    // Si una fila fue deseleccionada manualmente (no estaba en ids
-    // originales), no forzar el header: devolver solo lo que
-    // expandimos a partir de los ids originales.
-    return [...resultado];
-  }
-
-  // ======================================================
   // 🎨 FEEDBACK VISUAL DE SELECCIÓN
   // ======================================================
 
@@ -321,16 +255,9 @@ export function crearControladorArrastre(
   function seleccionar(id: string): void {
     if (seleccionadas.has(id)) return;
 
-    const expandidos = expandirSeleccionConGrupos([...seleccionadas, id]);
+    seleccionadas.add(id);
 
-    // Agregar solo los nuevos para no perder los ya seleccionados.
-    expandidos.forEach((eid) => {
-      if (!seleccionadas.has(eid)) {
-        seleccionadas.add(eid);
-
-        refrescarClaseFila(eid);
-      }
-    });
+    refrescarClaseFila(id);
   }
 
   function deseleccionar(id: string): void {
@@ -339,35 +266,6 @@ export function crearControladorArrastre(
     seleccionadas.delete(id);
 
     refrescarClaseFila(id);
-
-    // Si el id era una fila y su header queda en la selección,
-    // quitarlo también (ya no todas sus filas están seleccionadas).
-    const idsGrupos = obtenerIdsGrupos?.();
-
-    if (!idsGrupos) return;
-
-    const setGrupos = new Set(idsGrupos);
-
-    const orden = obtenerOrdenIds();
-
-    // Calcular header del id deseleccionado.
-    let grupoActual: string | null = null;
-
-    for (const oid of orden) {
-      if (setGrupos.has(oid)) {
-        grupoActual = oid;
-      } else if (oid === id && grupoActual) {
-        // Esta fila pertenece a grupoActual — si el header está
-        // seleccionado, desactivarlo.
-        if (seleccionadas.has(grupoActual)) {
-          seleccionadas.delete(grupoActual);
-
-          refrescarClaseFila(grupoActual);
-        }
-
-        break;
-      }
-    }
   }
 
   function reemplazarSeleccionPor(id: string): void {
@@ -375,13 +273,11 @@ export function crearControladorArrastre(
 
     seleccionadas.clear();
 
-    const expandidos = expandirSeleccionConGrupos([id]);
-
-    expandidos.forEach((eid) => seleccionadas.add(eid));
+    seleccionadas.add(id);
 
     anteriores.forEach(refrescarClaseFila);
 
-    expandidos.forEach(refrescarClaseFila);
+    refrescarClaseFila(id);
   }
 
   // ======================================================
@@ -465,9 +361,7 @@ export function crearControladorArrastre(
       }
     }
 
-    aplicarNuevoOrden(arr, DURACION_ANIMACION_TECLADO_MS, undefined, [
-      ...seleccionadas,
-    ]);
+    aplicarNuevoOrden(arr, DURACION_ANIMACION_TECLADO_MS);
   }
 
   function manejarTeclado(evento: KeyboardEvent): void {
@@ -504,7 +398,6 @@ export function crearControladorArrastre(
     nuevoOrden: string[],
     duracionMs: number,
     rectosOrigenPorId?: Map<string, DOMRect>,
-    idsMovidos?: string[],
   ): void {
     const rectosAntes = new Map<string, DOMRect>();
 
@@ -518,7 +411,7 @@ export function crearControladorArrastre(
       if (registro) contenedor.appendChild(registro.elemento);
     });
 
-    onReordenar(nuevoOrden, idsMovidos ?? []);
+    onReordenar(nuevoOrden);
 
     nuevoOrden.forEach((id) => {
       const registro = filas.get(id);
@@ -649,7 +542,9 @@ export function crearControladorArrastre(
       if (
         ultimoVisible &&
         ultimoVisible.classList.contains("fila-grupo") &&
-        obtenerIdsGrupos?.().includes(idPorElemento.get(ultimoVisible) ?? "")
+        obtenerIdsSeparadores?.().includes(
+          idPorElemento.get(ultimoVisible) ?? "",
+        )
       ) {
         const siguiente =
           ultimoVisible.nextElementSibling as HTMLElement | null;
@@ -674,7 +569,7 @@ export function crearControladorArrastre(
       }
     } else if (
       referencia.classList.contains("fila-grupo") &&
-      obtenerIdsGrupos?.().includes(idPorElemento.get(referencia) ?? "")
+      obtenerIdsSeparadores?.().includes(idPorElemento.get(referencia) ?? "")
     ) {
       // El puntero está sobre un header. Verificar si está colapsado.
       const siguiente = referencia.nextElementSibling as HTMLElement | null;
@@ -855,7 +750,6 @@ export function crearControladorArrastre(
       nuevoOrden,
       duracionAnimacionArrastreMs(contenedor),
       origenesGrupo,
-      idsGrupo,
     );
 
     arrastreActual = null;
@@ -1133,13 +1027,11 @@ export function crearControladorArrastre(
 
     seleccionadas.clear();
 
-    const expandidos = expandirSeleccionConGrupos([id]);
-
-    expandidos.forEach((eid) => seleccionadas.add(eid));
+    seleccionadas.add(id);
 
     anteriores.forEach(refrescarClaseFila);
 
-    expandidos.forEach(refrescarClaseFila);
+    refrescarClaseFila(id);
   }
 
   return {

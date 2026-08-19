@@ -1,32 +1,32 @@
 // ======================================================
 // ui_Grupo
 // ------------------------------------------------------
-// Header de una Agrupación: div.fila-grupo con Estado,
+// Header de un Separador: div.fila-grupo con Estado,
 // Opciones ("⁝") y Nota — sin las celdas App/Trigger/Tipo/
 // Acción/Extra que sí tiene una fila normal. No lleva celda
 // de número: el botón expandir/contraer vive en el carril
 // (ver comp_grupo_expandir.ts).
 // ======================================================
 
-import type { AgrupacionPerfil } from "../core/core_perfil";
+import type { SeparadorPerfil } from "../core/core_perfil";
 
 import { crearEstadoGrupo } from "./componentes/comp_grupo_estado";
 import { crearBoton } from "./componentes/comp_boton";
 import { crearNota } from "./componentes/comp_controles";
 import { abrirPopupAgrupacion } from "./componentes/comp_popup_agrupacion";
 
-export function crearGrupoHeader(
-  grupo: AgrupacionPerfil,
+export function crearSeparadorHeader(
+  separador: SeparadorPerfil,
   alModificar: () => void,
 ): HTMLElement {
   const fila = document.createElement("div");
 
   fila.className = "fila-grupo";
 
-  fila.dataset.id = grupo.id;
+  fila.dataset.id = separador.id;
 
-  if (grupo.color) {
-    fila.style.setProperty("--grupo-color", `var(--tag-${grupo.color})`);
+  if (separador.color) {
+    fila.style.setProperty("--grupo-color", `var(--tag-${separador.color})`);
   } else {
     fila.style.removeProperty("--grupo-color");
   }
@@ -35,7 +35,7 @@ export function crearGrupoHeader(
 
   celdaEstado.className = "celda grupo-estado";
 
-  celdaEstado.append(crearEstadoGrupo(grupo, alModificar));
+  celdaEstado.append(crearEstadoGrupo(separador, alModificar));
 
   const celdaOpciones = document.createElement("div");
 
@@ -48,7 +48,7 @@ export function crearGrupoHeader(
   });
 
   botonOpciones.addEventListener("click", (evento) => {
-    abrirPopupAgrupacion(evento, grupo, alModificar);
+    abrirPopupAgrupacion(evento, separador, alModificar);
   });
 
   celdaOpciones.append(botonOpciones);
@@ -57,7 +57,7 @@ export function crearGrupoHeader(
 
   celdaNota.className = "celda nota-grupo";
 
-  celdaNota.append(crearNota(grupo));
+  celdaNota.append(crearNota(separador));
 
   fila.append(celdaEstado, celdaOpciones, celdaNota);
 

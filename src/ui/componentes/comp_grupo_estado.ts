@@ -1,68 +1,52 @@
 // ======================================================
 // 🟢🔴 comp_Grupo_Estado
 // ------------------------------------------------------
-// Botón Estado del header de una Agrupación.
-// Al hacer clic: fuerza ese estado en todas las filas
-// contenidas (Etapa E). Muestra indicador gris cuando
-// alguna fila ya no coincide con el estado del grupo.
+// Botón Estado del header de un Separador.
+// Al hacer clic: fuerza ese estado en todas las filas del
+// tramo (cascada descendente, Regla 14). Muestra indicador
+// gris cuando estadoVisual del separador es "mixto".
 // ======================================================
 
-import type { AgrupacionPerfil } from "../../core/core_perfil";
+import type { SeparadorPerfil } from "../../core/core_perfil";
 import {
-  calcularPertenencia,
-  estadoGrupoVigente,
+  aplicarCascadaDescendente,
+  recomputarCascadaAscendente,
 } from "../../core/core_agrupacion";
 import { obtenerPerfilUi } from "../../core/core_perfil_ui";
 import { reconstruirTabla } from "../ui_tabla_control";
 
 export function crearEstadoGrupo(
-  grupo: AgrupacionPerfil,
+  separador: SeparadorPerfil,
   alModificar: () => void,
 ): HTMLButtonElement {
-  const perfil = obtenerPerfilUi();
-
-  const { rangoPorGrupo } = calcularPertenencia(
-    perfil.grupos,
-    perfil.filas.length,
-  );
-
-  const rango = rangoPorGrupo.get(grupo.id) ?? { inicio: 0, fin: 0 };
-
-  const vigente = estadoGrupoVigente(grupo, perfil.filas, rango);
-
   const boton = document.createElement("button");
 
   boton.className = "ui-btn estado-toggle";
 
-  boton.dataset.estado = grupo.estado === "ON" ? "on" : "off";
+  boton.dataset.estado = separador.estado === "ON" ? "on" : "off";
 
-  if (vigente === "mixto") {
+  if (separador.estadoVisual === "mixto") {
     boton.classList.add("estado-grupo-mixto");
   }
 
   const texto = document.createElement("span");
 
-  texto.textContent = grupo.estado;
+  texto.textContent = separador.estado;
 
   boton.append(texto);
 
   boton.addEventListener("click", () => {
-    grupo.estado = grupo.estado === "ON" ? "OFF" : "ON";
+    separador.estado = separador.estado === "ON" ? "OFF" : "ON";
 
     const perfilActual = obtenerPerfilUi();
 
-    const { rangoPorGrupo: rangos } = calcularPertenencia(
-      perfilActual.grupos,
-      perfilActual.filas.length,
-    );
+    const indice = perfilActual.filas.indexOf(separador);
 
-    const rangoActual = rangos.get(grupo.id);
-
-    if (rangoActual) {
-      for (let i = rangoActual.inicio; i < rangoActual.fin; i++) {
-        perfilActual.filas[i].estado = grupo.estado;
-      }
+    if (indice !== -1) {
+      aplicarCascadaDescendente(perfilActual.filas, indice, separador.estado);
     }
+
+    recomputarCascadaAscendente(perfilActual.filas);
 
     alModificar();
 

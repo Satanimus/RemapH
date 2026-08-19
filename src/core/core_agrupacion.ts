@@ -1,243 +1,210 @@
 // ======================================================
 // 🗂️ core_Agrupacion
 // ------------------------------------------------------
-// Lógica pura de pertenencia entre filas y Agrupaciones.
-// No toca el DOM ni el estado global (obtenerPerfilUi()):
-// recibe datos, devuelve datos. La usan Etapa B (render)
-// y Etapa D (arrastre) para no duplicar el cálculo de rangos.
+// Lógica pura de pertenencia entre filas y Separadores.
+// No toca el DOM ni el estado global: recibe datos, devuelve datos.
+// En el nuevo modelo, los separadores son elementos del array
+// `perfil.filas` (tipo "separador"). La pertenencia se deriva
+// por posición en cada render (Regla 3).
 // ======================================================
 
-import type { AgrupacionPerfil, FilaPerfil, Perfil } from "./core_perfil";
+import type {
+  FilaPerfil,
+  ItemFilaPerfil,
+  Perfil,
+  SeparadorPerfil,
+} from "./core_perfil";
 
 // ======================================================
-// 📐 PERTENENCIA
+// 🧩 TYPE GUARD
 // ======================================================
 
-export interface RangoGrupo {
-  inicio: number;
-
-  fin: number;
-}
-
-export interface Pertenencia {
-  // Índice de fila (0-based, sobre el array `filas`) -> id del
-  // grupo al que pertenece, o null si es una fila suelta.
-  filaAGrupo: (string | null)[];
-
-  // id de grupo -> rango [inicio, fin) de índices de fila que contiene.
-  rangoPorGrupo: Map<string, RangoGrupo>;
-}
-
-// ======================================================
-// 📐 CALCULAR PERTENENCIA
-// ======================================================
-
-export function calcularPertenencia(
-  grupos: AgrupacionPerfil[],
-  totalFilas: number,
-): Pertenencia {
-  const filaAGrupo: (string | null)[] = new Array(totalFilas).fill(null);
-
-  const rangoPorGrupo = new Map<string, RangoGrupo>();
-
-  let cursor = 0;
-
-  for (const grupo of grupos) {
-    const inicio = cursor;
-
-    const fin = Math.min(cursor + grupo.numFilas, totalFilas);
-
-    rangoPorGrupo.set(grupo.id, { inicio, fin });
-
-    for (let i = inicio; i < fin; i++) {
-      filaAGrupo[i] = grupo.id;
-    }
-
-    cursor = fin;
-  }
-
-  // Lo que sobra después de sumar todos los grupos queda sin
-  // grupo (filaAGrupo ya vale null ahí por el fill inicial).
-
-  return { filaAGrupo, rangoPorGrupo };
-}
-
-// ======================================================
-// 🔄 RECALCULAR GRUPOS
-// ======================================================
-
-// Dada la lista final ya reordenada (una secuencia de ids que
-// mezcla ids de grupo e ids de fila, en el orden visual tras un
-// movimiento), devuelve un nuevo array `grupos` con los `numFilas`
-// recalculados. Cada tramo de ids de fila entre un id de grupo y
-// el siguiente (o el final) pasa a ser el `numFilas` de ese grupo;
-// lo que sobra después del último grupo son las filas sueltas y
-// queda fuera del resultado.
-//
-// `filaAGrupoAntes` es la pertenencia (id de fila -> id de grupo
-// anterior, o null si estaba suelta) DE ANTES de este reordenamiento.
-// `idsMovidos` son los ids que el usuario realmente arrastró/movió
-// en esta operación (el resto solo cambió de posición relativa como
-// efecto secundario, si acaso).
-//
-// Recorriendo `ordenVisual`, una fila se cuenta para el grupo actual
-// si: (a) fue movida y el grupo sigue "abierto", o (b) no fue movida
-// y ya pertenecía a ese mismo grupo antes. En cuanto aparece una fila
-// SIN mover que no pertenecía a este grupo (sea porque estaba suelta,
-// sea porque era de otro grupo), el grupo se da por "cerrado": ninguna
-// fila posterior puede volver a sumarse a él, ni siquiera si fue
-// movida y quedó pegada ahí por coincidencia de posición. Esto evita
-// dos bugs relacionados: el grupo de abajo "comiéndose" filas sueltas
-// que no se tocaron, y — el que motivó este cambio — que la fila que
-// el usuario acaba de SACAR de un grupo quede contada igual porque el
-// recorrido no distinguía "salir del grupo" de "entrar al grupo".
-export function recalcularGrupos(
-  grupos: AgrupacionPerfil[],
-  ordenVisual: string[],
-  filaAGrupoAntes: Map<string, string | null>,
-  idsMovidos: Set<string>,
-): AgrupacionPerfil[] {
-  const grupoPorId = new Map(grupos.map((g) => [g.id, g]));
-
-  const resultado: AgrupacionPerfil[] = [];
-
-  let grupoActual: AgrupacionPerfil | null = null;
-
-  let grupoAbierto = false;
-
-  for (const id of ordenVisual) {
-    const grupo = grupoPorId.get(id);
-
-    if (grupo) {
-      grupoActual = { ...grupo, numFilas: 0 };
-
-      grupoAbierto = true;
-
-      resultado.push(grupoActual);
-
-      continue;
-    }
-
-    if (!grupoActual) {
-      // Fila suelta antes de cualquier header: no cuenta para nadie.
-      continue;
-    }
-
-    const eraDeEsteGrupo = filaAGrupoAntes.get(id) === grupoActual.id;
-
-    if (!idsMovidos.has(id) && !eraDeEsteGrupo) {
-      // Fila sin tocar que no era de este grupo (estaba suelta o en
-      // otro grupo): corta la racha, el grupo actual queda cerrado.
-      grupoAbierto = false;
-
-      continue;
-    }
-
-    if (!grupoAbierto) {
-      // El grupo ya se cerró por una fila ajena de por medio: esta
-      // fila, aunque haya sido movida, no puede "saltar" el hueco y
-      // reengancharse.
-      continue;
-    }
-
-    grupoActual.numFilas += 1;
-  }
-
-  return resultado;
+export function esSeparador(item: ItemFilaPerfil): item is SeparadorPerfil {
+  return item.tipoItem === "separador";
 }
 
 // ======================================================
 // 🧩 PLAN VISUAL
 // ------------------------------------------------------
-// Arma, en un solo array ordenado, la secuencia real de lo que
-// hay que dibujar: headers de grupo y filas, ya filtrando las
-// filas internas de los grupos colapsados. `ui_tabla.ts` (tabla)
-// y el carril de números recorren este mismo array, ítem por
-// ítem, para quedar sincronizados 1 a 1.
+// Arma la secuencia real de lo que hay que dibujar:
+// separadores y filas (omitidas si están dentro de un separador
+// contraído). `ui_tabla.ts` y el carril de números recorren
+// este mismo array ítem por ítem.
 // ======================================================
 
 export type ItemVisualTabla =
-  | { tipo: "grupo"; grupo: AgrupacionPerfil }
+  | { tipo: "separador"; separador: SeparadorPerfil }
   | {
       tipo: "fila";
       fila: FilaPerfil;
       indiceAbsoluto: number;
-      grupo?: { color: string; primera: boolean; ultima: boolean };
-    }
-  | { tipo: "placeholder"; grupo: AgrupacionPerfil };
+      separador?: { color: string; primera: boolean; ultima: boolean };
+    };
 
 export function construirPlanVisual(perfil: Perfil): ItemVisualTabla[] {
-  const { filaAGrupo, rangoPorGrupo } = calcularPertenencia(
-    perfil.grupos,
-    perfil.filas.length,
-  );
-
   const plan: ItemVisualTabla[] = [];
 
-  for (const grupo of perfil.grupos) {
-    plan.push({ tipo: "grupo", grupo });
+  const items = perfil.filas;
 
-    if (!grupo.expandido) {
-      continue;
-    }
+  let separadorActivo: SeparadorPerfil | null = null;
 
-    const rango = rangoPorGrupo.get(grupo.id);
+  for (let i = 0; i < items.length; i++) {
+    const item = items[i];
 
-    if (!rango) {
-      continue;
-    }
+    if (esSeparador(item)) {
+      separadorActivo = item;
 
-    if (rango.fin === rango.inicio) {
-      plan.push({ tipo: "placeholder", grupo });
+      plan.push({ tipo: "separador", separador: item });
 
       continue;
     }
 
-    for (let i = rango.inicio; i < rango.fin; i++) {
-      plan.push({
-        tipo: "fila",
-        fila: perfil.filas[i],
-        indiceAbsoluto: i,
-        grupo: {
-          color: grupo.color,
-          primera: i === rango.inicio,
-          ultima: i === rango.fin - 1,
-        },
-      });
-    }
-  }
+    // Fila normal (el type guard de arriba ya angostó `item` en el
+    // resto del bloque a todo lo que no sea SeparadorPerfil, es
+    // decir FilaPerfil — sin necesidad de cast).
+    const fila = item;
 
-  for (let i = 0; i < perfil.filas.length; i++) {
-    if (filaAGrupo[i] === null) {
-      plan.push({ tipo: "fila", fila: perfil.filas[i], indiceAbsoluto: i });
+    const indiceAbsoluto = i;
+
+    // Regla 7: si el separador activo está contraído, la fila no
+    // entra al plan visual.
+    if (separadorActivo && !separadorActivo.expandido) {
+      continue;
     }
+
+    const anteriorEsSeparador = i > 0 && esSeparador(items[i - 1]);
+
+    const siguienteEsSeparador =
+      i + 1 < items.length && esSeparador(items[i + 1]);
+
+    const finDeArray = i === items.length - 1;
+
+    const esPrimera = anteriorEsSeparador;
+
+    const esUltima = siguienteEsSeparador || finDeArray;
+
+    // Regla 4: filas antes del primer separador no pertenecen a
+    // ninguno, por eso solo se agrega la info si hay separador activo.
+    const infoSeparador = separadorActivo
+      ? {
+          color: separadorActivo.color,
+
+          primera: esPrimera,
+
+          ultima: esUltima,
+        }
+      : undefined;
+
+    plan.push({
+      tipo: "fila",
+
+      fila,
+
+      indiceAbsoluto,
+
+      separador: infoSeparador,
+    });
   }
 
   return plan;
 }
 
 // ======================================================
-// 🔴🟢 ESTADO VIGENTE DEL GRUPO
+// 📏 TRAMO DE SEPARADOR
 // ------------------------------------------------------
-// Compara el estado guardado del grupo contra el estado real
-// de sus filas contenidas. Usado por comp_grupo_estado.ts
-// para decidir si mostrar el indicador gris (mixto).
+// Filas entre este separador (exclusive) y el siguiente
+// separador o el fin del array (exclusive), sin importar
+// si `expandido` está en false — el tramo existe igual,
+// solo no se dibuja (ver construirPlanVisual).
 // ======================================================
 
-export function estadoGrupoVigente(
-  grupo: AgrupacionPerfil,
-  filas: FilaPerfil[],
-  rango: RangoGrupo,
+export function obtenerTramoDeSeparador(
+  filas: ItemFilaPerfil[],
+  indiceSeparador: number,
+): FilaPerfil[] {
+  const tramo: FilaPerfil[] = [];
+
+  for (let i = indiceSeparador + 1; i < filas.length; i++) {
+    const item = filas[i];
+
+    if (esSeparador(item)) break;
+
+    tramo.push(item);
+  }
+
+  return tramo;
+}
+
+// ======================================================
+// ⬇️ CASCADA DESCENDENTE
+// ------------------------------------------------------
+// Regla 14: al cambiar manualmente el estado ON/OFF de un
+// separador, sobrescribe el estado de todas las filas de
+// su tramo (hasta el siguiente separador o fin de array).
+// ======================================================
+
+export function aplicarCascadaDescendente(
+  filas: ItemFilaPerfil[],
+  indiceSeparador: number,
+  nuevoEstado: string,
+): void {
+  for (let i = indiceSeparador + 1; i < filas.length; i++) {
+    const item = filas[i];
+
+    if (esSeparador(item)) break;
+
+    item.estado = nuevoEstado;
+  }
+}
+
+// ======================================================
+// ⬆️ CASCADA ASCENDENTE (RECOMPUTACIÓN)
+// ------------------------------------------------------
+// Regla 15/16: recorre todo el array por tramos y recalcula
+// `estadoVisual` de cada separador según el estado real de
+// las filas de su tramo. No toca `estado` (último ON/OFF
+// explícito del separador, usado por la cascada descendente).
+// ======================================================
+
+export function recomputarCascadaAscendente(filas: ItemFilaPerfil[]): void {
+  for (let i = 0; i < filas.length; i++) {
+    const item = filas[i];
+
+    if (!esSeparador(item)) continue;
+
+    const tramo = obtenerTramoDeSeparador(filas, i);
+
+    item.estadoVisual = estadoSeparadorVigente(item, tramo);
+  }
+}
+
+// ======================================================
+// 🔴🟢 ESTADO VIGENTE DEL SEPARADOR
+// ------------------------------------------------------
+// Compara el estado guardado del separador contra el estado
+// real de sus filas contenidas (el tramo que le corresponde).
+// Usado por comp_separador_estado.ts para decidir si mostrar
+// el indicador gris (mixto).
+// ======================================================
+
+export function estadoSeparadorVigente(
+  separador: SeparadorPerfil,
+  filasDelTramo: FilaPerfil[],
 ): "on" | "off" | "mixto" {
-  if (rango.inicio === rango.fin) {
-    return grupo.estado === "ON" ? "on" : "off";
+  if (filasDelTramo.length === 0) {
+    return separador.estado === "ON" ? "on" : "off";
   }
 
-  for (let i = rango.inicio; i < rango.fin; i++) {
-    if (filas[i].estado !== grupo.estado) {
-      return "mixto";
-    }
+  let hayOn = false;
+
+  let hayOff = false;
+
+  for (const fila of filasDelTramo) {
+    if (fila.estado === "ON") hayOn = true;
+    else hayOff = true;
+
+    if (hayOn && hayOff) return "mixto";
   }
 
-  return grupo.estado === "ON" ? "on" : "off";
+  return hayOn ? "on" : "off";
 }

@@ -11,8 +11,6 @@ import { crearBoton } from "./comp_boton";
 
 import { confirmarPopup } from "./comp_popup_confirmar";
 
-import { obtenerPerfilUi } from "../../core/core_perfil_ui";
-
 import type { perfil_json } from "../../core/core_perfil_json";
 
 import type { AdvertenciaCompilacion } from "../../core/core_advertencias_compilacion";
@@ -298,9 +296,7 @@ function crearAcciones(
 
   botonClonar.addEventListener("click", async () => {
     try {
-      const resultado = await invoke<ResultadoPerfil>("clonar_perfil", {
-        filas: obtenerPerfilUi().filas,
-      });
+      const resultado = await invoke<ResultadoPerfil>("clonar_perfil");
 
       alCambiarPerfil(resultado);
     } catch (error) {

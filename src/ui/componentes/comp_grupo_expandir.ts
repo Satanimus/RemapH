@@ -15,12 +15,12 @@
 // agregaba un grupo.
 // ======================================================
 
-import type { AgrupacionPerfil } from "../../core/core_perfil";
+import type { SeparadorPerfil } from "../../core/core_perfil";
 import { crearBoton } from "./comp_boton";
 import { reconstruirTabla } from "../ui_tabla_control";
 
 export function crearExpandirGrupo(
-  grupo: AgrupacionPerfil,
+  grupo: SeparadorPerfil,
   alModificar: () => void,
 ): HTMLElement {
   const slot = document.createElement("div");

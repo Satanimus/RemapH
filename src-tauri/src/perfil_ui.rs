@@ -127,9 +127,9 @@ use serde::{Deserialize, Serialize};
 use crate::compilador::AdvertenciaCompilacion;
 
 use crate::perfil_json::{
-    perfil_json, AbrirAccionJson, AbrirExtraJson, AgrupacionJson, AppJson, CoordenadaJson,
+    perfil_json, AbrirAccionJson, AbrirExtraJson, AppJson, CoordenadaJson, ItemFilaJson,
     MacroExtraJson, MenuAccionJson, MenuExpressExtraJson, PortapapelesAccionJson,
-    PortapapelesExtraJson, RemapeoJson, TriggerJson,
+    PortapapelesExtraJson, RemapeoJson, SeparadorJson, TriggerJson,
 };
 
 // ======================================================
@@ -332,11 +332,11 @@ pub struct EstadoCachePerfil {
 }
 
 // ======================================================
-// 🗂️ AGRUPACION UI
+// 🗂️ SEPARADOR UI
 // ======================================================
 
 #[derive(Deserialize)]
-pub struct AgrupacionUI {
+pub struct SeparadorUI {
     pub id: String,
 
     pub estado: String,
@@ -346,40 +346,56 @@ pub struct AgrupacionUI {
     pub color: String,
 
     pub expandido: bool,
+}
 
-    #[serde(rename = "numFilas")]
-    pub num_filas: usize,
+// ======================================================
+// 📦 ITEM DE FILA UI (fila normal o separador)
+// ------------------------------------------------------
+// Mismo tag serde que ItemFilaJson (ver perfil_json.rs) para
+// deserializar exactamente lo que manda el frontend TS
+// (ItemFilaPerfil, discriminado por tipoItem).
+// ======================================================
+
+#[derive(Deserialize)]
+#[serde(tag = "tipoItem", rename_all = "lowercase")]
+pub enum ItemFilaUI {
+    Fila(FilaUI),
+    Separador(SeparadorUI),
 }
 
 // ======================================================
 // 🔄 CONVERTIR PERFIL
 // ======================================================
 
-pub fn convertir_perfil(filas: Vec<FilaUI>, grupos: Vec<AgrupacionUI>) -> perfil_json {
-    let remapeos = filas.into_iter().map(convertir_fila).collect();
+pub fn convertir_perfil(filas: Vec<ItemFilaUI>) -> perfil_json {
+    let filas = filas
+        .into_iter()
+        .map(|item| match item {
+            ItemFilaUI::Fila(fila) => ItemFilaJson::Fila(convertir_fila(fila)),
+            ItemFilaUI::Separador(separador) => {
+                ItemFilaJson::Separador(convertir_separador(separador))
+            }
+        })
+        .collect();
 
-    let grupos = grupos.into_iter().map(convertir_agrupacion).collect();
-
-    perfil_json { remapeos, grupos }
+    perfil_json { filas }
 }
 
 // ======================================================
-// 🗂️ CONVERTIR AGRUPACION
+// 🗂️ CONVERTIR SEPARADOR
 // ======================================================
 
-fn convertir_agrupacion(grupo: AgrupacionUI) -> AgrupacionJson {
-    AgrupacionJson {
-        id: grupo.id,
+fn convertir_separador(separador: SeparadorUI) -> SeparadorJson {
+    SeparadorJson {
+        id: separador.id,
 
-        estado: grupo.estado,
+        estado: separador.estado,
 
-        nota: grupo.nota,
+        nota: separador.nota,
 
-        color: grupo.color,
+        color: separador.color,
 
-        expandido: grupo.expandido,
-
-        num_filas: grupo.num_filas,
+        expandido: separador.expandido,
     }
 }
 

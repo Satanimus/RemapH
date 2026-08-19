@@ -6,8 +6,9 @@ import type { ContextoFila } from "../../core/core_contexto_fila";
 import type { FilaPerfil } from "../../core/core_perfil";
 import { crearPopup } from "./comp_popup";
 import { crearBoton } from "./comp_boton";
-import { reconstruirFila } from "../ui_tabla_control";
+import { reconstruirFila, reconstruirTabla } from "../ui_tabla_control";
 import { invoke } from "@tauri-apps/api/core";
+import { recomputarCascadaAscendente } from "../../core/core_agrupacion";
 
 import {
   abrirPopupTipo,
@@ -138,7 +139,9 @@ export function crearEstado(
 
       filaPerfil.estado = filaPerfil.estado === "ON" ? "OFF" : "ON";
 
-      reconstruirFila(contexto.id);
+      recomputarCascadaAscendente(obtenerPerfilUi().filas);
+
+      reconstruirTabla();
     },
   );
 

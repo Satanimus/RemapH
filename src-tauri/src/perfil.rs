@@ -256,10 +256,14 @@ pub fn restaurar_perfil_actual() -> Result<ResultadoPerfil, String> {
 // 📋 CLONAR PERFIL
 // ======================================================
 
-pub fn clonar_perfil(perfil: perfil_json) -> Result<ResultadoPerfil, String> {
+pub fn clonar_perfil() -> Result<ResultadoPerfil, String> {
     let nombre_actual = usuario::nombre_actual()?;
 
     let nombre = siguiente_nombre(&nombre_actual)?;
+
+    let ruta_actual = usuario::perfil_actual()?;
+
+    let perfil = cargar_desde_disco(&ruta_actual)?;
 
     // Etapa 8C: ver excepción documentada en el header del archivo.
     runtime::detener_todo();

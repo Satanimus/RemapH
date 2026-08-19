@@ -113,8 +113,7 @@ impl Input {
 
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct perfil_json {
-    pub remapeos: Vec<RemapeoJson>,
-    pub grupos: Vec<AgrupacionJson>,
+    pub filas: Vec<ItemFilaJson>,
 }
 
 // ======================================================
@@ -218,25 +217,39 @@ pub struct TriggerJson {
 
 impl perfil_json {
     pub fn nuevo() -> Self {
-        Self {
-            remapeos: Vec::new(),
-            grupos: Vec::new(),
-        }
+        Self { filas: Vec::new() }
     }
 }
 
 // ======================================================
-// 🗂️ AGRUPACION JSON
+// 🗂️ SEPARADOR JSON
 // ======================================================
 
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
-pub struct AgrupacionJson {
+pub struct SeparadorJson {
     pub id: String,
     pub estado: String,
     pub nota: String,
     pub color: String,
     pub expandido: bool,
-    pub num_filas: usize,
+}
+
+// ======================================================
+// 📦 ITEM DE FILA JSON (fila normal o separador)
+// ------------------------------------------------------
+// Tag "tipoItem" a nivel del mismo objeto, coincidiendo con
+// el discriminante que usa el modelo TS (FilaPerfil.tipoItem
+// / SeparadorPerfil.tipoItem). Con #[serde(tag = "tipoItem")]
+// sobre un enum de variantes-newtype, serde aplana los campos
+// del struct interno al mismo nivel que el tag — no anida un
+// objeto extra, que es el formato que espera el frontend.
+// ======================================================
+
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+#[serde(tag = "tipoItem", rename_all = "lowercase")]
+pub enum ItemFilaJson {
+    Fila(RemapeoJson),
+    Separador(SeparadorJson),
 }
 
 // ======================================================

@@ -7,19 +7,13 @@ import { COLUMNAS } from "./ui_columnas";
 
 import { crearFila } from "./ui_fila";
 
-import { crearGrupoHeader } from "./ui_grupo";
+import { crearSeparadorHeader } from "./ui_grupo";
 
 import { crearExpandirGrupo } from "./componentes/comp_grupo_expandir";
 
 import { obtenerPerfilUi } from "../core/core_perfil_ui";
 
-import type { FilaPerfil } from "../core/core_perfil";
-
-import {
-  construirPlanVisual,
-  recalcularGrupos,
-  calcularPertenencia,
-} from "../core/core_agrupacion";
+import { construirPlanVisual, esSeparador } from "../core/core_agrupacion";
 
 import {
   registrarReconstruccion,
@@ -134,52 +128,42 @@ export function crearTabla(alModificar: () => void): HTMLElement {
     obtenerOrdenIds: () => {
       const plan = construirPlanVisual(obtenerPerfilUi());
 
-      return plan
-        .filter((item) => item.tipo === "fila" || item.tipo === "grupo")
-        .map((item) =>
-          item.tipo === "grupo" ? item.grupo.id : (item as any).fila.id,
-        );
+      return plan.map((item) =>
+        item.tipo === "separador" ? item.separador.id : item.fila.id,
+      );
     },
 
-    onReordenar: (nuevoOrden, idsMovidos) => {
+    onReordenar: (nuevoOrden) => {
       const perfil = obtenerPerfilUi();
 
-      const idsGrupos = new Set(perfil.grupos.map((g) => g.id));
+      // Regla 9/10/12: el nuevo orden mezcla ids de fila y de
+      // separador tal cual el usuario los arrastró — es
+      // directamente el nuevo array de filas del perfil, sin
+      // rangos ni recálculo de pertenencia (eso lo deriva
+      // construirPlanVisual en cada render).
+      const porId = new Map(perfil.filas.map((item) => [item.id, item]));
 
-      // Pertenencia DE ANTES de este reordenamiento (por id, no por
-      // índice: perfil.filas está a punto de reasignarse). La usa
-      // recalcularGrupos para no confundir filas sueltas sin tocar
-      // con filas recién arrastradas dentro del último grupo.
-      const { filaAGrupo } = calcularPertenencia(
-        perfil.grupos,
-        perfil.filas.length,
-      );
-
-      const filaAGrupoAntes = new Map<string, string | null>(
-        perfil.filas.map((f, i) => [f.id, filaAGrupo[i]]),
-      );
-
-      const idsFilasNuevo = nuevoOrden.filter((id) => !idsGrupos.has(id));
-
-      const porIdFila = new Map(perfil.filas.map((f) => [f.id, f]));
-
-      perfil.filas = idsFilasNuevo
-        .map((id) => porIdFila.get(id))
-        .filter((f): f is FilaPerfil => !!f);
-
-      perfil.grupos = recalcularGrupos(
-        perfil.grupos,
-        nuevoOrden,
-        filaAGrupoAntes,
-        new Set(idsMovidos),
-      );
+      perfil.filas = nuevoOrden
+        .map((id) => porId.get(id))
+        .filter((item): item is (typeof perfil.filas)[number] => !!item);
 
       alModificar();
 
       reconstruirTabla();
     },
 
-    obtenerIdsGrupos: () => obtenerPerfilUi().grupos.map((g) => g.id),
+    obtenerIdsSeparadores: () =>
+      obtenerPerfilUi()
+        .filas.filter(esSeparador)
+        .map((separador) => separador.id),
+
+    // Regla 11: si se arrastra un separador contraído, se expande
+    // automáticamente al iniciar el gesto de arrastre.
+    esSeparadorContraido: (id) => {
+      const item = obtenerPerfilUi().filas.find((f) => f.id === id);
+
+      return !!item && esSeparador(item) && !item.expandido;
+    },
   });
 
   registrarSalirModoMover(() => controladorArrastre.salirModoMover());
@@ -217,31 +201,56 @@ export function crearTabla(alModificar: () => void): HTMLElement {
 
     const plan = construirPlanVisual(perfil);
 
-    plan.forEach((item) => {
+    // Regla 18: la numeración del carril solo cuenta filas normales,
+    // saltando los separadores en la secuencia.
+    let numeroVisible = 0;
+
+    // Último índice de plan que es una fila, para saber cuál es la
+    // "última" fila visible cuando no pertenece a ningún separador
+    // (zona superior, Regla 4) — item.separador.ultima ya resuelve
+    // ese caso cuando sí hay separador activo.
+    let ultimoIndiceFilaEnPlan = -1;
+
+    plan.forEach((item, indicePlan) => {
       if (item.tipo === "fila") {
+        ultimoIndiceFilaEnPlan = indicePlan;
+      }
+    });
+
+    plan.forEach((item, indicePlan) => {
+      if (item.tipo === "fila") {
+        const esUltima = item.separador
+          ? item.separador.ultima
+          : indicePlan === ultimoIndiceFilaEnPlan;
+
         const filaElemento = crearFila(
           item.fila,
-          item.indiceAbsoluto === perfil.filas.length - 1,
+          esUltima,
           alModificar,
-          item.grupo,
+          item.separador,
         );
 
         filas.append(filaElemento);
 
         registrarFilaArrastrable(filaElemento);
 
+        numeroVisible += 1;
+
         const numero = document.createElement("div");
 
         numero.className = "carril-numero";
-        numero.textContent = String(item.indiceAbsoluto + 1);
+        numero.textContent = String(numeroVisible);
 
         carrilLista.append(numero);
-      } else if (item.tipo === "grupo") {
-        const headerElemento = crearGrupoHeader(item.grupo, alModificar);
+      } else {
+        const headerElemento = crearSeparadorHeader(
+          item.separador,
+          alModificar,
+        );
 
         filas.append(headerElemento);
 
-        carrilLista.append(crearExpandirGrupo(item.grupo, alModificar));
+        carrilLista.append(crearExpandirGrupo(item.separador, alModificar));
 
         const botonOpciones = headerElemento.querySelector(
           ".opciones-asa",
@@ -249,24 +258,11 @@ export function crearTabla(alModificar: () => void): HTMLElement {
 
         if (botonOpciones) {
           controladorArrastre.registrarFila(
-            item.grupo.id,
+            item.separador.id,
             headerElemento,
             botonOpciones,
           );
         }
-      } else {
-        const placeholder = document.createElement("div");
-
-        placeholder.className = "fila-grupo-placeholder";
-        placeholder.textContent = "Arrastra tus filas aquí...";
-
-        filas.append(placeholder);
-
-        const numeroVacio = document.createElement("div");
-
-        numeroVacio.className = "carril-numero";
-
-        carrilLista.append(numeroVacio);
       }
     });
   };

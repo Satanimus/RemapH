@@ -16,7 +16,12 @@
 // La UI lo representa visualmente.
 // ======================================================
 
-import type { Perfil, FilaPerfil, AgrupacionPerfil } from "./core_perfil";
+import type {
+  Perfil,
+  FilaPerfil,
+  SeparadorPerfil,
+  ItemFilaPerfil,
+} from "./core_perfil";
 
 import { crearFila } from "./core_perfil";
 
@@ -53,7 +58,7 @@ import { traducirLote } from "./core_traductor";
 export interface perfil_json {
   remapeos: RemapeoJson[];
 
-  grupos: AgrupacionJson[];
+  grupos: SeparadorJson[];
 }
 
 // ======================================================
@@ -125,13 +130,13 @@ interface RemapeoJson {
 }
 
 // ======================================================
-// AGRUPACION JSON
+// SEPARADOR JSON
 // ------------------------------------------------------
 // Nombres de campo tal cual los serializa Rust (snake_case,
 // sin #[serde(rename)]) — mismo criterio que RemapeoJson.
 // ======================================================
 
-interface AgrupacionJson {
+interface SeparadorJson {
   id: string;
 
   estado: string;
@@ -142,6 +147,10 @@ interface AgrupacionJson {
 
   expandido: boolean;
 
+  // Sigue llegando así desde Rust hasta que se aplique la
+  // migración del lado Rust (Etapa H). Acá se usa solo para
+  // calcular la posición de fusión (ver fusionarFilasYSeparadores)
+  // y no pasa a SeparadorPerfil, que correctamente no lo tiene.
   num_filas: number;
 }
 
@@ -180,6 +189,44 @@ interface InputJson {
 // en todo el perfil y se traduce todo en un solo lote.
 // ======================================================
 
+// ======================================================
+// 🧷 FUSIONAR FILAS Y SEPARADORES
+// ------------------------------------------------------
+// Migración del modelo viejo (grupos con num_filas aparte)
+// al nuevo (separador insertado como fila en su posición).
+// Cada separador se inserta antes del tramo de `num_filas`
+// filas que le correspondía, en el orden en que llegan los
+// grupos. Si num_filas excede las filas restantes, se acota
+// a lo que queda (mismo criterio que calcularPertenencia).
+// ======================================================
+
+function fusionarFilasYSeparadores(
+  filas: FilaPerfil[],
+  gruposJson: SeparadorJson[],
+): ItemFilaPerfil[] {
+  const resultado: ItemFilaPerfil[] = [];
+
+  let cursor = 0;
+
+  for (const grupoJson of gruposJson) {
+    resultado.push(convertirSeparador(grupoJson));
+
+    const fin = Math.min(cursor + grupoJson.num_filas, filas.length);
+
+    for (let i = cursor; i < fin; i++) {
+      resultado.push(filas[i]);
+    }
+
+    cursor = fin;
+  }
+
+  for (let i = cursor; i < filas.length; i++) {
+    resultado.push(filas[i]);
+  }
+
+  return resultado;
+}
+
 export async function convertirperfil_json(
   perfil_json: perfil_json,
 ): Promise<Perfil> {
@@ -195,32 +242,32 @@ export async function convertirperfil_json(
     convertirRemapeo(remapeo, mapaNombres),
   );
 
+  const itemsFusionados = fusionarFilasYSeparadores(filas, perfil_json.grupos);
+
   return {
     activo: true,
 
-    filas: filas.length > 0 ? filas : [crearFila()],
-
-    grupos: perfil_json.grupos.map(convertirAgrupacion),
+    filas: itemsFusionados.length > 0 ? itemsFusionados : [crearFila()],
   };
 }
 
 // ======================================================
-// 🗂️ CONVERTIR AGRUPACION
+// 🗂️ CONVERTIR SEPARADOR
 // ======================================================
 
-function convertirAgrupacion(grupo: AgrupacionJson): AgrupacionPerfil {
+function convertirSeparador(separador: SeparadorJson): SeparadorPerfil {
   return {
-    id: grupo.id,
+    tipoItem: "separador",
 
-    estado: grupo.estado,
+    id: separador.id,
 
-    nota: grupo.nota,
+    estado: separador.estado,
 
-    color: grupo.color,
+    nota: separador.nota,
 
-    expandido: grupo.expandido,
+    color: separador.color,
 
-    numFilas: grupo.num_filas,
+    expandido: separador.expandido,
   };
 }
 
@@ -264,6 +311,8 @@ function convertirRemapeo(
   const trigger = convertirTrigger(remapeo.trigger, mapaNombres);
 
   return {
+    tipoItem: "fila",
+
     id: remapeo.id,
 
     estado: remapeo.estado,

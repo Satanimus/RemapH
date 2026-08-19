@@ -38,9 +38,7 @@ import { crearMacroExtra } from "./core_macro";
 export interface Perfil {
   activo: boolean;
 
-  filas: FilaPerfil[];
-
-  grupos: AgrupacionPerfil[];
+  filas: ItemFilaPerfil[];
 }
 
 // ======================================================
@@ -58,6 +56,8 @@ export interface AppPerfil {
 // ======================================================
 
 export interface FilaPerfil {
+  tipoItem: "fila";
+
   id: string;
 
   estado: string;
@@ -131,6 +131,8 @@ export interface FilaPerfil {
 
 export function crearFila(): FilaPerfil {
   return {
+    tipoItem: "fila",
+
     id: crypto.randomUUID(),
 
     estado: "ON",
@@ -178,52 +180,64 @@ export function crearFila(): FilaPerfil {
 }
 
 // ======================================================
-// 🗂️ AGRUPACION
+// 🗂️ SEPARADOR
 // ======================================================
 
-export interface AgrupacionPerfil {
+export interface SeparadorPerfil {
+  tipoItem: "separador";
+
   id: string;
 
   estado: string;
+
+  // Derivado, recalculado por recomputarCascadaAscendente en cada
+  // cambio de estado de una fila del tramo. No lo setea el usuario
+  // directamente y no reemplaza a `estado` (que sigue guardando el
+  // último ON/OFF explícito, usado para la cascada descendente).
+  estadoVisual: "on" | "off" | "mixto";
 
   nota: string;
 
   color: string;
 
   expandido: boolean;
-
-  numFilas: number;
 }
 
 // ======================================================
-// 🗂️ CREAR AGRUPACION
+// 📦 ITEM DE FILA (fila normal o separador)
 // ======================================================
 
-export function crearAgrupacion(): AgrupacionPerfil {
+export type ItemFilaPerfil = FilaPerfil | SeparadorPerfil;
+
+// ======================================================
+// 🗂️ CREAR SEPARADOR
+// ======================================================
+
+export function crearSeparador(): SeparadorPerfil {
   return {
+    tipoItem: "separador",
+
     id: crypto.randomUUID(),
 
     estado: "ON",
+
+    estadoVisual: "on",
 
     nota: "",
 
     color: "",
 
     expandido: true,
-
-    numFilas: 0,
   };
 }
 
 // ======================================================
-// 🗂️ CLONAR AGRUPACION
+// 🗂️ CLONAR SEPARADOR
 // ======================================================
 
-export function clonarAgrupacion(
-  agrupacion: AgrupacionPerfil,
-): AgrupacionPerfil {
+export function clonarSeparador(separador: SeparadorPerfil): SeparadorPerfil {
   return {
-    ...agrupacion,
+    ...separador,
 
     id: crypto.randomUUID(),
   };
@@ -238,8 +252,6 @@ export function crearPerfil(): Perfil {
     activo: true,
 
     filas: [crearFila()],
-
-    grupos: [],
   };
 }
 
