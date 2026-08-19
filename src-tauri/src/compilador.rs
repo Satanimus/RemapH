@@ -180,7 +180,7 @@ use crate::perfil_cache::{
     UbicacionCache, UbicacionMenu,
 };
 
-use crate::perfil_json::{perfil_json, AppJson, CoordenadaJson, RemapeoJson};
+use crate::perfil_json::{perfil_json, AppJson, CoordenadaJson, ItemFilaJson, RemapeoJson};
 
 use serde::Serialize;
 
@@ -264,8 +264,12 @@ pub fn compilar_perfil(perfil: &perfil_json) -> (Vec<RemapeoCache>, Vec<Adverten
     let mut advertencias = Vec::new();
 
     let remapeos = perfil
-        .remapeos
+        .filas
         .iter()
+        .filter_map(|item| match item {
+            ItemFilaJson::Fila(remapeo) => Some(remapeo),
+            ItemFilaJson::Separador(_) => None,
+        })
         .enumerate()
         .filter_map(|(indice, remapeo)| {
             compilar_remapeo(indice + 1, remapeo, perfil, &mut advertencias)
@@ -496,7 +500,8 @@ fn convertir_accion(
 // exista en el perfil actual (fila borrada mientras tanto — mismo
 // criterio de descarte silencioso que el resto del compilador, ver
 // nota de convertir_accion más arriba). El orden final es por
-// posición de la fila referenciada dentro de perfil.remapeos (el
+// posición de la fila referenciada dentro de las filas normales de
+// perfil.filas (el
 // "número de fila" que ve el usuario en la columna Número), no el
 // orden en que se fueron agregando los botones (ver spec / nota en
 // perfil_json.rs::MenuAccionJson).
@@ -507,23 +512,34 @@ fn convertir_accion(
 // ======================================================
 
 fn convertir_menu_express(remapeo: &RemapeoJson, perfil: &perfil_json) -> Option<AccionCache> {
+    // Solo filas normales son referenciables por fila_id (mismo
+    // criterio de numero_fila en compilar_perfil, Regla 18: los
+    // separadores no cuentan ni participan de esta posición).
+    let filas_referenciables: Vec<&RemapeoJson> = perfil
+        .filas
+        .iter()
+        .filter_map(|item| match item {
+            ItemFilaJson::Fila(remapeo) => Some(remapeo),
+            ItemFilaJson::Separador(_) => None,
+        })
+        .collect();
+
     let mut botones: Vec<(usize, MenuBotonCache)> = remapeo
         .menu_accion
         .botones
         .iter()
         .filter_map(|boton| {
-            let posicion = perfil
-                .remapeos
+            let posicion = filas_referenciables
                 .iter()
                 .position(|fila| fila.id == boton.fila_id)?;
 
             // Color de la fila REFERENCIADA (pulido, punto "Color
             // botón") — no el color de la fila MenuExpress. Se
-            // resuelve acá porque perfil.remapeos ya está a mano
-            // (mismo find que resuelve `posicion` arriba); evita que
-            // back_menu_express.rs tenga que volver a buscar la fila
-            // del lado de la ventana.
-            let color = perfil.remapeos[posicion].color.clone();
+            // resuelve acá porque filas_referenciables ya está a
+            // mano (mismo find que resuelve `posicion` arriba);
+            // evita que back_menu_express.rs tenga que volver a
+            // buscar la fila del lado de la ventana.
+            let color = filas_referenciables[posicion].color.clone();
 
             Some((
                 posicion,

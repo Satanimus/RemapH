@@ -51,15 +51,27 @@ import type { MacroExtraPerfil } from "./core_macro";
 
 import { traducirLote } from "./core_traductor";
 
+import { recomputarCascadaAscendente } from "./core_agrupacion";
+
 // ======================================================
 // 📦 MODELO JSON
+// ------------------------------------------------------
+// Refleja exactamente lo que serializa perfil_json.rs desde la
+// Etapa H: un único array `filas` con separadores insertados
+// como ítems más, discriminados por el tag "tipoItem" a nivel
+// del mismo objeto (#[serde(tag = "tipoItem", rename_all =
+// "lowercase")] sobre un enum de variantes-newtype — serde
+// aplana los campos del struct interno junto al tag, no anida
+// un objeto extra).
 // ======================================================
 
 export interface perfil_json {
-  remapeos: RemapeoJson[];
-
-  grupos: SeparadorJson[];
+  filas: ItemFilaJson[];
 }
+
+export type ItemFilaJson =
+  | ({ tipoItem: "fila" } & RemapeoJson)
+  | ({ tipoItem: "separador" } & SeparadorJson);
 
 // ======================================================
 // APP JSON
@@ -133,7 +145,9 @@ interface RemapeoJson {
 // SEPARADOR JSON
 // ------------------------------------------------------
 // Nombres de campo tal cual los serializa Rust (snake_case,
-// sin #[serde(rename)]) — mismo criterio que RemapeoJson.
+// sin #[serde(rename)]) — mismo criterio que RemapeoJson. Sin
+// num_filas (Etapa H: eliminado también del lado Rust, Regla
+// 2 — la pertenencia se deriva por posición, no se guarda).
 // ======================================================
 
 interface SeparadorJson {
@@ -146,12 +160,6 @@ interface SeparadorJson {
   color: string;
 
   expandido: boolean;
-
-  // Sigue llegando así desde Rust hasta que se aplique la
-  // migración del lado Rust (Etapa H). Acá se usa solo para
-  // calcular la posición de fusión (ver fusionarFilasYSeparadores)
-  // y no pasa a SeparadorPerfil, que correctamente no lo tiene.
-  num_filas: number;
 }
 
 interface TriggerJson {
@@ -190,64 +198,47 @@ interface InputJson {
 // ======================================================
 
 // ======================================================
-// 🧷 FUSIONAR FILAS Y SEPARADORES
+// 🧩 TYPE GUARD LOCAL
 // ------------------------------------------------------
-// Migración del modelo viejo (grupos con num_filas aparte)
-// al nuevo (separador insertado como fila en su posición).
-// Cada separador se inserta antes del tramo de `num_filas`
-// filas que le correspondía, en el orden en que llegan los
-// grupos. Si num_filas excede las filas restantes, se acota
-// a lo que queda (mismo criterio que calcularPertenencia).
+// Distingue el tag "tipoItem" que ya viaja aplanado en cada
+// ítem de perfil_json.filas (ver ItemFilaJson más arriba).
 // ======================================================
 
-function fusionarFilasYSeparadores(
-  filas: FilaPerfil[],
-  gruposJson: SeparadorJson[],
-): ItemFilaPerfil[] {
-  const resultado: ItemFilaPerfil[] = [];
-
-  let cursor = 0;
-
-  for (const grupoJson of gruposJson) {
-    resultado.push(convertirSeparador(grupoJson));
-
-    const fin = Math.min(cursor + grupoJson.num_filas, filas.length);
-
-    for (let i = cursor; i < fin; i++) {
-      resultado.push(filas[i]);
-    }
-
-    cursor = fin;
-  }
-
-  for (let i = cursor; i < filas.length; i++) {
-    resultado.push(filas[i]);
-  }
-
-  return resultado;
+function esFilaJson(
+  item: ItemFilaJson,
+): item is { tipoItem: "fila" } & RemapeoJson {
+  return item.tipoItem === "fila";
 }
 
 export async function convertirperfil_json(
   perfil_json: perfil_json,
 ): Promise<Perfil> {
+  const remapeos = perfil_json.filas.filter(esFilaJson);
+
   const mapaNombres = await traducirLote(
-    recolectarControles(perfil_json.remapeos),
+    recolectarControles(remapeos),
 
     "interno",
 
     "usuario",
   );
 
-  const filas = perfil_json.remapeos.map((remapeo) =>
-    convertirRemapeo(remapeo, mapaNombres),
+  const items: ItemFilaPerfil[] = perfil_json.filas.map((item) =>
+    esFilaJson(item)
+      ? convertirRemapeo(item, mapaNombres)
+      : convertirSeparador(item),
   );
 
-  const itemsFusionados = fusionarFilasYSeparadores(filas, perfil_json.grupos);
+  // estadoVisual es derivado (Regla 15/16) — no viaja en el JSON,
+  // se recalcula una vez acá contra las filas ya convertidas para
+  // que cada separador nazca con el agregado correcto (on/off/mixto)
+  // de su tramo en vez de un valor placeholder.
+  recomputarCascadaAscendente(items);
 
   return {
     activo: true,
 
-    filas: itemsFusionados.length > 0 ? itemsFusionados : [crearFila()],
+    filas: items.length > 0 ? items : [crearFila()],
   };
 }
 
@@ -262,6 +253,12 @@ function convertirSeparador(separador: SeparadorJson): SeparadorPerfil {
     id: separador.id,
 
     estado: separador.estado,
+
+    // Placeholder — recomputarCascadaAscendente(items) en
+    // convertirperfil_json lo recalcula contra el tramo real
+    // apenas se arma el array completo, así que este valor nunca
+    // llega a pintarse tal cual.
+    estadoVisual: separador.estado === "ON" ? "on" : "off",
 
     nota: separador.nota,
 

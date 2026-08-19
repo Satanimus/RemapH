@@ -70,12 +70,14 @@ import { filaTieneConflicto } from "../../core/core_conflictos";
 
 import { filaTieneAdvertencia } from "../../core/core_advertencias_compilacion";
 
+import { esSeparador } from "../../core/core_agrupacion";
+
 // ======================================================
 // 🟢🔴 ESTADO (interruptor ON/OFF)
 // ======================================================
 
 export function crearEstado(
-  contexto: ContextoFila,
+  _contexto: ContextoFila,
 
   filaPerfil: FilaPerfil,
 ): HTMLButtonElement {
@@ -88,18 +90,16 @@ export function crearEstado(
   // de la última compilación (ej. ruta de "abrir" que ya no existe,
   // ver core_advertencias_compilacion.ts) — al usuario le alcanza con
   // saber que la fila no está funcionando; el motivo puntual se lee
-  // en el statusbar (ver ui_statusbar.ts).
-  const conflicto = filaTieneConflicto(
-    filaPerfil.id,
-
-    obtenerPerfilUi().filas,
+  // en el statusbar (ver ui_statusbar.ts). Ambos chequeos son solo
+  // entre filas normales (Regla 19: los separadores no participan
+  // de conflictos ni advertencias de compilación).
+  const filasNormales = obtenerPerfilUi().filas.filter(
+    (item): item is FilaPerfil => !esSeparador(item),
   );
 
-  const advertencia = filaTieneAdvertencia(
-    filaPerfil.id,
+  const conflicto = filaTieneConflicto(filaPerfil.id, filasNormales);
 
-    obtenerPerfilUi().filas,
-  );
+  const advertencia = filaTieneAdvertencia(filaPerfil.id, filasNormales);
 
   const apagadaPorAviso = conflicto || advertencia;
 

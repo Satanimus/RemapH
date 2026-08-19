@@ -7,13 +7,13 @@ import { obtenerPerfilUi } from "./core_perfil_ui";
 import {
   clonarFila,
   crearFila,
-  crearAgrupacion,
-  clonarAgrupacion,
+  crearSeparador,
+  clonarSeparador,
 } from "./core_perfil";
 
 import type { FilaPerfil } from "./core_perfil";
 
-import { calcularPertenencia } from "./core_agrupacion";
+import { esSeparador, obtenerTramoDeSeparador } from "./core_agrupacion";
 
 import { triggerATexto } from "./core_trigger";
 
@@ -34,7 +34,9 @@ import { textoMacroAccion } from "./core_macro";
 export function clonarFilaPorId(id: string): void {
   const perfil = obtenerPerfilUi();
 
-  const fila = perfil.filas.find((fila) => fila.id === id);
+  const fila = perfil.filas.find(
+    (item): item is FilaPerfil => !esSeparador(item) && item.id === id,
+  );
 
   if (!fila) {
     return;
@@ -75,93 +77,81 @@ export function eliminarFilaPorId(id: string): void {
 // ======================================================
 // 🗂️ AGREGAR AGRUPACIÓN
 // ------------------------------------------------------
-// Nace vacía (numFilas: 0), al final de perfil.grupos. Como
-// la pertenencia es puramente posicional y los grupos ya
-// existentes agotan sus filas antes que cualquier fila
-// suelta, agregarla al final ya es "después del último
-// grupo existente" — no hace falta calcular ninguna posición.
+// Nace como fila-separador al final de perfil.filas (Regla
+// 1/2). Como la pertenencia es puramente posicional (Regla 3)
+// y los separadores existentes ya agotan sus filas antes que
+// cualquier fila suelta, agregarla al final ya es "después
+// del último separador existente" — no hace falta calcular
+// ninguna posición.
 // ======================================================
 
 export function agregarAgrupacion(): void {
   const perfil = obtenerPerfilUi();
 
-  perfil.grupos.push(crearAgrupacion());
+  perfil.filas.push(crearSeparador());
 }
 
 // ======================================================
 // 📋 CLONAR AGRUPACIÓN POR ID
 // ------------------------------------------------------
-// A diferencia de clonarFilaPorId, acá no alcanza con
-// empujar al final: la pertenencia se calcula sumando
-// numFilas en orden posicional, así que el clon (filas +
-// grupo) tiene que insertarse justo después del original
-// para no terminar apuntando a filas ajenas.
+// A diferencia de clonarFilaPorId, acá no alcanza con empujar
+// al final: el clon (separador + sus filas) se inserta justo
+// después del tramo original (Regla 6: filas entre este
+// separador y el siguiente), para no terminar apuntando a
+// filas ajenas.
 // ======================================================
 
 export function clonarAgrupacionPorId(id: string): void {
   const perfil = obtenerPerfilUi();
 
-  const indice = perfil.grupos.findIndex((grupo) => grupo.id === id);
+  const indice = perfil.filas.findIndex(
+    (item) => esSeparador(item) && item.id === id,
+  );
 
   if (indice < 0) {
     return;
   }
 
-  const grupo = perfil.grupos[indice];
+  const separador = perfil.filas[indice];
 
-  const { rangoPorGrupo } = calcularPertenencia(
-    perfil.grupos,
-    perfil.filas.length,
-  );
-
-  const rango = rangoPorGrupo.get(id);
-
-  if (!rango) {
+  if (!esSeparador(separador)) {
     return;
   }
 
-  const filasClonadas = perfil.filas
-    .slice(rango.inicio, rango.fin)
-    .map((fila) => clonarFila(fila));
+  const tramo = obtenerTramoDeSeparador(perfil.filas, indice);
 
-  perfil.filas.splice(rango.fin, 0, ...filasClonadas);
+  const filasClonadas = tramo.map((fila) => clonarFila(fila));
 
-  const grupoClonado = clonarAgrupacion(grupo);
+  const separadorClonado = clonarSeparador(separador);
 
-  grupoClonado.numFilas = filasClonadas.length;
+  const finTramo = indice + 1 + tramo.length;
 
-  perfil.grupos.splice(indice + 1, 0, grupoClonado);
+  perfil.filas.splice(finTramo, 0, separadorClonado, ...filasClonadas);
 }
 
 // ======================================================
 // 🗑️ ELIMINAR AGRUPACIÓN CON FILAS
 // ------------------------------------------------------
-// Igual que eliminarFilaPorId: si perfil.filas queda vacío
-// después de descartar las filas del grupo, se empuja una
-// fila nueva para que la tabla nunca quede sin ninguna.
+// Elimina el separador y todas las filas de su tramo (Regla
+// 6). Igual que eliminarFilaPorId: si perfil.filas queda
+// vacío después, se empuja una fila nueva para que la tabla
+// nunca quede sin ninguna.
 // ======================================================
 
 export function eliminarAgrupacionConFilas(id: string): void {
   const perfil = obtenerPerfilUi();
 
-  const indice = perfil.grupos.findIndex((grupo) => grupo.id === id);
+  const indice = perfil.filas.findIndex(
+    (item) => esSeparador(item) && item.id === id,
+  );
 
   if (indice < 0) {
     return;
   }
 
-  const { rangoPorGrupo } = calcularPertenencia(
-    perfil.grupos,
-    perfil.filas.length,
-  );
+  const tramo = obtenerTramoDeSeparador(perfil.filas, indice);
 
-  const rango = rangoPorGrupo.get(id);
-
-  if (rango) {
-    perfil.filas.splice(rango.inicio, rango.fin - rango.inicio);
-  }
-
-  perfil.grupos.splice(indice, 1);
+  perfil.filas.splice(indice, 1 + tramo.length);
 
   if (perfil.filas.length === 0) {
     perfil.filas.push(crearFila());
@@ -171,38 +161,29 @@ export function eliminarAgrupacionConFilas(id: string): void {
 // ======================================================
 // 📤 MOVER AGRUPACIÓN FUERA
 // ------------------------------------------------------
-// Las filas del grupo quedan sueltas al final absoluto de
-// perfil.filas; el grupo se elimina. El resto de los grupos
-// no cambia de cantidad de filas ni de orden relativo, así
-// que su pertenencia sigue siendo correcta sola.
+// Las filas del tramo (Regla 6) quedan sueltas al final
+// absoluto de perfil.filas; el separador se elimina. El resto
+// de los separadores no cambia de cantidad de filas ni de
+// orden relativo, así que su pertenencia (derivada por
+// posición, Regla 3) sigue siendo correcta sola.
 // ======================================================
 
 export function moverAgrupacionFuera(id: string): void {
   const perfil = obtenerPerfilUi();
 
-  const indice = perfil.grupos.findIndex((grupo) => grupo.id === id);
+  const indice = perfil.filas.findIndex(
+    (item) => esSeparador(item) && item.id === id,
+  );
 
   if (indice < 0) {
     return;
   }
 
-  const { rangoPorGrupo } = calcularPertenencia(
-    perfil.grupos,
-    perfil.filas.length,
-  );
+  const tramo = obtenerTramoDeSeparador(perfil.filas, indice);
 
-  const rango = rangoPorGrupo.get(id);
+  perfil.filas.splice(indice, 1 + tramo.length);
 
-  if (rango) {
-    const filasSueltas = perfil.filas.splice(
-      rango.inicio,
-      rango.fin - rango.inicio,
-    );
-
-    perfil.filas.push(...filasSueltas);
-  }
-
-  perfil.grupos.splice(indice, 1);
+  perfil.filas.push(...tramo);
 }
 
 // ======================================================

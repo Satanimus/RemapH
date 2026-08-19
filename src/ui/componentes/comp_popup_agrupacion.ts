@@ -16,7 +16,7 @@
 
 import { mostrarPopup, ocultarPopup } from "./comp_popup_contenedor";
 
-import type { AgrupacionPerfil } from "../../core/core_perfil";
+import type { SeparadorPerfil } from "../../core/core_perfil";
 
 import {
   clonarAgrupacionPorId,
@@ -50,7 +50,7 @@ function crearSeparador(): HTMLElement {
 
 function llenarListaColorGrupo(
   contenedor: HTMLElement,
-  grupo: AgrupacionPerfil,
+  grupo: SeparadorPerfil,
   alSeleccionar: () => void,
 ): void {
   contenedor.replaceChildren();
@@ -102,7 +102,7 @@ function llenarListaColorGrupo(
 
 export function abrirPopupAgrupacion(
   evento: MouseEvent,
-  grupo: AgrupacionPerfil,
+  grupo: SeparadorPerfil,
   alModificar: () => void,
 ): void {
   let colorExpandido = false;

@@ -129,6 +129,14 @@ export interface OpcionesArrastrable {
   onSalirModoMover?: () => void;
 
   obtenerIdsSeparadores?: () => string[];
+
+  // Regla 11: consulta si `id` es un separador contraído. El
+  // llamador (ver ui_tabla.ts) también aprovecha esta consulta
+  // para expandirlo automáticamente (muta el modelo y reconstruye
+  // la tabla) antes de que el controlador de arrastre calcule
+  // posiciones — así las filas que quedaban ocultas por el
+  // colapso ya existen en el DOM al iniciar el gesto.
+  esSeparadorContraido?: (id: string) => boolean;
 }
 
 export interface ControladorArrastre {
@@ -177,6 +185,7 @@ export function crearControladorArrastre(
     onReordenar,
     onSalirModoMover,
     obtenerIdsSeparadores,
+    esSeparadorContraido,
   } = opciones;
 
   // id → elementos registrados por el llamador. Se puede
@@ -632,6 +641,17 @@ export function crearControladorArrastre(
     idsGrupoSinOrdenar: string[],
     eventoInicial: PointerEvent,
   ): void {
+    // Regla 11: expandir automáticamente cualquier separador
+    // contraído que vaya a arrastrarse, ANTES de leer el orden
+    // vigente y de tomar el elemento del DOM — esSeparadorContraido
+    // ya se encarga de mutar el modelo y reconstruir la tabla
+    // cuando corresponde, dejando las filas antes ocultas
+    // presentes en el DOM (y re-registradas en `filas`) para el
+    // resto de este gesto.
+    idsGrupoSinOrdenar.forEach((id) => {
+      esSeparadorContraido?.(id);
+    });
+
     const ordenVigente = obtenerOrdenIds();
 
     limpiarFilasFantasma(ordenVigente);

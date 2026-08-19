@@ -25,6 +25,10 @@ import { iniciarAjusteTextoBotones } from "./ui/util/util_texto_boton";
 
 import { actualizarStatusbar } from "./ui/ui_statusbar";
 
+import { esSeparador } from "./core/core_agrupacion";
+
+import type { FilaPerfil } from "./core/core_perfil";
+
 // Se dispara apenas se ejecuta el módulo, en paralelo con el resto
 // del arranque (ver core_apariencia.ts) — no hace falta esperarlo
 // acá, setProperty() en <html> aplica en cuanto resuelve.
@@ -46,7 +50,6 @@ async function guardarPerfil(): Promise<void> {
 
   const resultado = await invoke<ResultadoCompilacion>("compilar_perfil", {
     filas: perfil.filas,
-    grupos: perfil.grupos,
   });
 
   establecerAdvertenciasCompilacion(resultado.advertencias);
@@ -80,7 +83,9 @@ async function iniciarApp(): Promise<void> {
 
   document.body.replaceChildren(crearApp(guardarPerfil));
 
-  actualizarStatusbar(perfil.filas);
+  actualizarStatusbar(
+    perfil.filas.filter((item): item is FilaPerfil => !esSeparador(item)),
+  );
 
   iniciarAjusteTextoBotones();
 }

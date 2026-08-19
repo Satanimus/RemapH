@@ -110,7 +110,7 @@
 
 use crate::cache;
 use crate::compilador;
-use crate::perfil_json::perfil_json;
+use crate::perfil_json::{perfil_json, ItemFilaJson};
 use crate::runtime;
 use crate::usuario;
 use std::collections::HashMap;
@@ -518,7 +518,11 @@ pub fn buscar_nombres_portapapeles(ids: &[String]) -> HashMap<String, String> {
             continue;
         };
 
-        for remapeo in perfil.remapeos {
+        for item in perfil.filas {
+            let ItemFilaJson::Fila(remapeo) = item else {
+                continue;
+            };
+
             if remapeo.tipo != "portapapeles" {
                 continue;
             }

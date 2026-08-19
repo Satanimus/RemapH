@@ -158,11 +158,25 @@ export function crearTabla(alModificar: () => void): HTMLElement {
         .map((separador) => separador.id),
 
     // Regla 11: si se arrastra un separador contraído, se expande
-    // automáticamente al iniciar el gesto de arrastre.
+    // automáticamente al iniciar el gesto de arrastre — mutamos el
+    // modelo y reconstruimos la tabla acá mismo (mismo criterio que
+    // el botón ↴/≫ de crearExpandirGrupo) para que las filas que
+    // quedaban ocultas por el colapso ya estén en el DOM cuando
+    // iniciarArrastre calcule posiciones.
     esSeparadorContraido: (id) => {
       const item = obtenerPerfilUi().filas.find((f) => f.id === id);
 
-      return !!item && esSeparador(item) && !item.expandido;
+      if (!item || !esSeparador(item) || item.expandido) {
+        return false;
+      }
+
+      item.expandido = true;
+
+      alModificar();
+
+      reconstruirTabla();
+
+      return true;
     },
   });
 
@@ -282,6 +296,15 @@ export function crearTabla(alModificar: () => void): HTMLElement {
       return;
     }
 
+    const item = perfil.filas[indice];
+
+    // reconstruirFila es solo para filas normales — un separador
+    // se re-renderiza a través de reconstruirTabla (ver
+    // crearSeparadorHeader/crearExpandirGrupo), no acá.
+    if (esSeparador(item)) {
+      return;
+    }
+
     const filaActual = filas.querySelector(`[data-id="${id}"]`);
 
     if (!filaActual) {
@@ -289,7 +312,7 @@ export function crearTabla(alModificar: () => void): HTMLElement {
     }
 
     const filaNueva = crearFila(
-      perfil.filas[indice],
+      item,
       indice === perfil.filas.length - 1,
       alModificar,
     );
