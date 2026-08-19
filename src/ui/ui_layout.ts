@@ -14,6 +14,10 @@ import { obtenerPerfilUi } from "../core/core_perfil_ui";
 
 import { registrarActualizacionConflictos } from "./ui_tabla_control";
 
+import { esSeparador } from "../core/core_agrupacion";
+
+import type { FilaPerfil } from "../core/core_perfil";
+
 // ======================================================
 // CREAR LAYOUT
 // ======================================================
@@ -22,7 +26,11 @@ export function crearLayout(alGuardar: () => Promise<void>): HTMLElement {
   const statusbar = crearStatusbar();
 
   registrarActualizacionConflictos(() => {
-    actualizarStatusbar(obtenerPerfilUi().filas);
+    actualizarStatusbar(
+      obtenerPerfilUi().filas.filter(
+        (item): item is FilaPerfil => !esSeparador(item),
+      ),
+    );
   });
 
   const toolbar = crearToolbar(alGuardar);

@@ -40,6 +40,8 @@ import { textoAccionFila } from "../../core/core_perfil_acciones";
 
 import type { MenuBotonPerfil } from "../../core/core_menu_express";
 
+import { esSeparador } from "../../core/core_agrupacion";
+
 // ======================================================
 // 🎨 INDICADOR DE COLOR DE FILA
 // ------------------------------------------------------
@@ -166,7 +168,9 @@ export function abrirEditorMenuExpress(
   contexto: ContextoFila,
   filaPerfil: FilaPerfil,
 ): void {
-  const todasLasFilas = obtenerPerfilUi().filas;
+  const todasLasFilas = obtenerPerfilUi().filas.filter(
+    (item): item is FilaPerfil => !esSeparador(item),
+  );
 
   const menuAccion = filaPerfil.menuAccion;
 

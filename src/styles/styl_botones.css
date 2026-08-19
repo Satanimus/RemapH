@@ -670,7 +670,15 @@
 
 .estado-toggle {
 
-    border-color: transparent;
+    height: 22px;
+
+    border-width: 1px;
+
+    border-style: solid;
+
+    border-color: #000;
+
+    border-radius: 999px;
 
     color: #FFF;
 }
@@ -763,6 +771,10 @@
     align-items: center;
 
     justify-content: center;
+
+    flex-shrink: 0;
+
+    white-space: nowrap;
 
     height: 28px;
 

@@ -37,6 +37,8 @@ import { crearFila as crearFilaPerfil } from "../core/core_perfil";
 
 import { agregarAgrupacion } from "../core/core_perfil_acciones";
 
+import { esSeparador } from "../core/core_agrupacion";
+
 import {
   crearIndicador,
   actualizarIndicador,
@@ -70,9 +72,9 @@ export function crearToolbar(alGuardar: () => Promise<void>): HTMLElement {
             <button
                 class="btn-agregar-grupo"
                 type="button"
-                title="Agregar grupo"
+                title="Agregar separador"
             >
-                <span>+ Grupo</span>
+                <span>+ Separador</span>
             </button>
 
         </div>
@@ -242,6 +244,26 @@ export function crearToolbar(alGuardar: () => Promise<void>): HTMLElement {
 
   botonAgregarFila?.addEventListener("click", () => {
     const perfil = obtenerPerfilUi();
+
+    // [FIX] La fila nueva se agrega al final del array, así que
+    // pertenece al último separador (si hay uno). Si ese separador
+    // está contraído, la fila nace oculta y parece que el botón no
+    // hizo nada — se expande acá antes de agregarla.
+    let ultimoSeparador = null;
+
+    for (let i = perfil.filas.length - 1; i >= 0; i--) {
+      const item = perfil.filas[i];
+
+      if (esSeparador(item)) {
+        ultimoSeparador = item;
+
+        break;
+      }
+    }
+
+    if (ultimoSeparador && !ultimoSeparador.expandido) {
+      ultimoSeparador.expandido = true;
+    }
 
     perfil.filas.push(crearFilaPerfil());
 

@@ -13,7 +13,13 @@ import { crearExpandirGrupo } from "./componentes/comp_grupo_expandir";
 
 import { obtenerPerfilUi } from "../core/core_perfil_ui";
 
-import { construirPlanVisual, esSeparador } from "../core/core_agrupacion";
+import {
+  construirPlanVisual,
+  esSeparador,
+  obtenerTramoDeSeparador,
+} from "../core/core_agrupacion";
+
+import type { ItemFilaPerfil } from "../core/core_perfil";
 
 import {
   registrarReconstruccion,
@@ -141,11 +147,48 @@ export function crearTabla(alModificar: () => void): HTMLElement {
       // directamente el nuevo array de filas del perfil, sin
       // rangos ni recálculo de pertenencia (eso lo deriva
       // construirPlanVisual en cada render).
-      const porId = new Map(perfil.filas.map((item) => [item.id, item]));
+      //
+      // [FIX] `nuevoOrden` solo trae los ids VISIBLES (obtenerOrdenIds
+      // se arma con construirPlanVisual, que omite las filas de
+      // cualquier separador contraído — ver Regla 7). Si se
+      // reconstruía `perfil.filas` filtrando solo esos ids, las
+      // filas ocultas de un separador contraído que no participó
+      // del arrastre quedaban afuera para siempre (se "eliminaban").
+      // Ahora, al recorrer cada separador contraído dentro del
+      // nuevo orden, se reinserta su tramo oculto completo (tomado
+      // del array ANTERIOR, mismo orden relativo) justo después.
+      const anterior = perfil.filas;
 
-      perfil.filas = nuevoOrden
-        .map((id) => porId.get(id))
-        .filter((item): item is (typeof perfil.filas)[number] => !!item);
+      const porId = new Map(anterior.map((item) => [item.id, item]));
+
+      const nuevasFilas: ItemFilaPerfil[] = [];
+      const yaColocados = new Set<string>();
+
+      nuevoOrden.forEach((id) => {
+        const item = porId.get(id);
+
+        if (!item || yaColocados.has(id)) {
+          return;
+        }
+
+        nuevasFilas.push(item);
+        yaColocados.add(id);
+
+        if (esSeparador(item) && !item.expandido) {
+          const indiceAnterior = anterior.indexOf(item);
+
+          const tramoOculto = obtenerTramoDeSeparador(anterior, indiceAnterior);
+
+          tramoOculto.forEach((fila) => {
+            if (!yaColocados.has(fila.id)) {
+              nuevasFilas.push(fila);
+              yaColocados.add(fila.id);
+            }
+          });
+        }
+      });
+
+      perfil.filas = nuevasFilas;
 
       alModificar();
 
@@ -290,18 +333,12 @@ export function crearTabla(alModificar: () => void): HTMLElement {
   const reconstruirFila = (id: string): void => {
     const perfil = obtenerPerfilUi();
 
-    const indice = perfil.filas.findIndex((fila) => fila.id === id);
-
-    if (indice < 0) {
-      return;
-    }
-
-    const item = perfil.filas[indice];
+    const item = perfil.filas.find((fila) => fila.id === id);
 
     // reconstruirFila es solo para filas normales — un separador
     // se re-renderiza a través de reconstruirTabla (ver
     // crearSeparadorHeader/crearExpandirGrupo), no acá.
-    if (esSeparador(item)) {
+    if (!item || esSeparador(item)) {
       return;
     }
 
@@ -311,10 +348,40 @@ export function crearTabla(alModificar: () => void): HTMLElement {
       return;
     }
 
+    // [FIX] Antes se llamaba crearFila() sin el 4º parámetro
+    // (info de separador: color/primera/ultima) — la fila
+    // reconstruida perdía el color de fondo/borde del grupo hasta
+    // que otra acción disparara un reconstruirTabla() completo. Se
+    // recalcula acá el mismo plan visual que usa reconstruirTabla,
+    // así una fila individual queda idéntica a como saldría en un
+    // render completo.
+    const plan = construirPlanVisual(perfil);
+
+    const planItem = plan.find((p) => p.tipo === "fila" && p.fila.id === id);
+
+    if (!planItem || planItem.tipo !== "fila") {
+      return;
+    }
+
+    let ultimoIndiceFilaEnPlan = -1;
+
+    plan.forEach((p, i) => {
+      if (p.tipo === "fila") {
+        ultimoIndiceFilaEnPlan = i;
+      }
+    });
+
+    const indicePlan = plan.indexOf(planItem);
+
+    const esUltima = planItem.separador
+      ? planItem.separador.ultima
+      : indicePlan === ultimoIndiceFilaEnPlan;
+
     const filaNueva = crearFila(
-      item,
-      indice === perfil.filas.length - 1,
+      planItem.fila,
+      esUltima,
       alModificar,
+      planItem.separador,
     );
 
     filaActual.replaceWith(filaNueva);

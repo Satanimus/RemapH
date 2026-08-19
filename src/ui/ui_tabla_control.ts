@@ -14,6 +14,10 @@ import { obtenerConflictos } from "../core/core_conflictos";
 
 import { obtenerPerfilUi } from "../core/core_perfil_ui";
 
+import { esSeparador } from "../core/core_agrupacion";
+
+import type { FilaPerfil } from "../core/core_perfil";
+
 // ======================================================
 // 🔄 REGISTRAR RECONSTRUCCIÓN
 // ======================================================
@@ -87,7 +91,11 @@ export function reconstruirFila(id: string): void {
 function obtenerMapaConflictos(): Map<string, Set<string>> {
   const mapa = new Map<string, Set<string>>();
 
-  const conflictos = obtenerConflictos(obtenerPerfilUi().filas);
+  const conflictos = obtenerConflictos(
+    obtenerPerfilUi().filas.filter(
+      (item): item is FilaPerfil => !esSeparador(item),
+    ),
+  );
 
   conflictos.forEach((conflicto) => {
     const idA = conflicto.filaA.id;
