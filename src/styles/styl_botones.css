@@ -755,7 +755,8 @@
    debajo de la última fila de la tabla).
    ====================================================== */
 
-.btn-agregar-fila {
+.btn-agregar-fila,
+.btn-agregar-grupo {
 
     display: flex;
 
@@ -788,7 +789,8 @@
         color .12s ease;
 }
 
-.btn-agregar-fila:hover {
+.btn-agregar-fila:hover,
+.btn-agregar-grupo:hover {
 
     border-color: var(--highlight);
 

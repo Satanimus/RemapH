@@ -20,6 +20,10 @@
 
     height: 100%;
 
+    padding-right: 20px;
+
+    box-sizing: border-box;
+
     overflow: auto;
 }
 
@@ -85,7 +89,7 @@
     box-sizing: border-box;
 }
 
-.carril-expandir {
+.ui-btn.carril-expandir {
 
     min-width: 0;
 
