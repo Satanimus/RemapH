@@ -74,7 +74,6 @@ import {
   clonarPasoMacro,
   textoTipoPasoMacro,
   iconoTipoPasoMacro,
-  letraMarcadorDisponible,
 } from "../../core/core_macro";
 
 import type { Trigger } from "../../core/core_trigger";
@@ -816,6 +815,31 @@ function montarEditor(
       controladorArrastre = null;
     }
 
+    // Preservar tamaño y ancho de columna Extra ajustados por el
+    // usuario antes de que mostrarPopupFijo destruya el popup actual.
+    const popupPrevio = document.querySelector<HTMLElement>(
+      ".popup-macro-editor",
+    );
+    let anchoGuardado: string | null = null;
+    let altoGuardado: string | null = null;
+    let colExtraGuardado: string | null = null;
+
+    if (popupPrevio) {
+      const rect = popupPrevio.getBoundingClientRect();
+
+      anchoGuardado = `${rect.width}px`;
+      altoGuardado = `${rect.height}px`;
+    }
+
+    const colDerechaPrevio = document.querySelector<HTMLElement>(
+      ".popup-macro-editor-columna-derecha",
+    );
+
+    if (colDerechaPrevio) {
+      colExtraGuardado =
+        colDerechaPrevio.style.getPropertyValue("--col-extra-width");
+    }
+
     const popup = document.createElement("div");
 
     popup.className = "popup-extra popup-macro-editor";
@@ -870,8 +894,10 @@ function montarEditor(
     columnaDerecha.style.setProperty("--col-asa-width", "28px");
     columnaDerecha.style.setProperty("--col-numero-width", "32px");
     columnaDerecha.style.setProperty("--col-tipo-width", "40px");
-    columnaDerecha.style.setProperty("--col-extra-width", "260px");
-    columnaDerecha.style.setProperty("--col-nota-width", "140px");
+    columnaDerecha.style.setProperty(
+      "--col-extra-width",
+      colExtraGuardado ?? "260px",
+    );
 
     columnaDerecha.append(crearEncabezadoColumnas(columnaDerecha));
 
@@ -942,6 +968,17 @@ function montarEditor(
 
     mostrarPopupFijo(popup, posicionX, posicionY);
 
+    // Restaurar tamaño ajustado por el usuario (resize: both).
+    // Se aplica después de mostrarPopupFijo porque antes el elemento
+    // no está en el DOM y las asignaciones de style se perderían.
+    if (anchoGuardado) {
+      popup.style.width = anchoGuardado;
+    }
+
+    if (altoGuardado) {
+      popup.style.height = altoGuardado;
+    }
+
     // El componente de arrastre necesita el contenedor YA en el DOM
     // (mostrarPopupFijo ya lo insertó arriba) para poder registrar cada
     // fila-paso y medir sus posiciones.
@@ -996,6 +1033,30 @@ function montarEditor(
         controladorArrastre!.registrarFila(idPaso, fila, asa);
       }
     });
+
+    // Cerrar menú/lista-tipo abierto al hacer click fuera de él.
+    // Se registra con setTimeout para no dispararse en el mismo click
+    // que abrió el menú. Se usa capture para interceptar antes que
+    // los botones internos (que tienen stopPropagation).
+    if (idMenuAbierto) {
+      const cerrarAlClickFuera = (evento: MouseEvent): void => {
+        const menuAbierto = popup.querySelector<HTMLElement>(
+          ".popup-lista, .popup-macro-editor-menu-asa",
+        );
+
+        if (menuAbierto && !menuAbierto.contains(evento.target as Node)) {
+          document.removeEventListener("click", cerrarAlClickFuera, true);
+
+          idMenuAbierto = null;
+
+          redibujar();
+        }
+      };
+
+      setTimeout(() => {
+        document.addEventListener("click", cerrarAlClickFuera, true);
+      }, 0);
+    }
   }
 
   dibujar();
@@ -1007,7 +1068,7 @@ function montarEditor(
 // Fila fija arriba de la lista de pasos (spec punto 10). Único
 // separador arrastrable: entre Extra y Nota (spec: "las demás
 // columnas tendrán ancho fijo", "la flexible será la columna
-// Extra"). Arrastrarlo ajusta --col-nota-width — Extra (flex:1
+// Nota"). Arrastrarlo ajusta --col-extra-width — Nota (flex:1
 // en CSS) se acomoda sola al espacio que sobra, sin variable
 // propia.
 // ======================================================
@@ -1049,7 +1110,7 @@ function crearResizerColumna(columnaDerecha: HTMLElement): HTMLElement {
 
   resizer.className = "popup-macro-col-resizer";
 
-  const variable = "--col-nota-width";
+  const variable = "--col-extra-width";
 
   resizer.addEventListener("mousedown", (eventoInicial) => {
     eventoInicial.preventDefault();
@@ -1061,12 +1122,11 @@ function crearResizerColumna(columnaDerecha: HTMLElement): HTMLElement {
     const xInicial = eventoInicial.clientX;
 
     const alMover = (eventoMover: MouseEvent): void => {
-      // El resizer queda a la izquierda de Nota: arrastrar hacia la
-      // derecha corre el límite hacia la derecha (Extra gana
-      // espacio, Nota lo cede), así que el delta se resta.
+      // El resizer queda a la derecha de Extra: arrastrar hacia la
+      // derecha amplía Extra, hacia la izquierda la encoge.
       const delta = eventoMover.clientX - xInicial;
 
-      const nuevoAncho = Math.max(20, anchoInicial - delta);
+      const nuevoAncho = Math.max(20, anchoInicial + delta);
 
       columnaDerecha.style.setProperty(variable, `${nuevoAncho}px`);
     };
@@ -1180,21 +1240,35 @@ function crearFilaPaso(
 
   extra.className = "popup-macro-editor-extra";
 
-  // Columna Marcador — reserva espacio en toda fila apenas hay
-  // algún Bucle en la macro, pero el control real (asignar/quitar
-  // letra) solo se ofrece en pasos que NO son Bucle y que tienen al
-  // menos un Bucle en algún punto POSTERIOR (spec: "solo los pasos
-  // anteriores a un Bucle pueden tomar su letra"). Un paso ya
-  // marcado se sigue mostrando aunque un reordenamiento lo haya
-  // dejado sin ningún Bucle detrás — así el usuario puede verlo y
-  // quitarlo, en vez de que el marcador quede "invisible" pero
-  // todavía activo.
-  if (
-    hayBucle &&
-    paso.tipo !== "bucle" &&
-    (elegiblePorMarcador || paso.marcador)
-  ) {
-    extra.append(crearControlMarcador(paso, macroArchivo, guardarYRedibujar));
+  // Columna Marcador — tres casos:
+  // 1. Paso Bucle: muestra su propia letra (bucleMarcadorDestino) con
+  //    estilo invertido (borde azul, fondo transparente, letra azul).
+  // 2. Paso no-Bucle anterior a algún Bucle: muestra círculo ciclable
+  //    si hay letras de Bucle sin fila asignada, u oculta cuando todas
+  //    las letras ya tienen su fila. Si ya tiene marcador, lo muestra.
+  // 3. Resto con hayBucle: espacio reservado para alinear columnas.
+  if (hayBucle && paso.tipo === "bucle") {
+    extra.append(crearIconoBucle(paso));
+  } else if (hayBucle && paso.tipo !== "bucle" && elegiblePorMarcador) {
+    const letrasNecesitadas = calcularLetrasNecesitadas(macroArchivo.pasos);
+    const todasCubiertas = letrasNecesitadas.length === 0;
+
+    if (paso.marcador || !todasCubiertas) {
+      extra.append(
+        crearControlMarcador(
+          paso,
+          macroArchivo,
+          letrasNecesitadas,
+          guardarYRedibujar,
+        ),
+      );
+    } else {
+      const espacio = document.createElement("span");
+
+      espacio.className = "popup-macro-editor-marcador-espacio";
+
+      extra.append(espacio);
+    }
   } else if (hayBucle) {
     const espacio = document.createElement("span");
 
@@ -1226,7 +1300,7 @@ function crearFilaPaso(
 
   inputNota.className = "popup-macro-nota";
   inputNota.type = "text";
-  inputNota.placeholder = "Nota...";
+  inputNota.placeholder = "...";
   inputNota.value = paso.nota;
 
   inputNota.addEventListener("click", (eventoClick) => {
@@ -1298,29 +1372,84 @@ function crearFilaPaso(
 }
 
 // ======================================================
-// 🔤 CONTROL DE MARCADOR (columna condicional)
+// 🔤 HELPERS DE LETRAS DE BUCLE
+// ======================================================
+
+// Letras ya usadas como bucleMarcadorDestino entre todos los Bucles.
+function letraBucleDisponible(pasos: PasoMacro[]): string {
+  const usadas = new Set(
+    pasos
+      .filter((p) => p.tipo === "bucle")
+      .map((p) => p.bucleMarcadorDestino)
+      .filter((m): m is string => m !== null),
+  );
+
+  const ALFABETO = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+
+  for (const letra of ALFABETO) {
+    if (!usadas.has(letra)) {
+      return letra;
+    }
+  }
+
+  let indice = 0;
+
+  while (true) {
+    const letra = `${ALFABETO[indice % 26]}${Math.floor(indice / 26) + 1}`;
+
+    if (!usadas.has(letra)) {
+      return letra;
+    }
+
+    indice++;
+  }
+}
+
+// Letras de Bucles que no tienen ninguna fila con marcador igual a ellas.
+function calcularLetrasNecesitadas(pasos: PasoMacro[]): string[] {
+  const marcadoresFila = new Set(
+    pasos.map((p) => p.marcador).filter((m): m is string => m !== null),
+  );
+
+  return pasos
+    .filter((p) => p.tipo === "bucle" && p.bucleMarcadorDestino !== null)
+    .map((p) => p.bucleMarcadorDestino as string)
+    .filter((letra) => !marcadoresFila.has(letra));
+}
+
+// ======================================================
+// 🔵 ICONO DE BUCLE (su propia letra, estilo invertido)
 // ------------------------------------------------------
-// Reglas (spec sección 3):
-// - Solo asignable a un paso ANTERIOR a un Bucle existente
-//   (elegibilidad ya filtrada por el llamador — crearFilaPaso —
-//   antes de instanciar este control).
-// - Pueden coexistir varias letras a la vez en la misma macro
-//   (una por cada Bucle que las referencia — ver ejemplo de
-//   bucles anidados A/B en el plan, y letraMarcadorDisponible en
-//   core_macro.ts, diseñada explícitamente para A, B, C... sin
-//   límite). No hay "un solo marcador global": cada paso elegible
-//   ofrece su propio botón para tomar la próxima letra libre.
-// - Clic sobre "○" (sin marcar) asigna la próxima letra libre.
-//   Clic sobre la letra ya asignada la quita (vuelve cualquier
-//   Bucle que la referenciaba a "sin destino" — mismo criterio
-//   que crearMenuAsa al eliminar un paso marcado, porque quitar
-//   el marcador equivale a "borrar el paso marcado" desde el
-//   punto de vista del Bucle).
+// Muestra bucleMarcadorDestino con borde azul, fondo
+// transparente, letra azul — invertido al marcador de fila
+// (que tiene fondo cyan y letra blanca).
+// ======================================================
+
+function crearIconoBucle(paso: PasoMacro): HTMLElement {
+  const boton = document.createElement("button");
+
+  boton.className = "ui-btn popup-macro-editor-marcador";
+  boton.dataset.activo = "false";
+  boton.dataset.esBucle = "true";
+  boton.textContent = paso.bucleMarcadorDestino ?? "?";
+  boton.title = `Bucle ${paso.bucleMarcadorDestino ?? ""}`;
+  boton.disabled = true;
+
+  return boton;
+}
+
+// ======================================================
+// 🔤 CONTROL DE MARCADOR (columna condicional — filas no-Bucle)
+// ------------------------------------------------------
+// Click cicla entre letras de Bucles que necesitan fila asignada.
+// Primer click: primera letra necesitada. Siguiente: siguiente.
+// Cuando se agotan o el paso ya tenía la última: vuelve a ○.
 // ======================================================
 
 function crearControlMarcador(
   paso: PasoMacro,
   macroArchivo: MacroArchivo,
+  letrasNecesitadas: string[],
   guardarYRedibujar: () => void,
 ): HTMLElement {
   const boton = document.createElement("button");
@@ -1333,7 +1462,7 @@ function crearControlMarcador(
     boton.dataset.activo = "true";
   } else {
     boton.textContent = "○";
-    boton.title = "Asignar marcador";
+    boton.title = "Asignar marcador para Bucle";
     boton.dataset.activo = "false";
   }
 
@@ -1341,20 +1470,21 @@ function crearControlMarcador(
     evento.stopPropagation();
 
     if (paso.marcador) {
-      // Quitar: cualquier Bucle que apuntaba acá vuelve a "sin
-      // destino" — mismo efecto que "se borró el paso marcado"
-      // (spec), aplicado sin borrar el paso en sí.
-      const letra = paso.marcador;
+      // Ciclar a la siguiente letra necesitada, o volver a ○.
+      const indiceActual = letrasNecesitadas.indexOf(paso.marcador);
+      const siguiente = letrasNecesitadas[indiceActual + 1] ?? null;
 
-      paso.marcador = null;
-
-      macroArchivo.pasos.forEach((p) => {
-        if (p.tipo === "bucle" && p.bucleMarcadorDestino === letra) {
-          p.bucleMarcadorDestino = null;
-        }
-      });
+      if (siguiente === null) {
+        // Quitar: cualquier Bucle que apuntaba acá vuelve a sin
+        // destino visible (la letra en el Bucle se mantiene, pero
+        // la fila ya no la cubre).
+        paso.marcador = null;
+      } else {
+        paso.marcador = siguiente;
+      }
     } else {
-      paso.marcador = letraMarcadorDisponible(macroArchivo.pasos);
+      // Asignar primera letra necesitada disponible.
+      paso.marcador = letrasNecesitadas[0] ?? null;
     }
 
     guardarYRedibujar();
@@ -1427,16 +1557,15 @@ function crearMenuAsa(
   botonEliminar.textContent = "Eliminar";
 
   botonEliminar.addEventListener("click", () => {
-    // Si este paso estaba marcado, cualquier Bucle que apuntara acá
-    // vuelve a "sin destino" — mismo criterio que crearControlMarcador
-    // al quitar el marcador manualmente (spec: "si se borra el paso
-    // marcado, el Bucle vuelve al estado recién creado sin destino").
-    if (paso.marcador) {
-      const letra = paso.marcador;
+    // Si se elimina un Bucle, cualquier fila que tenía su letra
+    // de marcador queda huérfana — se limpia para que los círculos
+    // no muestren una letra que ya no existe.
+    if (paso.tipo === "bucle" && paso.bucleMarcadorDestino) {
+      const letra = paso.bucleMarcadorDestino;
 
       macroArchivo.pasos.forEach((p) => {
-        if (p.tipo === "bucle" && p.bucleMarcadorDestino === letra) {
-          p.bucleMarcadorDestino = null;
+        if (p.marcador === letra) {
+          p.marcador = null;
         }
       });
     }
@@ -1505,10 +1634,28 @@ function crearListaTipoPaso(
 
     boton.addEventListener("click", () => {
       if (tipo !== paso.tipo) {
+        // Si el paso actual ES Bucle y cambia a otro tipo, limpiar
+        // filas que tenían su letra (la letra desaparece con él).
+        if (paso.tipo === "bucle" && paso.bucleMarcadorDestino) {
+          const letraVieja = paso.bucleMarcadorDestino;
+
+          macroArchivo.pasos.forEach((p) => {
+            if (p.marcador === letraVieja) {
+              p.marcador = null;
+            }
+          });
+        }
+
         const nuevoPaso = crearPasoMacro(tipo);
 
         nuevoPaso.marcador = paso.marcador;
         nuevoPaso.nota = paso.nota;
+
+        if (tipo === "bucle") {
+          nuevoPaso.bucleMarcadorDestino = letraBucleDisponible(
+            macroArchivo.pasos,
+          );
+        }
 
         Object.assign(paso, nuevoPaso);
       }
@@ -1568,7 +1715,15 @@ function crearPanelFunciones(
     boton.textContent = textoTipoPasoMacro(tipo);
 
     boton.addEventListener("click", () => {
-      macroArchivo.pasos.push(crearPasoMacro(tipo));
+      const nuevoPaso = crearPasoMacro(tipo);
+
+      if (tipo === "bucle") {
+        nuevoPaso.bucleMarcadorDestino = letraBucleDisponible(
+          macroArchivo.pasos,
+        );
+      }
+
+      macroArchivo.pasos.push(nuevoPaso);
 
       guardarYRedibujar();
     });
@@ -1597,57 +1752,6 @@ function crearDetalleExpandido(
   const detalle = document.createElement("div");
 
   detalle.className = "popup-caja-interna popup-macro-editor-detalle";
-
-  // ----------------------------------
-  // Selector de Tipo (siempre presente en el detalle expandido)
-  // ----------------------------------
-
-  const tipos: { texto: string; valor: TipoPasoMacro }[] = [
-    { texto: "🔠 Tecla/Mouse", valor: "tecla_mouse" },
-    { texto: "⏳ Espera", valor: "espera" },
-    { texto: "🔁 Bucle", valor: "bucle" },
-    { texto: "📌 Coordenada", valor: "coordenada" },
-    { texto: "📋 Pegar", valor: "pegar" },
-    { texto: "📂 Abrir", valor: "abrir" },
-    { texto: "🎵 Multimedia", valor: "multimedia" },
-  ];
-
-  detalle.append(
-    crearFilaPopup(
-      "Tipo",
-      crearGrupoOpciones(tipos, paso.tipo, (valor) => {
-        if (valor === paso.tipo) {
-          return;
-        }
-
-        // Al cambiar de Tipo, si este paso estaba marcado y el nuevo
-        // tipo también puede tener marcador, se conserva (marcar no
-        // depende del tipo). Si el nuevo tipo es "bucle" y este paso
-        // tenía marcador propio, no tiene sentido (un Bucle no puede
-        // ser destino de sí mismo) — se limpia. El resto de los
-        // campos NO se resetea (mismo criterio que core_macro.ts:
-        // "objeto plano con todos los campos siempre presentes",
-        // cambiar el Tipo no borra los datos de los otros tipos).
-        if (valor === "bucle" && paso.marcador) {
-          const letra = paso.marcador;
-
-          paso.marcador = null;
-
-          macroArchivo.pasos.forEach((p) => {
-            if (p.tipo === "bucle" && p.bucleMarcadorDestino === letra) {
-              p.bucleMarcadorDestino = null;
-            }
-          });
-        }
-
-        paso.tipo = valor;
-
-        guardarYRedibujar();
-      }),
-    ),
-  );
-
-  detalle.append(crearSeparador());
 
   switch (paso.tipo) {
     case "tecla_mouse":
@@ -2091,7 +2195,7 @@ function crearDetallePegar(
 
   input.type = "text";
   input.className = "popup-input";
-  input.placeholder = "Ruta de archivo (.txt / .png)";
+  input.placeholder = "Solo ruta a archivo .txt/.png o escriba texto a pegar.";
   input.value = paso.pegarRuta ?? "";
 
   const confirmarTexto = () => {

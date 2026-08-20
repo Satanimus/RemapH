@@ -211,6 +211,8 @@ function crearMenuPrincipal(
       reconstruirFila(contexto.id);
 
       alModificar();
+
+      ocultarPopup();
     });
 
     menu.append(botonEliminar);
