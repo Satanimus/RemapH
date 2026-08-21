@@ -138,6 +138,12 @@
 //    caminos distintos para lo mismo. Emitir no usa esto —
 //    ver COLA_SALIDA en E).
 //
+//    esperar_detener() (Mantener/Click Sostenido) es la única
+//    excepción a "se revisa antes de cada REPETIR": ahí no hay
+//    ningún REPETIR que visitar mientras se espera el Up físico,
+//    así que en vez de sondear duerme en INSTANCIAS_CONDVAR,
+//    acoplado al mismo Mutex — ver esa función más abajo.
+//
 //    [FIX] Carrera Iniciar+Detener "pegados" (sin demora real
 //    entre uno y otro — típico de un tap rápido sobre un
 //    trigger diferido por ambigüedad, ver cache.rs): Cache
@@ -375,6 +381,7 @@ use std::path::Path;
 
 use std::sync::mpsc::Sender;
 
+use std::sync::Condvar;
 use std::sync::Mutex;
 
 use std::thread;
@@ -416,6 +423,16 @@ use windows_sys::Win32::UI::WindowsAndMessaging::{
 
 static INSTANCIAS: std::sync::LazyLock<Mutex<HashMap<String, bool>>> =
     std::sync::LazyLock::new(|| Mutex::new(HashMap::new()));
+
+// Condvar acoplado al MISMO Mutex que protege INSTANCIAS (no un
+// Mutex<()> aparte, a diferencia de runt_macro::NOTIFICADOR) — así
+// esperar_detener() jamás suelta el lock entre "leer la bandera" y
+// "dormirse esperando": wait() libera el lock y bloquea el hilo en
+// un solo paso atómico a nivel de SO, sin ninguna ventana en la que
+// una notificación pueda llegar y perderse entre medio. Toda
+// escritura que ponga `true` en INSTANCIAS (detener_ejecucion(),
+// detener_todas_las_instancias()) debe notificar acá después.
+static INSTANCIAS_CONDVAR: std::sync::LazyLock<Condvar> = std::sync::LazyLock::new(Condvar::new);
 
 // ======================================================
 // 🧬 GENERACIONES — id de fila -> ids de ejecución en curso
@@ -1443,15 +1460,27 @@ pub(crate) fn esperar(ms: u64) {
 // orden de detener (detener(id)) — usado por Mantener y
 // Click Sostenido para no soltar la acción hasta que el
 // físico se suelte (Cache es quien manda el Detener en
-// ese momento). Sondea debe_detenerse() en vez de dormir
-// una sola vez porque no hay forma de despertar el hilo
-// desde afuera — el intervalo es corto para que la
-// liberación se sienta instantánea.
+// ese momento).
+//
+// 100% reactivo, sin sondeo: el hilo se bloquea en
+// INSTANCIAS_CONDVAR.wait() (espera real a nivel de SO,
+// cero CPU, cero despertares periódicos) hasta que
+// detener_ejecucion() o detener_todas_las_instancias()
+// escriban `true` para este id y llamen notify_all(). Al
+// despertar, vuelve a mirar su propia entrada — si la
+// notificación era para otro id, sigue esperando sin
+// gastar ninguna vuelta de más. No hace falta timeout de
+// respaldo (a diferencia de runt_macro::esperar_interrumpible):
+// el Condvar está acoplado al mismo Mutex que guarda la
+// bandera, así que no hay ninguna ventana de carrera entre
+// leerla y dormirse.
 // ======================================================
 
 fn esperar_detener(id: &str) {
-    while !debe_detenerse(id) {
-        thread::sleep(Duration::from_millis(15));
+    let mut guard = INSTANCIAS.lock().unwrap();
+
+    while guard.get(id).copied() == Some(false) {
+        guard = INSTANCIAS_CONDVAR.wait(guard).unwrap();
     }
 }
 
@@ -1763,6 +1792,12 @@ fn detener_ejecucion(id_ejecucion: &str) {
         .lock()
         .unwrap()
         .insert(id_ejecucion.to_string(), true);
+
+    // El lock ya se soltó (el guard de arriba era temporal, murió al
+    // terminar la sentencia) — notify_all() se llama sin el lock
+    // tomado, cualquier hilo despierto en esperar_detener() vuelve a
+    // pedirlo él mismo dentro de wait().
+    INSTANCIAS_CONDVAR.notify_all();
 }
 
 // ======================================================
@@ -1819,11 +1854,15 @@ pub fn detener_todo() {
 }
 
 fn detener_todas_las_instancias() {
-    let mut instancias = INSTANCIAS.lock().unwrap();
+    {
+        let mut instancias = INSTANCIAS.lock().unwrap();
 
-    for detenida in instancias.values_mut() {
-        *detenida = true;
+        for detenida in instancias.values_mut() {
+            *detenida = true;
+        }
     }
+
+    INSTANCIAS_CONDVAR.notify_all();
 }
 
 fn soltar_salidas_pendientes() {
