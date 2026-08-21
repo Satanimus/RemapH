@@ -113,8 +113,6 @@ pub fn intentar(contenido: &ContenidoPortapapeles, bloquear_hasta_pegar: bool) -
         return false;
     }
 
-    println!("🎨 [diag] pegado personalizado: app activa es Photoshop, uso activación + Ctrl+V");
-
     ejecutar_pegado_photoshop(&ruta_exe, contenido, bloquear_hasta_pegar)
 }
 
@@ -159,46 +157,24 @@ fn ejecutar_pegado_photoshop(
     let es_imagen = matches!(contenido, ContenidoPortapapeles::Imagen { .. });
 
     if es_imagen {
-        println!("🎨 [diag] pegado personalizado: relanzamiento de activación (script vacío reutilizado)");
-
-        let activacion_ok = match ruta_script_vacio() {
-            Some(ruta_script) => lanzar_script_photoshop(ruta_exe, &ruta_script),
-            None => {
-                println!("🎨 [diag] pegado personalizado: no hay script vacío disponible, salto la activación");
-                false
-            }
-        };
-
-        if !activacion_ok {
-            println!("🎨 [diag] pegado personalizado: el relanzamiento de activación falló (sigo igual con el Ctrl+V)");
+        if let Some(ruta_script) = ruta_script_vacio() {
+            lanzar_script_photoshop(ruta_exe, &ruta_script);
         }
-    } else {
-        println!(
-            "🎨 [diag] pegado personalizado: contenido texto, salto la activación (no hace falta)"
-        );
     }
 
     let delay = delay_para_contenido(contenido);
-    println!(
-        "🎨 [diag] pegado personalizado: espero {}ms antes del Ctrl+V ({})",
-        delay,
-        if es_imagen {
-            "imagen, delay propio de Photoshop"
-        } else {
-            "texto, timer genérico"
-        }
-    );
-    std::thread::sleep(std::time::Duration::from_millis(delay));
 
-    // Mismo camino que usa pegar() para cualquier app sin ruta
-    // personalizada — antes acá se lanzaba un segundo script .jsx
-    // (app.activeDocument.paste()) en una segunda relanzada de
-    // Photoshop; ahora se simula Ctrl+V como el camino genérico, sin
-    // ese segundo relanzamiento.
-    println!("🎨 [diag] pegado personalizado: disparo Ctrl+V simulado (mismo camino que el pegado genérico)");
+    std::thread::sleep(std::time::Duration::from_millis(delay));
 
     if bloquear_hasta_pegar {
         crate::runtime::emitir_ctrl_v_bloqueante();
+
+        // Misma espera adicional post-emisión que el camino genérico
+        // (ver comentario largo en back_portapapeles::pegar()) — le
+        // da tiempo a Photoshop a procesar el Ctrl+V antes de que el
+        // próximo paso "Pegar" de la Macro sobreescriba el
+        // portapapeles.
+        std::thread::sleep(std::time::Duration::from_millis(delay));
     } else {
         crate::runtime::emitir_ctrl_v();
     }
@@ -216,20 +192,8 @@ fn ruta_script_vacio() -> Option<PathBuf> {
             let ruta = std::env::temp_dir().join("remaph_photoshop_activar.jsx");
 
             match fs::write(&ruta, SCRIPT_VACIO) {
-                Ok(()) => {
-                    println!(
-                        "🎨 [diag] pegado personalizado: script vacío escrito una vez en {:?}",
-                        ruta
-                    );
-                    Some(ruta)
-                }
-                Err(error) => {
-                    println!(
-                        "🎨 [diag] pegado personalizado: error escribiendo el script vacío: {}",
-                        error
-                    );
-                    None
-                }
+                Ok(()) => Some(ruta),
+                Err(_error) => None,
             }
         })
         .clone()
@@ -246,20 +210,6 @@ fn lanzar_script_photoshop(ruta_exe: &str, ruta_script: &std::path::Path) -> boo
     // configurable aplicado por el llamador antes del Ctrl+V (ver
     // delay_para_contenido()) ya cumple el rol de "darle tiempo a
     // Photoshop"; esperar ADEMÁS a que este proceso cierre era tiempo
-    // doble. Se pierde la confirmación de "estado=" en el log (ahora
-    // solo se sabe que arrancó, no que terminó bien), pero no afecta
-    // el pegado en sí.
-    match Command::new(ruta_exe).arg(ruta_script).spawn() {
-        Ok(_hijo) => {
-            println!("🎨 [diag] pegado personalizado: script de activación lanzado (sin esperar a que cierre)");
-            true
-        }
-        Err(error) => {
-            println!(
-                "🎨 [diag] pegado personalizado: error lanzando Photoshop con el script de activación: {}",
-                error
-            );
-            false
-        }
-    }
+    // doble.
+    Command::new(ruta_exe).arg(ruta_script).spawn().is_ok()
 }

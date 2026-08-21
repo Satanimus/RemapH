@@ -1373,21 +1373,11 @@ fn ignorar_proximo_cambio() -> bool {
 /// siguiente que pueda sobreescribir el portapapeles antes de que el
 /// Ctrl+V se procese.
 pub fn pegar(valor: &str, bloquear_hasta_pegar: bool) -> Result<(), String> {
-    println!("📋 [diag] pegar() llamado con valor={:?}", valor);
-
     let contenido = contenido_desde_archivo_o_texto(valor)?;
-
-    println!("📋 [diag] contenido_desde_archivo_o_texto: OK");
 
     marcar_ignorar_proximo_cambio();
 
-    match back_portapapeles_captura::escribir_portapapeles(&contenido) {
-        Ok(()) => println!("📋 [diag] escribir_portapapeles: OK"),
-        Err(error) => {
-            println!("📋 [diag] escribir_portapapeles: ERROR: {}", error);
-            return Err(error);
-        }
-    }
+    back_portapapeles_captura::escribir_portapapeles(&contenido)?;
 
     // Se usa el motor real de emisión de RemapH (back_interception,
     // nivel driver) en vez de simular_ctrl_v() (SendInput/WinAPI,
@@ -1427,8 +1417,6 @@ pub fn pegar(valor: &str, bloquear_hasta_pegar: bool) -> Result<(), String> {
     // TEXTO usa el mismo timer corto que cualquier app genérica
     // (config::tiempo_espera_pegado_texto()).
     if crate::back_pegado_personalizado::intentar(&contenido, bloquear_hasta_pegar) {
-        println!("📋 [diag] pegado personalizado tomó el control — pegar() termina OK");
-
         return Ok(());
     }
 
@@ -1450,11 +1438,27 @@ pub fn pegar(valor: &str, bloquear_hasta_pegar: bool) -> Result<(), String> {
 
     if bloquear_hasta_pegar {
         crate::runtime::emitir_ctrl_v_bloqueante();
+
+        // Espera ADICIONAL después de emitir, solo en el camino
+        // bloqueante — le da tiempo a la app destino a procesar el
+        // Ctrl+V y leer el portapapeles antes de retornar. Sin esto,
+        // pasos "Pegar" consecutivos de una Macro seguían fallando
+        // (pegaba "233566" en vez de "123456") incluso con el Ctrl+V
+        // ya emitido de este lado: RemapH solo controla cuándo TERMINA
+        // de emitir la tecla, no cuándo la app objetivo la procesa —
+        // eso pasa en el message-loop de esa ventana, en su propio
+        // hilo, de forma asíncrona a que RemapH suelte la tecla. El
+        // paso siguiente ya estaba sobreescribiendo el portapapeles
+        // con el próximo texto antes de que la app llegara a leerlo.
+        // Mismo timer que la espera ANTES de emitir
+        // (tiempo_espera_pegado_texto/imagen) — incluso para
+        // Imagen: ambos delays cubren el mismo problema de fondo (la
+        // app necesita tiempo real para reaccionar), solo que en
+        // momentos distintos del ciclo.
+        std::thread::sleep(std::time::Duration::from_millis(tiempo_espera));
     } else {
         crate::runtime::emitir_ctrl_v();
     }
-
-    println!("📋 [diag] runtime::emitir_ctrl_v() disparado — pegar() termina OK");
 
     Ok(())
 }
@@ -1504,25 +1508,16 @@ fn forzar_relectura_portapapeles() {
     use windows_sys::Win32::UI::WindowsAndMessaging::GetForegroundWindow;
 
     let Some(hwnd_propio) = hwnd_de_alguna_ventana_abierta() else {
-        println!(
-            "📋 [diag] forzar_relectura_portapapeles: ninguna ventana de Portapapeles abierta, se omite"
-        );
         return;
     };
 
     let hwnd_original = unsafe { GetForegroundWindow() };
 
     if hwnd_original.is_null() {
-        println!("📋 [diag] forzar_relectura_portapapeles: no hay ventana con foco, se omite");
         return;
     }
 
-    let ok = crate::back_app::robar_y_devolver_foco(hwnd_propio, hwnd_original);
-
-    println!(
-        "📋 [diag] forzar_relectura_portapapeles: robo+devolución de foco ok={}",
-        ok
-    );
+    crate::back_app::robar_y_devolver_foco(hwnd_propio, hwnd_original);
 }
 
 /// HWND real (Win32) de cualquiera de las ventanas flotantes de
@@ -1686,8 +1681,6 @@ fn simular_ctrl_v() {
 
         enviar_tecla(VK_CONTROL, true);
     }
-
-    println!("📋 [diag] simular_ctrl_v: secuencia con delays + scan code enviada");
 }
 
 /// Manda un solo evento de teclado (keydown o keyup) vía SendInput,
