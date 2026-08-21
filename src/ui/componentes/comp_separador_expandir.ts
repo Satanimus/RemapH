@@ -1,5 +1,5 @@
 // ======================================================
-// ↴ comp_Grupo_Expandir
+// ↴ comp_Separador_Expandir
 // ------------------------------------------------------
 // Botón Expandir/Contraer de un header de Separadores.
 // Vive en el carril de números (no dentro de .fila-grupo),

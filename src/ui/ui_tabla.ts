@@ -9,9 +9,9 @@ import { crearFila } from "./ui_fila";
 
 import { crearSeparadorHeader } from "./ui_grupo";
 
-import { crearEstadoGrupo } from "./componentes/comp_grupo_estado";
+import { crearEstadoGrupo } from "./componentes/comp_separador_estado";
 
-import { crearExpandirGrupo } from "./componentes/comp_grupo_expandir";
+import { crearExpandirGrupo } from "./componentes/comp_separador_expandir";
 
 import { obtenerPerfilUi } from "../core/core_perfil_ui";
 

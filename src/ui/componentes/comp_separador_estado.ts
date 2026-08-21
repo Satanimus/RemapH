@@ -1,5 +1,5 @@
 // ======================================================
-// 🟢🔴 comp_Grupo_Estado
+// 🟢🔴 comp_Separador_Estado
 // ------------------------------------------------------
 // Botón Estado del header de un Separador.
 // Al hacer clic: fuerza ese estado en todas las filas del

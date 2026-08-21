@@ -10,7 +10,7 @@
 
 import type { SeparadorPerfil } from "../core/core_perfil";
 
-import { crearEstadoGrupo } from "./componentes/comp_grupo_estado";
+import { crearEstadoGrupo } from "./componentes/comp_separador_estado";
 import { crearBoton } from "./componentes/comp_boton";
 import { crearNota } from "./componentes/comp_controles";
 import { abrirPopupSeparadores } from "./componentes/comp_popup_separadores";
