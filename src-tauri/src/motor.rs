@@ -23,8 +23,8 @@
 // entrada.rs / Runtime llaman motor::emitir_evento() en
 // vez de llamar directo a back_interception::emitir_evento()
 // o back_windows::emitir_evento().
-// El futuro flujo de cambio de modo (Etapa D) llama
-// motor::establecer_modo().
+// El flujo de cambio de modo (Etapas D/G) llama
+// motor::solicitar_cambio_modo().
 // lib.rs llama motor::cargar_modo_desde_config() al
 // arrancar, antes del hilo de entrada.
 // ------------------------------------------------------
@@ -50,6 +50,11 @@
 //     Llama establecer_modo() y persiste el valor a disco
 //     vía configuracion_usuario::guardar_modo_motor().
 //     Imprime warning por stderr si falla el guardado.
+// solicitar_cambio_modo(nuevo_modo)
+//     Persiste el nuevo modo y señala al backend anterior
+//     que debe detenerse (ver Regla 10 del plan de Modo
+//     Portable). El loop de iniciar() detecta que el
+//     backend retornó y arranca el nuevo.
 // cargar_modo_desde_config()
 //     Lee configuracion_usuario::leer_modo_motor() y llama
 //     establecer_modo(Modo::Portable) solo si el valor
@@ -68,7 +73,7 @@
 use std::sync::atomic::{AtomicU8, Ordering};
 
 use crate::eventos::InputEvent;
-use crate::{back_interception, back_windows, configuracion_usuario};
+use crate::{back_interception, back_windows, configuracion_usuario, perfil};
 
 // ======================================================
 // 🔀 MODO
@@ -120,6 +125,35 @@ pub fn guardar_modo(modo: Modo) {
 }
 
 // ======================================================
+// 🔄 SOLICITAR CAMBIO DE MODO (cambio en caliente)
+// ------------------------------------------------------
+// Persiste y actualiza el modo en memoria, luego le señala
+// al backend anterior que debe detenerse — con la asimetría
+// de Regla 10:
+// • Interception → Portable: solicitar_detener() pone una
+//   bandera; el loop de back_interception::iniciar() la
+//   revisa en el próximo evento físico real y sale limpio.
+// • Portable → Interception: back_windows::detener() envía
+//   WM_QUIT al hilo de hooks — instantáneo, sin esperar
+//   ningún evento.
+// El loop de motor::iniciar() (D3) detecta que el backend
+// retornó y arranca el nuevo.
+// ======================================================
+
+pub fn solicitar_cambio_modo(nuevo_modo: Modo) {
+    let modo_anterior = modo_activo();
+
+    guardar_modo(nuevo_modo);
+
+    perfil::desactivar_perfil();
+
+    match modo_anterior {
+        Modo::Interception => back_interception::solicitar_detener(),
+        Modo::Portable => back_windows::detener(),
+    }
+}
+
+// ======================================================
 // 📂 CARGAR MODO DESDE CONFIG
 // ======================================================
 
@@ -152,17 +186,19 @@ pub fn cargar_modo_desde_config() {
 // ======================================================
 
 pub fn iniciar(
-    procesar: impl FnMut(InputEvent) + 'static,
-    debe_tragar_no_traducible: impl Fn() -> bool + 'static,
+    procesar: impl FnMut(InputEvent) + Copy + 'static,
+    debe_tragar_no_traducible: impl Fn() -> bool + Copy + 'static,
 ) {
-    match modo_activo() {
-        Modo::Interception => {
-            back_interception::precargar_desde_config();
-            back_interception::iniciar(procesar, debe_tragar_no_traducible);
-        }
+    loop {
+        match modo_activo() {
+            Modo::Interception => {
+                back_interception::precargar_desde_config();
+                back_interception::iniciar(procesar, debe_tragar_no_traducible);
+            }
 
-        Modo::Portable => {
-            back_windows::iniciar(procesar, debe_tragar_no_traducible);
+            Modo::Portable => {
+                back_windows::iniciar(procesar, debe_tragar_no_traducible);
+            }
         }
     }
 }

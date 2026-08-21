@@ -190,6 +190,7 @@ use interception::{
     Device, Filter, Interception, KeyFilter, KeyState, MouseFilter, ScanCode, Stroke,
 };
 use std::cell::RefCell;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Mutex, OnceLock};
 
 // ======================================================
@@ -396,6 +397,30 @@ fn traducir(stroke: &Stroke) -> Option<InputEvent> {
 // 🔁 INICIAR (loop de entrada)
 // ======================================================
 
+// ======================================================
+// 🛑 DETENER
+// ------------------------------------------------------
+// Mecanismo de parada limpia para el cambio de modo en
+// caliente (Etapa D). solicitar_detener() pone la bandera;
+// el loop de iniciar() la revisa tras cada recibir() y
+// sale limpiamente sin matar el hilo a la fuerza.
+// La dirección Interception→Portable necesita este
+// mecanismo reactivo (el loop solo despierta ante un
+// evento físico real — ver Regla 10 del plan de Modo
+// Portable). La dirección opuesta (Portable→Interception)
+// es instantánea desde afuera vía back_windows::detener().
+// ======================================================
+
+static DETENER: AtomicBool = AtomicBool::new(false);
+
+pub fn solicitar_detener() {
+    DETENER.store(true, Ordering::SeqCst);
+}
+
+// ======================================================
+// 🔁 INICIAR (loop de entrada)
+// ======================================================
+
 pub fn iniciar(mut procesar: impl FnMut(InputEvent), debe_tragar_no_traducible: impl Fn() -> bool) {
     let ict = crear();
 
@@ -403,6 +428,10 @@ pub fn iniciar(mut procesar: impl FnMut(InputEvent), debe_tragar_no_traducible: 
         let Some((device, stroke)) = recibir(&ict) else {
             continue;
         };
+
+        if DETENER.swap(false, Ordering::SeqCst) {
+            break;
+        }
 
         match &stroke {
             Stroke::Keyboard { .. } => registrar_teclado(device),
