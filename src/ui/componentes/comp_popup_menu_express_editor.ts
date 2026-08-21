@@ -40,7 +40,7 @@ import { textoAccionFila } from "../../core/core_perfil_acciones";
 
 import type { MenuBotonPerfil } from "../../core/core_menu_express";
 
-import { esSeparador } from "../../core/core_agrupacion";
+import { esSeparador } from "../../core/core_separadores";
 
 // ======================================================
 // 🎨 INDICADOR DE COLOR DE FILA

@@ -1,7 +1,7 @@
 // ======================================================
 // ↴ comp_Grupo_Expandir
 // ------------------------------------------------------
-// Botón Expandir/Contraer de un header de Agrupación.
+// Botón Expandir/Contraer de un header de Separadores.
 // Vive en el carril de números (no dentro de .fila-grupo),
 // ocupando el slot que le correspondería al número en esa
 // posición — ver nota de arquitectura de la Etapa B.

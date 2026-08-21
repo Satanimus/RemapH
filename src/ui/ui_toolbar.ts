@@ -35,9 +35,9 @@ import { reconstruirTabla, salirModoMoverTabla } from "./ui_tabla_control";
 
 import { crearFila as crearFilaPerfil } from "../core/core_perfil";
 
-import { agregarAgrupacion } from "../core/core_perfil_acciones";
+import { agregarSeparadores } from "../core/core_perfil_acciones";
 
-import { esSeparador } from "../core/core_agrupacion";
+import { esSeparador } from "../core/core_separadores";
 
 import {
   crearIndicador,
@@ -276,7 +276,7 @@ export function crearToolbar(alGuardar: () => Promise<void>): HTMLElement {
   ) as HTMLButtonElement | null;
 
   botonAgregarGrupo?.addEventListener("click", () => {
-    agregarAgrupacion();
+    agregarSeparadores();
 
     marcarPerfilEditado(toolbar);
     reconstruirTabla();

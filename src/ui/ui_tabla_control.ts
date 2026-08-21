@@ -22,7 +22,7 @@ import { obtenerConflictos } from "../core/core_conflictos";
 
 import { obtenerPerfilUi } from "../core/core_perfil_ui";
 
-import { esSeparador } from "../core/core_agrupacion";
+import { esSeparador } from "../core/core_separadores";
 
 import type { FilaPerfil } from "../core/core_perfil";
 

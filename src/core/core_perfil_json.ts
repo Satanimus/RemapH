@@ -51,7 +51,7 @@ import type { MacroExtraPerfil } from "./core_macro";
 
 import { traducirLote } from "./core_traductor";
 
-import { recomputarCascadaAscendente } from "./core_agrupacion";
+import { recomputarCascadaAscendente } from "./core_separadores";
 
 // ======================================================
 // 📦 MODELO JSON

@@ -1,5 +1,5 @@
 // ======================================================
-// 🗂️ core_Agrupacion
+// 🗂️ core_Separadores
 // ------------------------------------------------------
 // Lógica pura de pertenencia entre filas y Separadores.
 // No toca el DOM ni el estado global: recibe datos, devuelve datos.

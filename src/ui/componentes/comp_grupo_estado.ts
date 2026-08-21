@@ -13,7 +13,7 @@ import {
   esSeparador,
   obtenerTramoDeSeparador,
   recomputarCascadaAscendente,
-} from "../../core/core_agrupacion";
+} from "../../core/core_separadores";
 import { obtenerPerfilUi } from "../../core/core_perfil_ui";
 import { reconstruirTabla } from "../ui_tabla_control";
 import { filaTieneConflicto } from "../../core/core_conflictos";

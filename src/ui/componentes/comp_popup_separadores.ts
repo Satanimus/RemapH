@@ -1,7 +1,7 @@
 // ======================================================
-// 🪟 comp_Popup_Agrupacion
+// 🪟 comp_Popup_Separadores
 // ------------------------------------------------------
-// Popup de opciones del header de una Agrupación (botón "⁝"
+// Popup de opciones del header de Separadores (botón "⁝"
 // de ui_grupo.ts). Calcado de abrirPopupOpciones() en
 // comp_popup_abrir.ts (mismo patrón dibujar()/mostrarPopup/
 // ocultarPopup), con las diferencias puntuales del grupo:
@@ -19,9 +19,9 @@ import { mostrarPopup, ocultarPopup } from "./comp_popup_contenedor";
 import type { SeparadorPerfil } from "../../core/core_perfil";
 
 import {
-  clonarAgrupacionPorId,
-  eliminarAgrupacionConFilas,
-  moverAgrupacionFuera,
+  clonarSeparadoresPorId,
+  eliminarSeparadoresConFilas,
+  moverSeparadoresFuera,
 } from "../../core/core_perfil_acciones";
 
 import { COLOR_OPCIONES } from "./comp_popup_abrir";
@@ -100,7 +100,7 @@ function llenarListaColorGrupo(
 // ⁝ POPUP OPCIONES DE GRUPO
 // ======================================================
 
-export function abrirPopupAgrupacion(
+export function abrirPopupSeparadores(
   evento: MouseEvent,
   grupo: SeparadorPerfil,
   alModificar: () => void,
@@ -173,7 +173,7 @@ export function abrirPopupAgrupacion(
     botonClonar.textContent = "Clonar";
 
     botonClonar.addEventListener("click", () => {
-      clonarAgrupacionPorId(grupo.id);
+      clonarSeparadoresPorId(grupo.id);
       alModificar();
       reconstruirTabla();
       ocultarPopup();
@@ -225,7 +225,7 @@ export function abrirPopupAgrupacion(
       botonEliminarFilas.textContent = "Eliminar filas";
 
       botonEliminarFilas.addEventListener("click", () => {
-        eliminarAgrupacionConFilas(grupo.id);
+        eliminarSeparadoresConFilas(grupo.id);
         alModificar();
         reconstruirTabla();
         ocultarPopup();
@@ -237,7 +237,7 @@ export function abrirPopupAgrupacion(
       botonMoverFuera.textContent = "Mover fuera";
 
       botonMoverFuera.addEventListener("click", () => {
-        moverAgrupacionFuera(grupo.id);
+        moverSeparadoresFuera(grupo.id);
         alModificar();
         reconstruirTabla();
         ocultarPopup();

@@ -13,7 +13,7 @@ import type { SeparadorPerfil } from "../core/core_perfil";
 import { crearEstadoGrupo } from "./componentes/comp_grupo_estado";
 import { crearBoton } from "./componentes/comp_boton";
 import { crearNota } from "./componentes/comp_controles";
-import { abrirPopupAgrupacion } from "./componentes/comp_popup_agrupacion";
+import { abrirPopupSeparadores } from "./componentes/comp_popup_separadores";
 import { COLUMNAS } from "./ui_columnas";
 
 // [FIX] Ancho tomado de la misma fuente única de verdad que usa
@@ -65,7 +65,7 @@ export function crearSeparadorHeader(
   });
 
   botonOpciones.addEventListener("click", (evento) => {
-    abrirPopupAgrupacion(evento, separador, alModificar);
+    abrirPopupSeparadores(evento, separador, alModificar);
   });
 
   celdaOpciones.append(botonOpciones);

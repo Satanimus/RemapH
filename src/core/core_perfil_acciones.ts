@@ -13,7 +13,7 @@ import {
 
 import type { FilaPerfil } from "./core_perfil";
 
-import { esSeparador, obtenerTramoDeSeparador } from "./core_agrupacion";
+import { esSeparador, obtenerTramoDeSeparador } from "./core_separadores";
 
 import { triggerATexto } from "./core_trigger";
 
@@ -75,7 +75,7 @@ export function eliminarFilaPorId(id: string): void {
 }
 
 // ======================================================
-// 🗂️ AGREGAR AGRUPACIÓN
+// 🗂️ AGREGAR   SEPARADORES
 // ------------------------------------------------------
 // Nace como fila-separador al final de perfil.filas (Regla
 // 1/2). Como la pertenencia es puramente posicional (Regla 3)
@@ -85,14 +85,14 @@ export function eliminarFilaPorId(id: string): void {
 // ninguna posición.
 // ======================================================
 
-export function agregarAgrupacion(): void {
+export function agregarSeparadores(): void {
   const perfil = obtenerPerfilUi();
 
   perfil.filas.push(crearSeparador());
 }
 
 // ======================================================
-// 📋 CLONAR AGRUPACIÓN POR ID
+// 📋 CLONAR SEPARADORES POR ID
 // ------------------------------------------------------
 // A diferencia de clonarFilaPorId, acá no alcanza con empujar
 // al final: el clon (separador + sus filas) se inserta justo
@@ -101,7 +101,7 @@ export function agregarAgrupacion(): void {
 // filas ajenas.
 // ======================================================
 
-export function clonarAgrupacionPorId(id: string): void {
+export function clonarSeparadoresPorId(id: string): void {
   const perfil = obtenerPerfilUi();
 
   const indice = perfil.filas.findIndex(
@@ -130,7 +130,7 @@ export function clonarAgrupacionPorId(id: string): void {
 }
 
 // ======================================================
-// 🗑️ ELIMINAR AGRUPACIÓN CON FILAS
+// 🗑️ ELIMINAR SEPARADORES CON FILAS
 // ------------------------------------------------------
 // Elimina el separador y todas las filas de su tramo (Regla
 // 6). Igual que eliminarFilaPorId: si perfil.filas queda
@@ -138,7 +138,7 @@ export function clonarAgrupacionPorId(id: string): void {
 // nunca quede sin ninguna.
 // ======================================================
 
-export function eliminarAgrupacionConFilas(id: string): void {
+export function eliminarSeparadoresConFilas(id: string): void {
   const perfil = obtenerPerfilUi();
 
   const indice = perfil.filas.findIndex(
@@ -159,7 +159,7 @@ export function eliminarAgrupacionConFilas(id: string): void {
 }
 
 // ======================================================
-// 📤 MOVER AGRUPACIÓN FUERA
+// 📤 MOVER SEPARADORES FUERA
 // ------------------------------------------------------
 // Las filas del tramo (Regla 6) quedan sueltas al final
 // absoluto de perfil.filas; el separador se elimina. El resto
@@ -168,7 +168,7 @@ export function eliminarAgrupacionConFilas(id: string): void {
 // posición, Regla 3) sigue siendo correcta sola.
 // ======================================================
 
-export function moverAgrupacionFuera(id: string): void {
+export function moverSeparadoresFuera(id: string): void {
   const perfil = obtenerPerfilUi();
 
   const indice = perfil.filas.findIndex(

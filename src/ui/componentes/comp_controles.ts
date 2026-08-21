@@ -8,7 +8,7 @@ import { crearPopup } from "./comp_popup";
 import { crearBoton } from "./comp_boton";
 import { reconstruirFila, reconstruirTabla } from "../ui_tabla_control";
 import { invoke } from "@tauri-apps/api/core";
-import { recomputarCascadaAscendente } from "../../core/core_agrupacion";
+import { recomputarCascadaAscendente } from "../../core/core_separadores";
 
 import {
   abrirPopupTipo,
@@ -70,7 +70,7 @@ import { filaTieneConflicto } from "../../core/core_conflictos";
 
 import { filaTieneAdvertencia } from "../../core/core_advertencias_compilacion";
 
-import { esSeparador } from "../../core/core_agrupacion";
+import { esSeparador } from "../../core/core_separadores";
 
 // ======================================================
 // 🟢🔴 ESTADO (interruptor ON/OFF)

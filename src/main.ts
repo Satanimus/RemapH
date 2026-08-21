@@ -25,7 +25,7 @@ import { iniciarAjusteTextoBotones } from "./ui/util/util_texto_boton";
 
 import { actualizarStatusbar } from "./ui/ui_statusbar";
 
-import { esSeparador } from "./core/core_agrupacion";
+import { esSeparador } from "./core/core_separadores";
 
 import type { FilaPerfil } from "./core/core_perfil";
 

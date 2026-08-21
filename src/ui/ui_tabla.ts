@@ -19,7 +19,7 @@ import {
   construirPlanVisual,
   esSeparador,
   obtenerTramoDeSeparador,
-} from "../core/core_agrupacion";
+} from "../core/core_separadores";
 
 import type { ItemFilaPerfil, SeparadorPerfil } from "../core/core_perfil";
 
