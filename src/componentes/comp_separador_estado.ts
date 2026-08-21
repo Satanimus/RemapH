@@ -7,17 +7,17 @@
 // gris cuando estadoVisual del separador es "mixto".
 // ======================================================
 
-import type { FilaPerfil, SeparadorPerfil } from "../../core/core_perfil";
+import type { FilaPerfil, SeparadorPerfil } from "../core/core_perfil";
 import {
   aplicarCascadaDescendente,
   esSeparador,
   obtenerTramoDeSeparador,
   recomputarCascadaAscendente,
-} from "../../core/core_separadores";
-import { obtenerPerfilUi } from "../../core/core_perfil_ui";
-import { reconstruirTabla } from "../ui_tabla_control";
-import { filaTieneConflicto } from "../../core/core_conflictos";
-import { filaTieneAdvertencia } from "../../core/core_advertencias_compilacion";
+} from "../core/core_separadores";
+import { obtenerPerfilUi } from "../core/core_perfil_ui";
+import { reconstruirTabla } from "../ui/ui_tabla_control";
+import { filaTieneConflicto } from "../core/core_conflictos";
+import { filaTieneAdvertencia } from "../core/core_advertencias_compilacion";
 
 // Tercer estado (además de on/off/mixto): si alguna fila del tramo
 // propio de este separador (el más cercano por arriba) está "en

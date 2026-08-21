@@ -12,13 +12,13 @@
 // botón vía querySelector tras cada render).
 // ======================================================
 
-import type { ContextoFila } from "../../core/core_contexto_fila";
-import type { FilaPerfil } from "../../core/core_perfil";
-import { crearFila } from "../../core/core_perfil";
+import type { ContextoFila } from "../core/core_contexto_fila";
+import type { FilaPerfil } from "../core/core_perfil";
+import { crearFila } from "../core/core_perfil";
 import { crearBoton } from "./comp_boton";
 import { abrirPopupNumero } from "./comp_popup_abrir";
-import { obtenerPerfilUi } from "../../core/core_perfil_ui";
-import { reconstruirTabla } from "../ui_tabla_control";
+import { obtenerPerfilUi } from "../core/core_perfil_ui";
+import { reconstruirTabla } from "../ui/ui_tabla_control";
 
 export function crearNumero(
   contexto: ContextoFila,

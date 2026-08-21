@@ -28,19 +28,19 @@
 
 import { mostrarPopup } from "./comp_popup_contenedor";
 
-import { reconstruirFila } from "../ui_tabla_control";
+import { reconstruirFila } from "../ui/ui_tabla_control";
 
-import type { ContextoFila } from "../../core/core_contexto_fila";
+import type { ContextoFila } from "../core/core_contexto_fila";
 
-import type { FilaPerfil } from "../../core/core_perfil";
+import type { FilaPerfil } from "../core/core_perfil";
 
-import { obtenerPerfilUi } from "../../core/core_perfil_ui";
+import { obtenerPerfilUi } from "../core/core_perfil_ui";
 
-import { textoAccionFila } from "../../core/core_perfil_acciones";
+import { textoAccionFila } from "../core/core_perfil_acciones";
 
-import type { MenuBotonPerfil } from "../../core/core_menu_express";
+import type { MenuBotonPerfil } from "../core/core_menu_express";
 
-import { esSeparador } from "../../core/core_separadores";
+import { esSeparador } from "../core/core_separadores";
 
 // ======================================================
 // 🎨 INDICADOR DE COLOR DE FILA

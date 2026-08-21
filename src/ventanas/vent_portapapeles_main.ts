@@ -28,7 +28,7 @@ import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { aplicarOverridesApariencia } from "../core/core_apariencia";
 
 import "../styles/styl_variables.css";
-import "../styles/portapapeles.css";
+import "../styles/styl_portapapeles.css";
 
 void aplicarOverridesApariencia();
 

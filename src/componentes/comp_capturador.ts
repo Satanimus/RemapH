@@ -7,23 +7,23 @@
 
 import { invoke } from "@tauri-apps/api/core";
 
-import type { ContextoFila } from "../../core/core_contexto_fila";
+import type { ContextoFila } from "../core/core_contexto_fila";
 
-import type { FilaPerfil } from "../../core/core_perfil";
+import type { FilaPerfil } from "../core/core_perfil";
 
 import { crearBoton } from "./comp_boton";
 
-import { reconstruirFila } from "../ui_tabla_control";
+import { reconstruirFila } from "../ui/ui_tabla_control";
 
 import {
   triggerATexto,
   triggerAHTML,
   extrasPermitidosTeclaMouse,
-} from "../../core/core_trigger";
+} from "../core/core_trigger";
 
 import { abrirPopupModificador } from "./comp_popup_abrir";
 
-import { crearTrigger } from "../../core/core_trigger";
+import { crearTrigger } from "../core/core_trigger";
 
 type DestinoCaptura = "Trigger" | "Accion";
 

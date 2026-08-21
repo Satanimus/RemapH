@@ -57,7 +57,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { aplicarOverridesApariencia } from "../core/core_apariencia";
 
 import "../styles/styl_variables.css";
-import "./menu_express.css";
+import "../styles/styl_menu_express.css";
 
 import { iniciarAjusteTextoBotones } from "../util/util_texto_boton";
 

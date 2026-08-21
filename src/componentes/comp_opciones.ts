@@ -14,8 +14,8 @@
 // ui_tabla.ts, Etapa D).
 // ======================================================
 
-import type { ContextoFila } from "../../core/core_contexto_fila";
-import type { FilaPerfil } from "../../core/core_perfil";
+import type { ContextoFila } from "../core/core_contexto_fila";
+import type { FilaPerfil } from "../core/core_perfil";
 import { crearBoton } from "./comp_boton";
 import { abrirPopupOpciones } from "./comp_popup_abrir";
 

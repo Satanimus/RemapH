@@ -18,9 +18,9 @@
 
 import { invoke } from "@tauri-apps/api/core";
 
-import { abrirPopupPerfil } from "./componentes/comp_popup_perfil";
+import { abrirPopupPerfil } from "../componentes/comp_popup_perfil";
 
-import type { ResultadoPerfil } from "./componentes/comp_popup_perfil";
+import type { ResultadoPerfil } from "../componentes/comp_popup_perfil";
 
 import { convertirperfil_json } from "../core/core_perfil_json";
 
@@ -42,7 +42,7 @@ import { esSeparador } from "../core/core_separadores";
 import {
   crearIndicador,
   actualizarIndicador,
-} from "./componentes/comp_indicador";
+} from "../componentes/comp_indicador";
 
 // ======================================================
 // CREAR TOOLBAR

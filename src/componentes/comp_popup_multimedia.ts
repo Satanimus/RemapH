@@ -16,11 +16,11 @@
 
 import { ocultarPopup, mostrarPopup } from "./comp_popup_contenedor";
 
-import { reconstruirFila } from "../ui_tabla_control";
+import { reconstruirFila } from "../ui/ui_tabla_control";
 
-import type { ContextoFila } from "../../core/core_contexto_fila";
+import type { ContextoFila } from "../core/core_contexto_fila";
 
-import type { FilaPerfil } from "../../core/core_perfil";
+import type { FilaPerfil } from "../core/core_perfil";
 
 import {
   COMANDOS_VOLUMEN,
@@ -28,11 +28,11 @@ import {
   COMANDOS_REPRODUCCION_PRINCIPAL,
   COMANDOS_REPRODUCCION_PISTA,
   esComandoDeVolumen,
-} from "../../core/core_multimedia";
+} from "../core/core_multimedia";
 
-import type { ComandoMultimedia } from "../../core/core_multimedia";
+import type { ComandoMultimedia } from "../core/core_multimedia";
 
-import type { OpcionMultimedia } from "../../core/core_multimedia";
+import type { OpcionMultimedia } from "../core/core_multimedia";
 
 import { crearGrupoOpciones, crearFilaPopup } from "./comp_popup_grupo";
 

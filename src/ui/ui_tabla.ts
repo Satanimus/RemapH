@@ -9,9 +9,9 @@ import { crearFila } from "./ui_fila";
 
 import { crearSeparadorHeader } from "./ui_separador";
 
-import { crearEstadoSeparador } from "./componentes/comp_separador_estado";
+import { crearEstadoSeparador } from "../componentes/comp_separador_estado";
 
-import { crearExpandirSeparador } from "./componentes/comp_separador_expandir";
+import { crearExpandirSeparador } from "../componentes/comp_separador_expandir";
 
 import { obtenerPerfilUi } from "../core/core_perfil_ui";
 
@@ -31,7 +31,7 @@ import {
 
 import { activarRedimensionColumnas } from "./ui_redimension_columnas";
 
-import { crearControladorArrastre } from "./util/util_arrastrable";
+import { crearControladorArrastre } from "../util/util_arrastrable";
 
 // ======================================================
 // CREAR TABLA

@@ -16,17 +16,17 @@
 
 import { mostrarPopup, ocultarPopup } from "./comp_popup_contenedor";
 
-import type { SeparadorPerfil } from "../../core/core_perfil";
+import type { SeparadorPerfil } from "../core/core_perfil";
 
 import {
   clonarSeparadoresPorId,
   eliminarSeparadoresConFilas,
   moverSeparadoresFuera,
-} from "../../core/core_perfil_acciones";
+} from "../core/core_perfil_acciones";
 
 import { COLOR_OPCIONES } from "./comp_popup_abrir";
 
-import { reconstruirTabla, activarModoMoverTabla } from "../ui_tabla_control";
+import { reconstruirTabla, activarModoMoverTabla } from "../ui/ui_tabla_control";
 
 // ======================================================
 // ➖ SEPARADOR (mismo estilo que el resto de los popups)

@@ -2,13 +2,13 @@
 // 🎛️ comp_Controles
 // ======================================================
 
-import type { ContextoFila } from "../../core/core_contexto_fila";
-import type { FilaPerfil } from "../../core/core_perfil";
+import type { ContextoFila } from "../core/core_contexto_fila";
+import type { FilaPerfil } from "../core/core_perfil";
 import { crearPopup } from "./comp_popup";
 import { crearBoton } from "./comp_boton";
-import { reconstruirFila, reconstruirTabla } from "../ui_tabla_control";
+import { reconstruirFila, reconstruirTabla } from "../ui/ui_tabla_control";
 import { invoke } from "@tauri-apps/api/core";
-import { recomputarCascadaAscendente } from "../../core/core_separadores";
+import { recomputarCascadaAscendente } from "../core/core_separadores";
 
 import {
   abrirPopupTipo,
@@ -29,7 +29,7 @@ import {
 
 import { abrirPopupExtraMultimedia } from "./comp_popup_multimedia_extra";
 
-import { textoExtraMultimedia } from "../../core/core_multimedia";
+import { textoExtraMultimedia } from "../core/core_multimedia";
 
 import { abrirPopupExtraMenuExpress } from "./comp_popup_menu_express_extra";
 
@@ -38,7 +38,7 @@ import { abrirPopupExtraPortapapeles } from "./comp_popup_portapapeles_extra";
 import {
   textoComportamientoMacro,
   crearMacroExtra,
-} from "../../core/core_macro";
+} from "../core/core_macro";
 
 import { abrirPopupExtraMacro } from "./comp_popup_macro_extra";
 
@@ -46,31 +46,31 @@ import {
   textoMenuExtra,
   crearMenuAccion,
   crearMenuExtra,
-} from "../../core/core_menu_express";
+} from "../core/core_menu_express";
 
 import {
   textoPortapapelesExtra,
   crearPortapapelesAccion,
   crearPortapapelesExtra,
-} from "../../core/core_portapapeles";
+} from "../core/core_portapapeles";
 
 import {
   textoAbrirExtra,
   crearAbrirAccion,
   crearAbrirExtra,
-} from "../../core/core_abrir";
+} from "../core/core_abrir";
 
 import { abrirPopupExtraAbrir } from "./comp_popup_abrir_extra";
 
-import { crearCoordenada } from "../../core/core_coordenada";
+import { crearCoordenada } from "../core/core_coordenada";
 
-import { obtenerPerfilUi } from "../../core/core_perfil_ui";
+import { obtenerPerfilUi } from "../core/core_perfil_ui";
 
-import { filaTieneConflicto } from "../../core/core_conflictos";
+import { filaTieneConflicto } from "../core/core_conflictos";
 
-import { filaTieneAdvertencia } from "../../core/core_advertencias_compilacion";
+import { filaTieneAdvertencia } from "../core/core_advertencias_compilacion";
 
-import { esSeparador } from "../../core/core_separadores";
+import { esSeparador } from "../core/core_separadores";
 
 // ======================================================
 // 🟢🔴 ESTADO (interruptor ON/OFF)

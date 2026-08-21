@@ -3,9 +3,9 @@
 //
 // ======================================================
 
-import type { ContextoFila } from "../../core/core_contexto_fila";
+import type { ContextoFila } from "../core/core_contexto_fila";
 
-import type { FilaPerfil } from "../../core/core_perfil";
+import type { FilaPerfil } from "../core/core_perfil";
 
 import {
   crearAccionMultimedia,

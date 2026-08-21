@@ -11,9 +11,9 @@ import { crearBoton } from "./comp_boton";
 
 import { confirmarPopup } from "./comp_popup_confirmar";
 
-import type { perfil_json } from "../../core/core_perfil_json";
+import type { perfil_json } from "../core/core_perfil_json";
 
-import type { AdvertenciaCompilacion } from "../../core/core_advertencias_compilacion";
+import type { AdvertenciaCompilacion } from "../core/core_advertencias_compilacion";
 
 // ======================================================
 // RESULTADO PERFIL

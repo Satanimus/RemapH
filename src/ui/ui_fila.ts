@@ -7,9 +7,9 @@ import { crearContextoFila } from "../core/core_contexto_fila";
 
 import { COLUMNAS } from "./ui_columnas";
 
-import { crearCapturador } from "./componentes/comp_capturador";
+import { crearCapturador } from "../componentes/comp_capturador";
 
-import { crearOpciones } from "./componentes/comp_opciones";
+import { crearOpciones } from "../componentes/comp_opciones";
 
 import type { FilaPerfil } from "../core/core_perfil";
 
@@ -19,9 +19,9 @@ import {
   crearExtra,
   crearApp,
   crearNota,
-} from "./componentes/comp_controles";
+} from "../componentes/comp_controles";
 
-import { crearAccion } from "./componentes/comp_accion";
+import { crearAccion } from "../componentes/comp_accion";
 
 // ======================================================
 // CREAR FILA

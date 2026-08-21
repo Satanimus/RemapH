@@ -21,13 +21,13 @@ import { invoke } from "@tauri-apps/api/core";
 
 import { mostrarPopup, ocultarPopup } from "./comp_popup_contenedor";
 
-import { reconstruirFila } from "../ui_tabla_control";
+import { reconstruirFila } from "../ui/ui_tabla_control";
 
-import type { ContextoFila } from "../../core/core_contexto_fila";
+import type { ContextoFila } from "../core/core_contexto_fila";
 
-import type { FilaPerfil } from "../../core/core_perfil";
+import type { FilaPerfil } from "../core/core_perfil";
 
-import { textoAbrirAccion } from "../../core/core_abrir";
+import { textoAbrirAccion } from "../core/core_abrir";
 
 // ======================================================
 // 📦 MODELO ÍCONO (mismo shape que comandos.rs::IconoJson)

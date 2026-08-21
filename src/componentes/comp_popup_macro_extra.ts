@@ -17,13 +17,13 @@
 
 import { mostrarPopup } from "./comp_popup_contenedor";
 
-import { reconstruirFila } from "../ui_tabla_control";
+import { reconstruirFila } from "../ui/ui_tabla_control";
 
-import type { ContextoFila } from "../../core/core_contexto_fila";
+import type { ContextoFila } from "../core/core_contexto_fila";
 
-import type { FilaPerfil } from "../../core/core_perfil";
+import type { FilaPerfil } from "../core/core_perfil";
 
-import type { ComportamientoMacro } from "../../core/core_macro";
+import type { ComportamientoMacro } from "../core/core_macro";
 
 import { crearGrupoOpciones, crearFilaPopup } from "./comp_popup_grupo";
 

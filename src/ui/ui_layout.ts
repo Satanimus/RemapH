@@ -8,7 +8,7 @@ import { crearTabla } from "./ui_tabla";
 
 import { crearStatusbar, actualizarStatusbar } from "./ui_statusbar";
 
-import { crearContenedorPopup } from "./componentes/comp_popup_contenedor";
+import { crearContenedorPopup } from "../componentes/comp_popup_contenedor";
 
 import { obtenerPerfilUi } from "../core/core_perfil_ui";
 

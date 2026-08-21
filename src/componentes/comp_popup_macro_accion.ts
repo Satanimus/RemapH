@@ -27,13 +27,13 @@ import { mostrarPopup, ocultarPopup } from "./comp_popup_contenedor";
 
 import { crearBoton } from "./comp_boton";
 
-import { reconstruirFila } from "../ui_tabla_control";
+import { reconstruirFila } from "../ui/ui_tabla_control";
 
 import { abrirEditorMacro } from "./comp_popup_macro_editor";
 
-import type { ContextoFila } from "../../core/core_contexto_fila";
+import type { ContextoFila } from "../core/core_contexto_fila";
 
-import type { FilaPerfil } from "../../core/core_perfil";
+import type { FilaPerfil } from "../core/core_perfil";
 
 // ======================================================
 // 📦 RESULTADO DE macro_nueva

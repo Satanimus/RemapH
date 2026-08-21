@@ -4,15 +4,15 @@
 
 import { crearBoton } from "./comp_boton";
 
-import type { FilaPerfil } from "../../core/core_perfil";
+import type { FilaPerfil } from "../core/core_perfil";
 
-import { textoAccionMultimedia } from "../../core/core_multimedia";
+import { textoAccionMultimedia } from "../core/core_multimedia";
 
-import { textoMenuAccion } from "../../core/core_menu_express";
+import { textoMenuAccion } from "../core/core_menu_express";
 
-import { textoPortapapelesAccion } from "../../core/core_portapapeles";
+import { textoPortapapelesAccion } from "../core/core_portapapeles";
 
-import { textoMacroAccion } from "../../core/core_macro";
+import { textoMacroAccion } from "../core/core_macro";
 
 export function crearAccionTeclado(): HTMLButtonElement {
   return crearBoton({

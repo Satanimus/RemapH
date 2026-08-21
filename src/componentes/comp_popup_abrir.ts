@@ -4,18 +4,18 @@
 
 import { mostrarPopup, ocultarPopup } from "./comp_popup_contenedor";
 
-import type { ContextoFila } from "../../core/core_contexto_fila";
+import type { ContextoFila } from "../core/core_contexto_fila";
 import {
   clonarFilaPorId,
   eliminarFilaPorId,
   filaTieneAccion,
-} from "../../core/core_perfil_acciones";
-import type { FilaPerfil } from "../../core/core_perfil";
-import { crearEntrada } from "../../core/core_entrada";
-import { crearTrigger } from "../../core/core_trigger";
-import { reconstruirFila } from "../ui_tabla_control";
-import { reconstruirTabla } from "../ui_tabla_control";
-import { activarModoMoverTabla } from "../ui_tabla_control";
+} from "../core/core_perfil_acciones";
+import type { FilaPerfil } from "../core/core_perfil";
+import { crearEntrada } from "../core/core_entrada";
+import { crearTrigger } from "../core/core_trigger";
+import { reconstruirFila } from "../ui/ui_tabla_control";
+import { reconstruirTabla } from "../ui/ui_tabla_control";
+import { activarModoMoverTabla } from "../ui/ui_tabla_control";
 
 // ======================================================
 // ➖ SEPARADOR (mismo estilo que el resto de los popups)

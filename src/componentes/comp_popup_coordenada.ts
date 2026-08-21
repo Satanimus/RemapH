@@ -39,20 +39,20 @@ import { invoke } from "@tauri-apps/api/core";
 
 import { mostrarPopup } from "./comp_popup_contenedor";
 
-import { reconstruirFila } from "../ui_tabla_control";
+import { reconstruirFila } from "../ui/ui_tabla_control";
 
-import type { ContextoFila } from "../../core/core_contexto_fila";
+import type { ContextoFila } from "../core/core_contexto_fila";
 
-import type { FilaPerfil } from "../../core/core_perfil";
+import type { FilaPerfil } from "../core/core_perfil";
 
 import type {
   UbicacionCoordenada,
   ModoVentanaCoordenada,
   PuntoReferenciaCoordenada,
   PostAccionCoordenada,
-} from "../../core/core_coordenada";
+} from "../core/core_coordenada";
 
-import { textoCoordenada } from "../../core/core_coordenada";
+import { textoCoordenada } from "../core/core_coordenada";
 
 import {
   crearGrupoOpciones,
@@ -63,7 +63,7 @@ import {
 import {
   extrasPermitidosTeclaMouse,
   esGatilloRueda,
-} from "../../core/core_trigger";
+} from "../core/core_trigger";
 
 // ======================================================
 // 🧭 VOCABULARIO Ninguno / Normal / Turbo / Repetición

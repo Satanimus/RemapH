@@ -28,13 +28,13 @@
 
 import { invoke } from "@tauri-apps/api/core";
 
-import { reconstruirFila } from "../ui_tabla_control";
+import { reconstruirFila } from "../ui/ui_tabla_control";
 
-import type { ContextoFila } from "../../core/core_contexto_fila";
+import type { ContextoFila } from "../core/core_contexto_fila";
 
-import type { FilaPerfil } from "../../core/core_perfil";
+import type { FilaPerfil } from "../core/core_perfil";
 
-import { extensionDeRuta, nombreDeRuta } from "../../core/core_abrir";
+import { extensionDeRuta, nombreDeRuta } from "../core/core_abrir";
 
 import { crearIndicadorActivo } from "./comp_popup_grupo";
 

@@ -31,7 +31,7 @@ import { aplicarOverridesApariencia } from "../core/core_apariencia";
 
 import "../styles/styl_variables.css";
 import "../styles/styl_general.css";
-import "./configuracion.css";
+import "../styles/styl_configuracion.css";
 
 // La propia Ventana de Configuración también debe reflejar el
 // tema personalizado mientras se lo edita (no solo el resto de
