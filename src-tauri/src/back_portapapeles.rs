@@ -1360,12 +1360,12 @@ fn ignorar_proximo_cambio() -> bool {
 // pool.
 // ======================================================
 
-pub fn pegar(ruta: &Path) -> Result<(), String> {
-    println!("📋 [diag] pegar() llamado con ruta={:?}", ruta);
+pub fn pegar(valor: &str) -> Result<(), String> {
+    println!("📋 [diag] pegar() llamado con valor={:?}", valor);
 
-    let contenido = contenido_desde_archivo(ruta)?;
+    let contenido = contenido_desde_archivo_o_texto(valor)?;
 
-    println!("📋 [diag] contenido_desde_archivo: OK");
+    println!("📋 [diag] contenido_desde_archivo_o_texto: OK");
 
     marcar_ignorar_proximo_cambio();
 
@@ -1530,35 +1530,77 @@ fn hwnd_de_alguna_ventana_abierta() -> Option<windows_sys::Win32::Foundation::HW
     Some(win32.hwnd.get() as windows_sys::Win32::Foundation::HWND)
 }
 
-fn contenido_desde_archivo(ruta: &Path) -> Result<ContenidoPortapapeles, String> {
+// ======================================================
+// 📄 CONTENIDO DESDE ARCHIVO O TEXTO LITERAL
+// ------------------------------------------------------
+// El paso "Pegar" de una Macro (y el panel de Portapapeles)
+// comparten un único campo de texto libre: el usuario puede
+// escribir una ruta a un .txt/.png en disco, O escribir
+// directamente el texto que quiere pegar (spec: "si escribo
+// algo en la caja, debería pegarse ese texto"). Antes esta
+// función (entonces contenido_desde_archivo, recibía &Path)
+// SOLO sabía leer por extensión — cualquier valor sin
+// extensión .txt/.png caía siempre al Err() final sin que
+// nada lo tratara como texto, por eso escribir algo como
+// "Lolololo" en la caja no pegaba nada.
+//
+// Regla: si `valor` es la ruta a un archivo que EXISTE en
+// disco con una extensión de texto plano soportada (ver
+// EXTENSIONES_TEXTO más abajo) o .png, se lee ese archivo
+// (mismo comportamiento que antes para .txt/.png). En
+// cualquier otro caso —no existe el archivo, extensión no
+// soportada, o ni siquiera es una ruta válida— se usa `valor`
+// tal cual como el texto a pegar. Así una ruta typeada mal (o
+// a un archivo borrado) termina pegando el string de la ruta
+// como texto en vez de fallar en silencio, que es el
+// comportamiento esperado de una caja de texto libre.
+// ======================================================
+
+fn contenido_desde_archivo_o_texto(valor: &str) -> Result<ContenidoPortapapeles, String> {
+    let ruta = Path::new(valor);
+
     let extension = ruta
         .extension()
         .and_then(|ext| ext.to_str())
         .unwrap_or_default()
         .to_lowercase();
 
-    match extension.as_str() {
-        "txt" => {
-            let texto = fs::read_to_string(ruta).map_err(|error| error.to_string())?;
-            Ok(ContenidoPortapapeles::Texto(texto))
-        }
+    // Extensiones de TEXTO PLANO puro — contenido = exactamente los
+    // bytes del archivo, sin marcado ni estructura binaria a
+    // interpretar. Deliberadamente NO incluye .rtf (lleva marcado de
+    // formato, pegaría las llaves/controles crudos en vez de texto
+    // limpio), ni .doc/.docx/.pdf/etc. (binarios). Cuando la duda es
+    // "¿esto es exactamente el texto tal cual, o hay que decodificar
+    // algo más?", queda afuera — mejor pedir agregar el formato más
+    // adelante que pegar contenido corrupto por confiar de más.
+    const EXTENSIONES_TEXTO: &[&str] = &[
+        "txt", "md", "markdown", "log", "csv", "tsv", "json", "xml", "html", "htm", "ini", "cfg",
+        "conf", "yaml", "yml",
+    ];
 
-        "png" => {
-            let (ancho, alto) = dimensiones_png(ruta)
-                .ok_or_else(|| "no se pudo leer el tamaño de la imagen".to_string())?;
+    let es_texto_plano = EXTENSIONES_TEXTO.contains(&extension.as_str()) && ruta.is_file();
+    let es_imagen_png = extension == "png" && ruta.is_file();
 
-            let pixeles = decodificar_png_rgba8(ruta)
-                .ok_or_else(|| "no se pudo decodificar la imagen".to_string())?;
-
-            Ok(ContenidoPortapapeles::Imagen {
-                ancho: ancho as usize,
-                alto: alto as usize,
-                pixeles,
-            })
-        }
-
-        _ => Err(format!("extensión no soportada: {extension}")),
+    if es_texto_plano {
+        let texto = fs::read_to_string(ruta).map_err(|error| error.to_string())?;
+        return Ok(ContenidoPortapapeles::Texto(texto));
     }
+
+    if !es_imagen_png {
+        return Ok(ContenidoPortapapeles::Texto(valor.to_string()));
+    }
+
+    let (ancho, alto) = dimensiones_png(ruta)
+        .ok_or_else(|| "no se pudo leer el tamaño de la imagen".to_string())?;
+
+    let pixeles = decodificar_png_rgba8(ruta)
+        .ok_or_else(|| "no se pudo decodificar la imagen".to_string())?;
+
+    Ok(ContenidoPortapapeles::Imagen {
+        ancho: ancho as usize,
+        alto: alto as usize,
+        pixeles,
+    })
 }
 
 fn dimensiones_png(ruta: &Path) -> Option<(u32, u32)> {

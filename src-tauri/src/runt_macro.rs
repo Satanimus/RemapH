@@ -162,7 +162,6 @@ use crate::perfil_json::Input;
 use crate::runtime;
 
 use std::collections::HashMap;
-use std::path::Path;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Condvar, LazyLock, Mutex};
 use std::thread;
@@ -618,7 +617,7 @@ fn ejecutar_paso_pegar(paso: &PasoMacroJson) {
         return;
     };
 
-    let _ = back_portapapeles::pegar(Path::new(ruta));
+    let _ = back_portapapeles::pegar(ruta);
 }
 
 // ======================================================

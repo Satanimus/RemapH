@@ -1028,7 +1028,7 @@ pub fn portapapeles_fijar_como(
 
 #[tauri::command]
 pub fn portapapeles_pegar(ruta: String) -> Result<(), String> {
-    crate::back_portapapeles::pegar(std::path::Path::new(&ruta))
+    crate::back_portapapeles::pegar(&ruta)
 }
 
 // ======================================================

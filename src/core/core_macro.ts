@@ -17,12 +17,29 @@
 //
 // Espejo exacto de MacroJson / PasoMacroJson en
 // macro_json.rs (camelCase vía #[serde(rename_all =
-// "camelCase")]) — viaja tal cual hacia Rust al guardar, sin
-// traducción adicional.
+// "camelCase")]) — viaja tal cual hacia Rust al guardar, con
+// UNA excepción: el campo teclaAccion de un paso tecla_mouse
+// es un Trigger (modificadores/gatillo con forma Entrada —
+// {tipo, codigo, nombre}, la misma que arma el capturador vía
+// obtener_captura/EntradaCapturaUI), mientras que Rust espera
+// ahí un TriggerJson con Input{fuente, control}. La tabla
+// principal salva esta diferencia adentro de Rust (comando
+// compilar_perfil recibe la forma UI cruda —EntradaUI— y la
+// convierte con perfil_ui::convertir_trigger antes de guardar
+// perfil_json). Los comandos de Macro (macro_guardar_paso,
+// macro_guardar_como) no tienen ese paso intermedio del lado
+// Rust — MacroArchivoJson deserializa TriggerJson estricto
+// directamente — así que la conversión se hace acá antes de
+// invocar, con macroArchivoParaBackend() más abajo. Sin esto,
+// guardar cualquier paso Tecla/Mouse con un trigger capturado
+// fallaba con "missing field `fuente`".
 // ======================================================
 
 import type { Trigger } from "./core_trigger";
 import { crearTrigger } from "./core_trigger";
+import type { Entrada, TipoEntrada } from "./core_entrada";
+import { crearEntrada } from "./core_entrada";
+import { traducirLote } from "./core_traductor";
 
 // ======================================================
 // 🗂️ ARCHIVO DE MACRO
@@ -443,4 +460,197 @@ export function letraMarcadorDisponible(pasos: PasoMacro[]): string {
 
     indice++;
   }
+}
+
+// ======================================================
+// 📤 PREPARAR PARA EL BACKEND (Trigger → forma Input de Rust)
+// ------------------------------------------------------
+// Convierte cada Entrada {tipo, codigo, nombre} de
+// paso.teclaAccion a la forma {fuente, control} que Rust
+// espera en TriggerJson/Input (perfil_json.rs) — ver comentario
+// de cabecera del archivo. Mismo mapeo tipo→fuente que usa
+// perfil_ui::convertir_fuente para la tabla principal
+// (Teclado→keyboard, Mouse→mouse, Multimedia→multimedia,
+// Joystick→joystick). Se descarta `nombre` (Rust no lo usa,
+// solo viaja para mostrar el texto en la UI).
+//
+// Llamar SIEMPRE antes de invoke("macro_guardar_paso" | "macro_
+// guardar_como", { macroArchivo }) — nunca mandar el
+// macroArchivo del estado del editor tal cual.
+// ======================================================
+
+interface InputBackend {
+  fuente: string;
+
+  control: string;
+}
+
+interface TriggerBackend {
+  modificadores: InputBackend[];
+
+  gatillo: InputBackend | null;
+
+  condicion: string;
+}
+
+function tipoEntradaAFuente(tipo: TipoEntrada): string {
+  switch (tipo) {
+    case "Teclado":
+      return "keyboard";
+
+    case "Mouse":
+      return "mouse";
+
+    case "Multimedia":
+      return "multimedia";
+
+    case "Joystick":
+      return "joystick";
+  }
+}
+
+function entradaAInputBackend(entrada: Entrada): InputBackend {
+  return {
+    fuente: tipoEntradaAFuente(entrada.tipo),
+
+    control: entrada.codigo,
+  };
+}
+
+function triggerABackend(trigger: Trigger): TriggerBackend {
+  return {
+    modificadores: trigger.modificadores.map(entradaAInputBackend),
+
+    gatillo: trigger.gatillo ? entradaAInputBackend(trigger.gatillo) : null,
+
+    condicion: trigger.condicion,
+  };
+}
+
+export function macroArchivoParaBackend(
+  macroArchivo: MacroArchivo,
+): Record<string, unknown> {
+  return {
+    ...macroArchivo,
+
+    pasos: macroArchivo.pasos.map((paso) => ({
+      ...paso,
+
+      teclaAccion: triggerABackend(paso.teclaAccion),
+    })),
+  };
+}
+
+// ======================================================
+// 📥 RECIBIR DEL BACKEND (forma Input de Rust → Trigger)
+// ------------------------------------------------------
+// Camino inverso de macroArchivoParaBackend: invoke("macro_
+// abrir" | "macro_guardar_como") devuelve teclaAccion con
+// {fuente, control} (Rust nunca conoció la forma {tipo,
+// codigo, nombre} que usa la UI — ver comentario de cabecera
+// del archivo), así que sin esto triggerATexto/triggerAHTML
+// leerían undefined en paso.teclaAccion.tipo/codigo/nombre
+// para cualquier macro guardada con un trigger capturado.
+//
+// Mismo patrón que convertirEntrada en core_perfil_json.ts:
+// un solo traducirLote() para todos los controles de todos
+// los pasos (evita N round-trips a Tauri), `nombre` cae al
+// control crudo si no matchea ningún pulsador conocido.
+//
+// Llamar SIEMPRE sobre lo que devuelve invoke("macro_abrir" |
+// "macro_guardar_como") antes de usarlo como MacroArchivo del
+// editor.
+// ======================================================
+
+function fuenteATipoEntrada(fuente: string): TipoEntrada {
+  switch (fuente) {
+    case "keyboard":
+      return "Teclado";
+
+    case "mouse":
+      return "Mouse";
+
+    case "multimedia":
+      return "Multimedia";
+
+    case "joystick":
+      return "Joystick";
+
+    default:
+      return "Teclado";
+  }
+}
+
+function inputBackendAEntrada(
+  input: InputBackend,
+
+  mapaNombres: Record<string, string>,
+): Entrada {
+  return crearEntrada(
+    fuenteATipoEntrada(input.fuente),
+
+    input.control,
+
+    mapaNombres[input.control] ?? input.control,
+  );
+}
+
+function triggerDesdeBackend(
+  trigger: TriggerBackend,
+
+  mapaNombres: Record<string, string>,
+): Trigger {
+  const resultado = crearTrigger();
+
+  resultado.modificadores = trigger.modificadores.map((input) =>
+    inputBackendAEntrada(input, mapaNombres),
+  );
+
+  resultado.gatillo = trigger.gatillo
+    ? inputBackendAEntrada(trigger.gatillo, mapaNombres)
+    : null;
+
+  resultado.condicion = trigger.condicion as Trigger["condicion"];
+
+  return resultado;
+}
+
+function recolectarControles(macroArchivo: {
+  pasos: { teclaAccion: TriggerBackend }[];
+}): string[] {
+  const controles = new Set<string>();
+
+  macroArchivo.pasos.forEach((paso) => {
+    paso.teclaAccion.modificadores.forEach((input) =>
+      controles.add(input.control),
+    );
+
+    if (paso.teclaAccion.gatillo) {
+      controles.add(paso.teclaAccion.gatillo.control);
+    }
+  });
+
+  return Array.from(controles);
+}
+
+export async function macroArchivoDesdeBackend(macroArchivoBackend: {
+  nombre: string;
+
+  pasos: (Omit<PasoMacro, "teclaAccion"> & { teclaAccion: TriggerBackend })[];
+}): Promise<MacroArchivo> {
+  const controles = recolectarControles(macroArchivoBackend);
+
+  const mapaNombres = controles.length
+    ? await traducirLote(controles, "interno", "usuario")
+    : {};
+
+  return {
+    ...macroArchivoBackend,
+
+    pasos: macroArchivoBackend.pasos.map((paso) => ({
+      ...paso,
+
+      teclaAccion: triggerDesdeBackend(paso.teclaAccion, mapaNombres),
+    })),
+  };
 }

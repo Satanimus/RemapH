@@ -77,9 +77,12 @@ impl MacroArchivoJson {
 //   tecla, a diferencia de CoordenadaJson).
 //
 // pegar_ruta: solo cuando tipo == "pegar". Misma ruta sirve
-//   para un fijado del Portapapeles o cualquier archivo del
-//   disco (back_portapapeles::pegar() decide por extensión).
-//   Formatos soportados: .txt y .png únicamente.
+//   para un fijado del Portapapeles, cualquier archivo del
+//   disco soportado, o texto literal si no matchea ningún
+//   archivo (back_portapapeles::contenido_desde_archivo_o_
+//   texto() decide). Formatos de archivo soportados: cualquier
+//   extensión de texto plano (ver EXTENSIONES_TEXTO en
+//   back_portapapeles.rs) y .png.
 //
 // abrir_*: solo cuando tipo == "abrir". Mismos 5 campos que
 //   AbrirAccionJson/AbrirExtraJson, aplanados acá.

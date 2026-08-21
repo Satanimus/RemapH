@@ -74,6 +74,8 @@ import {
   clonarPasoMacro,
   textoTipoPasoMacro,
   iconoTipoPasoMacro,
+  macroArchivoParaBackend,
+  macroArchivoDesdeBackend,
 } from "../../core/core_macro";
 
 import type { Trigger } from "../../core/core_trigger";
@@ -190,7 +192,9 @@ async function guardarAhora(macroArchivo: MacroArchivo): Promise<void> {
   cancelarDebounceGuardado();
 
   try {
-    await invoke("macro_guardar_paso", { macroArchivo });
+    await invoke("macro_guardar_paso", {
+      macroArchivo: macroArchivoParaBackend(macroArchivo),
+    });
   } catch (error) {
     console.error("❌ No se pudo guardar la macro en cache:", error);
   }
@@ -405,7 +409,12 @@ export function abrirEditorMacro(
     return;
   }
 
-  invoke<MacroArchivo>("macro_abrir", { nombre: nombreMacro })
+  invoke("macro_abrir", { nombre: nombreMacro })
+    .then((macroArchivoBackend) =>
+      macroArchivoDesdeBackend(
+        macroArchivoBackend as Parameters<typeof macroArchivoDesdeBackend>[0],
+      ),
+    )
     .then((macroArchivo) => {
       idsPasosActual = new WeakMap();
 
@@ -697,7 +706,9 @@ function montarEditor(
       cancelarDebounceGuardado();
 
       try {
-        await invoke("macro_guardar_paso", { macroArchivo });
+        await invoke("macro_guardar_paso", {
+          macroArchivo: macroArchivoParaBackend(macroArchivo),
+        });
 
         await invoke("macro_guardar", { nombre: nombreCache });
       } catch (error) {
@@ -756,12 +767,18 @@ function montarEditor(
       cancelarDebounceGuardado();
 
       try {
-        await invoke("macro_guardar_paso", { macroArchivo });
+        await invoke("macro_guardar_paso", {
+          macroArchivo: macroArchivoParaBackend(macroArchivo),
+        });
 
-        const resultado = await invoke<MacroArchivo>("macro_guardar_como", {
+        const resultadoBackend = await invoke("macro_guardar_como", {
           nombreOrigen: nombreCache,
           nombreNuevo: input.value.trim() || null,
         });
+
+        const resultado = await macroArchivoDesdeBackend(
+          resultadoBackend as Parameters<typeof macroArchivoDesdeBackend>[0],
+        );
 
         nombreCache = resultado.nombre;
         macroArchivo = resultado;
@@ -2406,9 +2423,14 @@ function crearDetalleCoordenada(
 // Un solo campo (pegarRuta) — llama directo a
 // back_portapapeles::pegar(ruta) en tiempo de ejecución (Etapa
 // 8), acá solo se elige la ruta. Mismo selector Archivo/Carpeta
-// que comp_popup_abrir_accion.ts, sin filtro de extensión en
-// el diálogo (la validación .txt/.png es responsabilidad del
-// ejecutor, no de este selector — igual criterio que "abrir").
+// que comp_popup_abrir_accion.ts, sin filtro estricto en el
+// diálogo más allá de la lista de extensiones soportadas (la
+// validación real es responsabilidad del ejecutor, no de este
+// selector — igual criterio que "abrir"). Formatos soportados:
+// ver EXTENSIONES_TEXTO en back_portapapeles.rs (texto plano) +
+// .png (imagen). Cualquier valor que no matchee ninguno de esos
+// —incluida cualquier ruta que no exista— se pega tal cual como
+// texto literal.
 // ======================================================
 
 function crearDetallePegar(
@@ -2422,7 +2444,8 @@ function crearDetallePegar(
 
   input.type = "text";
   input.className = "popup-input";
-  input.placeholder = "Solo ruta a archivo .txt/.png o escriba texto a pegar.";
+  input.placeholder =
+    "Ruta a archivo de texto (.txt, .md, .csv, .json, .xml, .html, .ini, .yaml, etc.) o .png, o escriba el texto a pegar.";
   input.value = paso.pegarRuta ?? "";
 
   const confirmarTexto = () => {
@@ -2448,7 +2471,28 @@ function crearDetallePegar(
 
   botonExaminar.addEventListener("click", async () => {
     const ruta = await invoke<string | null>("seleccionar_archivo", {
-      extensiones: ["txt", "png"],
+      // Mismo listado que EXTENSIONES_TEXTO en
+      // back_portapapeles.rs (contenido_desde_archivo_o_texto) + png
+      // — mantener ambas listas sincronizadas si se agrega un
+      // formato nuevo.
+      extensiones: [
+        "txt",
+        "md",
+        "markdown",
+        "log",
+        "csv",
+        "tsv",
+        "json",
+        "xml",
+        "html",
+        "htm",
+        "ini",
+        "cfg",
+        "conf",
+        "yaml",
+        "yml",
+        "png",
+      ],
     });
 
     if (!ruta) {
