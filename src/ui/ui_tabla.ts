@@ -7,11 +7,11 @@ import { COLUMNAS } from "./ui_columnas";
 
 import { crearFila } from "./ui_fila";
 
-import { crearSeparadorHeader } from "./ui_grupo";
+import { crearSeparadorHeader } from "./ui_separador";
 
-import { crearEstadoGrupo } from "./componentes/comp_separador_estado";
+import { crearEstadoSeparador } from "./componentes/comp_separador_estado";
 
-import { crearExpandirGrupo } from "./componentes/comp_separador_expandir";
+import { crearExpandirSeparador } from "./componentes/comp_separador_expandir";
 
 import { obtenerPerfilUi } from "../core/core_perfil_ui";
 
@@ -124,9 +124,9 @@ export function crearTabla(alModificar: () => void): HTMLElement {
   // perfil y ADEMÁS reconstruye la tabla entera: el
   // reordenamiento visual que ya hizo el componente es solo
   // un swap de posición de los nodos existentes, no vuelve a
-  // calcular pertenencia a grupo — sin este reconstruirTabla()
+  // calcular pertenencia a separador — sin este reconstruirTabla()
   // el carril de números/expandir y los colores/bordes de
-  // grupo de cada fila quedan con los valores de ANTES del
+  // separador de cada fila quedan con los valores de ANTES del
   // movimiento (ver bugs de sincronía y de color de fondo).
   // ==================================================
 
@@ -205,7 +205,7 @@ export function crearTabla(alModificar: () => void): HTMLElement {
     // Regla 11: si se arrastra un separador contraído, se expande
     // automáticamente al iniciar el gesto de arrastre — mutamos el
     // modelo y reconstruimos la tabla acá mismo (mismo criterio que
-    // el botón ↴/≫ de crearExpandirGrupo) para que las filas que
+    // el botón ↴/≫ de crearExpandirSeparador) para que las filas que
     // quedaban ocultas por el colapso ya estén en el DOM cuando
     // iniciarArrastre calcule posiciones.
     esSeparadorContraido: (id) => {
@@ -309,7 +309,7 @@ export function crearTabla(alModificar: () => void): HTMLElement {
 
         filas.append(headerElemento);
 
-        carrilLista.append(crearExpandirGrupo(item.separador, alModificar));
+        carrilLista.append(crearExpandirSeparador(item.separador, alModificar));
 
         const botonOpciones = headerElemento.querySelector(
           ".opciones-asa",
@@ -339,7 +339,7 @@ export function crearTabla(alModificar: () => void): HTMLElement {
 
     // reconstruirFila es solo para filas normales — un separador
     // se re-renderiza a través de reconstruirTabla (ver
-    // crearSeparadorHeader/crearExpandirGrupo), no acá.
+    // crearSeparadorHeader/crearExpandirSeparador), no acá.
     if (!item || esSeparador(item)) {
       return;
     }
@@ -352,7 +352,7 @@ export function crearTabla(alModificar: () => void): HTMLElement {
 
     // [FIX] Antes se llamaba crearFila() sin el 4º parámetro
     // (info de separador: color/primera/ultima) — la fila
-    // reconstruida perdía el color de fondo/borde del grupo hasta
+    // reconstruida perdía el color de fondo/borde del separador hasta
     // que otra acción disparara un reconstruirTabla() completo. Se
     // recalcula acá el mismo plan visual que usa reconstruirTabla,
     // así una fila individual queda idéntica a como saldría en un
@@ -456,7 +456,7 @@ export function crearTabla(alModificar: () => void): HTMLElement {
 
       // Buscar el header del separador en el DOM y reemplazar solo su botón estado
       const headerEl = filas.querySelector<HTMLElement>(
-        `.fila-grupo[data-id="${separadorPadre.id}"]`,
+        `.fila-separador[data-id="${separadorPadre.id}"]`,
       );
 
       if (!headerEl) {
@@ -464,7 +464,7 @@ export function crearTabla(alModificar: () => void): HTMLElement {
       }
 
       const celdaEstado = headerEl.querySelector<HTMLElement>(
-        ".celda.grupo-estado",
+        ".celda.separador-estado",
       );
 
       if (!celdaEstado) {
@@ -473,7 +473,7 @@ export function crearTabla(alModificar: () => void): HTMLElement {
 
       const botonViejo = celdaEstado.querySelector("button");
 
-      const botonNuevo = crearEstadoGrupo(separadorPadre, alModificar);
+      const botonNuevo = crearEstadoSeparador(separadorPadre, alModificar);
 
       if (botonViejo) {
         celdaEstado.replaceChild(botonNuevo, botonViejo);

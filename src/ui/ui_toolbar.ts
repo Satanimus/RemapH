@@ -70,7 +70,7 @@ export function crearToolbar(alGuardar: () => Promise<void>): HTMLElement {
             </button>
 
             <button
-                class="btn-agregar-grupo"
+                class="btn-agregar-separador"
                 type="button"
                 title="Agregar separador"
             >
@@ -271,11 +271,11 @@ export function crearToolbar(alGuardar: () => Promise<void>): HTMLElement {
     reconstruirTabla();
   });
 
-  const botonAgregarGrupo = toolbar.querySelector(
-    ".btn-agregar-grupo",
+  const botonAgregarSeparador = toolbar.querySelector(
+    ".btn-agregar-separador",
   ) as HTMLButtonElement | null;
 
-  botonAgregarGrupo?.addEventListener("click", () => {
+  botonAgregarSeparador?.addEventListener("click", () => {
     agregarSeparadores();
 
     marcarPerfilEditado(toolbar);

@@ -253,7 +253,7 @@
     --separador-sombra: inset 0 0 14px rgba(0, 0, 0, .3);
 
     /* Fuente propia del texto de Nota del Separador — ahí funciona
-      como título del grupo, no como una nota común, así que no
+      como título del separador, no como una nota común, así que no
       comparte variable con la tipografía general (--font). Mismo
       motivo que --separador-sombra: no personalizable todavía desde
       Apariencia por faltar un tipo "texto libre" en el catálogo. */

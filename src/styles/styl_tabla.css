@@ -97,7 +97,7 @@
 
     background: transparent;
 
-    border: 1px solid var(--grupo-color, var(--border-light));
+    border: 1px solid var(--separador-color, var(--border-light));
 
     color: var(--text-disabled);
 
@@ -155,35 +155,35 @@
     background: var(--row-hover-bg);
 }
 
-.fila.en-grupo {
+.fila.en-separador {
 
-    background: color-mix(in srgb, var(--grupo-color) 18%, var(--row-bg));
+    background: color-mix(in srgb, var(--separador-color) 18%, var(--row-bg));
 
-    border-left: 1px solid var(--grupo-color);
+    border-left: 1px solid var(--separador-color);
 
-    border-right: 1px solid var(--grupo-color);
+    border-right: 1px solid var(--separador-color);
 
     box-sizing: border-box;
 }
 
-.fila.en-grupo:hover {
+.fila.en-separador:hover {
 
-    background: color-mix(in srgb, var(--grupo-color) 30%, var(--row-bg));
+    background: color-mix(in srgb, var(--separador-color) 30%, var(--row-bg));
 }
 
-.fila.primera-del-grupo {
+.fila.primera-del-separador {
 
-    border-top: 1px solid var(--grupo-color);
+    border-top: 1px solid var(--separador-color);
 }
 
-.fila.ultima-del-grupo {
+.fila.ultima-del-separador {
 
-    border-bottom: 1px solid var(--grupo-color);
+    border-bottom: 1px solid var(--separador-color);
 
     border-radius: 0 0 var(--r8) var(--r8);
 }
 
-.fila-grupo {
+.fila-separador {
 
     display: flex;
 
@@ -195,14 +195,14 @@
 
     box-sizing: border-box;
 
-    background: var(--grupo-color, var(--panel2));
+    background: var(--separador-color, var(--panel2));
 
     border-radius: var(--r8) var(--r8) 0 0;
 
     box-shadow: var(--separador-sombra);
 }
 
-.fila-grupo-placeholder {
+.fila-separador-placeholder {
 
     display: flex;
 
@@ -267,12 +267,12 @@
     border-right: 1px solid rgba(255, 255, 255, .025);
 }
 
-.celda.nota-grupo {
+.celda.nota-separador {
 
     flex: 1;
 }
 
-.celda.nota-grupo .nota {
+.celda.nota-separador .nota {
 
     font: var(--separador-nota-fuente);
 }
@@ -312,7 +312,7 @@
 /* El botón Opciones del separador no debe estirarse con la columna:
    el ancho lo da el contenido (igual que en la fila normal, donde
    el div.opciones-celda actúa como contenedor que se contrae). */
-.celda.grupo-opciones .ui-btn {
+.celda.separador-opciones .ui-btn {
 
     width: fit-content;
 

@@ -31,7 +31,7 @@ export function crearFila(
   filaPerfil: FilaPerfil,
   esUltima: boolean,
   alModificar: () => void = () => {},
-  infoGrupo?: { color: string; primera: boolean; ultima: boolean },
+  infoSeparador?: { color: string; primera: boolean; ultima: boolean },
 ): HTMLElement {
   const contexto = crearContextoFila(filaPerfil.id);
 
@@ -47,23 +47,23 @@ export function crearFila(
     fila.style.removeProperty("--fila-color");
   }
 
-  if (infoGrupo) {
+  if (infoSeparador) {
     fila.style.setProperty(
-      "--grupo-color",
-      infoGrupo.color ? `var(--tag-${infoGrupo.color})` : "var(--border-light)",
+      "--separador-color",
+      infoSeparador.color ? `var(--tag-${infoSeparador.color})` : "var(--border-light)",
     );
 
-    fila.classList.add("en-grupo");
+    fila.classList.add("en-separador");
 
-    if (infoGrupo.primera) {
-      fila.classList.add("primera-del-grupo");
+    if (infoSeparador.primera) {
+      fila.classList.add("primera-del-separador");
     }
 
-    if (infoGrupo.ultima) {
-      fila.classList.add("ultima-del-grupo");
+    if (infoSeparador.ultima) {
+      fila.classList.add("ultima-del-separador");
     }
   } else {
-    fila.style.removeProperty("--grupo-color");
+    fila.style.removeProperty("--separador-color");
   }
 
   COLUMNAS.forEach((col) => {

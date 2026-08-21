@@ -2,11 +2,11 @@
 // 🪟 comp_Popup_Separadores
 // ------------------------------------------------------
 // Popup de opciones del header de Separadores (botón "⁝"
-// de ui_grupo.ts). Calcado de abrirPopupOpciones() en
+// de ui_separador.ts). Calcado de abrirPopupOpciones() en
 // comp_popup_abrir.ts (mismo patrón dibujar()/mostrarPopup/
-// ocultarPopup), con las diferencias puntuales del grupo:
-// Color escribe grupo.color y repinta con reconstruirTabla()
-// (no reconstruirFila, que no sirve para un id de grupo);
+// ocultarPopup), con las diferencias puntuales del separador:
+// Color escribe separador.color y repinta con reconstruirTabla()
+// (no reconstruirFila, que no sirve para un id de separador);
 // Clonar es un solo botón sin la lógica de filaTieneAccion;
 // Mover queda listado sin función real (Etapa D); Eliminar
 // NO usa doble confirmación — expande una caja con 3 botones
@@ -41,16 +41,16 @@ function crearSeparador(): HTMLElement {
 }
 
 // ======================================================
-// 🎨 LISTA DE COLOR DEL GRUPO
+// 🎨 LISTA DE COLOR DEL SEPARADOR
 // ------------------------------------------------------
 // Misma UI que llenarListaColor() de la fila (comp_popup_abrir.ts),
-// pero escribe grupo.color y repinta con reconstruirTabla() —
+// pero escribe separador.color y repinta con reconstruirTabla() —
 // el color también repinta las filas contenidas (ver C7/C8).
 // ======================================================
 
-function llenarListaColorGrupo(
+function llenarListaColorSeparador(
   contenedor: HTMLElement,
-  grupo: SeparadorPerfil,
+  separador: SeparadorPerfil,
   alSeleccionar: () => void,
 ): void {
   contenedor.replaceChildren();
@@ -61,7 +61,7 @@ function llenarListaColorGrupo(
   botonLimpiar.textContent = "🎨 Limpiar";
 
   botonLimpiar.addEventListener("click", () => {
-    grupo.color = "";
+    separador.color = "";
 
     reconstruirTabla();
     alSeleccionar();
@@ -86,7 +86,7 @@ function llenarListaColorGrupo(
     boton.append(muestra, texto);
 
     boton.addEventListener("click", () => {
-      grupo.color = opcion.valor;
+      separador.color = opcion.valor;
 
       reconstruirTabla();
       alSeleccionar();
@@ -97,12 +97,12 @@ function llenarListaColorGrupo(
 }
 
 // ======================================================
-// ⁝ POPUP OPCIONES DE GRUPO
+// ⁝ POPUP OPCIONES DE SEPARADOR
 // ======================================================
 
 export function abrirPopupSeparadores(
   evento: MouseEvent,
-  grupo: SeparadorPerfil,
+  separador: SeparadorPerfil,
   alModificar: () => void,
 ): void {
   let colorExpandido = false;
@@ -122,19 +122,19 @@ export function abrirPopupSeparadores(
 
     botonColor.className = "ui-btn";
 
-    if (grupo.color) {
+    if (separador.color) {
       botonColor.classList.add("popup-color-item");
 
-      const opcion = COLOR_OPCIONES.find((o) => o.valor === grupo.color);
+      const opcion = COLOR_OPCIONES.find((o) => o.valor === separador.color);
 
       const muestra = document.createElement("span");
 
       muestra.className = "popup-color-muestra";
-      muestra.style.background = `var(--tag-${grupo.color})`;
+      muestra.style.background = `var(--tag-${separador.color})`;
 
       const texto = document.createElement("span");
 
-      texto.textContent = `Color ${opcion?.texto ?? grupo.color}`;
+      texto.textContent = `Color ${opcion?.texto ?? separador.color}`;
 
       botonColor.append(muestra, texto);
     } else {
@@ -153,7 +153,7 @@ export function abrirPopupSeparadores(
 
       caja.className = "popup-caja-interna";
 
-      llenarListaColorGrupo(caja, grupo, () => {
+      llenarListaColorSeparador(caja, separador, () => {
         alModificar();
         ocultarPopup();
       });
@@ -173,7 +173,7 @@ export function abrirPopupSeparadores(
     botonClonar.textContent = "Clonar";
 
     botonClonar.addEventListener("click", () => {
-      clonarSeparadoresPorId(grupo.id);
+      clonarSeparadoresPorId(separador.id);
       alModificar();
       reconstruirTabla();
       ocultarPopup();
@@ -191,7 +191,7 @@ export function abrirPopupSeparadores(
     botonMover.textContent = "Mover";
 
     botonMover.addEventListener("click", () => {
-      activarModoMoverTabla(grupo.id);
+      activarModoMoverTabla(separador.id);
       ocultarPopup();
     });
 
@@ -225,7 +225,7 @@ export function abrirPopupSeparadores(
       botonEliminarFilas.textContent = "Eliminar filas";
 
       botonEliminarFilas.addEventListener("click", () => {
-        eliminarSeparadoresConFilas(grupo.id);
+        eliminarSeparadoresConFilas(separador.id);
         alModificar();
         reconstruirTabla();
         ocultarPopup();
@@ -237,7 +237,7 @@ export function abrirPopupSeparadores(
       botonMoverFuera.textContent = "Mover fuera";
 
       botonMoverFuera.addEventListener("click", () => {
-        moverSeparadoresFuera(grupo.id);
+        moverSeparadoresFuera(separador.id);
         alModificar();
         reconstruirTabla();
         ocultarPopup();

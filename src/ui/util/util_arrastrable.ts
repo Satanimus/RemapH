@@ -537,12 +537,12 @@ export function crearControladorArrastre(
       }
     }
 
-    // D7 — grupo colapsado: si el puntero cayó sobre un header de
-    // grupo (div.fila-grupo) y ese grupo está colapsado (el elemento
-    // siguiente en el contenedor también es un header o no existe),
-    // insertar el placeholder justo después del header — que es donde
-    // terminaría el tramo de ese grupo, produciendo el resultado
-    // correcto al llamar ordenTrasPlaceholder.
+    // D7 — separador colapsado: si el puntero cayó sobre un header de
+    // separador (div.fila-separador) y ese separador está colapsado (el
+    // elemento siguiente en el contenedor también es un header o no
+    // existe), insertar el placeholder justo después del header — que
+    // es donde terminaría el tramo de ese separador, produciendo el
+    // resultado correcto al llamar ordenTrasPlaceholder.
     if (!referencia) {
       // El puntero está por debajo de todos los visibles — verificar
       // si el último visible es un header colapsado.
@@ -550,7 +550,7 @@ export function crearControladorArrastre(
 
       if (
         ultimoVisible &&
-        ultimoVisible.classList.contains("fila-grupo") &&
+        ultimoVisible.classList.contains("fila-separador") &&
         obtenerIdsSeparadores?.().includes(
           idPorElemento.get(ultimoVisible) ?? "",
         )
@@ -561,7 +561,7 @@ export function crearControladorArrastre(
         const esColapsado =
           !siguiente ||
           (siguiente !== placeholder &&
-            siguiente.classList.contains("fila-grupo"));
+            siguiente.classList.contains("fila-separador"));
 
         if (esColapsado) {
           const despuesDelHeader =
@@ -577,7 +577,7 @@ export function crearControladorArrastre(
         }
       }
     } else if (
-      referencia.classList.contains("fila-grupo") &&
+      referencia.classList.contains("fila-separador") &&
       obtenerIdsSeparadores?.().includes(idPorElemento.get(referencia) ?? "")
     ) {
       // El puntero está sobre un header. Verificar si está colapsado.
@@ -586,7 +586,7 @@ export function crearControladorArrastre(
       const esColapsado =
         !siguiente ||
         (siguiente !== placeholder &&
-          siguiente.classList.contains("fila-grupo"));
+          siguiente.classList.contains("fila-separador"));
 
       if (esColapsado) {
         // Insertar después del header (al final del tramo colapsado).

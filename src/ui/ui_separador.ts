@@ -1,16 +1,16 @@
 // ======================================================
-// ui_Grupo
+// ui_Separador
 // ------------------------------------------------------
-// Header de un Separador: div.fila-grupo con Estado,
+// Header de un Separador: div.fila-separador con Estado,
 // Opciones ("⁝") y Nota — sin las celdas App/Trigger/Tipo/
 // Acción/Extra que sí tiene una fila normal. No lleva celda
 // de número: el botón expandir/contraer vive en el carril
-// (ver comp_grupo_expandir.ts).
+// (ver comp_separador_expandir.ts).
 // ======================================================
 
 import type { SeparadorPerfil } from "../core/core_perfil";
 
-import { crearEstadoGrupo } from "./componentes/comp_separador_estado";
+import { crearEstadoSeparador } from "./componentes/comp_separador_estado";
 import { crearBoton } from "./componentes/comp_boton";
 import { crearNota } from "./componentes/comp_controles";
 import { abrirPopupSeparadores } from "./componentes/comp_popup_separadores";
@@ -32,35 +32,35 @@ export function crearSeparadorHeader(
 ): HTMLElement {
   const fila = document.createElement("div");
 
-  fila.className = "fila-grupo";
+  fila.className = "fila-separador";
 
   fila.dataset.id = separador.id;
 
   if (separador.color) {
-    fila.style.setProperty("--grupo-color", `var(--tag-${separador.color})`);
+    fila.style.setProperty("--separador-color", `var(--tag-${separador.color})`);
   } else {
-    fila.style.removeProperty("--grupo-color");
+    fila.style.removeProperty("--separador-color");
   }
 
   const celdaEstado = document.createElement("div");
 
-  celdaEstado.className = "celda grupo-estado";
+  celdaEstado.className = "celda separador-estado";
 
   celdaEstado.style.width = anchoEstado;
   celdaEstado.style.flexBasis = anchoEstado;
 
-  celdaEstado.append(crearEstadoGrupo(separador, alModificar));
+  celdaEstado.append(crearEstadoSeparador(separador, alModificar));
 
   const celdaOpciones = document.createElement("div");
 
-  celdaOpciones.className = "celda grupo-opciones";
+  celdaOpciones.className = "celda separador-opciones";
 
   celdaOpciones.style.width = anchoOpciones;
   celdaOpciones.style.flexBasis = anchoOpciones;
 
   const botonOpciones = crearBoton({
     texto: "⁝",
-    titulo: "Opciones de grupo",
+    titulo: "Opciones de separador",
     clase: "opciones-asa",
   });
 
@@ -72,7 +72,7 @@ export function crearSeparadorHeader(
 
   const celdaNota = document.createElement("div");
 
-  celdaNota.className = "celda nota-grupo";
+  celdaNota.className = "celda nota-separador";
 
   celdaNota.append(crearNota(separador));
 

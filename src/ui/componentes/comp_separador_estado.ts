@@ -46,7 +46,7 @@ function tramoTieneAlerta(separador: SeparadorPerfil): boolean {
   );
 }
 
-export function crearEstadoGrupo(
+export function crearEstadoSeparador(
   separador: SeparadorPerfil,
   alModificar: () => void,
 ): HTMLButtonElement {
@@ -69,7 +69,7 @@ export function crearEstadoGrupo(
 
     boton.append(alerta);
   } else if (esMixto) {
-    boton.classList.add("estado-grupo-mixto");
+    boton.classList.add("estado-separador-mixto");
 
     const texto = document.createElement("span");
 

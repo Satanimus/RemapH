@@ -715,7 +715,7 @@
     background: var(--red);
 }
 
-.estado-toggle.estado-grupo-mixto {
+.estado-toggle.estado-separador-mixto {
 
     background: var(--text-disabled);
 
@@ -724,7 +724,7 @@
     border-color: #000;
 }
 
-.estado-toggle.estado-grupo-mixto:hover {
+.estado-toggle.estado-separador-mixto:hover {
 
     background: var(--text-soft);
 }
@@ -771,7 +771,7 @@
    ====================================================== */
 
 .btn-agregar-fila,
-.btn-agregar-grupo {
+.btn-agregar-separador {
 
     display: flex;
 
@@ -809,7 +809,7 @@
 }
 
 .btn-agregar-fila:hover,
-.btn-agregar-grupo:hover {
+.btn-agregar-separador:hover {
 
     border-color: var(--highlight);
 
