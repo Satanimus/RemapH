@@ -4,7 +4,8 @@
 // 1. ¿Qué hace este archivo?
 //
 // El portero: recibe cada InputEvent físico del backend
-// (back_interception), se lo entrega al AnalizadorTrigger,
+// activo (back_interception o back_windows, según el modo —
+// ver motor.rs), se lo entrega al AnalizadorTrigger,
 // y según la ResolucionEntrada que termine llegando de
 // Cache, decide si el input vuelve a Windows, se bloquea,
 // o queda pendiente.
@@ -88,8 +89,9 @@
 // guardar coordenada. Windows sigue recibiendo todo normal.
 // ------------------------------------------------------
 // 2. ¿Quién llama este archivo?
-// back_interception::iniciar() — le entrega cada
-//     InputEvent físico capturado.
+// motor::iniciar() — le entrega cada InputEvent físico
+//     capturado por el backend activo (back_interception o
+//     back_windows, según el modo — ver motor.rs).
 // cache.rs — le avisa retener() / pasar() / consumir() sin
 //     pasarle ningún dato salvo, en el caso de consumir(),
 //     la lista de teclas que siguen físicamente vivas tras
@@ -102,7 +104,7 @@
 // ------------------------------------------------------
 // 4. ¿Qué información entrega?
 // No retorna nada — actúa directo llamando a
-// back_interception::emitir_evento() cuando corresponde
+// motor::emitir_evento() cuando corresponde
 // dejar pasar algo.
 // ------------------------------------------------------
 // 5. Comportamiento
@@ -187,11 +189,11 @@
 // retener() | pasar() | consumir(vivas)
 // ======================================================
 
-use crate::back_interception;
 use crate::cache;
 use crate::captura_coordenada;
 use crate::config;
 use crate::eventos::{InputEvent, InputId, InputState};
+use crate::motor;
 use std::cell::RefCell;
 use std::sync::Mutex;
 use std::time::Duration;
@@ -293,7 +295,7 @@ pub fn procesar_evento(evento: InputEvent) {
     // si hay captura activa, la rama de arriba ya se hizo cargo y esta
     // línea ni se evalúa.)
     if cache::esta_vacia() {
-        back_interception::emitir_evento(evento);
+        motor::emitir_evento(evento);
         return;
     }
 
@@ -309,7 +311,7 @@ pub fn procesar_evento(evento: InputEvent) {
             .position(|grupo| grupo.faltan_soltar.contains(&evento.input))
         {
             if !devolviendo[indice].bloquear {
-                back_interception::emitir_evento(evento.clone());
+                motor::emitir_evento(evento.clone());
             }
 
             if evento.state == InputState::Up {
@@ -371,7 +373,7 @@ pub fn pasar() {
         let evento = EVENTO_EN_CURSO.with(|c| c.borrow().clone());
 
         if let Some(evento) = evento {
-            back_interception::emitir_evento(evento.clone());
+            motor::emitir_evento(evento.clone());
 
             if evento.state == InputState::Down {
                 purgar_de_devolviendo(std::slice::from_ref(&evento.input)); // ⚠️ ver FIX en la definición
@@ -389,7 +391,7 @@ pub fn pasar() {
     let mut faltan_soltar: Vec<InputId> = Vec::new();
 
     for evento in grupo.buffer {
-        back_interception::emitir_evento(evento.clone());
+        motor::emitir_evento(evento.clone());
 
         match evento.state {
             InputState::Down => {

@@ -33,7 +33,9 @@
 // ------------------------------------------------------
 // 4. ¿Qué información entrega?
 // Nada por retorno — actúa directo contra
-// back_interception::emitir_evento() para cada paso físico.
+// motor::emitir_evento() para cada paso físico (motor.rs
+// decide si eso termina en back_interception o back_windows,
+// según el modo activo).
 // ------------------------------------------------------
 // 5. Decisiones de diseño (no perder esto de vista)
 //
@@ -345,7 +347,7 @@
 //               ↓
 //         ejecutar_linea() por cada paso
 //               ↓
-//         back_interception::emitir_evento()
+//         motor::emitir_evento()
 //               ↓
 //         Dispositivo físico
 // ======================================================
@@ -353,7 +355,7 @@ use crate::back_app;
 use crate::back_coordenada;
 use crate::back_registro;
 
-use crate::back_interception;
+use crate::motor;
 
 use crate::back_menu_express;
 use crate::back_portapapeles;
@@ -2145,5 +2147,5 @@ fn ejecutar_pulse(identificador: &str) {
 // ======================================================
 
 fn emitir_evento(evento: crate::eventos::InputEvent) {
-    back_interception::emitir_evento(evento);
+    motor::emitir_evento(evento);
 }

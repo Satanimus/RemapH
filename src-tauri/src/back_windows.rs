@@ -75,13 +75,15 @@
 // hook_teclado() [privada, unsafe extern "system"]
 //     Callback de WH_KEYBOARD_LL. Traduce KBDLLHOOKSTRUCT
 //     a InputEvent. Filtra eventos inyectados propios.
-//     Retorna 1 si el evento fue consumido, llama
-//     CallNextHookEx si no.
+//     Retorna 1 si el evento se tradujo (siempre lo
+//     bloquea) o si debe_tragar_no_traducible() lo pide;
+//     llama CallNextHookEx en cualquier otro caso.
 // hook_mouse() [privada, unsafe extern "system"]
 //     Callback de WH_MOUSE_LL. Traduce MSLLHOOKSTRUCT
 //     a InputEvent. Filtra eventos inyectados propios.
-//     Retorna 1 si el evento fue consumido, llama
-//     CallNextHookEx si no.
+//     Retorna 1 si el evento se tradujo (siempre lo
+//     bloquea) o si debe_tragar_no_traducible() lo pide;
+//     llama CallNextHookEx en cualquier otro caso.
 // traducir_teclado() [privada]
 //     KBDLLHOOKSTRUCT → Option<InputEvent>, consultando
 //     pulsadores::por_nativo() con el vkCode recibido.
@@ -91,8 +93,9 @@
 //     de botón/rueda correspondiente.
 // evaluar() [privada]
 //     Extrae el procesador del estado de hilo, lo llama
-//     con el evento y el cierre de emitir, lo devuelve al
-//     estado. Retorna true si el evento fue consumido.
+//     con el evento, lo devuelve al estado. No decide
+//     bloqueo — eso ya lo resolvió el hook que la llama
+//     (siempre bloquea un evento traducido).
 // emitir_evento()
 //     InputEvent → INPUT(s) físicos vía SendInput.
 //     Teclado: KEYBDINPUT con wVk. Mouse: MOUSEINPUT con
@@ -283,9 +286,17 @@ unsafe extern "system" fn hook_teclado(codigo: i32, wparam: WPARAM, lparam: LPAR
 
     match traducir_teclado(datos.vkCode, presionado) {
         Some(evento) => {
-            if evaluar(evento) {
-                return 1;
-            }
+            // Evento traducido: SIEMPRE se bloquea el físico original
+            // (nunca CallNextHookEx acá) — mismo modelo que Interception,
+            // que intercepta todo por default. Lo que deba pasar
+            // (el mismo evento sin tocar, o una acción remapeada) lo
+            // reinyecta motor::emitir_evento() más abajo en la cadena
+            // (entrada.rs), vía SendInput — el filtro de "eventos
+            // inyectados por este mismo proceso" de más arriba evita
+            // que esa reinyección se vuelva a capturar como si fuera
+            // físico.
+            evaluar(evento);
+            return 1;
         }
         None => {
             // No traducible: tragar si hay captura activa, pasar si no
@@ -324,9 +335,10 @@ unsafe extern "system" fn hook_mouse(codigo: i32, wparam: WPARAM, lparam: LPARAM
 
     match traducir_mouse(wparam, datos) {
         Some(evento) => {
-            if evaluar(evento) {
-                return 1;
-            }
+            // Ver nota equivalente en hook_teclado(): un evento
+            // traducido siempre bloquea el físico original.
+            evaluar(evento);
+            return 1;
         }
         None => {
             let debe_tragar = ESTADO.with(|estado| {
@@ -350,7 +362,7 @@ unsafe extern "system" fn hook_mouse(codigo: i32, wparam: WPARAM, lparam: LPARAM
 // 🧠 EVALUAR
 // ======================================================
 
-fn evaluar(evento: InputEvent) -> bool {
+fn evaluar(evento: InputEvent) {
     let mut procesar: Option<Box<dyn FnMut(InputEvent)>> = None;
     let mut debe_tragar_no_traducible: Option<Box<dyn Fn() -> bool>> = None;
 
@@ -361,16 +373,10 @@ fn evaluar(evento: InputEvent) -> bool {
         }
     });
 
-    // Nota: el procesador de back_interception no retorna bool —
-    // llama a procesar(evento) sin valor de retorno. En back_windows
-    // los hooks siempre pasan el evento (nunca lo consumen solos;
-    // el procesador decide si emitir o no). Retornamos false para
-    // que CallNextHookEx siga la cadena — la lógica de bloqueo
-    // real vendrá del Runtime en etapas posteriores.
-    //
-    // TODO (Etapa B): cuando el punto de despacho unificado esté
-    // listo, ajustar si procesar() necesita retornar bool aquí
-    // para bloquear eventos.
+    // El bloqueo del evento físico ya se decidió en el hook (siempre
+    // se bloquea, ver hook_teclado()/hook_mouse()) — acá solo se
+    // entrega al procesador para que decida qué reinyectar, si
+    // corresponde, vía motor::emitir_evento().
     if let (Some(mut f), Some(pred)) = (procesar, debe_tragar_no_traducible) {
         f(evento);
 
@@ -381,8 +387,6 @@ fn evaluar(evento: InputEvent) -> bool {
             });
         });
     }
-
-    false
 }
 
 // ======================================================

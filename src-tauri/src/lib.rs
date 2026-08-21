@@ -30,6 +30,7 @@ mod macro_cache;
 mod macro_json;
 mod macro_usuario;
 mod macros;
+mod motor;
 mod perfil;
 mod perfil_cache;
 mod perfil_json;
@@ -47,18 +48,14 @@ mod usuario;
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 
 pub fn run() {
-    // Carga el teclado/mouse primario guardado la sesión anterior
-    // (Configuracion_Usuario.txt, prefijo "dispositivo.") ANTES de
-    // spawnear el hilo de entrada — ver "Reglas de dispositivo
-    // primario" en back_interception.rs. Tiene que ir antes: si se
-    // hiciera después (ej. dentro de .setup(), como
-    // configuracion_usuario::cargar_al_iniciar() más abajo), un
-    // evento físico real podría llegar primero y no habría nada que
-    // precargar.
-    back_interception::precargar_desde_config();
-
+    // El punto único de despacho (motor.rs) decide, según el modo
+    // activo, si arranca back_interception (con su propia precarga
+    // de dispositivo primario) o back_windows — ver motor::iniciar().
+    // Tiene que ir antes de que arranque el hilo de entrada, no
+    // adentro: ver comentario largo en back_interception.rs
+    // ("Reglas de dispositivo primario") y en motor::iniciar().
     std::thread::spawn(|| {
-        back_interception::iniciar(entrada::procesar_evento, cache::captura_activa);
+        motor::iniciar(entrada::procesar_evento, cache::captura_activa);
     });
     back_app::iniciar_monitor();
     tauri::Builder::default()
