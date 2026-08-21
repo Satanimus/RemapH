@@ -460,6 +460,27 @@ function montarEditor(
 
   let controladorArrastre: ControladorArrastre | null = null;
 
+  // true después del primer dibujar() (spec punto 1: "al hacer
+  // click en algún botón la ventana del editor se mueve" / "en modo
+  // ventana salta a la orilla izquierda"). mostrarPopupFijo corre
+  // ajustarPosicionDentroDeVentana en CADA llamada, que decide entre
+  // left/right y top/bottom según si el popup entra en la ventana
+  // con el ancho/alto que tenga en ESE momento — un redibujado
+  // disparado por cualquier botón (agrega una fila, abre un panel)
+  // cambia ese tamaño y el cálculo se repite desde cero, pudiendo
+  // saltar entre "cabe a la izquierda" y "hay que pegarlo al borde"
+  // de un click a otro. Tras el primer dibujado se fuerza left/top
+  // explícitos (más abajo) en vez de dejar que se recalcule.
+  let posicionYaAjustada = false;
+
+  // Id del paso actualmente en "modo Mover" (activado desde el
+  // ítem "Mover" del menú Opciones — ver crearMenuAsa) — null si
+  // ninguno. Espejo propio del Set `seleccionadas` que vive DENTRO
+  // de controladorArrastre, porque ese controlador se destruye y
+  // recrea en cada dibujar() (spec punto 4, ver comentario en el
+  // callback de activarModoMoverPara más abajo).
+  let idPasoEnModoMover: string | null = null;
+
   const redibujar = (): void => {
     dibujar();
   };
@@ -829,6 +850,24 @@ function montarEditor(
 
       anchoGuardado = `${rect.width}px`;
       altoGuardado = `${rect.height}px`;
+
+      // Igual criterio que iniciarArrastrePopup (ver más arriba):
+      // la posición real en pantalla puede no coincidir con
+      // posicionX/posicionY si mostrarPopupFijo reubicó el popup
+      // con right/bottom en vez de left/top (no entraba en la
+      // ventana al dibujarse la vez anterior). Sin esto, cada
+      // redibujado por click de botón volvía a llamar
+      // mostrarPopupFijo con el x/y ORIGINAL de apertura y
+      // ajustarPosicionDentroDeVentana lo recalculaba desde cero
+      // contra el tamaño de fábrica del contenido (antes de
+      // reaplicar anchoGuardado/altoGuardado más abajo) — eso
+      // producía el salto de posición reportado (spec punto 1: "al
+      // hacer click en algún botón la ventana se mueve"). Se fija
+      // acá la posición real actual como nuevo punto de partida, así
+      // el popup no se reposiciona a menos que ya no entre en la
+      // ventana con su tamaño real.
+      posicionX = rect.left;
+      posicionY = rect.top;
     }
 
     const colDerechaPrevio = document.querySelector<HTMLElement>(
@@ -839,6 +878,17 @@ function montarEditor(
       colExtraGuardado =
         colDerechaPrevio.style.getPropertyValue("--col-extra-width");
     }
+
+    // Preservar la posición de scroll de la lista de pasos (spec
+    // punto 4: un click en un marcador no debe volver la vista
+    // arriba) — cada redibujado reemplaza .popup-macro-editor-lista
+    // por un elemento nuevo, que nace con scrollTop 0 si no se
+    // restaura acá.
+    const listaPrevia = document.querySelector<HTMLElement>(
+      ".popup-macro-editor-lista",
+    );
+
+    const scrollTopGuardado = listaPrevia?.scrollTop ?? 0;
 
     const popup = document.createElement("div");
 
@@ -927,6 +977,8 @@ function montarEditor(
           idPasoExpandido,
           idMenuAbierto,
           (nuevoId) => {
+            // Solo un popup anidado (Opción/Tipo/Extra) puede estar
+            // abierto a la vez en todo el editor (spec punto 3).
             idPasoExpandido = idPasoExpandido === nuevoId ? null : nuevoId;
             idMenuAbierto = null;
 
@@ -934,6 +986,7 @@ function montarEditor(
           },
           (nuevoId) => {
             idMenuAbierto = idMenuAbierto === nuevoId ? null : nuevoId;
+            idPasoExpandido = null;
 
             redibujar();
           },
@@ -942,6 +995,17 @@ function montarEditor(
           redibujar,
           (idPasoAMover) => {
             idMenuAbierto = null;
+
+            // Se guarda acá (además de aplicarse al controlador
+            // vigente) porque cada dibujar() destruye y recrea
+            // controladorArrastre desde cero (con su Set de
+            // seleccionadas vacío) — sin este registro propio, el
+            // modo Mover se perdía en el primer redibujado posterior
+            // (spec punto 4: "al presionarlas se sale del modo
+            // mover"), por ejemplo el que dispara moverGrupoConFlecha
+            // al mover con las flechas. Se restaura más abajo, justo
+            // después de crear el controlador nuevo.
+            idPasoEnModoMover = idPasoAMover;
 
             // El controlador se reasigna en cada dibujar() — se lee
             // en el momento del click (no se captura antes), porque
@@ -966,11 +1030,16 @@ function montarEditor(
 
     popup.append(crearPieBotones());
 
-    mostrarPopupFijo(popup, posicionX, posicionY);
-
-    // Restaurar tamaño ajustado por el usuario (resize: both).
-    // Se aplica después de mostrarPopupFijo porque antes el elemento
-    // no está en el DOM y las asignaciones de style se perderían.
+    // Aplicar el tamaño ajustado por el usuario (resize: both) ANTES
+    // de mostrarPopupFijo — asignar style.width/height no requiere
+    // que el nodo esté en el DOM (a diferencia de leer offsetWidth).
+    // Se necesita en este orden porque mostrarPopupFijo llama
+    // internamente a ajustarPosicionDentroDeVentana, que mide
+    // offsetWidth/offsetHeight para decidir si el popup entra en la
+    // ventana: medir ANTES de aplicar el tamaño real (como se hacía
+    // antes) usaba el tamaño "de fábrica" del contenido en vez del
+    // tamaño real que va a ocupar, dando una posición incorrecta que
+    // se notaba como salto en cada redibujado (spec punto 1).
     if (anchoGuardado) {
       popup.style.width = anchoGuardado;
     }
@@ -979,50 +1048,122 @@ function montarEditor(
       popup.style.height = altoGuardado;
     }
 
+    mostrarPopupFijo(popup, posicionX, posicionY);
+
+    // Solo la PRIMERA vez se deja que ajustarPosicionDentroDeVentana
+    // (dentro de mostrarPopupFijo) decida entre left/right y
+    // top/bottom según si el popup entra en la ventana. En
+    // redibujados posteriores se fuerza left/top explícitos con la
+    // posición real ya capturada arriba (rect del popup previo) —
+    // así un cambio de tamaño del contenido (agregar una fila, abrir
+    // un panel) nunca puede hacer que el cálculo se repita y el
+    // popup salte de golpe a otro lado (spec punto 1). Al arrastrar
+    // la barra de título el popup ya queda con left/top fijos
+    // (iniciarArrastrePopup), así que este mismo criterio aplica
+    // igual después de moverlo a mano.
+    if (posicionYaAjustada) {
+      popup.style.left = `${posicionX}px`;
+      popup.style.top = `${posicionY}px`;
+      popup.style.right = "";
+      popup.style.bottom = "";
+    } else {
+      posicionYaAjustada = true;
+    }
+
+    // Restaurar scroll de la lista de pasos (spec punto 4) — mismo
+    // motivo que ancho/alto arriba: hay que esperar a que
+    // mostrarPopupFijo la conecte al DOM, si no el navegador
+    // descarta la asignación.
+    if (scrollTopGuardado) {
+      lista.scrollTop = scrollTopGuardado;
+    }
+
     // El componente de arrastre necesita el contenedor YA en el DOM
     // (mostrarPopupFijo ya lo insertó arriba) para poder registrar cada
     // fila-paso y medir sus posiciones.
     controladorArrastre = crearControladorArrastre({
       contenedor: lista,
       obtenerOrdenIds: () => macroArchivo.pasos.map((paso) => idDePaso(paso)),
-      onReordenar: (nuevoOrden) => {
-        const porId = new Map(
-          macroArchivo.pasos.map((paso) => [idDePaso(paso), paso]),
-        );
+      onReordenar: (nuevoOrdenSolicitado) => {
+        // No tocar el modelo ni redibujar de forma SÍNCRONA acá:
+        // este callback corre en medio de aplicarNuevoOrden()
+        // (util_arrastrable.ts), que todavía tiene que leer las
+        // posiciones DOM post-reorden para animar el FLIP y recién
+        // después limpia arrastreActual. Un redibujar() síncrono
+        // destruye controladorArrastre (dibujar() lo hace siempre)
+        // a mitad de esa operación — deja aplicarNuevoOrden
+        // trabajando sobre nodos ya desconectados del DOM real y el
+        // arrastre queda colgado (fila pegada, resto de botones sin
+        // responder). Se difiere con setTimeout 0 para que
+        // aplicarNuevoOrden termine su ciclo completo primero.
+        setTimeout(() => {
+          const nuevoOrden = nuevoOrdenSolicitado;
 
-        macroArchivo.pasos = nuevoOrden
-          .map((id) => porId.get(id))
-          .filter((paso): paso is PasoMacro => !!paso);
-
-        guardarConDebounce(macroArchivo);
-
-        // aplicarNuevoOrden (util_arrastrable.ts) ya reordenó
-        // físicamente los nodos en `lista` antes de llamar a este
-        // callback — solo falta refrescar el texto de cada número
-        // para que la numeración quede secuencial tras soltar (spec
-        // punto 11: el # es puramente visual/derivado, no debe poder
-        // quedar desordenado). Un redibujar() completo acá cortaría
-        // de raíz la animación de acomodo que arranca justo después
-        // de este callback, así que se ajusta solo el texto.
-        nuevoOrden.forEach((id, indice) => {
-          const fila = lista.querySelector<HTMLElement>(
-            `[data-paso-id="${id}"]`,
+          const porId = new Map(
+            macroArchivo.pasos.map((paso) => [idDePaso(paso), paso]),
           );
 
-          const numero = fila?.querySelector<HTMLElement>(
-            ".popup-macro-editor-numero",
-          );
+          macroArchivo.pasos = nuevoOrden
+            .map((id) => porId.get(id))
+            .filter((paso): paso is PasoMacro => !!paso);
 
-          if (numero) {
-            numero.textContent = `#${indice + 1}`;
-          }
-        });
+          // Recalcular la columna Marcador tras el movimiento (spec
+          // punto 2): el Bucle se puede arrastrar libremente arriba
+          // o abajo — lo que nunca puede pasar es que su letra
+          // (bucleMarcadorDestino) quede apuntando a una fila con
+          // número IGUAL O MAYOR al suyo. Semánticamente el Bucle
+          // hace que el RUN "vuelva" a una fila anterior; si esa
+          // fila quedó en un número igual o posterior ya no sería
+          // un bucle sino un salto hacia adelante, así que la fila
+          // pierde el marcador (el Bucle conserva su letra, solo
+          // queda temporalmente sin ninguna fila que la cubra). No
+          // alcanza con mirar si hay ALGÚN Bucle después de la fila
+          // marcada: con más de un Bucle, uno posterior de letra
+          // distinta no valida el marcador que apunta a otro Bucle
+          // que quedó antes.
+          const indiceBuclePorLetra = new Map<string, number>();
+
+          macroArchivo.pasos.forEach((p, i) => {
+            if (p.tipo === "bucle" && p.bucleMarcadorDestino) {
+              indiceBuclePorLetra.set(p.bucleMarcadorDestino, i);
+            }
+          });
+
+          macroArchivo.pasos.forEach((paso, indice) => {
+            if (paso.tipo === "bucle" || !paso.marcador) {
+              return;
+            }
+
+            const indiceBucle = indiceBuclePorLetra.get(paso.marcador);
+
+            if (indiceBucle === undefined || indice >= indiceBucle) {
+              paso.marcador = null;
+            }
+          });
+
+          guardarConDebounce(macroArchivo);
+
+          redibujar();
+        }, 0);
       },
       onSalirModoMover: () => {
-        // No hace falta redibujar acá — salirModoMover ya limpió las
-        // clases de selección directamente sobre el DOM existente.
+        // Limpiar el espejo propio (spec punto 4) — si no se hace
+        // acá, el próximo redibujado (por cualquier otro motivo)
+        // volvería a activar el modo Mover sobre esta fila aunque
+        // el usuario ya haya salido explícitamente (click afuera,
+        // Escape). No hace falta redibujar: salirModoMover ya
+        // limpió las clases de selección directamente sobre el DOM
+        // existente.
+        idPasoEnModoMover = null;
       },
     });
+
+    // Restaurar el modo Mover tras recrear el controlador (spec
+    // punto 4) — ver comentario en la declaración de
+    // idPasoEnModoMover más arriba. Debe ir DESPUÉS de
+    // crearControladorArrastre (activarModoMoverPara necesita que
+    // la fila ya esté registrada, lo que ocurre más abajo) — se
+    // repite acá también tras registrar filas, tal como estaba.
 
     lista.querySelectorAll<HTMLElement>("[data-paso-id]").forEach((fila) => {
       const idPaso = fila.dataset.pasoId!;
@@ -1034,20 +1175,35 @@ function montarEditor(
       }
     });
 
-    // Cerrar menú/lista-tipo abierto al hacer click fuera de él.
-    // Se registra con setTimeout para no dispararse en el mismo click
-    // que abrió el menú. Se usa capture para interceptar antes que
+    // Recién acá, con todas las filas ya registradas, se puede
+    // restaurar el modo Mover en el controlador nuevo (spec punto
+    // 4) — si el paso todavía existe (pudo haber sido eliminado
+    // mientras estaba en modo Mover).
+    if (
+      idPasoEnModoMover &&
+      macroArchivo.pasos.some((p) => idDePaso(p) === idPasoEnModoMover)
+    ) {
+      controladorArrastre.activarModoMoverPara(idPasoEnModoMover);
+    } else {
+      idPasoEnModoMover = null;
+    }
+
+    // Cerrar el popup anidado abierto (Opción/Tipo/Extra — spec
+    // punto 3, solo una instancia a la vez) al hacer click fuera de
+    // él. Se registra con setTimeout para no dispararse en el mismo
+    // click que lo abrió. Se usa capture para interceptar antes que
     // los botones internos (que tienen stopPropagation).
-    if (idMenuAbierto) {
+    if (idMenuAbierto || idPasoExpandido) {
       const cerrarAlClickFuera = (evento: MouseEvent): void => {
         const menuAbierto = popup.querySelector<HTMLElement>(
-          ".popup-lista, .popup-macro-editor-menu-asa",
+          ".popup-lista, .popup-macro-editor-menu-asa, .popup-macro-editor-detalle",
         );
 
         if (menuAbierto && !menuAbierto.contains(evento.target as Node)) {
           document.removeEventListener("click", cerrarAlClickFuera, true);
 
           idMenuAbierto = null;
+          idPasoExpandido = null;
 
           redibujar();
         }
@@ -1087,6 +1243,19 @@ function crearEncabezadoColumnas(columnaDerecha: HTMLElement): HTMLElement {
   encabezado.className = "popup-macro-editor-header";
 
   COLUMNAS_ENCABEZADO.forEach((columna) => {
+    // Celda fantasma del ancho del Marcador — SIEMPRE antes de
+    // "Extra" (exista o no la columna Marcador en las filas), para
+    // que el título "Extra" arranque en la misma X que el texto del
+    // botón de acción de cada fila. Ver .popup-macro-col-header
+    // [data-columna="extra"] (resta este mismo ancho vía calc()).
+    if (columna.nombre === "extra") {
+      const espacioMarcador = document.createElement("div");
+
+      espacioMarcador.className = "popup-macro-col-header-marcador";
+
+      encabezado.append(espacioMarcador);
+    }
+
     const celda = document.createElement("div");
 
     celda.className = "popup-macro-col-header";
@@ -1200,6 +1369,7 @@ function crearFilaPaso(
   asa.className = "ui-btn popup-macro-editor-asa";
   asa.textContent = "⁝";
   asa.title = "Opciones";
+  asa.dataset.abierto = String(idMenuAbierto === idPaso);
 
   asa.addEventListener("click", () => {
     alternarMenu(idPaso);
@@ -1219,6 +1389,7 @@ function crearFilaPaso(
   botonTipo.className = "ui-btn popup-macro-editor-tipo";
   botonTipo.textContent = iconoTipoPasoMacro(paso.tipo);
   botonTipo.title = textoTipoPasoMacro(paso.tipo);
+  botonTipo.dataset.abierto = String(tipoAbierto);
 
   const expandido = idPasoExpandido === idPaso;
 
@@ -1240,17 +1411,24 @@ function crearFilaPaso(
 
   extra.className = "popup-macro-editor-extra";
 
-  // Columna Marcador — tres casos:
+  // Columna Marcador — SIEMPRE reserva su espacio (haya o no Bucles
+  // en la macro), para que el encabezado "Extra" quede alineado con
+  // el texto de esta celda en todos los casos (ver
+  // .popup-macro-col-header-marcador, que resta el mismo ancho fijo
+  // del lado del título). Cuatro casos:
   // 1. Paso Bucle: muestra su propia letra (bucleMarcadorDestino) con
   //    estilo invertido (borde azul, fondo transparente, letra azul).
   // 2. Paso no-Bucle anterior a algún Bucle: muestra círculo ciclable
   //    si hay letras de Bucle sin fila asignada, u oculta cuando todas
   //    las letras ya tienen su fila. Si ya tiene marcador, lo muestra.
-  // 3. Resto con hayBucle: espacio reservado para alinear columnas.
+  // 3. Resto: espacio reservado (vacío) para alinear columnas.
   if (hayBucle && paso.tipo === "bucle") {
     extra.append(crearIconoBucle(paso));
   } else if (hayBucle && paso.tipo !== "bucle" && elegiblePorMarcador) {
-    const letrasNecesitadas = calcularLetrasNecesitadas(macroArchivo.pasos);
+    const letrasNecesitadas = calcularLetrasNecesitadas(
+      macroArchivo.pasos,
+      indice,
+    );
     const todasCubiertas = letrasNecesitadas.length === 0;
 
     if (paso.marcador || !todasCubiertas) {
@@ -1258,6 +1436,7 @@ function crearFilaPaso(
         crearControlMarcador(
           paso,
           macroArchivo,
+          calcularLetrasDisponiblesParaFila(macroArchivo.pasos, paso, indice),
           letrasNecesitadas,
           guardarYRedibujar,
         ),
@@ -1269,7 +1448,7 @@ function crearFilaPaso(
 
       extra.append(espacio);
     }
-  } else if (hayBucle) {
+  } else {
     const espacio = document.createElement("span");
 
     espacio.className = "popup-macro-editor-marcador-espacio";
@@ -1281,6 +1460,7 @@ function crearFilaPaso(
 
   accion.className = "ui-btn popup-macro-editor-accion";
   accion.textContent = expandido ? "Editando..." : textoAccionPaso(paso);
+  accion.dataset.abierto = String(expandido);
 
   accion.addEventListener("click", (eventoClick) => {
     eventoClick.stopPropagation();
@@ -1405,16 +1585,47 @@ function letraBucleDisponible(pasos: PasoMacro[]): string {
   }
 }
 
-// Letras de Bucles que no tienen ninguna fila con marcador igual a ellas.
-function calcularLetrasNecesitadas(pasos: PasoMacro[]): string[] {
+// Letras de Bucles POSTERIORES a `indice` (spec punto 2: "los
+// bucles solo llevan a filas de número inferior, no superior") que
+// todavía no tienen ninguna fila con marcador igual a ellas.
+function calcularLetrasNecesitadas(
+  pasos: PasoMacro[],
+  indice: number,
+): string[] {
   const marcadoresFila = new Set(
     pasos.map((p) => p.marcador).filter((m): m is string => m !== null),
   );
 
   return pasos
+    .slice(indice + 1)
     .filter((p) => p.tipo === "bucle" && p.bucleMarcadorDestino !== null)
     .map((p) => p.bucleMarcadorDestino as string)
     .filter((letra) => !marcadoresFila.has(letra));
+}
+
+// Letras de Bucle disponibles para ciclar en la fila `indice`: solo
+// las de Bucles POSTERIORES a ella (spec punto 2-A) y que además
+// están libres o ya asignadas a ESTA MISMA fila (spec punto 2-B:
+// "Letras que ya estén agregadas en otras filas" quedan afuera) —
+// en el mismo orden en que aparecen sus Bucles (spec punto 4:
+// "verificar que haga el salto de letras en orden").
+function calcularLetrasDisponiblesParaFila(
+  pasos: PasoMacro[],
+  paso: PasoMacro,
+  indice: number,
+): string[] {
+  const marcadoresOtrasFilas = new Set(
+    pasos
+      .filter((p) => p !== paso)
+      .map((p) => p.marcador)
+      .filter((m): m is string => m !== null),
+  );
+
+  return pasos
+    .slice(indice + 1)
+    .filter((p) => p.tipo === "bucle" && p.bucleMarcadorDestino !== null)
+    .map((p) => p.bucleMarcadorDestino as string)
+    .filter((letra) => !marcadoresOtrasFilas.has(letra));
 }
 
 // ======================================================
@@ -1441,14 +1652,22 @@ function crearIconoBucle(paso: PasoMacro): HTMLElement {
 // ======================================================
 // 🔤 CONTROL DE MARCADOR (columna condicional — filas no-Bucle)
 // ------------------------------------------------------
-// Click cicla entre letras de Bucles que necesitan fila asignada.
-// Primer click: primera letra necesitada. Siguiente: siguiente.
-// Cuando se agotan o el paso ya tenía la última: vuelve a ○.
+// Click cicla, EN ORDEN, entre las letras de Bucle DISPONIBLES para
+// esta fila (spec punto 2: solo Bucles POSTERIORES a ella — "los
+// bucles solo llevan a filas de número inferior, no superior" — y
+// libres o ya asignadas a esta misma fila — "letras que ya estén
+// agregadas en otras filas" quedan afuera del ciclo, spec punto 4:
+// "verificar que haga el salto de letras en orden", "ahora se
+// salta letras de bucles que no han sido asignados"). Primer click:
+// primera letra disponible. Siguiente click: la siguiente de esa
+// misma lista. Al llegar al final, vuelve a ○ (spec: "falta que
+// vuelva al círculo").
 // ======================================================
 
 function crearControlMarcador(
   paso: PasoMacro,
   macroArchivo: MacroArchivo,
+  letrasDisponibles: string[],
   letrasNecesitadas: string[],
   guardarYRedibujar: () => void,
 ): HTMLElement {
@@ -1470,21 +1689,19 @@ function crearControlMarcador(
     evento.stopPropagation();
 
     if (paso.marcador) {
-      // Ciclar a la siguiente letra necesitada, o volver a ○.
-      const indiceActual = letrasNecesitadas.indexOf(paso.marcador);
-      const siguiente = letrasNecesitadas[indiceActual + 1] ?? null;
+      // Ciclar a la siguiente letra DISPONIBLE para esta fila (en
+      // orden de aparición de los Bucles), no solo entre las libres
+      // a secas — ver calcularLetrasDisponiblesParaFila.
+      const indiceActual = letrasDisponibles.indexOf(paso.marcador);
+      const siguiente = letrasDisponibles[indiceActual + 1] ?? null;
 
-      if (siguiente === null) {
-        // Quitar: cualquier Bucle que apuntaba acá vuelve a sin
-        // destino visible (la letra en el Bucle se mantiene, pero
-        // la fila ya no la cubre).
-        paso.marcador = null;
-      } else {
-        paso.marcador = siguiente;
-      }
+      paso.marcador = siguiente;
     } else {
-      // Asignar primera letra necesitada disponible.
-      paso.marcador = letrasNecesitadas[0] ?? null;
+      // Asignar la primera letra que todavía necesita fila; si no
+      // queda ninguna libre (no debería llegar acá — el llamador ya
+      // oculta el círculo en ese caso), cae a la primera disponible
+      // para esta fila.
+      paso.marcador = letrasNecesitadas[0] ?? letrasDisponibles[0] ?? null;
     }
 
     guardarYRedibujar();
@@ -1543,7 +1760,17 @@ function crearMenuAsa(
   botonDuplicar.textContent = "Duplicar";
 
   botonDuplicar.addEventListener("click", () => {
-    macroArchivo.pasos.splice(indice + 1, 0, clonarPasoMacro(paso));
+    const nuevoPaso = clonarPasoMacro(paso);
+
+    // Duplicar un Bucle crea un Bucle limpio (spec punto 4): sin la
+    // letra del original — clonarPasoMacro ya la vació — y con una
+    // letra propia nueva, igual que al crear un Bucle desde el
+    // panel Funciones (ver crearPanelFunciones).
+    if (nuevoPaso.tipo === "bucle") {
+      nuevoPaso.bucleMarcadorDestino = letraBucleDisponible(macroArchivo.pasos);
+    }
+
+    macroArchivo.pasos.splice(indice + 1, 0, nuevoPaso);
 
     guardarConDebounce(macroArchivo);
     cerrarMenu();

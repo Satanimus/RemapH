@@ -319,6 +319,12 @@ export function crearPasoMacro(tipo: TipoPasoMacro): PasoMacro {
 // clonar un paso internamente. El duplicado nunca hereda el
 // marcador del original (ver spec) — a qué paso volvería el
 // Bucle quedaría ambiguo con dos pasos marcados igual.
+//
+// Si el paso es un Bucle, tampoco hereda su letra propia
+// (bucleMarcadorDestino) ni la cantidad de veces recorridas en
+// memoria — el duplicado nace como un Bucle limpio, con una letra
+// nueva (asignada por el llamador, ver botonDuplicar en
+// comp_popup_macro_editor.ts) y sin destino todavía elegido.
 // ======================================================
 
 export function clonarPasoMacro(paso: PasoMacro): PasoMacro {
@@ -326,6 +332,9 @@ export function clonarPasoMacro(paso: PasoMacro): PasoMacro {
     ...paso,
 
     marcador: null,
+
+    bucleMarcadorDestino:
+      paso.tipo === "bucle" ? null : paso.bucleMarcadorDestino,
 
     teclaAccion: {
       ...paso.teclaAccion,

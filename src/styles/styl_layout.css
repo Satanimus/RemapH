@@ -940,8 +940,12 @@
 .popup-macro-editor {
     min-width: 640px;
     max-width: 1100px;
+    min-height: 420px;
+    max-height: 90vh;
     resize: both;
-    overflow: auto;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
 }
 
 .popup-macro-editor-titulo {
@@ -1008,6 +1012,7 @@
    ====================================================== */
 
 .popup-macro-editor-pie {
+    flex: 0 0 auto;
     display: flex;
     justify-content: flex-end;
     gap: var(--gap8);
@@ -1050,14 +1055,17 @@
    ====================================================== */
 
 .popup-macro-editor-cuerpo {
+    flex: 1 1 auto;
+    min-height: 0;
     display: flex;
-    align-items: flex-start;
+    align-items: stretch;
     gap: var(--gap12);
 }
 
 .popup-macro-editor-columna-derecha {
     flex: 1;
     min-width: 0;
+    min-height: 0;
     display: flex;
     flex-direction: column;
     gap: var(--gap4);
@@ -1066,6 +1074,8 @@
 .popup-macro-funciones {
     flex: 0 0 auto;
     width: 120px;
+    min-height: 0;
+    overflow-y: auto;
     display: flex;
     flex-direction: column;
     gap: var(--gap8);
@@ -1100,9 +1110,17 @@
    ====================================================== */
 
 .popup-macro-editor-header {
+    flex: 0 0 auto;
     display: flex;
     align-items: center;
-    padding: 0 var(--gap4);
+    gap: var(--gap8);
+    /* Mismo padding que .popup-macro-editor-lista (var(--gap4)) +
+       .popup-macro-editor-paso (var(--gap4)) sumados, para que las
+       columnas de esta fila caigan exactamente en la misma posición
+       horizontal que las de .popup-macro-editor-paso-fila más abajo
+       (ambas viven dentro del mismo padding acumulado de la lista). */
+    padding: 0 calc(var(--gap4) * 2);
+    margin-bottom: var(--gap4);
     color: var(--text-soft);
     font-size: var(--fs11);
     font-weight: 600;
@@ -1115,20 +1133,49 @@
     text-overflow: ellipsis;
 }
 
-.popup-macro-col-header[data-columna="asa"] {
-    width: var(--col-asa-width);
-}
-
 .popup-macro-col-header[data-columna="numero"] {
+    flex: 0 0 auto;
     width: var(--col-numero-width);
 }
 
+.popup-macro-col-header[data-columna="asa"] {
+    flex: 0 0 auto;
+    width: var(--col-asa-width);
+}
+
 .popup-macro-col-header[data-columna="tipo"] {
+    flex: 0 0 auto;
     width: var(--col-tipo-width);
 }
 
+/* Espacio reservado para la columna Marcador (círculo/letra de
+   Bucle) que vive DENTRO de la celda Extra de cada fila, antes del
+   botón de acción — ver .popup-macro-editor-extra. Mismo ancho +
+   gap que .ui-btn.popup-macro-editor-marcador, así el título "Extra"
+   arranca exactamente donde arranca el texto del botón de acción de
+   la fila, esté o no la macro usando Bucles. Se agrega SIEMPRE
+   (aunque la columna Marcador no exista sin Bucles) para que el
+   ancho de "Extra" no dependa de si hay Bucles o no.
+   */
+.popup-macro-col-header-marcador {
+    flex: 0 0 auto;
+    width: 22px;
+    /* El gap del contenedor (--gap8) es el que separa numero/asa/
+       tipo/extra en la fila real. Pero DENTRO de la celda Extra de
+       la fila, marcador↔botón usan --gap4 (.popup-macro-editor-extra).
+       Se corrige acá restando la diferencia del lado derecho de esta
+       celda fantasma para que el próximo gap efectivo sea --gap4. */
+    margin-right: calc(var(--gap4) - var(--gap8));
+}
+
 .popup-macro-col-header[data-columna="extra"] {
-    width: var(--col-extra-width);
+    /* Restar el ancho + gap reservados por
+       .popup-macro-col-header-marcador (22px + gap4, mismo gap que
+       .popup-macro-editor-extra), así el TEXTO "Extra" arranca
+       alineado con el texto del botón de acción de la fila (que va
+       después del marcador dentro de la misma celda flex), no con
+       el borde izquierdo de la celda completa. */
+    width: calc(var(--col-extra-width) - 22px - var(--gap4));
     min-width: 20px;
     flex: 0 0 auto;
     text-align: left;
@@ -1137,6 +1184,7 @@
 .popup-macro-col-header[data-columna="nota"] {
     flex: 1;
     min-width: 0;
+    text-align: left;
 }
 
 .popup-macro-col-resizer {
@@ -1158,10 +1206,11 @@
    ====================================================== */
 
 .popup-macro-editor-lista {
+    flex: 1 1 auto;
+    min-height: 80px;
     display: flex;
     flex-direction: column;
     gap: var(--gap4);
-    max-height: 360px;
     overflow-y: auto;
     padding: var(--gap4);
     background: var(--bg);
@@ -1220,6 +1269,18 @@
     border-color: var(--tag-cyan);
 }
 
+/* Sin esto, la regla genérica .ui-btn:hover (color: var(--text))
+   pisa el color de la letra al pasar el mouse — sobre el fondo
+   cyan del marcador activo queda con muy poco contraste (spec
+   punto 4: "la letra debe tomar color Cyan, sino no se ve"). Se
+   invierte a fondo transparente + letra cyan, mismo criterio visual
+   que el ícono de Bucle (data-es-bucle="true") de acá arriba. */
+.ui-btn.popup-macro-editor-marcador[data-activo="true"]:hover {
+    color: var(--tag-cyan);
+    background: transparent;
+    border-color: var(--tag-cyan);
+}
+
 .ui-btn.popup-macro-editor-marcador[data-es-bucle="true"] {
     color: var(--tag-cyan);
     background: transparent;
@@ -1254,9 +1315,60 @@
     justify-content: flex-start;
 }
 
+/* ======================================================
+   🟦 POPUPS ANIDADOS UNIFICADOS (Opción ⋮ / Tipo / Extra —
+   spec punto 3)
+   ------------------------------------------------------
+   Los tres comparten la misma estructura visual: fondo gris
+   (.popup-caja-interna), alineados con el borde izquierdo de la
+   fila (mismo offset que .popup-macro-editor-detalle), y solo uno
+   puede estar abierto a la vez (ver idMenuAbierto/idPasoExpandido
+   en comp_popup_macro_editor.ts). El botón que abrió el popup
+   activo queda con borde cyan mientras dure (data-abierto="true").
+   ====================================================== */
+
+/* ======================================================
+   🟦 POPUPS ANIDADOS UNIFICADOS (Opción ⋮ / Tipo / Extra —
+   spec punto 3-4)
+   ------------------------------------------------------
+   Los tres comparten la misma estructura visual: fondo gris
+   (.popup-caja-interna), pegados al borde izquierdo real de la
+   fila (bajo la columna #), y solo uno puede estar abierto a la
+   vez (ver idMenuAbierto/idPasoExpandido en
+   comp_popup_macro_editor.ts). El botón que abrió el popup activo
+   queda con borde cyan mientras dure (data-abierto="true").
+   ------------------------------------------------------
+   BUG previo (spec punto 3, "queda a 3/4 del botón Opciones"): acá
+   se declaraba margin-left: calc(--col-asa-width + --col-numero-width)
+   para las tres, pero .popup-lista (styl_botones.css, clase que SOLO
+   llevan Opciones/Tipo) trae margin:0 y styl_botones.css se importa
+   DESPUÉS de este archivo (ver styles.css) — con igual especificidad
+   (una clase), ese margin:0 ganaba la cascada y pisaba el
+   margin-left de acá. Opciones/Tipo terminaban en 0 mientras Extra
+   (sin la clase popup-lista) sí quedaba desplazado. Ahora las tres
+   declaran margin-left: 0 explícito, sin depender del orden de los
+   @import.
+   ====================================================== */
+
 .popup-macro-editor-menu-asa {
-    align-self: flex-start;
-    margin-left: var(--col-asa-width);
+    margin-left: 0;
+    /* Llega desde el borde izquierdo hasta el separador Extra↔Nota
+       (spec punto 4), no hasta el borde derecho de la tabla: mismo
+       ancho acumulado que numero+asa+tipo+extra en la fila real,
+       con sus 3 gaps intermedios (numero↔asa, asa↔tipo, tipo↔extra
+       — .popup-macro-editor-paso-fila usa gap: var(--gap8)). */
+    width: calc(var(--col-numero-width) + var(--col-asa-width) + var(--col-tipo-width) + var(--col-extra-width) + (var(--gap8) * 3));
+    box-sizing: border-box;
+    padding: var(--gap8);
+    background: var(--bg);
+    border: 1px solid var(--border-light);
+    border-radius: var(--r4);
+}
+
+.ui-btn.popup-macro-editor-asa[data-abierto="true"],
+.ui-btn.popup-macro-editor-tipo[data-abierto="true"],
+.ui-btn.popup-macro-editor-accion[data-abierto="true"] {
+    border-color: var(--tag-cyan);
 }
 
 .popup-macro-editor-eliminar {
@@ -1269,7 +1381,12 @@
 }
 
 .popup-macro-editor-detalle {
-    margin-left: calc(var(--col-asa-width) + var(--col-numero-width));
+    margin-left: 0;
+    /* Mismo criterio de ancho que .popup-macro-editor-menu-asa (spec
+       punto 4): llega hasta el separador Extra↔Nota, no hasta el
+       borde derecho de la tabla. */
+    width: calc(var(--col-numero-width) + var(--col-asa-width) + var(--col-tipo-width) + var(--col-extra-width) + (var(--gap8) * 3));
+    box-sizing: border-box;
     display: flex;
     flex-direction: column;
     gap: var(--gap8);
