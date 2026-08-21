@@ -428,6 +428,26 @@ pub fn guardar_dispositivo_mouse(device: i32) -> Result<(), String> {
 }
 
 // ======================================================
+// 🔀 MODO DE MOTOR
+// ======================================================
+
+const CLAVE_MODO_MOTOR: &str = "motor.modo";
+
+pub fn guardar_modo_motor(modo: &str) -> Result<(), String> {
+    let mut mapa = leer_mapa_completo()?;
+
+    mapa.insert(CLAVE_MODO_MOTOR.to_string(), modo.to_string());
+
+    escribir_mapa_completo(&mapa)
+}
+
+pub fn leer_modo_motor() -> Result<Option<String>, String> {
+    let mapa = leer_mapa_completo()?;
+
+    Ok(mapa.get(CLAVE_MODO_MOTOR).map(|v| v.trim().to_string()))
+}
+
+// ======================================================
 // 🔢 PARSEO DE VALORES
 // ======================================================
 

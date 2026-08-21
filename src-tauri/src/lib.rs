@@ -48,6 +48,12 @@ mod usuario;
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 
 pub fn run() {
+    // Carga el modo de motor guardado en Configuracion_Usuario.txt
+    // antes de arrancar el hilo de entrada — si el usuario eligió
+    // Portable en la sesión anterior, el backend correcto arranca
+    // desde el primer evento físico.
+    motor::cargar_modo_desde_config();
+
     // El punto único de despacho (motor.rs) decide, según el modo
     // activo, si arranca back_interception (con su propia precarga
     // de dispositivo primario) o back_windows — ver motor::iniciar().

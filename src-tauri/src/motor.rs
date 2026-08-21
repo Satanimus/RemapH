@@ -25,12 +25,18 @@
 // o back_windows::emitir_evento().
 // El futuro flujo de cambio de modo (Etapa D) llama
 // motor::establecer_modo().
+// lib.rs llama motor::cargar_modo_desde_config() al
+// arrancar, antes del hilo de entrada.
 // ------------------------------------------------------
 // 3. ¿Qué información recibe?
 // iniciar(procesar, debe_tragar_no_traducible): misma firma
 // que back_interception::iniciar()/back_windows::iniciar().
 // emitir_evento(evento): un InputEvent completo.
 // establecer_modo(modo): un Modo (Interception o Portable).
+// guardar_modo(modo): un Modo — persiste a disco además de
+//     actualizar en memoria.
+// cargar_modo_desde_config(): sin parámetros — lee disco y
+//     actualiza el modo en memoria si corresponde.
 // ------------------------------------------------------
 // 4. ¿Qué información entrega?
 // modo_activo() -> Modo: el modo actualmente activo.
@@ -39,9 +45,17 @@
 // 5. Funciones del archivo
 // modo_activo() / establecer_modo(modo)
 //     Getter/setter del modo activo en memoria (Modo::
-//     Interception por defecto). Solo el valor — sin
-//     persistir a disco (Etapa C) ni cortar/arrancar
-//     backends en caliente (Etapa D).
+//     Interception por defecto).
+// guardar_modo(modo)
+//     Llama establecer_modo() y persiste el valor a disco
+//     vía configuracion_usuario::guardar_modo_motor().
+//     Imprime warning por stderr si falla el guardado.
+// cargar_modo_desde_config()
+//     Lee configuracion_usuario::leer_modo_motor() y llama
+//     establecer_modo(Modo::Portable) solo si el valor
+//     guardado es "Portable". Cualquier otro valor
+//     (incluyendo ausencia o desconocido) deja el default
+//     Modo::Interception sin tocarlo.
 // iniciar(procesar, debe_tragar_no_traducible)
 //     Según modo_activo(), llama a back_interception::
 //     iniciar() (con precargar_desde_config() antes) o a
@@ -54,7 +68,7 @@
 use std::sync::atomic::{AtomicU8, Ordering};
 
 use crate::eventos::InputEvent;
-use crate::{back_interception, back_windows};
+use crate::{back_interception, back_windows, configuracion_usuario};
 
 // ======================================================
 // 🔀 MODO
@@ -79,9 +93,6 @@ pub fn modo_activo() -> Modo {
     }
 }
 
-// (Nota: solo cambia el valor en memoria — sin persistir a
-// disco (Etapa C) ni disparar el corte/arranque de backends
-// en caliente (Etapa D). Acá es un simple getter/setter.)
 pub fn establecer_modo(modo: Modo) {
     let valor = match modo {
         Modo::Interception => 0,
@@ -89,6 +100,39 @@ pub fn establecer_modo(modo: Modo) {
     };
 
     MODO_ACTIVO.store(valor, Ordering::SeqCst);
+}
+
+// ======================================================
+// 💾 GUARDAR MODO
+// ======================================================
+
+pub fn guardar_modo(modo: Modo) {
+    establecer_modo(modo);
+
+    let clave = match modo {
+        Modo::Interception => "Interception",
+        Modo::Portable => "Portable",
+    };
+
+    if let Err(e) = configuracion_usuario::guardar_modo_motor(clave) {
+        eprintln!("⚠️ No se pudo guardar el modo de motor: {}", e);
+    }
+}
+
+// ======================================================
+// 📂 CARGAR MODO DESDE CONFIG
+// ======================================================
+
+pub fn cargar_modo_desde_config() {
+    match configuracion_usuario::leer_modo_motor() {
+        Ok(Some(valor)) if valor == "Portable" => {
+            establecer_modo(Modo::Portable);
+        }
+        _ => {
+            // Ausencia, valor desconocido o error: deja Interception
+            // (el default de MODO_ACTIVO) sin tocarlo.
+        }
+    }
 }
 
 // ======================================================
