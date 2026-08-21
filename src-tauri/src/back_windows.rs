@@ -99,21 +99,25 @@
 //     los flags del botón/rueda correspondiente.
 // emitir_teclado() [privada]
 //     Construye y envía un KEYBDINPUT (down o up).
+// vk_desde_interno() [privada]
+//     Nombre interno (InputId) → Option<u16> con el VK
+//     real a usar en wVk, vía pulsadores::interno_a_nativo().
+// es_extendida() [privada]
+//     VK → bool. Marca los VK que Windows considera
+//     "extendidos" (ver KEYEVENTF_EXTENDEDKEY más abajo).
+// enviar_tecla() [privada]
+//     Construye y envía un KEYBDINPUT (down o up),
+//     agregando KEYEVENTF_EXTENDEDKEY cuando corresponde.
 // emitir_mouse() [privada]
 //     Construye y envía un MOUSEINPUT (botón o rueda).
 // emitir_mouse_button() [privada]
 //     Construye y envía un MOUSEINPUT para un botón
 //     con los flags dados.
-// teclado_control() [privada]
-//     vkCode → Option<String> (nombre interno del
-//     control), consultando pulsadores::por_nativo().
-// interno_nativo() [privada]
-//     Nombre interno → Option<String> con el código
-//     nativo Windows ("0xXX"), vía
-//     pulsadores::interno_a_nativo().
 // mouse_flags() [privada]
 //     Nombre interno del control → Option<(u32, u32)>
 //     con los flags de down y up para MOUSEINPUT.
+// enviar_rueda() [privada]
+//     Construye y envía un MOUSEINPUT de rueda.
 // enviar() [privada]
 //     Llama SendInput con un INPUT ya construido.
 // ------------------------------------------------------
@@ -137,7 +141,6 @@
 // ======================================================
 
 use crate::eventos::InputEvent;
-use crate::instante;
 use crate::pulsadores;
 use std::cell::RefCell;
 use std::mem::size_of;
@@ -146,10 +149,10 @@ use std::sync::atomic::{AtomicU32, Ordering};
 use windows_sys::Win32::Foundation::{LPARAM, LRESULT, WPARAM};
 
 use windows_sys::Win32::UI::Input::KeyboardAndMouse::{
-    SendInput, INPUT, INPUT_0, INPUT_KEYBOARD, INPUT_MOUSE, KEYBDINPUT, KEYEVENTF_KEYUP,
-    MOUSEEVENTF_LEFTDOWN, MOUSEEVENTF_LEFTUP, MOUSEEVENTF_MIDDLEDOWN, MOUSEEVENTF_MIDDLEUP,
-    MOUSEEVENTF_RIGHTDOWN, MOUSEEVENTF_RIGHTUP, MOUSEEVENTF_WHEEL, MOUSEEVENTF_XDOWN,
-    MOUSEEVENTF_XUP, MOUSEINPUT,
+    SendInput, INPUT, INPUT_0, INPUT_KEYBOARD, INPUT_MOUSE, KEYBDINPUT, KEYEVENTF_EXTENDEDKEY,
+    KEYEVENTF_KEYUP, MOUSEEVENTF_LEFTDOWN, MOUSEEVENTF_LEFTUP, MOUSEEVENTF_MIDDLEDOWN,
+    MOUSEEVENTF_MIDDLEUP, MOUSEEVENTF_RIGHTDOWN, MOUSEEVENTF_RIGHTUP, MOUSEEVENTF_WHEEL,
+    MOUSEEVENTF_XDOWN, MOUSEEVENTF_XUP, MOUSEINPUT,
 };
 
 use windows_sys::Win32::UI::WindowsAndMessaging::{
@@ -349,17 +352,12 @@ unsafe extern "system" fn hook_mouse(codigo: i32, wparam: WPARAM, lparam: LPARAM
 
 fn evaluar(evento: InputEvent) -> bool {
     let mut procesar: Option<Box<dyn FnMut(InputEvent)>> = None;
+    let mut debe_tragar_no_traducible: Option<Box<dyn Fn() -> bool>> = None;
 
     ESTADO.with(|estado| {
         if let Some(actual) = estado.borrow_mut().take() {
             procesar = Some(actual.procesar);
-
-            // Devolver el estado sin el procesador temporalmente
-            // (se restaura abajo)
-            *estado.borrow_mut() = Some(Estado {
-                procesar: Box::new(|_| {}),
-                debe_tragar_no_traducible: actual.debe_tragar_no_traducible,
-            });
+            debe_tragar_no_traducible = Some(actual.debe_tragar_no_traducible);
         }
     });
 
@@ -373,17 +371,14 @@ fn evaluar(evento: InputEvent) -> bool {
     // TODO (Etapa B): cuando el punto de despacho unificado esté
     // listo, ajustar si procesar() necesita retornar bool aquí
     // para bloquear eventos.
-    if let Some(mut f) = procesar {
+    if let (Some(mut f), Some(pred)) = (procesar, debe_tragar_no_traducible) {
         f(evento);
 
         ESTADO.with(|estado| {
-            let mut guard = estado.borrow_mut();
-            if let Some(actual) = guard.take() {
-                *guard = Some(Estado {
-                    procesar: f,
-                    debe_tragar_no_traducible: actual.debe_tragar_no_traducible,
-                });
-            }
+            *estado.borrow_mut() = Some(Estado {
+                procesar: f,
+                debe_tragar_no_traducible: pred,
+            });
         });
     }
 
@@ -400,9 +395,9 @@ fn traducir_teclado(vk: u32, presionado: bool) -> Option<InputEvent> {
     let input = InputId::new("keyboard", &pulsador.interno);
 
     if presionado {
-        Some(InputEvent::down(input, instante::ahora()))
+        Some(InputEvent::down(input))
     } else {
-        Some(InputEvent::up(input, instante::ahora()))
+        Some(InputEvent::up(input))
     }
 }
 
@@ -421,9 +416,9 @@ fn traducir_mouse(mensaje: WPARAM, datos: &MSLLHOOKSTRUCT) -> Option<InputEvent>
             "0x020A_DOWN"
         };
         let pulsador = pulsadores::por_nativo(nativo)?;
-        return Some(InputEvent::pulse(
+        return Some(InputEvent::pulse_con_magnitud(
             InputId::new("mouse", &pulsador.interno),
-            instante::ahora(),
+            delta,
         ));
     }
 
@@ -444,11 +439,9 @@ fn traducir_mouse(mensaje: WPARAM, datos: &MSLLHOOKSTRUCT) -> Option<InputEvent>
 
     match mensaje {
         WM_LBUTTONDOWN | WM_RBUTTONDOWN | WM_MBUTTONDOWN | WM_XBUTTONDOWN => {
-            Some(InputEvent::down(input, instante::ahora()))
+            Some(InputEvent::down(input))
         }
-        WM_LBUTTONUP | WM_RBUTTONUP | WM_MBUTTONUP | WM_XBUTTONUP => {
-            Some(InputEvent::up(input, instante::ahora()))
-        }
+        WM_LBUTTONUP | WM_RBUTTONUP | WM_MBUTTONUP | WM_XBUTTONUP => Some(InputEvent::up(input)),
         _ => None,
     }
 }
@@ -456,12 +449,201 @@ fn traducir_mouse(mensaje: WPARAM, datos: &MSLLHOOKSTRUCT) -> Option<InputEvent>
 // ======================================================
 // 📤 EMITIR EVENTO
 // ======================================================
+//
+// InputEvent → INPUT(s) físicos vía SendInput. Sin
+// concepto de "dispositivo destino" — SendInput inyecta a
+// nivel de sistema (ver Regla 6 del plan de Modo Portable),
+// a diferencia de back_interception::emitir_evento() que
+// manda a un Device puntual (teclado_primario()/mouse_
+// primario()).
+// ======================================================
 
 pub fn emitir_evento(evento: InputEvent) {
-    // Implementado en A4
-    let _ = evento;
+    match evento.input.fuente() {
+        Some("keyboard") => emitir_teclado(&evento),
+        Some("mouse") => emitir_mouse(&evento),
+        _ => {}
+    }
 }
 
 // ======================================================
-// (resto de funciones de salida — A4)
+// 🎹 EMITIR TECLADO
 // ======================================================
+
+fn emitir_teclado(evento: &InputEvent) {
+    let Some(vk) = vk_desde_interno(evento) else {
+        return;
+    };
+
+    match evento.state {
+        InputState::Down => enviar_tecla(vk, false),
+        InputState::Up => enviar_tecla(vk, true),
+        InputState::Pulse => {
+            enviar_tecla(vk, false);
+            enviar_tecla(vk, true);
+        }
+    }
+}
+
+fn vk_desde_interno(evento: &InputEvent) -> Option<u16> {
+    let interno = evento.input.control()?;
+    let nativo = pulsadores::interno_a_nativo(interno)?;
+
+    nativo
+        .strip_prefix("0x")
+        .and_then(|valor| u16::from_str_radix(valor, 16).ok())
+}
+
+// ======================================================
+// 🧩 ES_EXTENDIDA
+// ------------------------------------------------------
+// VK que Windows considera parte del "grupo extendido"
+// (ver KEYBDINPUT/KEYEVENTF_EXTENDEDKEY en MSDN): Ctrl/Alt
+// derecho, el bloque de navegación (Inicio/Fin/RePág/AvPág/
+// flechas/Insert/Supr), Impr Pant, Num Lock, la tecla Win, y
+// el "/" del numpad (Divide). Sin esto, SendInput con solo
+// wVk las manda como si fueran su par no-extendido (ej. el
+// numpad), igual que el problema que Regla 7/TABLA_EXTENDIDA
+// resuelve del lado de back_teclas.rs para Interception —acá
+// no hace falta una tabla de ambigüedad porque el VK ya es
+// único por tecla (ver columna "nativo" de pulsadores.tsv);
+// solo falta marcar el flag para que Windows la trate igual
+// que la manda un teclado físico real.
+// ======================================================
+
+fn es_extendida(vk: u16) -> bool {
+    matches!(
+        vk,
+        0x21..=0x28 // RePág, AvPág, Fin, Inicio, Izquierda, Arriba, Derecha, Abajo
+            | 0x2C..=0x2E // Impr Pant, Insert, Supr
+            | 0x5B // Win (LeftMeta)
+            | 0x6F // Divide (Numpad /)
+            | 0x90 // Num Lock
+            | 0xA3 // Ctrl derecho
+            | 0xA5 // Alt derecho
+    )
+}
+
+fn enviar_tecla(vk: u16, arriba: bool) {
+    let flags = match (es_extendida(vk), arriba) {
+        (true, true) => KEYEVENTF_EXTENDEDKEY | KEYEVENTF_KEYUP,
+        (true, false) => KEYEVENTF_EXTENDEDKEY,
+        (false, true) => KEYEVENTF_KEYUP,
+        (false, false) => 0,
+    };
+
+    let input = INPUT {
+        r#type: INPUT_KEYBOARD,
+        Anonymous: INPUT_0 {
+            ki: KEYBDINPUT {
+                wVk: vk,
+                wScan: 0,
+                dwFlags: flags,
+                time: 0,
+                dwExtraInfo: 0,
+            },
+        },
+    };
+
+    enviar(input);
+}
+
+// ======================================================
+// 🖱️ EMITIR MOUSE
+// ======================================================
+
+fn emitir_mouse(evento: &InputEvent) {
+    let Some(control) = evento.input.control() else {
+        return;
+    };
+
+    if control == "WheelUp" || control == "WheelDown" {
+        // Si el evento trae magnitud real (rueda física, ver
+        // traducir_mouse()/InputEvent::pulse_con_magnitud), se
+        // reenvía tal cual entró — igual criterio que
+        // back_interception::emitir_mouse(). Si no trae magnitud
+        // (evento sintético de una Acción remapeada), se usa el
+        // valor fijo de siempre (120/-120).
+        let signo: i32 = if control == "WheelUp" { 1 } else { -1 };
+        let cantidad = evento.magnitud.map(|m| m as i32).unwrap_or(signo * 120);
+
+        enviar_rueda(cantidad);
+        return;
+    }
+
+    let Some((down, up)) = mouse_flags(control) else {
+        return;
+    };
+
+    match evento.state {
+        InputState::Down => enviar_mouse_button(control, down),
+        InputState::Up => enviar_mouse_button(control, up),
+        InputState::Pulse => {
+            enviar_mouse_button(control, down);
+            enviar_mouse_button(control, up);
+        }
+    }
+}
+
+fn mouse_flags(control: &str) -> Option<(u32, u32)> {
+    match control {
+        "LeftButton" => Some((MOUSEEVENTF_LEFTDOWN, MOUSEEVENTF_LEFTUP)),
+        "RightButton" => Some((MOUSEEVENTF_RIGHTDOWN, MOUSEEVENTF_RIGHTUP)),
+        "MiddleButton" => Some((MOUSEEVENTF_MIDDLEDOWN, MOUSEEVENTF_MIDDLEUP)),
+        "Button4" => Some((MOUSEEVENTF_XDOWN, MOUSEEVENTF_XUP)),
+        "Button5" => Some((MOUSEEVENTF_XDOWN, MOUSEEVENTF_XUP)),
+        _ => None,
+    }
+}
+
+fn enviar_mouse_button(control: &str, flags: u32) {
+    let mouse_data = match control {
+        "Button4" => 1,
+        "Button5" => 2,
+        _ => 0,
+    };
+
+    let input = INPUT {
+        r#type: INPUT_MOUSE,
+        Anonymous: INPUT_0 {
+            mi: MOUSEINPUT {
+                dx: 0,
+                dy: 0,
+                mouseData: mouse_data,
+                dwFlags: flags,
+                time: 0,
+                dwExtraInfo: 0,
+            },
+        },
+    };
+
+    enviar(input);
+}
+
+fn enviar_rueda(cantidad: i32) {
+    let input = INPUT {
+        r#type: INPUT_MOUSE,
+        Anonymous: INPUT_0 {
+            mi: MOUSEINPUT {
+                dx: 0,
+                dy: 0,
+                mouseData: cantidad as u32,
+                dwFlags: MOUSEEVENTF_WHEEL,
+                time: 0,
+                dwExtraInfo: 0,
+            },
+        },
+    };
+
+    enviar(input);
+}
+
+// ======================================================
+// 📤 SEND INPUT
+// ======================================================
+
+fn enviar(input: INPUT) {
+    unsafe {
+        SendInput(1, &input, size_of::<INPUT>() as i32);
+    }
+}

@@ -17,6 +17,7 @@ mod back_portapapeles;
 mod back_portapapeles_captura;
 mod back_registro;
 mod back_teclas;
+mod back_windows;
 mod cache;
 mod captura_coordenada;
 mod comandos;
