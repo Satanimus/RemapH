@@ -475,6 +475,28 @@ pub fn emitir_evento(evento: InputEvent) {
 // ======================================================
 
 fn emitir_teclado(evento: &InputEvent) {
+    // Caso especial por paridad estructural con
+    // back_interception.rs::emitir_teclado (mismo chequeo sobre
+    // evento.input.control()) — pero la mecánica de fake-shift de la
+    // Regla 7 no aplica acá: esa mecánica existe solo porque
+    // Interception opera en Set 1/Set 2 crudo, donde Impr Pant sin el
+    // par fake-shift+tecla no se traduce a nada (ver comentario en
+    // back_interception.rs, líneas 513-521). SendInput ya traduce
+    // Impr Pant correctamente como una tecla suelta más, vía el wVk
+    // real (0x2C) + KEYEVENTF_EXTENDEDKEY (ver es_extendida()).
+    if evento.input.control() == Some("PrintScreen") {
+        match evento.state {
+            InputState::Down => enviar_tecla(0x2C, false),
+            InputState::Up => enviar_tecla(0x2C, true),
+            InputState::Pulse => {
+                enviar_tecla(0x2C, false);
+                enviar_tecla(0x2C, true);
+            }
+        }
+
+        return;
+    }
+
     let Some(vk) = vk_desde_interno(evento) else {
         return;
     };

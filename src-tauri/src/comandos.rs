@@ -140,6 +140,7 @@ use crate::macro_cache;
 use crate::macro_json::MacroArchivoJson;
 use crate::macro_usuario;
 use crate::macros;
+use crate::motor;
 use crate::perfil;
 use crate::perfil_ui::{
     convertir_perfil, ItemFilaUI, ResultadoPerfil, ResultadoPerfilInicial, TriggerCapturaUI,
@@ -1474,4 +1475,26 @@ pub fn configuracion_refrescar_ventanas_apariencia(app: tauri::AppHandle) {
 
         let _ = ventana.eval("window.location.reload();");
     }
+}
+
+// ======================================================
+// 🛠️ MOTOR — MODO PORTABLE / INTERCEPTION (Etapa F)
+// ======================================================
+
+#[tauri::command]
+pub fn motor_obtener_modo() -> String {
+    match motor::modo_activo() {
+        motor::Modo::Interception => "Interception".to_string(),
+        motor::Modo::Portable => "Portable".to_string(),
+    }
+}
+
+#[tauri::command]
+pub fn motor_solicitar_cambio_modo(modo: String) {
+    let modo = match modo.as_str() {
+        "Portable" => motor::Modo::Portable,
+        _ => motor::Modo::Interception,
+    };
+
+    motor::solicitar_cambio_modo(modo);
 }

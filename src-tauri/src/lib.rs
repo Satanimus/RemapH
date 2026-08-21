@@ -181,6 +181,8 @@ pub fn run() {
             comandos::configuracion_cargar_tema,
             comandos::obtener_overrides_apariencia,
             comandos::configuracion_refrescar_ventanas_apariencia,
+            comandos::motor_obtener_modo,
+            comandos::motor_solicitar_cambio_modo,
         ])
         .build(tauri::generate_context!())
         .expect("error al construir Tauri")

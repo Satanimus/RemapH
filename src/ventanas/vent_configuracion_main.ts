@@ -29,6 +29,8 @@ import { invoke } from "@tauri-apps/api/core";
 
 import { aplicarOverridesApariencia } from "../core/core_apariencia";
 
+import { confirmarCambioModo } from "../componentes/comp_popup_confirmar_modo";
+
 import "../styles/styl_variables.css";
 import "../styles/styl_general.css";
 import "../styles/styl_configuracion.css";
@@ -100,8 +102,9 @@ tabs.className = "configuracion-tabs";
 const tabGeneral = crearBotonTab("General", true);
 const tabApariencia = crearBotonTab("Apariencia", false);
 const tabTeclas = crearBotonTab("Teclas", false);
+const tabAvanzado = crearBotonTab("Avanzado", false);
 
-tabs.append(tabGeneral, tabApariencia, tabTeclas);
+tabs.append(tabGeneral, tabApariencia, tabTeclas, tabAvanzado);
 
 const cuerpo = document.createElement("div");
 cuerpo.className = "configuracion-cuerpo";
@@ -115,7 +118,10 @@ panelApariencia.className = "configuracion-panel oculto";
 const panelTeclas = document.createElement("div");
 panelTeclas.className = "configuracion-panel oculto";
 
-cuerpo.append(panelGeneral, panelApariencia, panelTeclas);
+const panelAvanzado = document.createElement("div");
+panelAvanzado.className = "configuracion-panel oculto";
+
+cuerpo.append(panelGeneral, panelApariencia, panelTeclas, panelAvanzado);
 
 card.append(tabs, cuerpo);
 raiz.append(card);
@@ -142,6 +148,7 @@ const paresTab: ReadonlyArray<readonly [HTMLButtonElement, HTMLDivElement]> = [
   [tabGeneral, panelGeneral],
   [tabApariencia, panelApariencia],
   [tabTeclas, panelTeclas],
+  [tabAvanzado, panelAvanzado],
 ];
 
 function activarTab(botonElegido: HTMLButtonElement): void {
@@ -157,6 +164,7 @@ function activarTab(botonElegido: HTMLButtonElement): void {
 tabGeneral.addEventListener("click", () => activarTab(tabGeneral));
 tabApariencia.addEventListener("click", () => activarTab(tabApariencia));
 tabTeclas.addEventListener("click", () => activarTab(tabTeclas));
+tabAvanzado.addEventListener("click", () => activarTab(tabAvanzado));
 
 // ======================================================
 // 🍞 TOAST (compartido por todas las pestañas)
@@ -1033,6 +1041,64 @@ const pestanaApariencia = crearPestanaEditable({
 });
 
 recargarApariencia = pestanaApariencia.cargar;
+
+// ======================================================
+// 🛠️ PESTAÑA AVANZADO
+// ------------------------------------------------------
+// Selector de modo de motor (Interception / Portable).
+// El popup de doble confirmación es Etapa G — acá el
+// selector solo llama directo al comando, sin popup todavía.
+// ======================================================
+
+const tituloModoMotor = document.createElement("h3");
+tituloModoMotor.className = "configuracion-avanzado-titulo";
+tituloModoMotor.textContent = "Motor de entrada/salida";
+
+const selectorModoMotor = document.createElement("select");
+selectorModoMotor.className = "configuracion-avanzado-select";
+
+const opcionInterception = document.createElement("option");
+opcionInterception.value = "Interception";
+opcionInterception.textContent = "Interception";
+
+const opcionPortable = document.createElement("option");
+opcionPortable.value = "Portable";
+opcionPortable.textContent = "Portable";
+
+selectorModoMotor.append(opcionInterception, opcionPortable);
+
+panelAvanzado.append(tituloModoMotor, selectorModoMotor);
+
+let ultimoClickModoMotor: MouseEvent | null = null;
+
+selectorModoMotor.addEventListener("mousedown", (evento) => {
+  ultimoClickModoMotor = evento;
+});
+
+selectorModoMotor.addEventListener("change", () => {
+  const modoElegido = selectorModoMotor.value;
+  const eventoClick = ultimoClickModoMotor;
+
+  void (async () => {
+    const confirmado = eventoClick
+      ? await confirmarCambioModo(modoElegido, eventoClick)
+      : false;
+
+    if (!confirmado) {
+      selectorModoMotor.value = await invoke<string>("motor_obtener_modo");
+      return;
+    }
+
+    await invoke("motor_solicitar_cambio_modo", { modo: modoElegido });
+  })();
+});
+
+async function cargarModoMotor(): Promise<void> {
+  const modoActual = await invoke<string>("motor_obtener_modo");
+  selectorModoMotor.value = modoActual;
+}
+
+void cargarModoMotor();
 
 // ======================================================
 // 🏁 INICIAR
