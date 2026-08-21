@@ -59,7 +59,7 @@ import { aplicarOverridesApariencia } from "../core/core_apariencia";
 import "../styles/styl_variables.css";
 import "./menu_express.css";
 
-import { iniciarAjusteTextoBotones } from "../ui/util/util_texto_boton";
+import { iniciarAjusteTextoBotones } from "../util/util_texto_boton";
 
 void aplicarOverridesApariencia();
 

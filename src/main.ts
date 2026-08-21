@@ -21,7 +21,7 @@ import {
   type ResultadoCompilacion,
 } from "./core/core_advertencias_compilacion";
 
-import { iniciarAjusteTextoBotones } from "./ui/util/util_texto_boton";
+import { iniciarAjusteTextoBotones } from "./util/util_texto_boton";
 
 import { actualizarStatusbar } from "./ui/ui_statusbar";
 
