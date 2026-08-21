@@ -1310,6 +1310,41 @@ pub fn emitir_ctrl_v() {
         .send((inputs, CondicionTrigger::Simple));
 }
 
+/// Misma emisión que emitir_ctrl_v() (mismo camino
+/// back_interception vía ejecutar_emitir, ver comentario largo de
+/// arriba), pero SÍNCRONA — corre ejecutar_emitir() directo en el
+/// hilo del llamador en vez de encolar en COLA_SALIDA, y por lo
+/// tanto BLOQUEA hasta que el combo terminó de emitirse (incluye el
+/// sleep de tiempo_simple_teclas() entre DOWN y UP del gatillo, ver
+/// emitir_un_toque()).
+///
+/// Usada por back_portapapeles::pegar() cuando quien pega es un paso
+/// de Macro (runt_macro.rs::ejecutar_paso_pegar) — a diferencia del
+/// pegado automático original (una tecla remapeada dispara UN
+/// pegar() y no hay nada más compitiendo por el portapapeles
+/// después), una Macro puede encadenar varios pasos "Pegar" seguidos
+/// sin pausa. emitir_ctrl_v() normal solo ENCOLA y retorna al
+/// instante — el paso siguiente de la Macro (que ya corre en su
+/// propio hilo dedicado, ejecutar_macro_completa, nunca el hilo de
+/// captura del sistema) alcanzaba a sobreescribir el portapapeles
+/// con el SIGUIENTE texto antes de que el hilo consumidor de
+/// COLA_SALIDA llegara a procesar el Ctrl+V del paso anterior — de
+/// ahí el bug reportado ("Pegar 1", "Pegar 2" pegaba "22"; con 5
+/// pasos pegaba "23455", el consumidor siempre iba unos pasos atrás
+/// de las escrituras). Bloquear acá hasta que el Ctrl+V realmente se
+/// emitió es seguro porque el runtime de macro ya corre aislado en
+/// su propio hilo — no congela el hilo de captura de eventos del
+/// sistema, que es el único motivo por el que Emitir usa el canal en
+/// el resto de los casos.
+pub fn emitir_ctrl_v_bloqueante() {
+    let inputs = vec![
+        InputId::new("keyboard", "LeftControl"),
+        InputId::new("keyboard", "V"),
+    ];
+
+    ejecutar_emitir(&inputs, &CondicionTrigger::Simple);
+}
+
 // ======================================================
 // ⬇️ EMITIR COMBO ABAJO (solo la mitad DOWN)
 // ------------------------------------------------------

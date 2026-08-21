@@ -1360,7 +1360,19 @@ fn ignorar_proximo_cambio() -> bool {
 // pool.
 // ======================================================
 
-pub fn pegar(valor: &str) -> Result<(), String> {
+/// `bloquear_hasta_pegar`: true espera a que el Ctrl+V realmente
+/// termine de emitirse antes de retornar (runtime::
+/// emitir_ctrl_v_bloqueante) — necesario cuando puede haber otro
+/// paso compitiendo por el portapapeles inmediatamente después, como
+/// pasos "Pegar" consecutivos de una Macro (ver
+/// runt_macro.rs::ejecutar_paso_pegar y el comentario largo en
+/// runtime::emitir_ctrl_v_bloqueante). false (comportamiento
+/// original) encola y retorna al instante — correcto para el click
+/// manual en un elemento del panel de Portapapeles
+/// (comandos.rs::portapapeles_pegar), donde no hay ningún paso
+/// siguiente que pueda sobreescribir el portapapeles antes de que el
+/// Ctrl+V se procese.
+pub fn pegar(valor: &str, bloquear_hasta_pegar: bool) -> Result<(), String> {
     println!("📋 [diag] pegar() llamado con valor={:?}", valor);
 
     let contenido = contenido_desde_archivo_o_texto(valor)?;
@@ -1414,7 +1426,7 @@ pub fn pegar(valor: &str) -> Result<(), String> {
     // delay independiente (config::delay_imagen_photoshop()), con
     // TEXTO usa el mismo timer corto que cualquier app genérica
     // (config::tiempo_espera_pegado_texto()).
-    if crate::back_pegado_personalizado::intentar(&contenido) {
+    if crate::back_pegado_personalizado::intentar(&contenido, bloquear_hasta_pegar) {
         println!("📋 [diag] pegado personalizado tomó el control — pegar() termina OK");
 
         return Ok(());
@@ -1436,7 +1448,11 @@ pub fn pegar(valor: &str) -> Result<(), String> {
 
     std::thread::sleep(std::time::Duration::from_millis(tiempo_espera));
 
-    crate::runtime::emitir_ctrl_v();
+    if bloquear_hasta_pegar {
+        crate::runtime::emitir_ctrl_v_bloqueante();
+    } else {
+        crate::runtime::emitir_ctrl_v();
+    }
 
     println!("📋 [diag] runtime::emitir_ctrl_v() disparado — pegar() termina OK");
 

@@ -97,7 +97,7 @@ static RUTA_SCRIPT_VACIO: OnceLock<Option<PathBuf>> = OnceLock::new();
 // 🎯 PUNTO DE ENTRADA
 // ======================================================
 
-pub fn intentar(contenido: &ContenidoPortapapeles) -> bool {
+pub fn intentar(contenido: &ContenidoPortapapeles, bloquear_hasta_pegar: bool) -> bool {
     let Some((_pid, ruta_exe)) = back_app::obtener_pid_y_ruta_activo() else {
         return false;
     };
@@ -115,7 +115,7 @@ pub fn intentar(contenido: &ContenidoPortapapeles) -> bool {
 
     println!("🎨 [diag] pegado personalizado: app activa es Photoshop, uso activación + Ctrl+V");
 
-    ejecutar_pegado_photoshop(&ruta_exe, contenido)
+    ejecutar_pegado_photoshop(&ruta_exe, contenido, bloquear_hasta_pegar)
 }
 
 // ======================================================
@@ -151,7 +151,11 @@ fn delay_para_contenido(contenido: &ContenidoPortapapeles) -> u64 {
 // texto + Ctrl+V, un relanzamiento de Photoshop menos.
 // ======================================================
 
-fn ejecutar_pegado_photoshop(ruta_exe: &str, contenido: &ContenidoPortapapeles) -> bool {
+fn ejecutar_pegado_photoshop(
+    ruta_exe: &str,
+    contenido: &ContenidoPortapapeles,
+    bloquear_hasta_pegar: bool,
+) -> bool {
     let es_imagen = matches!(contenido, ContenidoPortapapeles::Imagen { .. });
 
     if es_imagen {
@@ -192,7 +196,12 @@ fn ejecutar_pegado_photoshop(ruta_exe: &str, contenido: &ContenidoPortapapeles) 
     // Photoshop; ahora se simula Ctrl+V como el camino genérico, sin
     // ese segundo relanzamiento.
     println!("🎨 [diag] pegado personalizado: disparo Ctrl+V simulado (mismo camino que el pegado genérico)");
-    crate::runtime::emitir_ctrl_v();
+
+    if bloquear_hasta_pegar {
+        crate::runtime::emitir_ctrl_v_bloqueante();
+    } else {
+        crate::runtime::emitir_ctrl_v();
+    }
 
     true
 }

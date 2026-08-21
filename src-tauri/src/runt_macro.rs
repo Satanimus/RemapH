@@ -617,7 +617,12 @@ fn ejecutar_paso_pegar(paso: &PasoMacroJson) {
         return;
     };
 
-    let _ = back_portapapeles::pegar(ruta);
+    // true: bloquea hasta que el Ctrl+V realmente se emitió — sin
+    // esto, dos pasos "Pegar" seguidos en la misma Macro podían
+    // sobreescribir el portapapeles antes de que el primer Ctrl+V
+    // encolado llegara a procesarse (ver comentario largo en
+    // runtime::emitir_ctrl_v_bloqueante).
+    let _ = back_portapapeles::pegar(ruta, true);
 }
 
 // ======================================================
