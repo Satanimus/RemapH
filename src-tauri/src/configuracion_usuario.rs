@@ -17,8 +17,21 @@
 //                    styl_variables.css).
 // • "pulsador."   → Teclas (nombre visible de
 //                    pulsadores.tsv).
+// • "dispositivo." → NO es una pestaña de la Ventana de
+//                    Configuración — es el teclado/mouse
+//                    primario que back_interception.rs
+//                    aprende de un evento físico real (ver
+//                    ese archivo). Se guarda acá para
+//                    reusar el mismo archivo/mecanismo de
+//                    persistencia, no porque sea editable
+//                    por el usuario. Por eso no tiene
+//                    catálogo de fábrica ni validación de
+//                    tipo — son dos claves fijas
+//                    ("dispositivo.teclado"/"dispositivo.mouse"),
+//                    leídas/escritas directo como número.
 //
-// Este archivo conoce las 3 secciones. Para General carga el
+// Este archivo conoce las 3 secciones de UI + esta cuarta
+// clave interna. Para General carga el
 // catálogo de fábrica (configuracion.tsv), aplica overrides
 // sobre config.rs y persiste cambios. Para Teclas valida
 // contra pulsadores::por_interno() (el catálogo lo posee
@@ -128,6 +141,21 @@
 //     .theme (mismo formato "clave=valor", sin el prefijo
 //     "css."). importar_tema reusa guardar_lote_css(), así
 //     que también es todo o nada.
+//
+// leer_dispositivo_teclado() / leer_dispositivo_mouse()
+//     Devuelven el número de dispositivo (Device = i32 en
+//     Interception) guardado la sesión anterior, si hay
+//     uno ("dispositivo.teclado"/"dispositivo.mouse"). None
+//     si nunca se guardó (primera vez que corre el programa).
+//
+// guardar_dispositivo_teclado(device) / guardar_dispositivo_mouse(device)
+//     Persisten el número de dispositivo confirmado por un
+//     evento físico real (ver back_interception::registrar_
+//     teclado/registrar_mouse). Sin catálogo ni validación —
+//     a diferencia de guardar_lote()/guardar_lote_pulsadores()/
+//     guardar_lote_css(), esto no viene de un formulario de la
+//     Ventana de Configuración, así que no hace falta el
+//     mecanismo de "todo o nada" de esos tres.
 // ------------------------------------------------------
 // Transformación:
 //
@@ -328,7 +356,10 @@ fn escribir_mapa_completo(mapa: &HashMap<String, String>) -> Result<(), String> 
          # Formato: clave=valor (una línea por override).\n\
          # Sin prefijo   → variable de config.rs (ver configuracion.tsv).\n\
          # Prefijo css.  → variable de styl_variables.css.\n\
-         # Prefijo pulsador. → nombre visible de pulsadores.tsv.\n\n",
+         # Prefijo pulsador. → nombre visible de pulsadores.tsv.\n\
+         # Prefijo dispositivo. → teclado/mouse primario aprendido por\n\
+         #   back_interception.rs (no editable desde la Ventana de\n\
+         #   Configuración).\n\n",
     );
 
     for clave in claves {
@@ -351,6 +382,49 @@ pub fn leer_overrides() -> Result<HashMap<String, String>, String> {
         .into_iter()
         .filter(|(clave, _)| !clave.contains('.'))
         .collect())
+}
+
+// ======================================================
+// 🖱️⌨️ DISPOSITIVO PRIMARIO (teclado/mouse)
+// ------------------------------------------------------
+// Ver decisión en la sección 1 del header: reusa el mismo
+// archivo/mecanismo (leer_mapa_completo/escribir_mapa_completo)
+// que el resto de este módulo, con el prefijo "dispositivo.",
+// pero sin catálogo ni pestaña de UI — son dos claves fijas.
+// ======================================================
+
+const PREFIJO_DISPOSITIVO: &str = "dispositivo.";
+
+fn leer_dispositivo(clave: &str) -> Result<Option<i32>, String> {
+    let mapa = leer_mapa_completo()?;
+
+    Ok(mapa
+        .get(clave)
+        .and_then(|valor| valor.trim().parse::<i32>().ok()))
+}
+
+fn guardar_dispositivo(clave: &str, device: i32) -> Result<(), String> {
+    let mut mapa = leer_mapa_completo()?;
+
+    mapa.insert(clave.to_string(), device.to_string());
+
+    escribir_mapa_completo(&mapa)
+}
+
+pub fn leer_dispositivo_teclado() -> Result<Option<i32>, String> {
+    leer_dispositivo(&format!("{}teclado", PREFIJO_DISPOSITIVO))
+}
+
+pub fn leer_dispositivo_mouse() -> Result<Option<i32>, String> {
+    leer_dispositivo(&format!("{}mouse", PREFIJO_DISPOSITIVO))
+}
+
+pub fn guardar_dispositivo_teclado(device: i32) -> Result<(), String> {
+    guardar_dispositivo(&format!("{}teclado", PREFIJO_DISPOSITIVO), device)
+}
+
+pub fn guardar_dispositivo_mouse(device: i32) -> Result<(), String> {
+    guardar_dispositivo(&format!("{}mouse", PREFIJO_DISPOSITIVO), device)
 }
 
 // ======================================================

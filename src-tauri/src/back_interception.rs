@@ -35,7 +35,11 @@
 // (ahí sí se traga, para no ensuciar lo que se está grabando).
 // ------------------------------------------------------
 // 2. ¿Quién llama este archivo?
-// lib.rs llama iniciar() una sola vez al arrancar, pasándole
+// lib.rs llama precargar_desde_config() una sola vez al
+//     arrancar, ANTES de spawnear el hilo de iniciar() (ver
+//     comentario en "Reglas de dispositivo primario" y en
+//     precargar_desde_config() más abajo). Después llama
+//     iniciar() una sola vez, pasándole
 //     entrada::procesar_evento y
 //     analizador_trigger::captura_activa.
 // entrada.rs llama emitir_evento() para devolver un
@@ -69,8 +73,38 @@
 // "teclado primario" — mismo criterio para "mouse
 // primario". Emitir_evento() usa esos valores guardados.
 // Quedan fijos el resto de la sesión (no se vuelve a
-// tocar una vez completados). Asume 1.0: un solo teclado
-// y un solo mouse conectados.
+// tocar una vez "confirmados" por ese primer evento real,
+// ver DispositivoPrimario más abajo). Asume 1.0: un solo
+// teclado y un solo mouse conectados.
+//
+// [FIX] Bug "trigger de mouse no genera salida de teclado
+// hasta tocar una tecla": con la regla de arriba sola, el
+// teclado primario queda en None hasta el primer evento de
+// teclado real — un trigger de mouse que dispara una salida
+// de TECLADO (ej. Emitir letra desde un botón lateral) antes
+// de que el usuario haya tocado el teclado físico ni una vez
+// se perdía en silencio (emitir_teclado() corta en el primer
+// `let Some(device) = teclado_primario() else { return }`).
+//
+// Ahora lib.rs llama precargar_desde_config() ANTES de
+// spawnear el hilo de iniciar() — carga el número guardado la
+// sesión anterior (configuracion_usuario::leer_dispositivo_
+// teclado/mouse, ver ese archivo) como valor INICIAL, pero SIN
+// marcarlo "confirmado". Con eso alcanza para tapar el hueco:
+// emitir_teclado()/emitir_mouse() ya tienen un `device` usable
+// desde el primer instante, incluso sin haber recibido ningún
+// evento físico todavía.
+//
+// El valor precargado es un punto de partida, no un techo: el
+// primer evento físico real de la sesión SIGUE ganando siempre
+// (por si el número cambió entre sesiones — Interception puede
+// reordenar los IDs si el dispositivo se reconectó en otro
+// puerto, por ejemplo). Recién en ESE momento se marca
+// "confirmado" (se deja de tocar el resto de la sesión, igual
+// que antes) y, si el número resultó distinto del precargado,
+// se persiste el nuevo — una sola escritura reactiva por
+// sesión, nunca un guardado periódico. Ver registrar_teclado()/
+// registrar_mouse() más abajo.
 //
 // Regla de threading para la sesión de salida (decisión
 // de diseño, no migrar sin volver a leer esto):
@@ -96,6 +130,11 @@
 //   strokes seguidos sin delay artificial entre medio.
 // ------------------------------------------------------
 // 5. Funciones del archivo
+// precargar_desde_config()
+//     Llamada por lib.rs, una sola vez, antes de spawnear
+//     iniciar(). Carga el teclado/mouse primario guardado la
+//     sesión anterior como valor inicial (sin confirmar) —
+//     ver "Reglas de dispositivo primario" arriba.
 // crear()
 //     Arranca la sesión de Interception para ENTRADA,
 //     configura los filtros de teclado/mouse a escuchar.
@@ -155,41 +194,116 @@ use std::sync::{Mutex, OnceLock};
 
 // ======================================================
 // 🆔 DISPOSITIVOS PRIMARIOS
+// ------------------------------------------------------
+// `confirmado` distingue un valor precargado desde disco
+// (posible punto de partida, todavía puede pisarse) de uno
+// confirmado por un evento físico real (fijo el resto de la
+// sesión) — ver "Reglas de dispositivo primario" en el
+// header de este archivo.
 // ======================================================
 
-static TECLADO_PRIMARIO: OnceLock<Mutex<Option<Device>>> = OnceLock::new();
-static MOUSE_PRIMARIO: OnceLock<Mutex<Option<Device>>> = OnceLock::new();
+struct DispositivoPrimario {
+    valor: Option<Device>,
+    confirmado: bool,
+}
+
+impl DispositivoPrimario {
+    const fn vacio() -> Self {
+        Self {
+            valor: None,
+            confirmado: false,
+        }
+    }
+}
+
+static TECLADO_PRIMARIO: OnceLock<Mutex<DispositivoPrimario>> = OnceLock::new();
+static MOUSE_PRIMARIO: OnceLock<Mutex<DispositivoPrimario>> = OnceLock::new();
+
+// ======================================================
+// 💾 PRECARGAR DESDE CONFIG
+// ------------------------------------------------------
+// Ver comentario largo en el header ("Reglas de dispositivo
+// primario"). Sin confirmar todavía — un evento físico real
+// sigue pudiendo pisar este valor (registrar_teclado/
+// registrar_mouse más abajo).
+// ======================================================
+
+pub fn precargar_desde_config() {
+    if let Ok(Some(device)) = crate::configuracion_usuario::leer_dispositivo_teclado() {
+        TECLADO_PRIMARIO
+            .get_or_init(|| Mutex::new(DispositivoPrimario::vacio()))
+            .lock()
+            .unwrap()
+            .valor = Some(device);
+    }
+
+    if let Ok(Some(device)) = crate::configuracion_usuario::leer_dispositivo_mouse() {
+        MOUSE_PRIMARIO
+            .get_or_init(|| Mutex::new(DispositivoPrimario::vacio()))
+            .lock()
+            .unwrap()
+            .valor = Some(device);
+    }
+}
 
 fn registrar_teclado(device: Device) {
-    let mutex = TECLADO_PRIMARIO.get_or_init(|| Mutex::new(None));
+    let mutex = TECLADO_PRIMARIO.get_or_init(|| Mutex::new(DispositivoPrimario::vacio()));
     let mut guardia = mutex.lock().unwrap();
 
-    if guardia.is_none() {
-        *guardia = Some(device);
+    if guardia.confirmado {
+        return;
+    }
+
+    let valor_previo = guardia.valor;
+
+    guardia.valor = Some(device);
+    guardia.confirmado = true;
+
+    drop(guardia);
+
+    if valor_previo != Some(device) {
+        if let Err(error) = crate::configuracion_usuario::guardar_dispositivo_teclado(device) {
+            eprintln!("⚠️ No se pudo guardar el teclado primario: {}", error);
+        }
     }
 }
 
 fn registrar_mouse(device: Device) {
-    let mutex = MOUSE_PRIMARIO.get_or_init(|| Mutex::new(None));
+    let mutex = MOUSE_PRIMARIO.get_or_init(|| Mutex::new(DispositivoPrimario::vacio()));
     let mut guardia = mutex.lock().unwrap();
 
-    if guardia.is_none() {
-        *guardia = Some(device);
+    if guardia.confirmado {
+        return;
+    }
+
+    let valor_previo = guardia.valor;
+
+    guardia.valor = Some(device);
+    guardia.confirmado = true;
+
+    drop(guardia);
+
+    if valor_previo != Some(device) {
+        if let Err(error) = crate::configuracion_usuario::guardar_dispositivo_mouse(device) {
+            eprintln!("⚠️ No se pudo guardar el mouse primario: {}", error);
+        }
     }
 }
 
 fn teclado_primario() -> Option<Device> {
-    *TECLADO_PRIMARIO
-        .get_or_init(|| Mutex::new(None))
+    TECLADO_PRIMARIO
+        .get_or_init(|| Mutex::new(DispositivoPrimario::vacio()))
         .lock()
         .unwrap()
+        .valor
 }
 
 fn mouse_primario() -> Option<Device> {
-    *MOUSE_PRIMARIO
-        .get_or_init(|| Mutex::new(None))
+    MOUSE_PRIMARIO
+        .get_or_init(|| Mutex::new(DispositivoPrimario::vacio()))
         .lock()
         .unwrap()
+        .valor
 }
 
 // ======================================================
