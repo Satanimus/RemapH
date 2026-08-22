@@ -87,8 +87,11 @@
 //     y encola; no traducible → debe_tragar_no_traducible()
 //     sincrónico decide; si no, CallNextHookEx.
 // traducir_teclado() [privada]
-//     KBDLLHOOKSTRUCT → Option<InputEvent>, consultando
-//     pulsadores::por_nativo() con el vkCode recibido.
+//     KBDLLHOOKSTRUCT (scanCode + flags extendida) →
+//     Option<InputEvent>: resuelve el VK correcto según el
+//     layout de la ventana en foco (MapVirtualKeyExW), y
+//     consulta pulsadores::por_nativo() con ese VK. Ver
+//     layout_activo() y su nota completa.
 // traducir_mouse() [privada]
 //     MSLLHOOKSTRUCT + wparam → Option<InputEvent>,
 //     consultando pulsadores::por_nativo() con el código
@@ -160,18 +163,18 @@ use std::sync::mpsc::{self, Sender};
 use windows_sys::Win32::Foundation::{LPARAM, LRESULT, WPARAM};
 
 use windows_sys::Win32::UI::Input::KeyboardAndMouse::{
-    SendInput, INPUT, INPUT_0, INPUT_KEYBOARD, INPUT_MOUSE, KEYBDINPUT, KEYEVENTF_EXTENDEDKEY,
-    KEYEVENTF_KEYUP, MOUSEEVENTF_LEFTDOWN, MOUSEEVENTF_LEFTUP, MOUSEEVENTF_MIDDLEDOWN,
-    MOUSEEVENTF_MIDDLEUP, MOUSEEVENTF_RIGHTDOWN, MOUSEEVENTF_RIGHTUP, MOUSEEVENTF_WHEEL,
-    MOUSEEVENTF_XDOWN, MOUSEEVENTF_XUP, MOUSEINPUT,
+    GetKeyboardLayout, MapVirtualKeyExW, SendInput, INPUT, INPUT_0, INPUT_KEYBOARD, INPUT_MOUSE,
+    KEYBDINPUT, KEYEVENTF_EXTENDEDKEY, KEYEVENTF_KEYUP, MAPVK_VSC_TO_VK_EX, MOUSEEVENTF_LEFTDOWN,
+    MOUSEEVENTF_LEFTUP, MOUSEEVENTF_MIDDLEDOWN, MOUSEEVENTF_MIDDLEUP, MOUSEEVENTF_RIGHTDOWN,
+    MOUSEEVENTF_RIGHTUP, MOUSEEVENTF_WHEEL, MOUSEEVENTF_XDOWN, MOUSEEVENTF_XUP, MOUSEINPUT,
 };
 
 use windows_sys::Win32::UI::WindowsAndMessaging::{
-    CallNextHookEx, GetMessageW, PostThreadMessageW, SetWindowsHookExW, UnhookWindowsHookEx,
-    KBDLLHOOKSTRUCT, MSG, MSLLHOOKSTRUCT, WH_KEYBOARD_LL, WH_MOUSE_LL, WM_KEYDOWN, WM_KEYUP,
-    WM_LBUTTONDOWN, WM_LBUTTONUP, WM_MBUTTONDOWN, WM_MBUTTONUP, WM_MOUSEMOVE, WM_MOUSEWHEEL,
-    WM_QUIT, WM_RBUTTONDOWN, WM_RBUTTONUP, WM_SYSKEYDOWN, WM_SYSKEYUP, WM_XBUTTONDOWN,
-    WM_XBUTTONUP,
+    CallNextHookEx, GetForegroundWindow, GetMessageW, GetWindowThreadProcessId, PostThreadMessageW,
+    SetWindowsHookExW, UnhookWindowsHookEx, KBDLLHOOKSTRUCT, MSG, MSLLHOOKSTRUCT, WH_KEYBOARD_LL,
+    WH_MOUSE_LL, WM_KEYDOWN, WM_KEYUP, WM_LBUTTONDOWN, WM_LBUTTONUP, WM_MBUTTONDOWN, WM_MBUTTONUP,
+    WM_MOUSEMOVE, WM_MOUSEWHEEL, WM_QUIT, WM_RBUTTONDOWN, WM_RBUTTONUP, WM_SYSKEYDOWN, WM_SYSKEYUP,
+    WM_XBUTTONDOWN, WM_XBUTTONUP,
 };
 
 use crate::eventos::{InputId, InputState};
@@ -369,7 +372,12 @@ unsafe extern "system" fn hook_teclado(codigo: i32, wparam: WPARAM, lparam: LPAR
         return CallNextHookEx(std::ptr::null_mut(), codigo, wparam, lparam);
     }
 
-    match traducir_teclado(datos.vkCode, presionado) {
+    // LLKHF_EXTENDED = 0x01: distingue, por ejemplo, la flecha derecha
+    // extendida del "6" de numpad, que comparten scanCode base (ver
+    // nota en traducir_teclado()).
+    let es_extendida = datos.flags & 0x01 != 0;
+
+    match traducir_teclado(datos.scanCode, es_extendida, presionado) {
         Some(evento) => {
             // Evento traducido: SIEMPRE se bloquea el físico original
             // (nunca CallNextHookEx acá) — mismo modelo que Interception,
@@ -486,10 +494,53 @@ unsafe extern "system" fn hook_mouse(codigo: i32, wparam: WPARAM, lparam: LPARAM
 }
 
 // ======================================================
+// 🌐 LAYOUT DE TECLADO ACTIVO
+// ------------------------------------------------------
+// KBDLLHOOKSTRUCT.vkCode ya viene traducido por Windows según
+// el layout del hilo que tiene el foco en cada momento — pero
+// eso puede no coincidir con el layout que RemapH necesita
+// (reportado: layout LatAm/España, vkCode entregado no siempre
+// corresponde al símbolo esperado en el capturador). Se resuelve
+// scanCode -> vkCode a mano, con el layout de la ventana en
+// foco explícito (no el del proceso de RemapH), para que el
+// resultado sea siempre el símbolo que el usuario ve en su
+// teclado físico, sin importar en qué ventana esté escribiendo.
+// ======================================================
+
+unsafe fn layout_activo() -> *mut std::ffi::c_void {
+    let ventana = GetForegroundWindow();
+    let id_hilo = GetWindowThreadProcessId(ventana, std::ptr::null_mut());
+
+    GetKeyboardLayout(id_hilo)
+}
+
+// ======================================================
 // 🎹 TRADUCIR TECLADO
 // ======================================================
 
-fn traducir_teclado(vk: u32, presionado: bool) -> Option<InputEvent> {
+fn traducir_teclado(scan_code: u32, es_extendida: bool, presionado: bool) -> Option<InputEvent> {
+    // MAPVK_VSC_TO_VK_EX resuelve el scan code (posición física,
+    // independiente del layout) al VK correspondiente en el layout
+    // recibido — así el resultado es siempre consistente con lo que
+    // el usuario ve impreso en esa tecla, igual que ya hace
+    // Interception (ver back_teclas.rs::convertir(), que parte de
+    // ScanCode y nunca de un VK). Para teclas extendidas (E0: Insert,
+    // Supr, flechas, RePág/AvPág, etc.) hay que poner el bit alto del
+    // scan code (0xE000) — sin esto MapVirtualKeyExW no distingue,
+    // por ejemplo, la flecha derecha extendida de la tecla "6" del
+    // numpad, que comparten el mismo scan code base.
+    let scan_code_extendido = if es_extendida {
+        0xE000 | scan_code
+    } else {
+        scan_code
+    };
+
+    let vk = unsafe { MapVirtualKeyExW(scan_code_extendido, MAPVK_VSC_TO_VK_EX, layout_activo()) };
+
+    if vk == 0 {
+        return None;
+    }
+
     let nativo = format!("0x{:X}", vk);
     let pulsador = pulsadores::por_nativo(&nativo)?;
     let input = InputId::new("keyboard", &pulsador.interno);
