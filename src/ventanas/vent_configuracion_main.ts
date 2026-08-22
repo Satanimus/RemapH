@@ -29,8 +29,6 @@ import { invoke } from "@tauri-apps/api/core";
 
 import { aplicarOverridesApariencia } from "../core/core_apariencia";
 
-import { confirmarCambioModo } from "../componentes/comp_popup_confirmar_modo";
-
 import "../styles/styl_variables.css";
 import "../styles/styl_general.css";
 import "../styles/styl_configuracion.css";
@@ -319,9 +317,9 @@ interface OpcionesPestana {
 
   textoConfirmacionRestablecer: string;
 
-  // Elementos extra a agregar en el pie, antes de los botones
-  // Restablecer/Guardar (solo lo usa Apariencia, para Guardar/Cargar
-  // tema — ver "PESTAÑA APARIENCIA" al final del archivo).
+  // Elementos extra a agregar en el pie de la tabla, dentro del panel
+  // de esta pestaña (solo lo usa Apariencia, para Guardar/Cargar tema
+  // — ver "PESTAÑA APARIENCIA" al final del archivo).
   accionesExtra?: HTMLElement[];
 
   // Se llama después de un guardado o restablecido exitoso, además
@@ -331,8 +329,29 @@ interface OpcionesPestana {
   despuesDeAplicar?: () => Promise<void>;
 }
 
+// Resultado de intentar juntar los cambios pendientes de una pestaña,
+// sin aplicarlos todavía — usado por el botón Guardar global (ver
+// bloque "BARRA DE ACCIONES GLOBAL") para validar TODAS las pestañas
+// antes de guardar ninguna.
+interface RecoleccionCambios {
+  cambios: CambioConfiguracion[];
+  erroresLocales: string[];
+}
+
 interface Pestana {
   cargar: () => Promise<void>;
+
+  // API usada por la barra de acciones global en vez de botones
+  // propios de esta pestaña (ver "BARRA DE ACCIONES GLOBAL").
+  hayEdicionesPendientes: () => boolean;
+  validarYRecolectar: () => RecoleccionCambios;
+  aplicarGuardado: (
+    cambios: CambioConfiguracion[],
+  ) => Promise<ResultadoGuardado>;
+  marcarErroresGuardado: (errores: ErrorConfiguracion[]) => void;
+  limpiarEstadoTrasGuardado: () => Promise<void>;
+  restablecerPestana: () => Promise<void>;
+  textoConfirmacionRestablecer: string;
 }
 
 function crearPestanaEditable(opciones: OpcionesPestana): Pestana {
@@ -380,26 +399,14 @@ function crearPestanaEditable(opciones: OpcionesPestana): Pestana {
   const mensajeError = document.createElement("div");
   mensajeError.className = "configuracion-error oculto";
 
-  const pieAcciones = document.createElement("div");
-  pieAcciones.className = "configuracion-acciones";
-
-  const botonRestablecer = document.createElement("button");
-  botonRestablecer.type = "button";
-  botonRestablecer.className = "configuracion-boton";
-  botonRestablecer.textContent = "Restablecer esta pestaña";
-
-  const botonGuardar = document.createElement("button");
-  botonGuardar.type = "button";
-  botonGuardar.className = "configuracion-boton configuracion-boton-primario";
-  botonGuardar.textContent = "Guardar cambios";
+  panel.append(scrollTabla, mensajeError);
 
   if (accionesExtra && accionesExtra.length > 0) {
-    pieAcciones.append(...accionesExtra);
+    const contenedorExtra = document.createElement("div");
+    contenedorExtra.className = "configuracion-acciones-extra";
+    contenedorExtra.append(...accionesExtra);
+    panel.append(contenedorExtra);
   }
-
-  pieAcciones.append(botonRestablecer, botonGuardar);
-
-  panel.append(scrollTabla, mensajeError, pieAcciones);
 
   // ----------------------------------------------------
   // Estado propio de esta pestaña
@@ -578,12 +585,20 @@ function crearPestanaEditable(opciones: OpcionesPestana): Pestana {
   // Guardar cambios
   // ----------------------------------------------------
 
-  botonGuardar.addEventListener("click", async () => {
-    ocultarError();
+  // ----------------------------------------------------
+  // Guardar cambios (API para la barra global — ver
+  // "BARRA DE ACCIONES GLOBAL")
+  // ----------------------------------------------------
 
-    if (filasEditadas.size === 0) {
-      return;
-    }
+  function hayEdicionesPendientes(): boolean {
+    return filasEditadas.size > 0;
+  }
+
+  // Valida y arma la lista de cambios de ESTA pestaña, sin aplicar
+  // nada todavía — la barra global junta esto de las 4 pestañas antes
+  // de guardar cualquiera (ver Guardar cambios / errorConsulta P2).
+  function validarYRecolectar(): RecoleccionCambios {
+    ocultarError();
 
     const cambios: CambioConfiguracion[] = [];
     const erroresLocales: string[] = [];
@@ -612,82 +627,64 @@ function crearPestanaEditable(opciones: OpcionesPestana): Pestana {
 
     if (erroresLocales.length > 0) {
       mostrarError(erroresLocales.join(" · "));
-      return;
     }
 
-    botonGuardar.disabled = true;
+    return { cambios, erroresLocales };
+  }
 
-    try {
-      const resultado = await guardarLote(cambios);
+  function marcarErroresGuardado(errores: ErrorConfiguracion[]): void {
+    for (const error of errores) {
+      const montada = filasMontadas.get(error.clave);
 
-      if (resultado.errores.length > 0) {
-        for (const error of resultado.errores) {
-          const montada = filasMontadas.get(error.clave);
-
-          if (montada) {
-            montada.tr.classList.remove("configuracion-fila-editando");
-            montada.tr.classList.add("configuracion-fila-error");
-          }
-        }
-
-        mostrarError(
-          resultado.errores
-            .map((error) => {
-              const nombre =
-                filasMontadas.get(error.clave)?.fila.nombreMostrado ??
-                error.clave;
-
-              return `${nombre}: ${error.mensaje}`;
-            })
-            .join(" · "),
-        );
-
-        return;
+      if (montada) {
+        montada.tr.classList.remove("configuracion-fila-editando");
+        montada.tr.classList.add("configuracion-fila-error");
       }
-
-      limpiarEstadoFilas();
-      mostrarToast("✅ Guardado");
-
-      if (despuesDeAplicar) {
-        await despuesDeAplicar();
-      }
-    } catch (error) {
-      mostrarError(`No se pudo guardar: ${String(error)}`);
-    } finally {
-      botonGuardar.disabled = false;
     }
-  });
+
+    mostrarError(
+      errores
+        .map((error) => {
+          const nombre =
+            filasMontadas.get(error.clave)?.fila.nombreMostrado ?? error.clave;
+
+          return `${nombre}: ${error.mensaje}`;
+        })
+        .join(" · "),
+    );
+  }
+
+  async function limpiarEstadoTrasGuardado(): Promise<void> {
+    limpiarEstadoFilas();
+
+    if (despuesDeAplicar) {
+      await despuesDeAplicar();
+    }
+  }
 
   // ----------------------------------------------------
-  // Restablecer esta pestaña
+  // Restablecer esta pestaña (API para la barra global)
   // ----------------------------------------------------
 
-  botonRestablecer.addEventListener("click", async () => {
-    const confirmado = window.confirm(textoConfirmacionRestablecer);
+  async function restablecerPestana(): Promise<void> {
+    await restablecer();
+    await cargar();
 
-    if (!confirmado) {
-      return;
+    if (despuesDeAplicar) {
+      await despuesDeAplicar();
     }
+  }
 
-    botonRestablecer.disabled = true;
-
-    try {
-      await restablecer();
-      await cargar();
-
-      mostrarToast("✅ Restablecido");
-
-      if (despuesDeAplicar) {
-        await despuesDeAplicar();
-      }
-    } catch (error) {
-      mostrarError(`No se pudo restablecer: ${String(error)}`);
-    } finally {
-      botonRestablecer.disabled = false;
-    }
-  });
-
-  return { cargar };
+  return {
+    cargar,
+    hayEdicionesPendientes,
+    validarYRecolectar,
+    aplicarGuardado: guardarLote,
+    marcarErroresGuardado,
+    limpiarEstadoTrasGuardado,
+    restablecerPestana,
+    textoConfirmacionRestablecer,
+  };
 }
 
 // ======================================================
@@ -1045,9 +1042,11 @@ recargarApariencia = pestanaApariencia.cargar;
 // ======================================================
 // 🛠️ PESTAÑA AVANZADO
 // ------------------------------------------------------
-// Selector de modo de motor (Interception / Portable).
-// El popup de doble confirmación es Etapa G — acá el
-// selector solo llama directo al comando, sin popup todavía.
+// Selector de modo de motor (Interception / Portable). No usa
+// crearPestanaEditable (no es una tabla), pero expone la misma
+// interfaz Pestana para integrarse con la barra de acciones global
+// (ver "BARRA DE ACCIONES GLOBAL"): tocar el selector solo marca un
+// cambio pendiente, sin aplicar nada hasta "Guardar cambios".
 // ======================================================
 
 const tituloModoMotor = document.createElement("h3");
@@ -1069,36 +1068,173 @@ selectorModoMotor.append(opcionInterception, opcionPortable);
 
 panelAvanzado.append(tituloModoMotor, selectorModoMotor);
 
-let ultimoClickModoMotor: MouseEvent | null = null;
-
-selectorModoMotor.addEventListener("mousedown", (evento) => {
-  ultimoClickModoMotor = evento;
-});
-
-selectorModoMotor.addEventListener("change", () => {
-  const modoElegido = selectorModoMotor.value;
-  const eventoClick = ultimoClickModoMotor;
-
-  void (async () => {
-    const confirmado = eventoClick
-      ? await confirmarCambioModo(modoElegido, eventoClick)
-      : false;
-
-    if (!confirmado) {
-      selectorModoMotor.value = await invoke<string>("motor_obtener_modo");
-      return;
-    }
-
-    await invoke("motor_solicitar_cambio_modo", { modo: modoElegido });
-  })();
-});
+// Último modo confirmado por el backend (no el elegido en el
+// <select>, que puede tener un cambio pendiente sin guardar todavía).
+let modoMotorActivo = "Interception";
 
 async function cargarModoMotor(): Promise<void> {
-  const modoActual = await invoke<string>("motor_obtener_modo");
-  selectorModoMotor.value = modoActual;
+  modoMotorActivo = await invoke<string>("motor_obtener_modo");
+  selectorModoMotor.value = modoMotorActivo;
 }
 
-void cargarModoMotor();
+function hayEdicionPendienteModoMotor(): boolean {
+  return selectorModoMotor.value !== modoMotorActivo;
+}
+
+async function guardarModoMotor(): Promise<void> {
+  await invoke("motor_solicitar_cambio_modo", {
+    modo: selectorModoMotor.value,
+  });
+
+  modoMotorActivo = selectorModoMotor.value;
+}
+
+async function restablecerModoMotor(): Promise<void> {
+  selectorModoMotor.value = modoMotorActivo;
+}
+
+const pestanaAvanzado: Pestana = {
+  cargar: cargarModoMotor,
+  hayEdicionesPendientes: hayEdicionPendienteModoMotor,
+
+  // Sin validación posible (es un <select> de dos opciones fijas):
+  // si hay cambio pendiente, se recolecta como un único "cambio" sin
+  // clave real — Guardar cambios global lo aplica llamando a
+  // guardarModoMotor() en vez de pasar por guardarLote genérico (ver
+  // manejo especial en el bloque "BARRA DE ACCIONES GLOBAL").
+  validarYRecolectar: () => ({ cambios: [], erroresLocales: [] }),
+  aplicarGuardado: async () => ({ errores: [] }),
+  marcarErroresGuardado: () => {},
+
+  limpiarEstadoTrasGuardado: async () => {},
+  restablecerPestana: restablecerModoMotor,
+
+  textoConfirmacionRestablecer:
+    "¿Restablecer el motor seleccionado al modo activo actual?",
+};
+
+// ======================================================
+// 🧭 BARRA DE ACCIONES GLOBAL
+// ------------------------------------------------------
+// Única y fija para las 4 pestañas: "Guardar cambios" junta y guarda
+// los cambios pendientes de TODAS las pestañas (no solo la activa).
+// "Restablecer esta pestaña" actúa solo sobre la pestaña activa
+// (título/mensaje cambia según cuál sea).
+// ======================================================
+
+const TODAS_LAS_PESTANAS: ReadonlyArray<readonly [HTMLButtonElement, Pestana]> =
+  [
+    [tabGeneral, pestanaGeneral],
+    [tabApariencia, pestanaApariencia],
+    [tabTeclas, pestanaTeclas],
+    [tabAvanzado, pestanaAvanzado],
+  ];
+
+const barraGlobal = document.createElement("div");
+barraGlobal.className = "configuracion-acciones";
+
+const botonRestablecerGlobal = document.createElement("button");
+botonRestablecerGlobal.type = "button";
+botonRestablecerGlobal.className = "configuracion-boton";
+botonRestablecerGlobal.textContent = "Restablecer esta pestaña";
+
+const botonGuardarGlobal = document.createElement("button");
+botonGuardarGlobal.type = "button";
+botonGuardarGlobal.className =
+  "configuracion-boton configuracion-boton-primario";
+botonGuardarGlobal.textContent = "Guardar cambios";
+
+barraGlobal.append(botonRestablecerGlobal, botonGuardarGlobal);
+card.append(barraGlobal);
+
+function pestanaActiva(): Pestana {
+  const par = TODAS_LAS_PESTANAS.find(([boton]) =>
+    boton.classList.contains("configuracion-tab-activa"),
+  );
+
+  return par ? par[1] : pestanaGeneral;
+}
+
+botonRestablecerGlobal.addEventListener("click", async () => {
+  const activa = pestanaActiva();
+
+  const confirmado = window.confirm(activa.textoConfirmacionRestablecer);
+
+  if (!confirmado) {
+    return;
+  }
+
+  botonRestablecerGlobal.disabled = true;
+
+  try {
+    await activa.restablecerPestana();
+    mostrarToast("✅ Restablecido");
+  } catch (error) {
+    window.alert(`No se pudo restablecer: ${String(error)}`);
+  } finally {
+    botonRestablecerGlobal.disabled = false;
+  }
+});
+
+botonGuardarGlobal.addEventListener("click", async () => {
+  const huboCambioModo = pestanaAvanzado.hayEdicionesPendientes();
+
+  // Junta y valida los cambios pendientes de las 3 pestañas de
+  // tabla. Si CUALQUIERA falla, se bloquea el guardado completo (no
+  // se guarda nada, ni siquiera lo válido de otras pestañas) — ver
+  // respuesta a la consulta sobre errores en pestaña no activa.
+  const recolecciones = [pestanaGeneral, pestanaApariencia, pestanaTeclas].map(
+    (pestana) => ({ pestana, resultado: pestana.validarYRecolectar() }),
+  );
+
+  const huboErrores = recolecciones.some(
+    ({ resultado }) => resultado.erroresLocales.length > 0,
+  );
+
+  if (huboErrores) {
+    return;
+  }
+
+  if (
+    !huboCambioModo &&
+    recolecciones.every(({ resultado }) => resultado.cambios.length === 0)
+  ) {
+    return;
+  }
+
+  botonGuardarGlobal.disabled = true;
+
+  try {
+    for (const { pestana, resultado } of recolecciones) {
+      if (resultado.cambios.length === 0) {
+        continue;
+      }
+
+      const guardado = await pestana.aplicarGuardado(resultado.cambios);
+
+      if (guardado.errores.length > 0) {
+        pestana.marcarErroresGuardado(guardado.errores);
+        botonGuardarGlobal.disabled = false;
+        return;
+      }
+
+      await pestana.limpiarEstadoTrasGuardado();
+    }
+
+    // El cambio de motor se guarda al final: si algún cambio de las
+    // otras pestañas falló, el motor no llega a tocarse (Regla 12
+    // solo debe dispararse cuando el guardado completo es exitoso).
+    if (huboCambioModo) {
+      await guardarModoMotor();
+    }
+
+    mostrarToast("✅ Guardado");
+  } catch (error) {
+    window.alert(`No se pudo guardar: ${String(error)}`);
+  } finally {
+    botonGuardarGlobal.disabled = false;
+  }
+});
 
 // ======================================================
 // 🏁 INICIAR
@@ -1107,3 +1243,4 @@ void cargarModoMotor();
 pestanaGeneral.cargar();
 pestanaApariencia.cargar();
 pestanaTeclas.cargar();
+pestanaAvanzado.cargar();

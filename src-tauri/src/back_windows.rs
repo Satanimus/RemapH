@@ -161,8 +161,9 @@ use windows_sys::Win32::UI::Input::KeyboardAndMouse::{
 use windows_sys::Win32::UI::WindowsAndMessaging::{
     CallNextHookEx, GetMessageW, PostThreadMessageW, SetWindowsHookExW, UnhookWindowsHookEx,
     KBDLLHOOKSTRUCT, MSG, MSLLHOOKSTRUCT, WH_KEYBOARD_LL, WH_MOUSE_LL, WM_KEYDOWN, WM_KEYUP,
-    WM_LBUTTONDOWN, WM_LBUTTONUP, WM_MBUTTONDOWN, WM_MBUTTONUP, WM_MOUSEWHEEL, WM_QUIT,
-    WM_RBUTTONDOWN, WM_RBUTTONUP, WM_SYSKEYDOWN, WM_SYSKEYUP, WM_XBUTTONDOWN, WM_XBUTTONUP,
+    WM_LBUTTONDOWN, WM_LBUTTONUP, WM_MBUTTONDOWN, WM_MBUTTONUP, WM_MOUSEMOVE, WM_MOUSEWHEEL,
+    WM_QUIT, WM_RBUTTONDOWN, WM_RBUTTONUP, WM_SYSKEYDOWN, WM_SYSKEYUP, WM_XBUTTONDOWN,
+    WM_XBUTTONUP,
 };
 
 use crate::eventos::{InputId, InputState};
@@ -270,6 +271,22 @@ unsafe extern "system" fn hook_teclado(codigo: i32, wparam: WPARAM, lparam: LPAR
         return CallNextHookEx(std::ptr::null_mut(), codigo, wparam, lparam);
     }
 
+    // Sin perfil activo NI captura en curso, no hay nada que
+    // remapear ni que grabar: se pasa TODO directo, sin traducir, sin
+    // bloquear el físico, sin llamar a debe_tragar_no_traducible() ni
+    // a evaluar(). Mismo criterio y mismo orden de precedencia que ya
+    // usa entrada.rs::procesar_evento (captura_activa() primero,
+    // esta_vacia() después) — con Modo Captura activo SIEMPRE hay que
+    // seguir interceptando, aunque no haya perfil, porque ese modo
+    // necesita ver/grabar cada evento físico (ver captura_coordenada.rs).
+    // Aplicado ANTES de interceptar nada, para evitar que este hook
+    // de baja latencia (WH_KEYBOARD_LL) haga trabajo alguno por cada
+    // tecla cuando RemapH no tiene nada que hacer — causa del lag
+    // general reportado (afecta más al mouse, ver hook_mouse()).
+    if !crate::cache::captura_activa() && crate::cache::esta_vacia() {
+        return CallNextHookEx(std::ptr::null_mut(), codigo, wparam, lparam);
+    }
+
     let datos = &*(lparam as *const KBDLLHOOKSTRUCT);
 
     // Filtrar eventos inyectados por este mismo proceso
@@ -326,10 +343,36 @@ unsafe extern "system" fn hook_mouse(codigo: i32, wparam: WPARAM, lparam: LPARAM
         return CallNextHookEx(std::ptr::null_mut(), codigo, wparam, lparam);
     }
 
+    // Sin perfil activo NI captura en curso, no hay nada que
+    // remapear ni que grabar: se pasa TODO directo (ver comentario
+    // equivalente en hook_teclado(), mismo orden de precedencia que
+    // entrada.rs::procesar_evento). Este es el caso que más importa:
+    // WM_MOUSEMOVE por sí solo ya se filtra más abajo, pero botones y
+    // rueda sin perfil ni captura también pasaban por
+    // evaluar()/debe_tragar_no_traducible() innecesariamente.
+    if !crate::cache::captura_activa() && crate::cache::esta_vacia() {
+        return CallNextHookEx(std::ptr::null_mut(), codigo, wparam, lparam);
+    }
+
     let datos = &*(lparam as *const MSLLHOOKSTRUCT);
 
     // Filtrar eventos inyectados por este mismo proceso
     if datos.flags & 0x01 != 0 {
+        return CallNextHookEx(std::ptr::null_mut(), codigo, wparam, lparam);
+    }
+
+    // WM_MOUSEMOVE se descarta ANTES de traducir_mouse/evaluar: no es
+    // un botón/rueda traducible (traducir_mouse() no lo contempla,
+    // siempre da None), y a diferencia de un click o scroll puntual
+    // llega a un ritmo de cientos/miles de eventos por segundo. Si
+    // cayera en la rama "no traducible" de más abajo, cada movimiento
+    // del mouse en CUALQUIER ventana del sistema llamaría a
+    // debe_tragar_no_traducible() dentro de este hook de baja
+    // latencia (WH_MOUSE_LL) — Windows tiene un timeout estricto para
+    // este hilo, y saturarlo así es lo que causa el lag general del
+    // sistema (arrastrar ventanas, rueda) visto incluso sin perfil
+    // activo. Nunca se bloquea el movimiento físico: siempre pasa.
+    if wparam as u32 == WM_MOUSEMOVE {
         return CallNextHookEx(std::ptr::null_mut(), codigo, wparam, lparam);
     }
 
