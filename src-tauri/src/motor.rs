@@ -174,10 +174,19 @@ pub fn cargar_modo_desde_config() {
 // ------------------------------------------------------
 // La firma pide `+ 'static` en ambos parámetros porque es
 // el requisito más estricto de los dos backends —
-// back_windows::iniciar() los necesita 'static porque los
-// guarda en su ESTADO por thread_local (Box<dyn ...>);
-// back_interception::iniciar() no exige 'static, así que un
-// valor 'static igual lo satisface sin problema.
+// back_windows::iniciar() los necesita 'static porque
+// debe_tragar_no_traducible se guarda en un estado por
+// thread_local (Box<dyn ...>); back_interception::iniciar()
+// no exige 'static, así que un valor 'static igual lo
+// satisface sin problema.
+//
+// `procesar` además exige `Send`: back_windows::iniciar()
+// lo mueve a un hilo worker dedicado (ver COLA en
+// back_windows.rs) para sacar el procesamiento pesado del
+// hilo de hooks WinAPI. En la práctica esto no restringe
+// nada — el único valor que se pasa hoy es una `fn` libre
+// (entrada::procesar_evento, ver lib.rs), que ya es
+// Send + Sync + Copy + 'static por no capturar nada.
 //
 // Solo una de las dos ramas se ejecuta en cada llamada — no
 // hay problema de mover procesar/debe_tragar_no_traducible
@@ -186,7 +195,7 @@ pub fn cargar_modo_desde_config() {
 // ======================================================
 
 pub fn iniciar(
-    procesar: impl FnMut(InputEvent) + Copy + 'static,
+    procesar: impl FnMut(InputEvent) + Copy + Send + 'static,
     debe_tragar_no_traducible: impl Fn() -> bool + Copy + 'static,
 ) {
     loop {

@@ -76,14 +76,16 @@
 //     Callback de WH_KEYBOARD_LL. Traduce KBDLLHOOKSTRUCT
 //     a InputEvent. Filtra eventos inyectados propios.
 //     Retorna 1 si el evento se tradujo (siempre lo
-//     bloquea) o si debe_tragar_no_traducible() lo pide;
-//     llama CallNextHookEx en cualquier otro caso.
+//     bloquea y lo ENCOLA para el hilo worker — ver COLA)
+//     o si debe_tragar_no_traducible() lo pide (sincrónico,
+//     no encolado); llama CallNextHookEx en cualquier otro
+//     caso.
 // hook_mouse() [privada, unsafe extern "system"]
 //     Callback de WH_MOUSE_LL. Traduce MSLLHOOKSTRUCT
 //     a InputEvent. Filtra eventos inyectados propios.
-//     Retorna 1 si el evento se tradujo (siempre lo
-//     bloquea) o si debe_tragar_no_traducible() lo pide;
-//     llama CallNextHookEx en cualquier otro caso.
+//     Mismo modelo que hook_teclado(): traducido → bloquea
+//     y encola; no traducible → debe_tragar_no_traducible()
+//     sincrónico decide; si no, CallNextHookEx.
 // traducir_teclado() [privada]
 //     KBDLLHOOKSTRUCT → Option<InputEvent>, consultando
 //     pulsadores::por_nativo() con el vkCode recibido.
@@ -91,11 +93,13 @@
 //     MSLLHOOKSTRUCT + wparam → Option<InputEvent>,
 //     consultando pulsadores::por_nativo() con el código
 //     de botón/rueda correspondiente.
-// evaluar() [privada]
-//     Extrae el procesador del estado de hilo, lo llama
-//     con el evento, lo devuelve al estado. No decide
-//     bloqueo — eso ya lo resolvió el hook que la llama
-//     (siempre bloquea un evento traducido).
+// (hilo worker, lanzado desde iniciar())
+//     Consume COLA en un loop (rx.recv()) y llama a
+//     procesar() (entrada::procesar_evento()) con cada
+//     evento — fuera del hilo de hooks, ver nota completa
+//     en la declaración de COLA. No decide bloqueo — eso ya
+//     lo resolvió el hook que encoló (siempre bloqueaba un
+//     evento traducido).
 // emitir_evento()
 //     InputEvent → INPUT(s) físicos vía SendInput.
 //     Teclado: KEYBDINPUT con wVk. Mouse: MOUSEINPUT con
@@ -133,7 +137,10 @@
 //     ↓
 // InputEvent
 //     ↓
-// callback(evento)   [quien llamó a iniciar()]
+// COLA (mpsc::channel) — el hook encola y retorna, sin
+//     esperar a que se procese
+//     ↓
+// hilo worker: callback(evento)   [quien llamó a iniciar()]
 //
 // SALIDA:
 // InputEvent
@@ -148,6 +155,7 @@ use crate::pulsadores;
 use std::cell::RefCell;
 use std::mem::size_of;
 use std::sync::atomic::{AtomicU32, Ordering};
+use std::sync::mpsc::{self, Sender};
 
 use windows_sys::Win32::Foundation::{LPARAM, LRESULT, WPARAM};
 
@@ -179,31 +187,86 @@ use crate::eventos::{InputId, InputState};
 static HILO_HOOKS: AtomicU32 = AtomicU32::new(0);
 
 // ======================================================
-// 🧠 ESTADO DEL HILO (procesador + predicado)
+// 🧠 ESTADO DEL HOOK (predicado no-traducible, sincrónico)
+// ------------------------------------------------------
+// Sigue viviendo en el hilo de hooks — la decisión de bloquear
+// un evento no traducible (debe_tragar_no_traducible) TIENE que
+// tomarse dentro del propio hook, ver nota en COLA más abajo.
 // ======================================================
 
-struct Estado {
-    procesar: Box<dyn FnMut(InputEvent)>,
+struct EstadoHook {
     debe_tragar_no_traducible: Box<dyn Fn() -> bool>,
 }
 
 thread_local! {
-    static ESTADO: RefCell<Option<Estado>> = RefCell::new(None);
+    static ESTADO_HOOK: RefCell<Option<EstadoHook>> = RefCell::new(None);
 }
+
+// ======================================================
+// 🧠 ESTADO DEL WORKER (procesador)
+// ------------------------------------------------------
+// El trabajo pesado — evaluar()/procesar_evento()/SendInput de
+// reinyección para el camino TRADUCIBLE — se movió a un hilo
+// dedicado (worker) para que el hilo de hooks (WH_KEYBOARD_LL/
+// WH_MOUSE_LL) nunca lo haga: Windows exige que ese hilo
+// responda con un timeout estricto, y cualquier lock o lógica
+// de matching ahí dentro competía por ese presupuesto, causando
+// el lag general del sistema reportado con perfil activo
+// (arrastrar ventanas, rueda, etc. en cualquier app, no solo
+// en RemapH).
+//
+// `procesar` es siempre una `fn` libre (entrada::procesar_evento
+// — ver lib.rs), no una closure con estado capturado, así que es
+// trivial de mover a otro hilo (Copy + Send + 'static).
+// ======================================================
+
+// Canal hacia el hilo worker. Se recrea en cada iniciar() y se
+// destruye (Sender se dropea) al salir — el hilo worker termina
+// solo cuando su Receiver se desconecta, sin necesitar una señal
+// explícita de apagado. Mutex en vez de thread_local porque el
+// hook y el worker corren en hilos distintos (mismo patrón que
+// COMPILADO/RUNTIME en cache.rs).
+//
+// Solo pasa por acá el camino TRADUCIBLE (evaluar() -> procesar_
+// evento() completo, con sus locks y posible SendInput de
+// reinyección — el costo variable real). El camino NO traducible
+// sigue siendo 100% sincrónico dentro del hook: la decisión de
+// bloquear un evento no traducible depende de debe_tragar_no_
+// traducible() (cache::captura_activa(), un solo Mutex.lock() +
+// lectura de bool — barato) y esa decisión TIENE que tomarse ahí
+// mismo, porque bloquear un evento físico solo es posible
+// devolviendo 1 desde el propio hook, no después.
+static COLA: std::sync::Mutex<Option<Sender<InputEvent>>> = std::sync::Mutex::new(None);
 
 // ======================================================
 // 🚀 INICIAR
 // ======================================================
 
 pub fn iniciar(
-    mut procesar: impl FnMut(InputEvent) + 'static,
+    mut procesar: impl FnMut(InputEvent) + Send + 'static,
     debe_tragar_no_traducible: impl Fn() -> bool + 'static,
 ) {
-    ESTADO.with(|estado| {
-        *estado.borrow_mut() = Some(Estado {
-            procesar: Box::new(procesar),
+    ESTADO_HOOK.with(|estado| {
+        *estado.borrow_mut() = Some(EstadoHook {
             debe_tragar_no_traducible: Box::new(debe_tragar_no_traducible),
         });
+    });
+
+    // Hilo worker dedicado: consume la cola y llama a procesar()
+    // (evaluar() -> entrada::procesar_evento()) fuera del hilo de
+    // hooks — ver nota completa en la declaración de COLA más
+    // arriba. join_handle no se guarda: el hilo termina solo cuando
+    // el Sender se dropea al salir del loop de mensajes más abajo,
+    // y no hace falta esperarlo (no toca nada que dependa del hilo
+    // de hooks después de ese punto).
+    let (tx, rx) = mpsc::channel::<InputEvent>();
+
+    *COLA.lock().unwrap() = Some(tx);
+
+    std::thread::spawn(move || {
+        while let Ok(evento) = rx.recv() {
+            procesar(evento);
+        }
     });
 
     let id_hilo = unsafe { windows_sys::Win32::System::Threading::GetCurrentThreadId() };
@@ -243,7 +306,12 @@ pub fn iniciar(
 
     HILO_HOOKS.store(0, Ordering::SeqCst);
 
-    ESTADO.with(|estado| {
+    // Dropea el Sender: el hilo worker sale de su while let Ok(...)
+    // en cuanto termina de procesar lo que ya tenía encolado, y
+    // finaliza solo.
+    *COLA.lock().unwrap() = None;
+
+    ESTADO_HOOK.with(|estado| {
         *estado.borrow_mut() = None;
     });
 
@@ -305,19 +373,29 @@ unsafe extern "system" fn hook_teclado(codigo: i32, wparam: WPARAM, lparam: LPAR
         Some(evento) => {
             // Evento traducido: SIEMPRE se bloquea el físico original
             // (nunca CallNextHookEx acá) — mismo modelo que Interception,
-            // que intercepta todo por default. Lo que deba pasar
-            // (el mismo evento sin tocar, o una acción remapeada) lo
-            // reinyecta motor::emitir_evento() más abajo en la cadena
-            // (entrada.rs), vía SendInput — el filtro de "eventos
-            // inyectados por este mismo proceso" de más arriba evita
-            // que esa reinyección se vuelva a capturar como si fuera
-            // físico.
-            evaluar(evento);
+            // que intercepta todo por default. Se ENCOLA para el hilo
+            // worker (ver COLA más arriba) en vez de llamar evaluar()
+            // acá mismo: ese es el trabajo variable/pesado (locks +
+            // posible SendInput de reinyección) que causaba el lag
+            // general del sistema al correr dentro de este hook de
+            // baja latencia. El evento físico ya quedó bloqueado con
+            // este mismo return, así que encolarlo y seguir es seguro
+            // — nada se pierde, solo se procesa un instante después.
+            let cola = COLA.lock().unwrap();
+
+            if let Some(tx) = cola.as_ref() {
+                let _ = tx.send(evento);
+            }
+
             return 1;
         }
         None => {
-            // No traducible: tragar si hay captura activa, pasar si no
-            let debe_tragar = ESTADO.with(|estado| {
+            // No traducible: tragar si hay captura activa, pasar si
+            // no. Esta decisión SÍ sigue siendo sincrónica (no se
+            // encola) porque bloquear un evento físico solo es
+            // posible devolviendo 1 desde el propio hook — ver nota
+            // en la declaración de ESTADO_HOOK/COLA más arriba.
+            let debe_tragar = ESTADO_HOOK.with(|estado| {
                 estado
                     .borrow()
                     .as_ref()
@@ -379,12 +457,18 @@ unsafe extern "system" fn hook_mouse(codigo: i32, wparam: WPARAM, lparam: LPARAM
     match traducir_mouse(wparam, datos) {
         Some(evento) => {
             // Ver nota equivalente en hook_teclado(): un evento
-            // traducido siempre bloquea el físico original.
-            evaluar(evento);
+            // traducido siempre bloquea el físico original y se
+            // encola para el hilo worker, sin llamar evaluar() acá.
+            let cola = COLA.lock().unwrap();
+
+            if let Some(tx) = cola.as_ref() {
+                let _ = tx.send(evento);
+            }
+
             return 1;
         }
         None => {
-            let debe_tragar = ESTADO.with(|estado| {
+            let debe_tragar = ESTADO_HOOK.with(|estado| {
                 estado
                     .borrow()
                     .as_ref()
@@ -399,37 +483,6 @@ unsafe extern "system" fn hook_mouse(codigo: i32, wparam: WPARAM, lparam: LPARAM
     }
 
     CallNextHookEx(std::ptr::null_mut(), codigo, wparam, lparam)
-}
-
-// ======================================================
-// 🧠 EVALUAR
-// ======================================================
-
-fn evaluar(evento: InputEvent) {
-    let mut procesar: Option<Box<dyn FnMut(InputEvent)>> = None;
-    let mut debe_tragar_no_traducible: Option<Box<dyn Fn() -> bool>> = None;
-
-    ESTADO.with(|estado| {
-        if let Some(actual) = estado.borrow_mut().take() {
-            procesar = Some(actual.procesar);
-            debe_tragar_no_traducible = Some(actual.debe_tragar_no_traducible);
-        }
-    });
-
-    // El bloqueo del evento físico ya se decidió en el hook (siempre
-    // se bloquea, ver hook_teclado()/hook_mouse()) — acá solo se
-    // entrega al procesador para que decida qué reinyectar, si
-    // corresponde, vía motor::emitir_evento().
-    if let (Some(mut f), Some(pred)) = (procesar, debe_tragar_no_traducible) {
-        f(evento);
-
-        ESTADO.with(|estado| {
-            *estado.borrow_mut() = Some(Estado {
-                procesar: f,
-                debe_tragar_no_traducible: pred,
-            });
-        });
-    }
 }
 
 // ======================================================
