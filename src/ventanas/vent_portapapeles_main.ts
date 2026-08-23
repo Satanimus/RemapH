@@ -1,5 +1,5 @@
 // ======================================================
-// 📋🪟 portapapeles_Main
+// 📋🪟 vent_portapapeles_Main
 // ------------------------------------------------------
 // Punto de entrada de la ventana flotante de Portapapeles
 // (portapapeles.html — página independiente, ver

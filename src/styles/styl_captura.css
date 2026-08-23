@@ -1,5 +1,5 @@
 /* ======================================================
-   📌 captura.css
+   📌 styl_captura.css
    ------------------------------------------------------
    Estilos propios de la ventana overlay de captura. NO
    importa styl_general.css: esa hoja fija html/body con
@@ -10,91 +10,91 @@
    ====================================================== */
 
 * {
-    margin: 0;
-    padding: 0;
-    box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
 }
 
 html,
 body {
-    width: 100%;
-    height: 100%;
-    overflow: hidden;
-    background: transparent;
-    font-family: var(--font);
-    font-size: var(--fs13);
-    color: #ffffff;
-    user-select: none;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: transparent;
+  font-family: var(--font);
+  font-size: var(--fs13);
+  color: #ffffff;
+  user-select: none;
 }
 
 .captura-card {
-    width: 100%;
-    height: 100%;
-    display: flex;
-    flex-direction: column;
-    background: rgba(20, 20, 30, 0.85);
-    border: 1px solid var(--border-light);
-    border-radius: 6px;
-    overflow: hidden;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: rgba(20, 20, 30, 0.85);
+  border: 1px solid var(--border-light);
+  border-radius: 6px;
+  overflow: hidden;
 }
 
 .captura-header {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    padding: 6px 8px;
-    background: rgba(255, 255, 255, 0.06);
-    cursor: move;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  background: rgba(255, 255, 255, 0.06);
+  cursor: move;
 }
 
 .captura-header-icono {
-    opacity: 0.7;
+  opacity: 0.7;
 }
 
 .captura-header-titulo {
-    flex: 1;
-    font-size: var(--fs11);
-    letter-spacing: 0.05em;
-    opacity: 0.85;
+  flex: 1;
+  font-size: var(--fs11);
+  letter-spacing: 0.05em;
+  opacity: 0.85;
 }
 
 .captura-cancelar {
-    background: transparent;
-    border: 1px solid var(--border-light);
-    color: #ffffff;
-    border-radius: 4px;
-    padding: 2px 8px;
-    font-size: var(--fs11);
-    cursor: pointer;
+  background: transparent;
+  border: 1px solid var(--border-light);
+  color: #ffffff;
+  border-radius: 4px;
+  padding: 2px 8px;
+  font-size: var(--fs11);
+  cursor: pointer;
 }
 
 .captura-cancelar:hover {
-    border-color: var(--highlight-red);
-    color: var(--highlight-red);
+  border-color: var(--highlight-red);
+  color: var(--highlight-red);
 }
 
 .captura-cuerpo {
-    flex: 1;
-    padding: 8px 10px;
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-    justify-content: center;
+  flex: 1;
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  justify-content: center;
 }
 
 .captura-linea {
-    font-size: var(--fs12);
-    opacity: 0.85;
+  font-size: var(--fs12);
+  opacity: 0.85;
 }
 
 .captura-valor {
-    color: var(--highlight);
-    font-weight: 600;
+  color: var(--highlight);
+  font-weight: 600;
 }
 
 .captura-guardado {
-    color: #4CAF50;
-    font-weight: 600;
-    text-align: center;
-    font-size: var(--fs14);
+  color: #4caf50;
+  font-weight: 600;
+  text-align: center;
+  font-size: var(--fs14);
 }

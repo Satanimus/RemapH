@@ -1,5 +1,5 @@
 /* ======================================================
-   ⚙️ configuracion.css
+   ⚙️ styl_configuracion.css
    ------------------------------------------------------
    Estilos propios de la Ventana de Configuración. A
    diferencia de captura.css, esta ventana SÍ importa
@@ -9,10 +9,10 @@
    ====================================================== */
 
 .configuracion-card {
-    display: flex;
-    flex-direction: column;
-    width: 100%;
-    height: 100vh;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100vh;
 }
 
 /* ======================================================
@@ -20,32 +20,32 @@
    ====================================================== */
 
 .configuracion-tabs {
-    display: flex;
-    gap: var(--gap4);
-    padding: var(--gap8) var(--gap12) 0;
-    border-bottom: 1px solid var(--border);
-    background: var(--panel);
+  display: flex;
+  gap: var(--gap4);
+  padding: var(--gap8) var(--gap12) 0;
+  border-bottom: 1px solid var(--border);
+  background: var(--panel);
 }
 
 .configuracion-tab {
-    padding: var(--gap8) var(--gap16);
-    background: transparent;
-    border: 1px solid transparent;
-    border-bottom: none;
-    border-radius: var(--r4) var(--r4) 0 0;
-    color: var(--text-soft);
-    font-size: var(--fs13);
+  padding: var(--gap8) var(--gap16);
+  background: transparent;
+  border: 1px solid transparent;
+  border-bottom: none;
+  border-radius: var(--r4) var(--r4) 0 0;
+  color: var(--text-soft);
+  font-size: var(--fs13);
 }
 
 .configuracion-tab:hover {
-    color: var(--text);
+  color: var(--text);
 }
 
 .configuracion-tab-activa {
-    background: var(--bg);
-    border-color: var(--border);
-    color: var(--text);
-    font-weight: 600;
+  background: var(--bg);
+  border-color: var(--border);
+  color: var(--text);
+  font-weight: 600;
 }
 
 /* ======================================================
@@ -53,34 +53,34 @@
    ====================================================== */
 
 .configuracion-cuerpo {
-    flex: 1;
-    overflow: hidden;
-    background: var(--bg);
+  flex: 1;
+  overflow: hidden;
+  background: var(--bg);
 }
 
 .configuracion-panel {
-    display: flex;
-    flex-direction: column;
-    width: 100%;
-    height: 100%;
-    /* min-height: 0 es necesario para que un hijo flex con overflow
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  /* min-height: 0 es necesario para que un hijo flex con overflow
        (.configuracion-tabla-scroll) pueda scrollear en vez de
        empujar la altura del panel — sin esto, un flex item por
        defecto no se encoge más allá del tamaño de su contenido. */
-    min-height: 0;
-    padding: var(--gap16);
-    gap: var(--gap12);
+  min-height: 0;
+  padding: var(--gap16);
+  gap: var(--gap12);
 }
 
 .configuracion-panel.oculto {
-    display: none;
+  display: none;
 }
 
 .configuracion-placeholder {
-    color: var(--text-disabled);
-    font-size: var(--fs13);
-    padding: var(--gap24);
-    text-align: center;
+  color: var(--text-disabled);
+  font-size: var(--fs13);
+  padding: var(--gap24);
+  text-align: center;
 }
 
 /* ======================================================
@@ -93,43 +93,43 @@
    queda a su altura natural y el thead se pega arriba (sticky) sobre
    ESTE contenedor, no sobre la ventana. */
 .configuracion-tabla-scroll {
-    flex: 1;
-    min-height: 0;
-    overflow-y: auto;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
 }
 
 .configuracion-tabla {
-    border-collapse: collapse;
-    width: 100%;
-    font-size: var(--fs13);
+  border-collapse: collapse;
+  width: 100%;
+  font-size: var(--fs13);
 }
 
 .configuracion-tabla thead th {
-    position: sticky;
-    top: 0;
-    z-index: 1;
+  position: sticky;
+  top: 0;
+  z-index: 1;
 
-    background: var(--panel2);
-    color: var(--text-soft);
-    text-align: left;
-    font-size: var(--fs12);
-    font-weight: 600;
-    padding: var(--gap8);
-    border-bottom: 1px solid var(--border);
+  background: var(--panel2);
+  color: var(--text-soft);
+  text-align: left;
+  font-size: var(--fs12);
+  font-weight: 600;
+  padding: var(--gap8);
+  border-bottom: 1px solid var(--border);
 }
 
 .configuracion-tabla tbody td {
-    padding: var(--gap8);
-    border-bottom: 1px solid var(--border);
-    vertical-align: middle;
+  padding: var(--gap8);
+  border-bottom: 1px solid var(--border);
+  vertical-align: middle;
 }
 
 .configuracion-tabla tbody tr:hover {
-    background: var(--row-hover-bg);
+  background: var(--row-hover-bg);
 }
 
 .configuracion-valor-defecto {
-    color: var(--text-soft);
+  color: var(--text-soft);
 }
 
 /* El swatch de color (Apariencia) necesita ir en línea junto al
@@ -140,87 +140,87 @@
    pegado arriba. inline-flex conserva el centrado de la celda y
    alinea swatch+texto entre sí. */
 .configuracion-valor-defecto .configuracion-swatch-wrap {
-    display: inline-flex;
-    align-items: center;
-    gap: var(--gap8);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--gap8);
 }
 
 .configuracion-swatch {
-    display: inline-block;
-    width: 14px;
-    height: 14px;
-    border-radius: var(--r4);
-    border: 1px solid var(--border-light);
-    flex-shrink: 0;
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border-radius: var(--r4);
+  border: 1px solid var(--border-light);
+  flex-shrink: 0;
 }
 
 /* Fila separadora de subtítulo (pestaña Teclas: Letras,
    Números, Teclado numérico, Funciones, Especiales,
    Símbolos, Mouse). */
 .configuracion-subtitulo td {
-    padding-top: var(--gap16);
-    color: var(--text-soft);
-    font-size: var(--fs12);
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-    border-bottom: 1px solid var(--border);
-    background: var(--panel2);
+  padding-top: var(--gap16);
+  color: var(--text-soft);
+  font-size: var(--fs12);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  border-bottom: 1px solid var(--border);
+  background: var(--panel2);
 }
 
 .configuracion-subtitulo:first-child td {
-    padding-top: var(--gap8);
+  padding-top: var(--gap8);
 }
 
 .configuracion-valor-personalizado input {
-    width: 100%;
+  width: 100%;
 }
 
 .configuracion-valor-personalizado input[type="color"] {
-    width: 44px;
-    height: 28px;
-    padding: 2px;
+  width: 44px;
+  height: 28px;
+  padding: 2px;
 }
 
 /* Grupo de controles de tema (Apariencia) — empujado al borde
    izquierdo del pie, mientras Restablecer/Guardar quedan a la
    derecha (el pie sigue siendo flex-end por defecto). */
 .configuracion-acciones-tema {
-    display: flex;
-    align-items: center;
-    gap: var(--gap8);
-    margin-right: auto;
+  display: flex;
+  align-items: center;
+  gap: var(--gap8);
+  margin-right: auto;
 }
 
 .configuracion-input-tema {
-    padding: var(--gap8);
-    background: var(--panel2);
-    border: 1px solid var(--border-light);
-    border-radius: var(--r4);
-    color: var(--text);
-    font-size: var(--fs13);
-    width: 160px;
+  padding: var(--gap8);
+  background: var(--panel2);
+  border: 1px solid var(--border-light);
+  border-radius: var(--r4);
+  color: var(--text);
+  font-size: var(--fs13);
+  width: 160px;
 }
 
 .configuracion-par {
-    display: flex;
-    align-items: center;
-    gap: var(--gap4);
+  display: flex;
+  align-items: center;
+  gap: var(--gap4);
 }
 
 .configuracion-par input {
-    width: 100%;
-    min-width: 0;
+  width: 100%;
+  min-width: 0;
 }
 
 /* Fila con un campo editado, todavía sin guardar. */
 .configuracion-fila-editando .configuracion-valor-personalizado input {
-    border-color: var(--green);
+  border-color: var(--green);
 }
 
 /* Fila con un valor inválido, marcada al intentar guardar. */
 .configuracion-fila-error .configuracion-valor-personalizado input {
-    border-color: var(--red);
+  border-color: var(--red);
 }
 
 /* ======================================================
@@ -228,63 +228,63 @@
    ====================================================== */
 
 .configuracion-error {
-    color: var(--red);
-    font-size: var(--fs12);
-    background: rgba(198, 40, 40, 0.12);
-    border: 1px solid var(--red);
-    border-radius: var(--r4);
-    padding: var(--gap8);
+  color: var(--red);
+  font-size: var(--fs12);
+  background: rgba(198, 40, 40, 0.12);
+  border: 1px solid var(--red);
+  border-radius: var(--r4);
+  padding: var(--gap8);
 }
 
 .configuracion-error.oculto {
-    display: none;
+  display: none;
 }
 
 .configuracion-acciones {
-    display: flex;
-    justify-content: flex-end;
-    gap: var(--gap8);
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--gap8);
 }
 
 .configuracion-boton {
-    padding: var(--gap8) var(--gap16);
-    background: var(--button-bg);
-    border: 1px solid var(--border-light);
-    border-radius: var(--r4);
-    color: var(--text);
-    font-size: var(--fs13);
+  padding: var(--gap8) var(--gap16);
+  background: var(--button-bg);
+  border: 1px solid var(--border-light);
+  border-radius: var(--r4);
+  color: var(--text);
+  font-size: var(--fs13);
 }
 
 .configuracion-boton:hover {
-    border-color: var(--highlight);
+  border-color: var(--highlight);
 }
 
 .configuracion-boton:disabled {
-    opacity: 0.5;
-    cursor: default;
+  opacity: 0.5;
+  cursor: default;
 }
 
 .configuracion-boton-primario {
-    background: var(--blue);
-    border-color: var(--blue);
+  background: var(--blue);
+  border-color: var(--blue);
 }
 
 .configuracion-toast {
-    position: fixed;
-    right: var(--gap16);
-    bottom: var(--gap16);
+  position: fixed;
+  right: var(--gap16);
+  bottom: var(--gap16);
 
-    padding: var(--gap8) var(--gap16);
-    background: var(--green-dark);
-    border-radius: var(--r6);
-    color: var(--text);
-    font-size: var(--fs13);
+  padding: var(--gap8) var(--gap16);
+  background: var(--green-dark);
+  border-radius: var(--r6);
+  color: var(--text);
+  font-size: var(--fs13);
 
-    opacity: 0;
-    pointer-events: none;
-    transition: opacity var(--speed);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--speed);
 }
 
 .configuracion-toast-visible {
-    opacity: 1;
+  opacity: 1;
 }

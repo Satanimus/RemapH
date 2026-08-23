@@ -1,5 +1,5 @@
 // ======================================================
-// ⚙️ configuracion_Main
+// ⚙️ vent_configuracion_Main
 // ------------------------------------------------------
 // Punto de entrada de la Ventana de Configuración
 // (configuracion.html — página independiente, ver

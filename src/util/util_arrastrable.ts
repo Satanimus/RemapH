@@ -376,6 +376,20 @@ export function crearControladorArrastre(
   function manejarTeclado(evento: KeyboardEvent): void {
     if (seleccionadas.size === 0) return;
 
+    // Esc sale del modo Mover (Regla 1/2 de reglas_esc.txt) — mismo
+    // camino que salir por click afuera o por Guardar: solo apaga
+    // selección/modo, no revierte ningún reordenamiento ya aplicado.
+    // stopPropagation: esta es la capa más externa (Regla 9) — un
+    // solo Esc no debe seguir burbujeando hacia otros listeners
+    // (popups, etc.) que puedan sumarse en etapas siguientes.
+    if (evento.key === "Escape") {
+      evento.stopPropagation();
+
+      salirModoMover();
+
+      return;
+    }
+
     if (evento.key !== "ArrowUp" && evento.key !== "ArrowDown") return;
 
     const objetivo = evento.target as HTMLElement | null;

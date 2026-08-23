@@ -1,5 +1,5 @@
 // ======================================================
-// 📌 captura_Main
+// 📌 vent_captura_Main
 // ------------------------------------------------------
 // Punto de entrada de la ventana overlay de "Click en
 // coordenada" (captura.html — página independiente, ver

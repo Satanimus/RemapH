@@ -1,5 +1,5 @@
 // ======================================================
-// 📝 vite-env.d.ts - Declaraciones Vite
+// 📝 src/vite-env.d.ts - Declaraciones Vite
 // ------------------------------------------------------
 // Permite importar archivos estáticos como CSS.
 // ======================================================
