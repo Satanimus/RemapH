@@ -4,82 +4,71 @@
    ====================================================== */
 
 .app {
+  width: 100vw;
 
-    width: 100vw;
+  height: 100vh;
 
-    height: 100vh;
-
-    background: var(--bg);
+  background: var(--bg);
 }
 
 .layout {
+  width: 100%;
 
-    width: 100%;
+  height: 100%;
 
-    height: 100%;
+  display: grid;
 
-    display: grid;
-
-    grid-template-rows:
-        var(--toolbar-height) 1fr var(--status-height);
+  grid-template-rows: var(--toolbar-height) 1fr var(--status-height);
 }
-
 
 /* ======================================================
    TOOLBAR
    ====================================================== */
 
 .toolbar {
+  display: grid;
 
-    display: grid;
+  grid-template-columns: 1fr auto 1fr;
 
-    grid-template-columns:
-        1fr auto 1fr;
+  align-items: center;
 
-    align-items: center;
+  padding: 0 var(--gap16);
 
-    padding: 0 var(--gap16);
+  background: var(--panel);
 
-    background: var(--panel);
-
-    border-bottom: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
 }
 
 .toolbar-left,
 .toolbar-center,
 .toolbar-right {
+  display: flex;
 
-    display: flex;
-
-    align-items: center;
+  align-items: center;
 }
 
 .toolbar-left {
+  justify-content: flex-start;
 
-    justify-content: flex-start;
-
-    gap: var(--gap12);
+  gap: var(--gap12);
 }
 
 .toolbar-center {
+  justify-content: center;
 
-    justify-content: center;
-
-    gap: var(--gap8);
+  gap: var(--gap8);
 }
 
 .toolbar-right {
+  justify-content: flex-end;
 
-    justify-content: flex-end;
-
-    gap: var(--gap8);
+  gap: var(--gap8);
 }
 
 .titulo {
+  font-size: var(--fs16);
 
-    font-size: var(--fs16);
-
-    font-weight: bold;
+  font-weight: bold;
 }
 
 /* ======================================================
@@ -87,12 +76,11 @@
    ====================================================== */
 
 .perfil-box {
+  display: flex;
 
-    display: flex;
+  align-items: center;
 
-    align-items: center;
-
-    gap: var(--gap8);
+  gap: var(--gap8);
 }
 
 /* ======================================================
@@ -100,368 +88,351 @@
    ====================================================== */
 
 .perfil-selector {
+  display: flex;
 
-    display: flex;
+  align-items: center;
 
-    align-items: center;
+  gap: var(--gap8);
 
-    gap: var(--gap8);
+  height: 30px;
 
-    height: 30px;
+  padding: 0 var(--gap8);
 
-    padding: 0 var(--gap8);
+  background: var(--panel2);
 
-    background: var(--panel2);
+  color: var(--text);
 
-    color: var(--text);
+  border: 1px solid var(--border-light);
 
-    border: 1px solid var(--border-light);
+  border-radius: var(--r4);
 
-    border-radius: var(--r4);
+  font-family: var(--font);
 
-    font-family: var(--font);
+  font-size: var(--fs13);
 
-    font-size: var(--fs13);
+  cursor: pointer;
 
-    cursor: pointer;
-
-    transition:
-        border-color .12s ease;
+  transition: border-color 0.12s ease;
 }
 
 .perfil-selector:hover {
+  background: var(--panel2);
 
-    background: var(--panel2);
-
-    border-color: var(--highlight);
+  border-color: var(--highlight);
 }
 
 .perfil-selector-nombre {
+  white-space: nowrap;
 
-    white-space: nowrap;
+  overflow: hidden;
 
-    overflow: hidden;
+  text-overflow: ellipsis;
 
-    text-overflow: ellipsis;
-
-    max-width: 220px;
+  max-width: 220px;
 }
-
 
 /* ======================================================
    🟢🔴 INDICADOR DEL PERFIL
    ====================================================== */
 
 .perfil-selector .indicador {
+  margin-left: 0;
 
-    margin-left: 0;
-
-    flex-shrink: 0;
+  flex-shrink: 0;
 }
-
 
 /* ======================================================
    🟢🟡🔴 ESTADO DEL PERFIL
    ====================================================== */
 
 .perfil-estado {
+  height: 30px;
 
-    height: 30px;
+  padding: 0 var(--gap12);
 
-    padding: 0 var(--gap12);
+  color: var(--text);
 
-    color: var(--text);
+  border: 1px solid transparent;
 
-    border: 1px solid transparent;
+  border-radius: var(--r4);
 
-    border-radius: var(--r4);
+  font-family: var(--font);
 
-    font-family: var(--font);
+  font-size: var(--fs13);
 
-    font-size: var(--fs13);
+  cursor: pointer;
 
-    cursor: pointer;
-
-    transition:
-        background .12s ease,
-        border-color .12s ease;
+  transition:
+    background 0.12s ease,
+    border-color 0.12s ease;
 }
 
 .perfil-estado[data-estado="activo"] {
-
-    background: var(--green-dark);
+  background: var(--green-dark);
 }
 
 .perfil-estado[data-estado="activo"]:hover {
-
-    background: var(--green);
+  background: var(--green);
 }
 
 .perfil-estado[data-estado="inactivo"] {
-
-    background: var(--red-dark);
+  background: var(--red-dark);
 }
 
 .perfil-estado[data-estado="inactivo"]:hover {
-
-    background: var(--red);
+  background: var(--red);
 }
 
 .perfil-estado[data-estado="editado"] {
-
-    background: var(--yellow-dark);
+  background: var(--yellow-dark);
 }
 
 .perfil-estado[data-estado="editado"]:hover {
-
-    background: var(--yellow);
+  background: var(--yellow);
 }
-
 
 /* ======================================================
    🔘 BOTONES TOOLBAR
    ====================================================== */
 
 .configuracion {
+  height: 30px;
 
-    height: 30px;
+  padding: 0 var(--gap8);
 
-    padding: 0 var(--gap8);
+  background: transparent;
 
-    background: transparent;
+  color: var(--text);
 
-    color: var(--text);
+  border: 1px solid var(--border-light);
 
-    border: 1px solid var(--border-light);
+  border-radius: var(--r4);
 
-    border-radius: var(--r4);
+  font-family: var(--font);
 
-    font-family: var(--font);
+  font-size: var(--fs13);
 
-    font-size: var(--fs13);
+  cursor: pointer;
 
-    cursor: pointer;
-
-    transition:
-        border-color .12s ease;
+  transition: border-color 0.12s ease;
 }
 
 .configuracion:hover {
+  background: transparent;
 
-    background: transparent;
-
-    border-color: var(--highlight);
+  border-color: var(--highlight);
 }
-
 
 /* ======================================================
    STATUS
    ====================================================== */
 
 .statusbar {
+  display: flex;
 
-    display: flex;
+  align-items: center;
 
-    align-items: center;
+  padding: 0 var(--gap16);
 
-    padding: 0 var(--gap16);
+  background: var(--panel);
 
-    background: var(--panel);
+  border-top: 1px solid var(--border);
 
-    border-top: 1px solid var(--border);
-
-    color: var(--text-soft);
+  color: var(--text-soft);
 }
 
+.statusbar-texto {
+  flex: 1;
+
+  overflow: hidden;
+
+  text-overflow: ellipsis;
+
+  white-space: nowrap;
+}
+
+.statusbar-box-modo {
+  flex-shrink: 0;
+
+  margin-left: var(--gap16);
+
+  padding-left: var(--gap16);
+
+  border-left: 1px solid var(--border);
+
+  color: var(--text-soft);
+}
 
 /* ======================================================
    POPUP
    ====================================================== */
 
 .popup-capa {
+  position: fixed;
 
-    position: fixed;
+  inset: 0;
 
-    inset: 0;
+  display: none;
 
-    display: none;
+  align-items: center;
 
-    align-items: center;
+  justify-content: center;
 
-    justify-content: center;
-
-    z-index: 9999;
+  z-index: 9999;
 }
 
-.popup-capa>div {
+.popup-capa > div {
+  width: max-content;
 
-    width: max-content;
+  min-width: 180px;
 
-    min-width: 180px;
+  padding: 8px;
 
-    padding: 8px;
+  background: var(--panel);
 
-    background: var(--panel);
+  color: var(--text);
 
-    color: var(--text);
+  border: 1px solid var(--border-light);
 
-    border: 1px solid var(--border-light);
+  border-radius: var(--r4);
 
-    border-radius: var(--r4);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
 
-    box-shadow:
-        0 10px 30px rgba(0, 0, 0, .4);
+  display: flex;
 
-    display: flex;
+  flex-direction: column;
 
-    flex-direction: column;
-
-    gap: 0;
+  gap: 0;
 }
-
 
 /* ======================================================
    👤 POPUP PERFIL
    ====================================================== */
 
 .popup-perfil {
-
-    min-width: 220px;
+  min-width: 220px;
 }
 
 .popup-perfil-lista {
+  display: flex;
 
-    display: flex;
+  flex-direction: column;
 
-    flex-direction: column;
+  gap: 0;
 
-    gap: 0;
+  max-height: 240px;
 
-    max-height: 240px;
-
-    overflow-y: auto;
+  overflow-y: auto;
 }
 
 .popup-perfil-acciones {
+  display: flex;
 
-    display: flex;
+  flex-direction: column;
 
-    flex-direction: column;
-
-    gap: 0;
+  gap: 0;
 }
 
 .popup-perfil-item {
+  display: flex;
 
-    display: flex;
+  align-items: center;
 
-    align-items: center;
+  justify-content: flex-start;
 
-    justify-content: flex-start;
+  width: 100%;
 
-    width: 100%;
-
-    gap: 0;
+  gap: 0;
 }
 
 .popup-perfil-indicador-espacio {
+  display: flex;
 
-    display: flex;
+  align-items: center;
 
-    align-items: center;
+  justify-content: center;
 
-    justify-content: center;
+  width: 18px;
 
-    width: 18px;
+  min-width: 18px;
 
-    min-width: 18px;
-
-    margin-right: var(--gap8);
+  margin-right: var(--gap8);
 }
 
 .popup-perfil-indicador {
-
-    margin: 0;
+  margin: 0;
 }
 
 .popup-perfil-nombre {
+  flex: 1;
 
-    flex: 1;
+  text-align: left;
 
-    text-align: left;
+  white-space: nowrap;
 
-    white-space: nowrap;
+  overflow: hidden;
 
-    overflow: hidden;
-
-    text-overflow: ellipsis;
+  text-overflow: ellipsis;
 }
 
 .popup-perfil-revertir-icono {
+  margin-left: auto;
 
-    margin-left: auto;
+  color: var(--text-soft);
 
-    color: var(--text-soft);
+  font-size: 16px;
 
-    font-size: 16px;
-
-    line-height: 1;
+  line-height: 1;
 }
 
 .popup-perfil-item:hover .popup-perfil-revertir-icono {
-
-    color: var(--highlight);
+  color: var(--highlight);
 }
 
 .popup-perfil-separador {
+  height: 1px;
 
-    height: 1px;
+  background: var(--border);
 
-    background: var(--border);
-
-    margin: var(--gap4) 0;
+  margin: var(--gap4) 0;
 }
-
 
 /* ======================================================
    ✏️ RENOMBRAR PERFIL
    ====================================================== */
 
 .popup-perfil-renombrar {
+  display: flex;
 
-    display: flex;
+  flex-direction: column;
 
-    flex-direction: column;
+  gap: var(--gap8);
 
-    gap: var(--gap8);
-
-    min-width: 220px;
+  min-width: 220px;
 }
 
 .popup-input {
+  height: 28px;
 
-    height: 28px;
+  padding: 0 var(--gap8);
 
-    padding: 0 var(--gap8);
+  background: var(--panel2);
 
-    background: var(--panel2);
+  color: var(--text);
 
-    color: var(--text);
+  border: 1px solid var(--border);
 
-    border: 1px solid var(--border);
+  border-radius: var(--r4);
 
-    border-radius: var(--r4);
+  font-family: var(--font);
 
-    font-family: var(--font);
-
-    font-size: var(--fs13);
+  font-size: var(--fs13);
 }
 
 .popup-input:focus {
+  outline: none;
 
-    outline: none;
-
-    border-color: var(--highlight);
+  border-color: var(--highlight);
 }
 
 /* ======================================================
@@ -469,15 +440,15 @@
    ====================================================== */
 
 .popup-numero-campo {
-    display: flex;
-    align-items: center;
-    gap: var(--gap4);
-    font-size: var(--fs13);
+  display: flex;
+  align-items: center;
+  gap: var(--gap4);
+  font-size: var(--fs13);
 }
 
 .popup-input-numero {
-    width: 56px;
-    text-align: center;
+  width: 56px;
+  text-align: center;
 }
 
 /* ======================================================
@@ -485,163 +456,155 @@
    ====================================================== */
 
 .popup-menu-editor {
-    min-width: 320px;
-    max-width: 380px;
+  min-width: 320px;
+  max-width: 380px;
 }
 
 .popup-menu-editor-nombre {
-    width: 100%;
+  width: 100%;
 }
 
 .popup-menu-editor-lista {
-    display: flex;
-    flex-direction: column;
-    gap: 0;
-    max-height: 180px;
-    overflow-y: auto;
-    padding: var(--gap4);
-    background: var(--bg);
-    border: 1px solid var(--border-light);
-    border-radius: var(--r4);
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  max-height: 180px;
+  overflow-y: auto;
+  padding: var(--gap4);
+  background: var(--bg);
+  border: 1px solid var(--border-light);
+  border-radius: var(--r4);
 }
 
 /* Ítem 4: Botones Disponibles siempre completo, sin scrollbar
    (a diferencia de Seleccionados, que sí puede comprimirse). */
 .popup-menu-editor-lista--completa {
-    max-height: none;
-    overflow-y: visible;
+  max-height: none;
+  overflow-y: visible;
 }
 
 .popup-menu-editor-item {
-    display: flex;
-    align-items: center;
-    gap: var(--gap8);
-    padding: 0 2px;
+  display: flex;
+  align-items: center;
+  gap: var(--gap8);
+  padding: 0 2px;
 }
 
 .popup-menu-editor-numero {
-    font-size: var(--fs11);
-    color: var(--text-soft);
-    min-width: 26px;
+  font-size: var(--fs11);
+  color: var(--text-soft);
+  min-width: 26px;
 }
 
 .popup-menu-editor-texto {
-    flex: 1;
-    color: var(--text-disabled);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+  flex: 1;
+  color: var(--text-disabled);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .popup-menu-editor-item[data-seccion="seleccionado"] .popup-menu-editor-numero {
-    color: var(--text);
+  color: var(--text);
 }
 
 .popup-menu-editor-renombrar {
-    flex: 1;
-    min-width: 0;
-    background: transparent;
-    border: 1px solid transparent;
+  flex: 1;
+  min-width: 0;
+  background: transparent;
+  border: 1px solid transparent;
 }
 
 .popup-menu-editor-renombrar:hover {
-    border-color: var(--highlight);
+  border-color: var(--highlight);
 }
 
 .popup-input.popup-menu-editor-renombrar:focus {
-    background: var(--panel2);
-    border-color: var(--border);
-    outline: none;
+  background: var(--panel2);
+  border-color: var(--border);
+  outline: none;
 }
 
 .popup-menu-editor-toggle {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    appearance: none;
-    -webkit-appearance: none;
-    width: 22px;
-    height: 22px;
-    min-width: 22px;
-    padding: 0;
-    border-radius: 50%;
-    font-weight: 700;
-    font-size: var(--fs14);
-    line-height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  appearance: none;
+  -webkit-appearance: none;
+  width: 22px;
+  height: 22px;
+  min-width: 22px;
+  padding: 0;
+  border-radius: 50%;
+  font-weight: 700;
+  font-size: var(--fs14);
+  line-height: 22px;
 }
 
 .popup-menu-editor-toggle.popup-menu-editor-agregar {
-    color: var(--tag-green);
-    border-color: var(--tag-green);
+  color: var(--tag-green);
+  border-color: var(--tag-green);
 }
 
 .popup-menu-editor-toggle.popup-menu-editor-agregar:hover {
-    background: var(--tag-green);
-    color: #FFF;
+  background: var(--tag-green);
+  color: #fff;
 }
 
 .popup-menu-editor-toggle.popup-menu-editor-quitar {
-    color: var(--highlight-red);
-    border-color: var(--highlight-red);
+  color: var(--highlight-red);
+  border-color: var(--highlight-red);
 }
 
 .popup-menu-editor-toggle.popup-menu-editor-quitar:hover {
-    background: var(--highlight-red);
-    color: #FFF;
+  background: var(--highlight-red);
+  color: #fff;
 }
-
 
 /* ======================================================
    ❓ CONFIRMAR
    ====================================================== */
 
 .popup-confirmar {
-
-    min-width: 220px;
+  min-width: 220px;
 }
 
 .popup-confirmar-mensaje {
+  margin: 0 0 var(--gap8) 0;
 
-    margin: 0 0 var(--gap8) 0;
-
-    color: var(--text);
+  color: var(--text);
 }
 
 .popup-confirmar-botones {
+  display: flex;
 
-    display: flex;
-
-    gap: var(--gap8);
+  gap: var(--gap8);
 }
 
 .popup-confirmar-botones .ui-btn {
-
-    flex: 1;
+  flex: 1;
 }
-
 
 /* ======================================================
    INDICADOR
    ====================================================== */
 
 .indicador {
+  display: inline-block;
 
-    display: inline-block;
+  width: 10px;
 
-    width: 10px;
+  height: 10px;
 
-    height: 10px;
+  border-radius: 50%;
 
-    border-radius: 50%;
+  background: var(--red);
 
-    background: var(--red);
-
-    margin-left: var(--gap8);
+  margin-left: var(--gap8);
 }
 
 .indicador[data-estado="activo"] {
-
-    background: var(--green);
+  background: var(--green);
 }
 
 /* ======================================================
@@ -649,52 +612,52 @@
    ====================================================== */
 
 .app-popup {
-    min-width: 220px;
-    max-width: 260px;
+  min-width: 220px;
+  max-width: 260px;
 }
 
 .app-popup-lista {
-    display: flex;
-    flex-direction: column;
-    gap: 0;
-    max-height: 280px;
-    overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  max-height: 280px;
+  overflow-y: auto;
 }
 
 .app-popup-programa {
-    justify-content: flex-start;
-    width: 100%;
-    gap: var(--gap8);
-    height: 34px;
-    flex-shrink: 0;
+  justify-content: flex-start;
+  width: 100%;
+  gap: var(--gap8);
+  height: 34px;
+  flex-shrink: 0;
 }
 
 .app-popup-nombre {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    line-height: 34px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  line-height: 34px;
 }
 
 .app-popup-global {
-    justify-content: flex-start;
-    width: 100%;
-    gap: var(--gap8);
+  justify-content: flex-start;
+  width: 100%;
+  gap: var(--gap8);
 }
 
 .app-popup-global-icono {
-    font-size: var(--fs16);
+  font-size: var(--fs16);
 }
 
 .app-popup-separador {
-    height: 1px;
-    background: var(--border);
-    margin: var(--gap4) 0;
+  height: 1px;
+  background: var(--border);
+  margin: var(--gap4) 0;
 }
 
 .app-popup-otros {
-    justify-content: flex-start;
-    width: 100%;
+  justify-content: flex-start;
+  width: 100%;
 }
 
 /* ======================================================
@@ -707,15 +670,15 @@
    ====================================================== */
 
 .app-popup-lista-titulo {
-    font-size: var(--fs11);
-    color: var(--border-light);
+  font-size: var(--fs11);
+  color: var(--border-light);
 }
 
 .app-popup-lista-caja {
-    background: var(--bg);
-    border: 1px solid var(--border-light);
-    border-radius: var(--r4);
-    padding: var(--gap4);
+  background: var(--bg);
+  border: 1px solid var(--border-light);
+  border-radius: var(--r4);
+  padding: var(--gap4);
 }
 
 /* ======================================================
@@ -731,20 +694,20 @@
    ====================================================== */
 
 .popup-fila {
-    display: flex;
-    flex-direction: column;
-    gap: var(--gap4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap4);
 }
 
 .popup-fila-label {
-    font-size: var(--fs11);
-    color: var(--border-light);
+  font-size: var(--fs11);
+  color: var(--border-light);
 }
 
 .popup-grupo {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--gap4);
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--gap4);
 }
 
 /* ======================================================
@@ -754,23 +717,23 @@
    ====================================================== */
 
 .popup-grupo.popup-grupo-grid3 {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
 }
 
 .popup-opcion {
-    display: inline-flex;
-    align-items: center;
-    gap: var(--gap4);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--gap4);
 }
 
 .popup-indicador-activo {
-    display: inline-block;
-    width: 8px;
-    height: 8px;
-    min-width: 8px;
-    border-radius: 50%;
-    background: var(--tag-cyan);
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  min-width: 8px;
+  border-radius: 50%;
+  background: var(--tag-cyan);
 }
 
 /* ======================================================
@@ -780,9 +743,9 @@
    ====================================================== */
 
 .popup-opcion:disabled {
-    color: var(--text-disabled);
-    cursor: not-allowed;
-    opacity: 0.6;
+  color: var(--text-disabled);
+  cursor: not-allowed;
+  opacity: 0.6;
 }
 
 /* ======================================================
@@ -796,45 +759,49 @@
    ====================================================== */
 
 .popup-switch {
-    width: 100%;
-    justify-content: flex-start;
-    gap: var(--gap8);
+  width: 100%;
+  justify-content: flex-start;
+  gap: var(--gap8);
 }
 
 .popup-switch-pista {
-    position: relative;
-    width: 32px;
-    height: 18px;
-    min-width: 32px;
-    border-radius: 9px;
-    background: var(--button-bg);
-    border: 1px solid var(--border-light);
-    transition: background var(--speed), border-color var(--speed);
+  position: relative;
+  width: 32px;
+  height: 18px;
+  min-width: 32px;
+  border-radius: 9px;
+  background: var(--button-bg);
+  border: 1px solid var(--border-light);
+  transition:
+    background var(--speed),
+    border-color var(--speed);
 }
 
 .popup-switch-bolita {
-    position: absolute;
-    top: 2px;
-    left: 2px;
-    width: 12px;
-    height: 12px;
-    border-radius: 50%;
-    background: var(--text-disabled);
-    transition: transform var(--speed), background var(--speed);
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--text-disabled);
+  transition:
+    transform var(--speed),
+    background var(--speed);
 }
 
 .popup-switch[data-activo="true"] .popup-switch-pista {
-    background: rgba(3, 169, 244, .18);
-    border-color: var(--tag-cyan);
+  background: rgba(3, 169, 244, 0.18);
+  border-color: var(--tag-cyan);
 }
 
 .popup-switch[data-activo="true"] .popup-switch-bolita {
-    background: var(--tag-cyan);
-    transform: translateX(14px);
+  background: var(--tag-cyan);
+  transform: translateX(14px);
 }
 
 .popup-switch[data-activo="false"] {
-    color: var(--text-soft);
+  color: var(--text-soft);
 }
 
 /* ======================================================
@@ -846,13 +813,13 @@
    ====================================================== */
 
 .popup-caja-interna {
-    display: flex;
-    flex-direction: column;
-    gap: var(--gap8);
-    padding: var(--gap8);
-    background: var(--bg);
-    border: 1px solid var(--border-light);
-    border-radius: var(--r4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap8);
+  padding: var(--gap8);
+  background: var(--bg);
+  border: 1px solid var(--border-light);
+  border-radius: var(--r4);
 }
 
 /* ======================================================
@@ -861,53 +828,53 @@
    ====================================================== */
 
 .popup-extra {
-    min-width: 260px;
-    max-width: 320px;
-    display: flex;
-    flex-direction: column;
-    gap: var(--gap8);
+  min-width: 260px;
+  max-width: 320px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap8);
 }
 
 .popup-extra-capturar {
-    width: 100%;
-    font-weight: 600;
+  width: 100%;
+  font-weight: 600;
 }
 
 .app-icono {
-    width: 18px;
-    height: 18px;
-    object-fit: contain;
-    image-rendering: auto;
-    flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  object-fit: contain;
+  image-rendering: auto;
+  flex-shrink: 0;
 }
 
 .app-icono-fallback {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 18px;
-    min-width: 18px;
-    height: 18px;
-    color: var(--text-soft);
-    font-size: var(--fs14);
-    line-height: 1;
-    flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  min-width: 18px;
+  height: 18px;
+  color: var(--text-soft);
+  font-size: var(--fs14);
+  line-height: 1;
+  flex-shrink: 0;
 }
 
 .app-control {
-    gap: var(--gap4);
+  gap: var(--gap4);
 }
 
 .app-control .app-icono {
-    width: 18px;
-    height: 18px;
+  width: 18px;
+  height: 18px;
 }
 
 .app-segundo-plano-indicador {
-    color: var(--green);
-    font-size: var(--fs16);
-    font-weight: bold;
-    line-height: 1;
+  color: var(--green);
+  font-size: var(--fs16);
+  font-weight: bold;
+  line-height: 1;
 }
 
 /* ======================================================
@@ -915,17 +882,13 @@
    ====================================================== */
 
 .app-popup .ui-btn {
+  justify-content: flex-start;
 
-    justify-content: flex-start;
-
-    text-align: left;
-
+  text-align: left;
 }
 
 .app-popup-lista {
-
-    align-items: stretch;
-
+  align-items: stretch;
 }
 
 /* ======================================================
@@ -938,20 +901,20 @@
    ====================================================== */
 
 .popup-macro-editor {
-    min-width: 640px;
-    max-width: 1100px;
-    min-height: 420px;
-    max-height: 90vh;
-    resize: both;
-    overflow: hidden;
-    display: flex;
-    flex-direction: column;
+  min-width: 640px;
+  max-width: 1100px;
+  min-height: 420px;
+  max-height: 90vh;
+  resize: both;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
 
 .popup-macro-editor-titulo {
-    margin-bottom: var(--gap8);
-    color: var(--text);
-    font-weight: 600;
+  margin-bottom: var(--gap8);
+  color: var(--text);
+  font-weight: 600;
 }
 
 /* ======================================================
@@ -963,13 +926,13 @@
    ====================================================== */
 
 .ui-btn.popup-btn-peligro {
-    color: var(--highlight-red);
+  color: var(--highlight-red);
 }
 
 .ui-btn.popup-btn-peligro:hover,
 .popup-capa .ui-btn.popup-btn-peligro:hover {
-    color: var(--highlight-red);
-    border-color: var(--highlight-red);
+  color: var(--highlight-red);
+  border-color: var(--highlight-red);
 }
 
 /* ======================================================
@@ -977,34 +940,34 @@
    ====================================================== */
 
 .popup-macro-barra {
-    display: flex;
-    align-items: center;
-    gap: var(--gap8);
-    margin: calc(var(--gap8) * -1) calc(var(--gap8) * -1) 0;
-    padding: var(--gap8);
-    background: var(--panel2);
-    border-radius: var(--r4) var(--r4) 0 0;
-    cursor: move;
+  display: flex;
+  align-items: center;
+  gap: var(--gap8);
+  margin: calc(var(--gap8) * -1) calc(var(--gap8) * -1) 0;
+  padding: var(--gap8);
+  background: var(--panel2);
+  border-radius: var(--r4) var(--r4) 0 0;
+  cursor: move;
 }
 
 .popup-macro-barra-nombre {
-    flex: 1;
-    min-width: 0;
-    color: var(--text);
-    font-weight: 600;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    cursor: default;
+  flex: 1;
+  min-width: 0;
+  color: var(--text);
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: default;
 }
 
 .popup-macro-barra-boton {
-    flex: 0 0 auto;
+  flex: 0 0 auto;
 }
 
 .popup-macro-barra-input {
-    flex: 1;
-    min-width: 0;
+  flex: 1;
+  min-width: 0;
 }
 
 /* ======================================================
@@ -1012,10 +975,10 @@
    ====================================================== */
 
 .popup-macro-editor-pie {
-    flex: 0 0 auto;
-    display: flex;
-    justify-content: flex-end;
-    gap: var(--gap8);
+  flex: 0 0 auto;
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--gap8);
 }
 
 /* ======================================================
@@ -1027,27 +990,27 @@
    ====================================================== */
 
 .popup-macro-guardarcomo-overlay {
-    position: absolute;
-    inset: 0;
-    z-index: 10;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: rgba(0, 0, 0, 0.45);
-    border-radius: var(--r4);
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.45);
+  border-radius: var(--r4);
 }
 
 .popup-macro-guardarcomo-caja {
-    width: 88%;
-    max-width: 280px;
-    display: flex;
-    flex-direction: column;
-    gap: var(--gap8);
-    padding: var(--gap12);
-    background: var(--panel);
-    border: 1px solid var(--border-light);
-    border-radius: var(--r6);
-    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.5);
+  width: 88%;
+  max-width: 280px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap8);
+  padding: var(--gap12);
+  background: var(--panel);
+  border: 1px solid var(--border-light);
+  border-radius: var(--r6);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.5);
 }
 
 /* ======================================================
@@ -1055,49 +1018,49 @@
    ====================================================== */
 
 .popup-macro-editor-cuerpo {
-    flex: 1 1 auto;
-    min-height: 0;
-    display: flex;
-    align-items: stretch;
-    gap: var(--gap12);
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  align-items: stretch;
+  gap: var(--gap12);
 }
 
 .popup-macro-editor-columna-derecha {
-    flex: 1;
-    min-width: 0;
-    min-height: 0;
-    display: flex;
-    flex-direction: column;
-    gap: var(--gap4);
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap4);
 }
 
 .popup-macro-funciones {
-    flex: 0 0 auto;
-    width: 120px;
-    min-height: 0;
-    overflow-y: auto;
-    display: flex;
-    flex-direction: column;
-    gap: var(--gap8);
-    padding-right: var(--gap8);
-    border-right: 1px solid var(--border-light);
+  flex: 0 0 auto;
+  width: 120px;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap8);
+  padding-right: var(--gap8);
+  border-right: 1px solid var(--border-light);
 }
 
 .popup-macro-funciones-titulo {
-    color: var(--text-soft);
-    font-size: var(--fs11);
-    text-transform: uppercase;
-    letter-spacing: .04em;
+  color: var(--text-soft);
+  font-size: var(--fs11);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
 }
 
 .popup-macro-funciones .popup-macro-editor-agregar {
-    flex-direction: column;
+  flex-direction: column;
 }
 
 .popup-macro-editor-agregar .ui-btn {
-    width: 100%;
-    justify-content: flex-start;
-    text-align: left;
+  width: 100%;
+  justify-content: flex-start;
+  text-align: left;
 }
 
 /* ======================================================
@@ -1110,42 +1073,42 @@
    ====================================================== */
 
 .popup-macro-editor-header {
-    flex: 0 0 auto;
-    display: flex;
-    align-items: center;
-    gap: var(--gap8);
-    /* Mismo padding que .popup-macro-editor-lista (var(--gap4)) +
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: var(--gap8);
+  /* Mismo padding que .popup-macro-editor-lista (var(--gap4)) +
        .popup-macro-editor-paso (var(--gap4)) sumados, para que las
        columnas de esta fila caigan exactamente en la misma posición
        horizontal que las de .popup-macro-editor-paso-fila más abajo
        (ambas viven dentro del mismo padding acumulado de la lista). */
-    padding: 0 calc(var(--gap4) * 2);
-    margin-bottom: var(--gap4);
-    color: var(--text-soft);
-    font-size: var(--fs11);
-    font-weight: 600;
+  padding: 0 calc(var(--gap4) * 2);
+  margin-bottom: var(--gap4);
+  color: var(--text-soft);
+  font-size: var(--fs11);
+  font-weight: 600;
 }
 
 .popup-macro-col-header {
-    text-align: center;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .popup-macro-col-header[data-columna="numero"] {
-    flex: 0 0 auto;
-    width: var(--col-numero-width);
+  flex: 0 0 auto;
+  width: var(--col-numero-width);
 }
 
 .popup-macro-col-header[data-columna="asa"] {
-    flex: 0 0 auto;
-    width: var(--col-asa-width);
+  flex: 0 0 auto;
+  width: var(--col-asa-width);
 }
 
 .popup-macro-col-header[data-columna="tipo"] {
-    flex: 0 0 auto;
-    width: var(--col-tipo-width);
+  flex: 0 0 auto;
+  width: var(--col-tipo-width);
 }
 
 /* Espacio reservado para la columna Marcador (círculo/letra de
@@ -1158,47 +1121,47 @@
    ancho de "Extra" no dependa de si hay Bucles o no.
    */
 .popup-macro-col-header-marcador {
-    flex: 0 0 auto;
-    width: 22px;
-    /* El gap del contenedor (--gap8) es el que separa numero/asa/
+  flex: 0 0 auto;
+  width: 22px;
+  /* El gap del contenedor (--gap8) es el que separa numero/asa/
        tipo/extra en la fila real. Pero DENTRO de la celda Extra de
        la fila, marcador↔botón usan --gap4 (.popup-macro-editor-extra).
        Se corrige acá restando la diferencia del lado derecho de esta
        celda fantasma para que el próximo gap efectivo sea --gap4. */
-    margin-right: calc(var(--gap4) - var(--gap8));
+  margin-right: calc(var(--gap4) - var(--gap8));
 }
 
 .popup-macro-col-header[data-columna="extra"] {
-    /* Restar el ancho + gap reservados por
+  /* Restar el ancho + gap reservados por
        .popup-macro-col-header-marcador (22px + gap4, mismo gap que
        .popup-macro-editor-extra), así el TEXTO "Extra" arranca
        alineado con el texto del botón de acción de la fila (que va
        después del marcador dentro de la misma celda flex), no con
        el borde izquierdo de la celda completa. */
-    width: calc(var(--col-extra-width) - 22px - var(--gap4));
-    min-width: 20px;
-    flex: 0 0 auto;
-    text-align: left;
+  width: calc(var(--col-extra-width) - 22px - var(--gap4));
+  min-width: 20px;
+  flex: 0 0 auto;
+  text-align: left;
 }
 
 .popup-macro-col-header[data-columna="nota"] {
-    flex: 1;
-    min-width: 0;
-    text-align: left;
+  flex: 1;
+  min-width: 0;
+  text-align: left;
 }
 
 .popup-macro-col-resizer {
-    flex: 0 0 auto;
-    width: 4px;
-    margin: 0 2px;
-    align-self: stretch;
-    cursor: col-resize;
-    border-radius: var(--r4);
-    background: var(--border-light);
+  flex: 0 0 auto;
+  width: 4px;
+  margin: 0 2px;
+  align-self: stretch;
+  cursor: col-resize;
+  border-radius: var(--r4);
+  background: var(--border-light);
 }
 
 .popup-macro-col-resizer:hover {
-    background: var(--highlight);
+  background: var(--highlight);
 }
 
 /* ======================================================
@@ -1206,67 +1169,67 @@
    ====================================================== */
 
 .popup-macro-editor-lista {
-    flex: 1 1 auto;
-    min-height: 80px;
-    display: flex;
-    flex-direction: column;
-    gap: var(--gap4);
-    overflow-y: auto;
-    padding: var(--gap4);
-    background: var(--bg);
-    border: 1px solid var(--border-light);
-    border-radius: var(--r4);
+  flex: 1 1 auto;
+  min-height: 80px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap4);
+  overflow-y: auto;
+  padding: var(--gap4);
+  background: var(--bg);
+  border: 1px solid var(--border-light);
+  border-radius: var(--r4);
 }
 
 .popup-macro-editor-paso {
-    display: flex;
-    flex-direction: column;
-    gap: var(--gap4);
-    padding: var(--gap4);
-    border-radius: var(--r4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap4);
+  padding: var(--gap4);
+  border-radius: var(--r4);
 }
 
 .popup-macro-editor-paso-fila {
-    display: flex;
-    align-items: center;
-    gap: var(--gap8);
+  display: flex;
+  align-items: center;
+  gap: var(--gap8);
 }
 
 .popup-macro-editor-asa {
-    flex: 0 0 auto;
-    width: var(--col-asa-width);
-    padding: 0;
-    cursor: grab;
+  flex: 0 0 auto;
+  width: var(--col-asa-width);
+  padding: 0;
+  cursor: grab;
 }
 
 .popup-macro-editor-numero {
-    flex: 0 0 auto;
-    width: var(--col-numero-width);
-    font-size: var(--fs11);
-    color: var(--text-soft);
-    text-align: center;
+  flex: 0 0 auto;
+  width: var(--col-numero-width);
+  font-size: var(--fs11);
+  color: var(--text-soft);
+  text-align: center;
 }
 
 .ui-btn.popup-macro-editor-marcador,
 .popup-macro-editor-marcador-espacio {
-    flex: 0 0 auto;
-    min-width: 22px;
-    width: 22px;
-    height: 22px;
-    padding: 0;
-    text-align: center;
+  flex: 0 0 auto;
+  min-width: 22px;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  text-align: center;
 }
 
 .ui-btn.popup-macro-editor-marcador {
-    border-radius: 50%;
-    font-size: var(--fs11);
-    font-weight: 700;
+  border-radius: 50%;
+  font-size: var(--fs11);
+  font-weight: 700;
 }
 
 .ui-btn.popup-macro-editor-marcador[data-activo="true"] {
-    color: var(--bg);
-    background: var(--tag-cyan);
-    border-color: var(--tag-cyan);
+  color: var(--bg);
+  background: var(--tag-cyan);
+  border-color: var(--tag-cyan);
 }
 
 /* Sin esto, la regla genérica .ui-btn:hover (color: var(--text))
@@ -1276,43 +1239,43 @@
    invierte a fondo transparente + letra cyan, mismo criterio visual
    que el ícono de Bucle (data-es-bucle="true") de acá arriba. */
 .ui-btn.popup-macro-editor-marcador[data-activo="true"]:hover {
-    color: var(--tag-cyan);
-    background: transparent;
-    border-color: var(--tag-cyan);
+  color: var(--tag-cyan);
+  background: transparent;
+  border-color: var(--tag-cyan);
 }
 
 .ui-btn.popup-macro-editor-marcador[data-es-bucle="true"] {
-    color: var(--tag-cyan);
-    background: transparent;
-    border-color: var(--tag-cyan);
-    cursor: default;
-    pointer-events: none;
+  color: var(--tag-cyan);
+  background: transparent;
+  border-color: var(--tag-cyan);
+  cursor: default;
+  pointer-events: none;
 }
 
 .popup-macro-editor-tipo {
-    flex: 0 0 auto;
-    width: var(--col-tipo-width);
-    padding: 0;
-    font-size: var(--fs16);
+  flex: 0 0 auto;
+  width: var(--col-tipo-width);
+  padding: 0;
+  font-size: var(--fs16);
 }
 
 .popup-macro-editor-extra {
-    flex: 0 0 auto;
-    width: var(--col-extra-width);
-    min-width: 20px;
-    display: flex;
-    align-items: center;
-    gap: var(--gap4);
+  flex: 0 0 auto;
+  width: var(--col-extra-width);
+  min-width: 20px;
+  display: flex;
+  align-items: center;
+  gap: var(--gap4);
 }
 
 .popup-macro-editor-accion {
-    flex: 1;
-    min-width: 0;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    text-align: left;
-    justify-content: flex-start;
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-align: left;
+  justify-content: flex-start;
 }
 
 /* ======================================================
@@ -1351,54 +1314,60 @@
    ====================================================== */
 
 .popup-macro-editor-menu-asa {
-    margin-left: 0;
-    /* Llega desde el borde izquierdo hasta el separador Extra↔Nota
+  margin-left: 0;
+  /* Llega desde el borde izquierdo hasta el separador Extra↔Nota
        (spec punto 4), no hasta el borde derecho de la tabla: mismo
        ancho acumulado que numero+asa+tipo+extra en la fila real,
        con sus 3 gaps intermedios (numero↔asa, asa↔tipo, tipo↔extra
        — .popup-macro-editor-paso-fila usa gap: var(--gap8)). */
-    width: calc(var(--col-numero-width) + var(--col-asa-width) + var(--col-tipo-width) + var(--col-extra-width) + (var(--gap8) * 3));
-    box-sizing: border-box;
-    padding: var(--gap8);
-    background: var(--bg);
-    border: 1px solid var(--border-light);
-    border-radius: var(--r4);
+  width: calc(
+    var(--col-numero-width) + var(--col-asa-width) + var(--col-tipo-width) +
+      var(--col-extra-width) + (var(--gap8) * 3)
+  );
+  box-sizing: border-box;
+  padding: var(--gap8);
+  background: var(--bg);
+  border: 1px solid var(--border-light);
+  border-radius: var(--r4);
 }
 
 .ui-btn.popup-macro-editor-asa[data-abierto="true"],
 .ui-btn.popup-macro-editor-tipo[data-abierto="true"],
 .ui-btn.popup-macro-editor-accion[data-abierto="true"] {
-    border-color: var(--tag-cyan);
+  border-color: var(--tag-cyan);
 }
 
 .popup-macro-editor-eliminar {
-    color: var(--highlight-red);
+  color: var(--highlight-red);
 }
 
 .popup-macro-editor-eliminar:hover {
-    background: var(--highlight-red);
-    color: #FFF;
+  background: var(--highlight-red);
+  color: #fff;
 }
 
 .popup-macro-editor-detalle {
-    margin-left: 0;
-    /* Mismo criterio de ancho que .popup-macro-editor-menu-asa (spec
+  margin-left: 0;
+  /* Mismo criterio de ancho que .popup-macro-editor-menu-asa (spec
        punto 4): llega hasta el separador Extra↔Nota, no hasta el
        borde derecho de la tabla. */
-    width: calc(var(--col-numero-width) + var(--col-asa-width) + var(--col-tipo-width) + var(--col-extra-width) + (var(--gap8) * 3));
-    box-sizing: border-box;
-    display: flex;
-    flex-direction: column;
-    gap: var(--gap8);
+  width: calc(
+    var(--col-numero-width) + var(--col-asa-width) + var(--col-tipo-width) +
+      var(--col-extra-width) + (var(--gap8) * 3)
+  );
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap8);
 }
 
 .popup-macro-editor-capturador {
-    min-width: 140px;
+  min-width: 140px;
 }
 
 .popup-macro-editor-ruta-lista,
 .popup-macro-editor-abrircon-lista {
-    margin-top: var(--gap4);
+  margin-top: var(--gap4);
 }
 
 /* ======================================================
@@ -1409,28 +1378,28 @@
    ====================================================== */
 
 .popup-macro-nota {
-    flex: 1;
-    min-width: 0;
-    height: 28px;
-    padding: 0 var(--gap8);
-    background: transparent;
-    color: var(--text-soft);
-    font-style: italic;
-    border: 1px solid transparent;
-    border-radius: var(--r4);
+  flex: 1;
+  min-width: 0;
+  height: 28px;
+  padding: 0 var(--gap8);
+  background: transparent;
+  color: var(--text-soft);
+  font-style: italic;
+  border: 1px solid transparent;
+  border-radius: var(--r4);
 }
 
 .popup-macro-nota:hover,
 .popup-macro-nota:focus {
-    background: var(--panel2);
-    border-color: var(--border);
+  background: var(--panel2);
+  border-color: var(--border);
 }
 
 .popup-macro-nota:focus {
-    outline: none;
-    border-color: var(--highlight);
+  outline: none;
+  border-color: var(--highlight);
 }
 
 .popup-macro-nota::placeholder {
-    color: var(--text-disabled);
+  color: var(--text-disabled);
 }

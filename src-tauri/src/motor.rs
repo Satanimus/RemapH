@@ -143,9 +143,16 @@ pub fn guardar_modo(modo: Modo) {
 pub fn solicitar_cambio_modo(nuevo_modo: Modo) {
     let modo_anterior = modo_activo();
 
-    guardar_modo(nuevo_modo);
-
+    // Regla: primero se detiene el perfil y se limpia la caché (con
+    // el motor VIEJO todavía activo, para que runtime::detener_todo()
+    // suelte cualquier tecla físicamente abajo por el backend
+    // correcto) — recién después se persiste el nuevo modo y se
+    // señala al backend anterior que debe parar. Así nunca queda un
+    // instante con el modo ya cambiado pero el perfil viejo todavía
+    // marcado activo en caché.
     perfil::desactivar_perfil();
+
+    guardar_modo(nuevo_modo);
 
     match modo_anterior {
         Modo::Interception => back_interception::solicitar_detener(),

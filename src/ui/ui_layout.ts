@@ -2,7 +2,11 @@
 // ui_Layout
 // ======================================================
 
-import { crearToolbar, marcarPerfilEditado } from "./ui_toolbar";
+import {
+  crearToolbar,
+  marcarPerfilEditado,
+  refrescarEstadoDesdeBackend,
+} from "./ui_toolbar";
 
 import { crearTabla } from "./ui_tabla";
 
@@ -23,7 +27,11 @@ import type { FilaPerfil } from "../core/core_perfil";
 // ======================================================
 
 export function crearLayout(alGuardar: () => Promise<void>): HTMLElement {
-  const statusbar = crearStatusbar();
+  const toolbar = crearToolbar(alGuardar);
+
+  const statusbar = crearStatusbar(() => {
+    void refrescarEstadoDesdeBackend(toolbar);
+  });
 
   registrarActualizacionConflictos(() => {
     actualizarStatusbar(
@@ -32,8 +40,6 @@ export function crearLayout(alGuardar: () => Promise<void>): HTMLElement {
       ),
     );
   });
-
-  const toolbar = crearToolbar(alGuardar);
 
   const tabla = crearTabla(() => {
     marcarPerfilEditado(toolbar);

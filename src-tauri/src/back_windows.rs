@@ -267,7 +267,7 @@ pub fn iniciar(
 
     *COLA.lock().unwrap() = Some(tx);
 
-    std::thread::spawn(move || {
+    let manija_worker = std::thread::spawn(move || {
         while let Ok(evento) = rx.recv() {
             procesar(evento);
         }
@@ -314,6 +314,16 @@ pub fn iniciar(
     // en cuanto termina de procesar lo que ya tenía encolado, y
     // finaliza solo.
     *COLA.lock().unwrap() = None;
+
+    // Espera a que el worker drene lo que ya tenía encolado ANTES de
+    // devolver el control a motor::iniciar() (que arranca el otro
+    // backend acto seguido). Sin este join(), un evento bloqueado
+    // justo antes del cambio de modo (ej. el click en "Guardar
+    // cambios" que disparó este mismo cambio) podía quedar sin su
+    // SendInput de reinyección — los hooks ya desinstalados, el
+    // worker todavía corriendo en paralelo — dejando ese botón físico
+    // "abajo" para Windows indefinidamente.
+    let _ = manija_worker.join();
 
     ESTADO_HOOK.with(|estado| {
         *estado.borrow_mut() = None;

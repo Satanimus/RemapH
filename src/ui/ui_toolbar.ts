@@ -45,6 +45,36 @@ import {
 } from "../componentes/comp_indicador";
 
 // ======================================================
+// 🔄 REFRESCAR ESTADO DESDE BACKEND (cambio de modo motor)
+// ------------------------------------------------------
+// motor::solicitar_cambio_modo ya detiene el perfil y limpia la
+// caché en el backend (ver motor.rs) — esto solo relee ese estado
+// y lo refleja en la toolbar. Usado por ui_layout.ts cuando el
+// polling de ui_statusbar.ts detecta que el modo motor cambió
+// (posiblemente desde la Ventana de Configuración).
+// ======================================================
+
+const cacheDotsPorToolbar = new WeakMap<HTMLElement, HTMLElement>();
+
+export async function refrescarEstadoDesdeBackend(
+  toolbar: HTMLElement,
+): Promise<void> {
+  const cacheDot = cacheDotsPorToolbar.get(toolbar);
+
+  if (!cacheDot) {
+    return;
+  }
+
+  try {
+    const activo = await invoke<boolean>("obtener_estado_cache");
+
+    marcarPerfilSegunCache(toolbar, cacheDot, activo);
+  } catch (error) {
+    console.error("❌ No se pudo refrescar el estado del perfil:", error);
+  }
+}
+
+// ======================================================
 // CREAR TOOLBAR
 // ======================================================
 
@@ -127,6 +157,8 @@ export function crearToolbar(alGuardar: () => Promise<void>): HTMLElement {
   }
 
   botonSelector.append(cacheDot);
+
+  cacheDotsPorToolbar.set(toolbar, cacheDot);
 
   const nombrePerfil = document.createElement("span");
 
