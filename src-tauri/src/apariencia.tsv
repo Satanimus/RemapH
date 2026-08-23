@@ -36,15 +36,26 @@ panel2	Fondo de panel secundario	#2B2B2B	color
 border	Color de borde	#404040	color
 text	Color de texto principal	#F2F2F2	color
 text-soft	Color de texto secundario	#BDBDBD	color
+text-disabled	Color de texto deshabilitado	#777777	color
 row-bg	Fondo de fila	#202020	color
 button-bg	Fondo de botón	#1a1a1a	color
 green	Verde (éxito)	#388E3C	color
+green-dark	Verde (estado activo)	#2E7D32	color
 red	Rojo (error)	#C62828	color
+red-dark	Rojo (estado activo)	#8F2525	color
 yellow	Amarillo (aviso)	#D8A628	color
+yellow-dark	Amarillo (estado activo)	#A77F1C	color
 blue	Azul	#1976D2	color
+tag-red	Etiqueta de fila — roja	#D32F2F	color
+tag-orange	Etiqueta de fila — naranja	#F57C00	color
+tag-yellow	Etiqueta de fila — amarilla	#FBC02D	color
+tag-green	Etiqueta de fila — verde	#388E3C	color
 tag-cyan	Etiqueta de fila — cian	#03A9F4	color
+cyan-dark	Etiqueta de fila — cian, oscurecido	#0B7285	color
+tag-blue	Etiqueta de fila — azul	#1976D2	color
 tag-purple	Etiqueta de fila — violeta	#7B1FA2	color
 tag-pink	Etiqueta de fila — rosa	#C2185B	color
+tag-gray	Etiqueta de fila — gris	#616161	color
 color-trigger-sintaxis	Color de sintaxis (capturador)	#1976D2	color
 fs12	Tamaño de texto pequeño	12px	pixeles
 fs14	Tamaño de texto normal	14px	pixeles
