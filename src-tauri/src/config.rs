@@ -88,6 +88,14 @@
 //     de advertencia avisa por consola cuando esto se activa, para
 //     poder distinguir "activó la red de seguridad" de "otra cosa".
 //
+// tiempo_inactividad_captura()
+// establecer_tiempo_inactividad_captura()
+//     Red de seguridad de Modo Captura: tiempo absoluto desde que
+//     se activó la captura hasta que se fuerza su cierre si no
+//     terminó sola. No se reinicia con la actividad — a propósito,
+//     para cubrir el caso de una tecla trabada que sigue mandando
+//     Down sin Up nunca.
+//
 // tecla_guardar_coordenada()
 // establecer_tecla_guardar_coordenada()
 //     Tecla que la ventana de captura de "Click en coordenada"
@@ -353,6 +361,29 @@ pub fn tiempo_maximo_retenido() -> u64 {
 
 pub fn establecer_tiempo_maximo_retenido(valor: u64) {
     TIEMPO_MAXIMO_RETENIDO.store(valor, Ordering::Relaxed);
+}
+
+// ======================================================
+// 🛟 TIEMPO INACTIVIDAD CAPTURA (red de seguridad)
+// ------------------------------------------------------
+// Modo Captura consume físicamente todo lo que llega (ver
+// entrada.rs) — si el usuario lo abre y se distrae sin terminar
+// el gesto, o si una tecla queda trabada físicamente (sigue
+// repitiendo Down sin soltar nunca el Up), el teclado/mouse queda
+// mudo indefinidamente. Este es el "vigía" que lo evita: tiempo
+// absoluto desde que se activó la captura, sin reiniciarse con
+// la actividad, tras el cual se fuerza su cierre si no terminó
+// sola.
+// ======================================================
+
+static TIEMPO_INACTIVIDAD_CAPTURA: AtomicU64 = AtomicU64::new(10000);
+
+pub fn tiempo_inactividad_captura() -> u64 {
+    TIEMPO_INACTIVIDAD_CAPTURA.load(Ordering::Relaxed)
+}
+
+pub fn establecer_tiempo_inactividad_captura(valor: u64) {
+    TIEMPO_INACTIVIDAD_CAPTURA.store(valor, Ordering::Relaxed);
 }
 
 // ======================================================

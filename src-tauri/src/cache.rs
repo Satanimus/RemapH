@@ -978,12 +978,14 @@ struct EstadoCaptura {
     activa: bool,
     sesion: Option<Sesion>,
     presionadas: Vec<InputId>,
+    vigia_generacion: u64,
 }
 
 static CAPTURA: Mutex<EstadoCaptura> = Mutex::new(EstadoCaptura {
     activa: false,
     sesion: None,
     presionadas: Vec::new(),
+    vigia_generacion: 0,
 });
 
 fn activar_captura_interna() {
@@ -991,6 +993,10 @@ fn activar_captura_interna() {
     captura.activa = true;
     captura.sesion = None;
     captura.presionadas.clear();
+    captura.vigia_generacion += 1;
+    let generacion = captura.vigia_generacion;
+    drop(captura);
+    iniciar_vigia_inactividad_captura(generacion);
 }
 
 fn desactivar_captura_interna(captura: &mut EstadoCaptura) {
@@ -1005,6 +1011,29 @@ fn vigente_captura(captura: &EstadoCaptura, generacion: u64) -> bool {
         .as_ref()
         .map(|s| s.generacion == generacion)
         .unwrap_or(false)
+}
+
+// ======================================================
+// 🚪 CANCELACIÓN FORZADA (Esc / vigía de inactividad)
+// ------------------------------------------------------
+// Punto único usado por las dos vías que pueden cortar una
+// captura sin que haya un resultado real: la tecla Esc
+// (procesar_down_captura) y el vigía de inactividad (más abajo).
+// Desactiva la captura interna de inmediato (libera el bloqueo
+// de entrada.rs) y recién después avisa a perfil_ui con la misma
+// señal que ya existe para "se descartó" — cero plomería nueva
+// del lado del frontend, el botón ya sabe resetearse ante ese
+// resultado.
+// ======================================================
+
+fn cancelar_captura_forzada() {
+    let mut captura = CAPTURA.lock().unwrap();
+    if !captura.activa {
+        return;
+    }
+    desactivar_captura_interna(&mut captura);
+    drop(captura);
+    perfil_ui::cancelar_captura();
 }
 
 pub(crate) fn recibir_down_captura(input: InputId) {
@@ -1159,6 +1188,40 @@ fn iniciar_timer_triple_captura(generacion: u64) {
         if let Some(condicion) = resultado {
             perfil_ui::recibir_condicion(condicion);
         }
+    });
+}
+
+// ======================================================
+// 🛟 VIGÍA DE INACTIVIDAD (red de seguridad)
+// ------------------------------------------------------
+// Mismo patrón que iniciar_timer_mantenido_captura/
+// iniciar_timer_triple_captura (thread + sleep + chequeo por
+// generación, para descartar vigías viejos de una captura
+// anterior) pero con su propia generación (vigia_generacion),
+// independiente de la de la sesión. A propósito NO se reinicia
+// con la actividad (Down/Up/Pulse): son 10s absolutos desde que
+// se activó la captura hasta que se fuerza su cierre si no
+// terminó sola. Motivo: si una tecla se traba físicamente y deja
+// de mandar Up pero sigue repitiendo Down, un vigía "de silencio"
+// nunca vería silencio y jamás cortaría — 10s son de sobra para
+// terminar cualquier captura real.
+// ======================================================
+
+fn vigia_captura_vigente(captura: &EstadoCaptura, generacion: u64) -> bool {
+    captura.activa && captura.vigia_generacion == generacion
+}
+
+fn iniciar_vigia_inactividad_captura(generacion: u64) {
+    std::thread::spawn(move || {
+        std::thread::sleep(std::time::Duration::from_millis(
+            config::tiempo_inactividad_captura(),
+        ));
+        let captura = CAPTURA.lock().unwrap();
+        if !vigia_captura_vigente(&captura, generacion) {
+            return;
+        }
+        drop(captura);
+        cancelar_captura_forzada();
     });
 }
 
@@ -1759,6 +1822,16 @@ fn presionada_en_captura(captura: &EstadoCaptura, input: &InputId) -> bool {
 }
 
 fn procesar_down_captura(input: InputId) {
+    // Esc es la salida manual del modo Captura: cancela en vez de
+    // capturarse a sí misma. Mismo camino que el vigía de
+    // inactividad (cancelar_captura_forzada) — la UI ya sabe
+    // resetear el botón al valor guardado (o a como fue creado, si
+    // no había ninguno) ante ese resultado.
+    if input == InputId::new("keyboard", "Escape") {
+        cancelar_captura_forzada();
+        return;
+    }
+
     {
         let captura = CAPTURA.lock().unwrap();
         if !captura.activa {

@@ -676,6 +676,20 @@ pub fn recibir_condicion(condicion: crate::perfil_cache::CondicionTrigger) {
     *RESULTADO_CAPTURA.lock().unwrap() = Some((captura.fila_id, captura.columna, Some(trigger)));
 }
 
+/// Llamada por cache.rs cuando la captura se corta sin que haya un
+/// resultado real: Esc del usuario o vigía de inactividad. Usa la
+/// misma señal que ya existe para "se descartó" (ver
+/// recibir_condicion, filtro de Click izquierdo solo) — cero
+/// plomería nueva del lado del frontend, el botón ya sabe
+/// resetearse ante ese resultado.
+pub fn cancelar_captura() {
+    let Some(captura) = CAPTURA.lock().unwrap().take() else {
+        return;
+    };
+
+    *RESULTADO_CAPTURA.lock().unwrap() = Some((captura.fila_id, captura.columna, None));
+}
+
 /// La UI lo consulta (polling) para saber si ya hay un resultado listo.
 pub fn obtener_captura() -> Option<(String, String, Option<TriggerCapturaUI>)> {
     RESULTADO_CAPTURA.lock().unwrap().take()
