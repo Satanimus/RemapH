@@ -40,9 +40,7 @@ export function crearAccion(
       const boton = crearAccionMultimedia(filaPerfil);
 
       boton.addEventListener("click", (evento) => {
-        abrirPopupAccionMultimedia(evento, contexto, filaPerfil);
-
-        alModificar();
+        abrirPopupAccionMultimedia(evento, contexto, filaPerfil, alModificar);
       });
 
       return boton;
@@ -54,9 +52,7 @@ export function crearAccion(
       const boton = crearAccionMenuExpress(filaPerfil);
 
       boton.addEventListener("click", (evento) => {
-        abrirEditorMenuExpress(evento, contexto, filaPerfil);
-
-        alModificar();
+        abrirEditorMenuExpress(evento, contexto, filaPerfil, alModificar);
       });
 
       return boton;
@@ -80,9 +76,7 @@ export function crearAccion(
       const boton = crearAccionPortapapeles(filaPerfil);
 
       boton.addEventListener("click", (evento) => {
-        abrirEditorPortapapeles(evento, contexto, filaPerfil);
-
-        alModificar();
+        abrirEditorPortapapeles(evento, contexto, filaPerfil, alModificar);
       });
 
       return boton;

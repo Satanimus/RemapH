@@ -167,6 +167,7 @@ export function abrirEditorMenuExpress(
   evento: MouseEvent,
   contexto: ContextoFila,
   filaPerfil: FilaPerfil,
+  alModificar: () => void,
 ): void {
   const todasLasFilas = obtenerPerfilUi().filas.filter(
     (item): item is FilaPerfil => !esSeparador(item),
@@ -174,10 +175,12 @@ export function abrirEditorMenuExpress(
 
   const menuAccion = filaPerfil.menuAccion;
 
-  const redibujar = () => abrirEditorMenuExpress(evento, contexto, filaPerfil);
+  const redibujar = () =>
+    abrirEditorMenuExpress(evento, contexto, filaPerfil, alModificar);
 
   const guardarYRedibujar = () => {
     reconstruirFila(contexto.id);
+    alModificar();
     redibujar();
   };
 
@@ -203,6 +206,7 @@ export function abrirEditorMenuExpress(
     // input mientras se escribe) — solo se refleja en la columna
     // Acción de la tabla, que sí puede reconstruirse en caliente.
     reconstruirFila(contexto.id);
+    alModificar();
   });
 
   popup.append(inputNombre);
@@ -267,6 +271,7 @@ export function abrirEditorMenuExpress(
           // Acá tampoco se redibuja el popup completo — perdería
           // el foco del input de Renombrar mientras se escribe.
           reconstruirFila(contexto.id);
+          alModificar();
         },
       ),
     );

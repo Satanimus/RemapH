@@ -77,8 +77,6 @@ export function crearCapturador(
       return;
     }
 
-    alModificar();
-
     capturando = true;
 
     boton.textContent = "Esperando...";
@@ -127,6 +125,8 @@ export function crearCapturador(
 
             return;
           }
+
+          alModificar();
 
           if (destino === "Trigger") {
             filaPerfil.trigger = trigger as FilaPerfil["trigger"];

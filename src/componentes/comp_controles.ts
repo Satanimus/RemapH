@@ -35,10 +35,7 @@ import { abrirPopupExtraMenuExpress } from "./comp_popup_menu_express_extra";
 
 import { abrirPopupExtraPortapapeles } from "./comp_popup_portapapeles_extra";
 
-import {
-  textoComportamientoMacro,
-  crearMacroExtra,
-} from "../core/core_macro";
+import { textoComportamientoMacro, crearMacroExtra } from "../core/core_macro";
 
 import { abrirPopupExtraMacro } from "./comp_popup_macro_extra";
 
@@ -80,6 +77,8 @@ export function crearEstado(
   _contexto: ContextoFila,
 
   filaPerfil: FilaPerfil,
+
+  alModificar: () => void,
 ): HTMLButtonElement {
   const boton = document.createElement("button");
 
@@ -141,6 +140,8 @@ export function crearEstado(
 
       recomputarCascadaAscendente(obtenerPerfilUi().filas);
 
+      alModificar();
+
       reconstruirTabla();
     },
   );
@@ -151,6 +152,7 @@ export function crearEstado(
 export function crearTipo(
   contexto: ContextoFila,
   filaPerfil: FilaPerfil,
+  alModificar: () => void,
 ): HTMLButtonElement {
   const boton = crearBoton({
     texto: iconoDeTipo(filaPerfil.tipo),
@@ -196,6 +198,7 @@ export function crearTipo(
         filaPerfil.tipo = valor;
 
         reconstruirFila(contexto.id);
+        alModificar();
       },
       contexto,
     );
@@ -207,6 +210,7 @@ export function crearTipo(
 export function crearExtra(
   contexto: ContextoFila,
   filaPerfil: FilaPerfil,
+  alModificar: () => void,
 ): HTMLButtonElement {
   // tecla_mouse tiene su propio popup Extra (Simple/Mantenido/Turbo +
   // toggle Coordenada expandible, queda abierto entre selecciones) —
@@ -215,7 +219,7 @@ export function crearExtra(
     return crearPopup({
       texto: textoExtraTeclaMouse(filaPerfil),
       onClick: (evento) => {
-        abrirPopupExtraTeclaMouse(evento, contexto, filaPerfil);
+        abrirPopupExtraTeclaMouse(evento, contexto, filaPerfil, alModificar);
       },
     });
   }
@@ -226,7 +230,7 @@ export function crearExtra(
     return crearPopup({
       texto: textoExtraMultimedia(filaPerfil.extraMultimedia),
       onClick: (evento) => {
-        abrirPopupExtraMultimedia(evento, contexto, filaPerfil);
+        abrirPopupExtraMultimedia(evento, contexto, filaPerfil, alModificar);
       },
     });
   }
@@ -238,7 +242,7 @@ export function crearExtra(
     return crearPopup({
       texto: textoMenuExtra(filaPerfil.menuExtra),
       onClick: (evento) => {
-        abrirPopupExtraMenuExpress(evento, contexto, filaPerfil);
+        abrirPopupExtraMenuExpress(evento, contexto, filaPerfil, alModificar);
       },
     });
   }
@@ -250,7 +254,7 @@ export function crearExtra(
     return crearPopup({
       texto: textoPortapapelesExtra(filaPerfil.portapapelesExtra),
       onClick: (evento) => {
-        abrirPopupExtraPortapapeles(evento, contexto, filaPerfil);
+        abrirPopupExtraPortapapeles(evento, contexto, filaPerfil, alModificar);
       },
     });
   }
@@ -264,7 +268,7 @@ export function crearExtra(
     return crearPopup({
       texto: textoAbrirExtra(filaPerfil.abrirExtra),
       onClick: (evento) => {
-        abrirPopupExtraAbrir(evento, contexto, filaPerfil);
+        abrirPopupExtraAbrir(evento, contexto, filaPerfil, alModificar);
       },
     });
   }
@@ -278,7 +282,7 @@ export function crearExtra(
     return crearPopup({
       texto: textoComportamientoMacro(filaPerfil.macroExtra.comportamiento),
       onClick: (evento) => {
-        abrirPopupExtraMacro(evento, contexto, filaPerfil);
+        abrirPopupExtraMacro(evento, contexto, filaPerfil, alModificar);
       },
     });
   }
@@ -286,7 +290,7 @@ export function crearExtra(
   return crearPopup({
     texto: extraATexto(filaPerfil.extra),
     onClick: (evento) => {
-      abrirPopupExtra(evento, contexto, filaPerfil);
+      abrirPopupExtra(evento, contexto, filaPerfil, alModificar);
     },
   });
 }
@@ -295,6 +299,8 @@ export function crearApp(
   contexto: ContextoFila,
 
   filaPerfil: FilaPerfil,
+
+  alModificar: () => void,
 ): HTMLButtonElement {
   const boton = document.createElement("button");
 
@@ -393,6 +399,8 @@ export function crearApp(
         contexto,
 
         filaPerfil,
+
+        alModificar,
       );
     },
   );
@@ -427,7 +435,10 @@ export function crearColor(
   return boton;
 }
 
-export function crearNota(objetivo: { nota: string }): HTMLDivElement {
+export function crearNota(
+  objetivo: { nota: string },
+  alModificar: () => void,
+): HTMLDivElement {
   const contenedor = document.createElement("div");
   contenedor.className = "nota-contenedor";
 
@@ -438,6 +449,7 @@ export function crearNota(objetivo: { nota: string }): HTMLDivElement {
 
   input.addEventListener("input", () => {
     objetivo.nota = input.value;
+    alModificar();
   });
 
   const btnEmoji = document.createElement("button");

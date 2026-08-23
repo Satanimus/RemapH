@@ -74,6 +74,7 @@ function elegirComando(
   contexto: ContextoFila,
   filaPerfil: FilaPerfil,
   comando: ComandoMultimedia,
+  alModificar: () => void,
 ): void {
   filaPerfil.accionReferencia = comando;
 
@@ -82,6 +83,8 @@ function elegirComando(
   }
 
   reconstruirFila(contexto.id);
+
+  alModificar();
 
   ocultarPopup();
 }
@@ -94,6 +97,7 @@ export function abrirPopupAccionMultimedia(
   evento: MouseEvent,
   contexto: ContextoFila,
   filaPerfil: FilaPerfil,
+  alModificar: () => void,
 ): void {
   const popup = document.createElement("div");
 
@@ -113,14 +117,14 @@ export function abrirPopupAccionMultimedia(
     crearFilaPopup(
       "Volumen",
       crearGrupoOpciones(conIcono(COMANDOS_VOLUMEN), actual, (valor) => {
-        elegirComando(contexto, filaPerfil, valor);
+        elegirComando(contexto, filaPerfil, valor, alModificar);
       }),
     ),
   );
 
   popup.append(
     crearGrupoOpciones(conIcono([COMANDO_SILENCIAR]), actual, (valor) => {
-      elegirComando(contexto, filaPerfil, valor);
+      elegirComando(contexto, filaPerfil, valor, alModificar);
     }),
   );
 
@@ -137,7 +141,7 @@ export function abrirPopupAccionMultimedia(
         conIcono(COMANDOS_REPRODUCCION_PRINCIPAL),
         actual,
         (valor) => {
-          elegirComando(contexto, filaPerfil, valor);
+          elegirComando(contexto, filaPerfil, valor, alModificar);
         },
       ),
     ),
@@ -148,7 +152,7 @@ export function abrirPopupAccionMultimedia(
       conIcono(COMANDOS_REPRODUCCION_PISTA),
       actual,
       (valor) => {
-        elegirComando(contexto, filaPerfil, valor);
+        elegirComando(contexto, filaPerfil, valor, alModificar);
       },
     ),
   );

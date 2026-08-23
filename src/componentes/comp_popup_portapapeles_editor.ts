@@ -29,6 +29,7 @@ export function abrirEditorPortapapeles(
   evento: MouseEvent,
   contexto: ContextoFila,
   filaPerfil: FilaPerfil,
+  alModificar: () => void,
 ): void {
   const portapapelesAccion = filaPerfil.portapapelesAccion;
 
@@ -53,6 +54,7 @@ export function abrirEditorPortapapeles(
     // la tabla, que sí puede reconstruirse en caliente. Mismo criterio
     // que el campo Nombre de comp_popup_menu_express_editor.ts.
     reconstruirFila(contexto.id);
+    alModificar();
   });
 
   popup.append(inputNombre);

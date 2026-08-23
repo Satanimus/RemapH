@@ -35,6 +35,7 @@ export function abrirPopupExtraMacro(
   evento: MouseEvent,
   contexto: ContextoFila,
   filaPerfil: FilaPerfil,
+  alModificar: () => void,
 ): void {
   const macroExtra = filaPerfil.macroExtra;
 
@@ -56,6 +57,7 @@ export function abrirPopupExtraMacro(
           macroExtra.comportamiento = valor;
 
           reconstruirFila(contexto.id);
+          alModificar();
           dibujar();
         }),
       ),

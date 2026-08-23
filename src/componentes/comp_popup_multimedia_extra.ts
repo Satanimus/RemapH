@@ -60,13 +60,14 @@ export function abrirPopupExtraMultimedia(
   evento: MouseEvent,
   contexto: ContextoFila,
   filaPerfil: FilaPerfil,
+  alModificar: () => void,
 ): void {
   const popup = document.createElement("div");
 
   popup.className = "popup-extra";
 
   const redibujar = () =>
-    abrirPopupExtraMultimedia(evento, contexto, filaPerfil);
+    abrirPopupExtraMultimedia(evento, contexto, filaPerfil, alModificar);
 
   const motivo = motivoDeshabilitado(filaPerfil);
 
@@ -92,6 +93,8 @@ export function abrirPopupExtraMultimedia(
         filaPerfil.extraMultimedia = valor;
 
         reconstruirFila(contexto.id);
+
+        alModificar();
 
         redibujar();
       }),

@@ -160,6 +160,8 @@ function crearBotonGlobal(
   filaPerfil: FilaPerfil,
 
   contexto: ContextoFila,
+
+  alModificar: () => void,
 ): HTMLButtonElement {
   const boton = document.createElement("button");
 
@@ -195,6 +197,8 @@ function crearBotonGlobal(
 
       reconstruirFila(contexto.id);
 
+      alModificar();
+
       ocultarPopup();
     },
   );
@@ -217,6 +221,8 @@ function crearSegundoPlano(
 
   contexto: ContextoFila,
 
+  alModificar: () => void,
+
   redibujar: () => void,
 ): HTMLElement {
   return crearInterruptor(
@@ -228,6 +234,8 @@ function crearSegundoPlano(
       filaPerfil.app.segundoPlano = !filaPerfil.app.segundoPlano;
 
       reconstruirFila(contexto.id);
+
+      alModificar();
 
       redibujar();
     },
@@ -275,6 +283,8 @@ function crearListadoProgramas(
 
   filaPerfil: FilaPerfil,
 
+  alModificar: () => void,
+
   filtro: FiltroListado,
 
   onCambiarFiltro: (filtro: FiltroListado) => void,
@@ -320,6 +330,8 @@ function crearListadoProgramas(
             filaPerfil.app.programa = proceso.nombre;
 
             reconstruirFila(contexto.id);
+
+            alModificar();
           },
         ),
       );
@@ -343,6 +355,8 @@ export async function abrirPopupApp(
 
   filaPerfil: FilaPerfil,
 
+  alModificar: () => void,
+
   filtroInicial: FiltroListado = "principales",
 ): Promise<void> {
   const procesos = await invoke<ProcesoIconoJson[]>("listar_procesos_ventana");
@@ -352,12 +366,14 @@ export async function abrirPopupApp(
   popup.className = "app-popup";
 
   const redibujar = (filtro: FiltroListado) =>
-    abrirPopupApp(evento, contexto, filaPerfil, filtro);
+    abrirPopupApp(evento, contexto, filaPerfil, alModificar, filtro);
 
   popup.append(
-    crearBotonGlobal(filaPerfil, contexto),
+    crearBotonGlobal(filaPerfil, contexto, alModificar),
 
-    crearSegundoPlano(filaPerfil, contexto, () => redibujar(filtroInicial)),
+    crearSegundoPlano(filaPerfil, contexto, alModificar, () =>
+      redibujar(filtroInicial),
+    ),
 
     crearSeparador(),
   );
@@ -369,6 +385,8 @@ export async function abrirPopupApp(
       contexto,
 
       filaPerfil,
+
+      alModificar,
 
       filtroInicial,
 

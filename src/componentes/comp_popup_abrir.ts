@@ -571,11 +571,14 @@ export function abrirPopupExtra(
   evento: MouseEvent,
   contexto: ContextoFila,
   filaPerfil: FilaPerfil,
+  alModificar: () => void,
 ): void {
   abrirListaConValor(evento, EXTRA_OPCIONES, (valor) => {
     filaPerfil.extra = valor;
 
     reconstruirFila(contexto.id);
+
+    alModificar();
   });
 }
 

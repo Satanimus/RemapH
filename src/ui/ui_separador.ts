@@ -37,7 +37,10 @@ export function crearSeparadorHeader(
   fila.dataset.id = separador.id;
 
   if (separador.color) {
-    fila.style.setProperty("--separador-color", `var(--tag-${separador.color})`);
+    fila.style.setProperty(
+      "--separador-color",
+      `var(--tag-${separador.color})`,
+    );
   } else {
     fila.style.removeProperty("--separador-color");
   }
@@ -74,7 +77,7 @@ export function crearSeparadorHeader(
 
   celdaNota.className = "celda nota-separador";
 
-  celdaNota.append(crearNota(separador));
+  celdaNota.append(crearNota(separador, alModificar));
 
   fila.append(celdaEstado, celdaOpciones, celdaNota);
 

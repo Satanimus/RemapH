@@ -164,6 +164,7 @@ function crearSeparador(): HTMLElement {
 function crearCajaVentana(
   contexto: ContextoFila,
   filaPerfil: FilaPerfil,
+  alModificar: () => void,
   redibujar: () => void,
 ): HTMLElement {
   const coordenada = filaPerfil.coordenada;
@@ -192,6 +193,7 @@ function crearCajaVentana(
 
         cerrarVentanaCapturaCoordenada();
         reconstruirFila(contexto.id);
+        alModificar();
         redibujar();
       }),
     ),
@@ -222,6 +224,7 @@ function crearCajaVentana(
 
             cerrarVentanaCapturaCoordenada();
             reconstruirFila(contexto.id);
+            alModificar();
             redibujar();
           },
           "popup-grupo-grid3",
@@ -251,6 +254,7 @@ function iniciarCaptura(
   contexto: ContextoFila,
   filaPerfil: FilaPerfil,
   evento: MouseEvent,
+  alModificar: () => void,
 ): void {
   const coordenada = filaPerfil.coordenada;
 
@@ -278,7 +282,8 @@ function iniciarCaptura(
         filaPerfil.coordenada.y = resultado[1];
 
         reconstruirFila(contexto.id);
-        abrirPopupExtraTeclaMouse(evento, contexto, filaPerfil);
+        alModificar();
+        abrirPopupExtraTeclaMouse(evento, contexto, filaPerfil, alModificar);
       })
       .catch(() => {
         clearInterval(intervalo);
@@ -294,6 +299,7 @@ export function abrirPopupExtraTeclaMouse(
   evento: MouseEvent,
   contexto: ContextoFila,
   filaPerfil: FilaPerfil,
+  alModificar: () => void,
 ): void {
   const coordenada = filaPerfil.coordenada;
 
@@ -302,7 +308,7 @@ export function abrirPopupExtraTeclaMouse(
   popup.className = "popup-extra";
 
   const redibujar = () =>
-    abrirPopupExtraTeclaMouse(evento, contexto, filaPerfil);
+    abrirPopupExtraTeclaMouse(evento, contexto, filaPerfil, alModificar);
 
   // ----------------------------------
   // NIVEL 1 — Repetición: Ninguno / Normal / Turbo / Repetición
@@ -324,6 +330,7 @@ export function abrirPopupExtraTeclaMouse(
     filaPerfil.extra = "normal";
 
     reconstruirFila(contexto.id);
+    alModificar();
   }
 
   const esRueda = esGatilloRueda(filaPerfil.trigger);
@@ -342,6 +349,7 @@ export function abrirPopupExtraTeclaMouse(
         filaPerfil.extra = valor;
 
         reconstruirFila(contexto.id);
+        alModificar();
         redibujar();
       }),
     ),
@@ -362,6 +370,7 @@ export function abrirPopupExtraTeclaMouse(
       }
 
       reconstruirFila(contexto.id);
+      alModificar();
       redibujar();
     }),
   );
@@ -397,6 +406,7 @@ export function abrirPopupExtraTeclaMouse(
 
         cerrarVentanaCapturaCoordenada();
         reconstruirFila(contexto.id);
+        alModificar();
         redibujar();
       }),
     ),
@@ -405,7 +415,9 @@ export function abrirPopupExtraTeclaMouse(
   // Caja interna (mismo popup, otro nivel visual) — solo si la
   // ubicación es Relativa a Ventana.
   if (coordenada.ubicacion === "relativa_ventana") {
-    popup.append(crearCajaVentana(contexto, filaPerfil, redibujar));
+    popup.append(
+      crearCajaVentana(contexto, filaPerfil, alModificar, redibujar),
+    );
   }
 
   // ----------------------------------
@@ -424,6 +436,7 @@ export function abrirPopupExtraTeclaMouse(
         coordenada.postAccion = valor;
 
         reconstruirFila(contexto.id);
+        alModificar();
         redibujar();
       }),
     ),
@@ -442,7 +455,7 @@ export function abrirPopupExtraTeclaMouse(
   botonCapturar.textContent = `📌 ${textoCoordenada(coordenada)}`;
 
   botonCapturar.addEventListener("click", () => {
-    iniciarCaptura(contexto, filaPerfil, evento);
+    iniciarCaptura(contexto, filaPerfil, evento, alModificar);
   });
 
   popup.append(botonCapturar);

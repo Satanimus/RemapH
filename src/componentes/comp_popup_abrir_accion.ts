@@ -127,9 +127,7 @@ export function crearAccionAbrir(
   }
 
   boton.addEventListener("click", (evento) => {
-    abrirPopupSeleccionRuta(evento, contexto, filaPerfil);
-
-    alModificar();
+    abrirPopupSeleccionRuta(evento, contexto, filaPerfil, alModificar);
   });
 
   return boton;
@@ -149,6 +147,7 @@ function abrirPopupSeleccionRuta(
   evento: MouseEvent,
   contexto: ContextoFila,
   filaPerfil: FilaPerfil,
+  alModificar: () => void,
 ): void {
   const lista = document.createElement("div");
 
@@ -166,7 +165,7 @@ function abrirPopupSeleccionRuta(
       extensiones: null,
     });
 
-    aplicarRuta(ruta, contexto, filaPerfil);
+    aplicarRuta(ruta, contexto, filaPerfil, alModificar);
   });
 
   const botonCarpeta = document.createElement("button");
@@ -179,7 +178,7 @@ function abrirPopupSeleccionRuta(
 
     const ruta = await invoke<string | null>("seleccionar_carpeta");
 
-    aplicarRuta(ruta, contexto, filaPerfil);
+    aplicarRuta(ruta, contexto, filaPerfil, alModificar);
   });
 
   lista.append(botonArchivo, botonCarpeta);
@@ -191,6 +190,7 @@ function aplicarRuta(
   ruta: string | null,
   contexto: ContextoFila,
   filaPerfil: FilaPerfil,
+  alModificar: () => void,
 ): void {
   if (!ruta) {
     return;
@@ -212,4 +212,5 @@ function aplicarRuta(
   filaPerfil.abrirExtra.argumento = "";
 
   reconstruirFila(contexto.id);
+  alModificar();
 }
