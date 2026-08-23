@@ -1229,23 +1229,40 @@ function montarEditor(
     // click que lo abrió. Se usa capture para interceptar antes que
     // los botones internos (que tienen stopPropagation).
     if (idMenuAbierto || idPasoExpandido) {
+      const cerrarCajasAnidadas = (): void => {
+        document.removeEventListener("click", cerrarAlClickFuera, true);
+        document.removeEventListener("keydown", cerrarAlEsc, true);
+
+        idMenuAbierto = null;
+        idPasoExpandido = null;
+
+        redibujar();
+      };
+
       const cerrarAlClickFuera = (evento: MouseEvent): void => {
         const menuAbierto = popup.querySelector<HTMLElement>(
           ".popup-lista, .popup-macro-editor-menu-asa, .popup-macro-editor-detalle",
         );
 
         if (menuAbierto && !menuAbierto.contains(evento.target as Node)) {
-          document.removeEventListener("click", cerrarAlClickFuera, true);
-
-          idMenuAbierto = null;
-          idPasoExpandido = null;
-
-          redibujar();
+          cerrarCajasAnidadas();
         }
+      };
+
+      // Regla 5: Esc cierra cajas anidadas (Opción/Tipo/Extra) dentro
+      // del editor. stopPropagation: es la capa más interna — no debe
+      // seguir burbujeando hacia el listener de popups globales ni al
+      // modo Mover (Regla 9).
+      const cerrarAlEsc = (evento: KeyboardEvent): void => {
+        if (evento.key !== "Escape") return;
+
+        evento.stopPropagation();
+        cerrarCajasAnidadas();
       };
 
       setTimeout(() => {
         document.addEventListener("click", cerrarAlClickFuera, true);
+        document.addEventListener("keydown", cerrarAlEsc, true);
       }, 0);
     }
   }

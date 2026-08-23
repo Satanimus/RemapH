@@ -32,6 +32,19 @@ export function crearContenedorPopup(): HTMLElement {
     }
   });
 
+  // Regla 3/4: Esc cierra cualquier popup no fijo (mismo camino
+  // que click afuera). El editor de Macro (popupFijoActual=true)
+  // queda excluido. stopPropagation para no acumular con otros
+  // listeners (Regla 9: un solo Esc cierra una sola capa).
+  document.addEventListener("keydown", (evento) => {
+    if (evento.key !== "Escape") return;
+    if (popupFijoActual) return;
+    if (capaPopup?.style.display === "none") return;
+
+    evento.stopPropagation();
+    ocultarPopup();
+  });
+
   return capaPopup;
 }
 
