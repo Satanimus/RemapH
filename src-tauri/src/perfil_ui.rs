@@ -541,7 +541,13 @@ pub fn convertir_input_captura(input: &crate::eventos::InputId) -> EntradaCaptur
 
     let codigo = input.control().unwrap_or("").to_string();
 
-    let nombre = crate::pulsadores::ui_desde_interno(&codigo);
+    // nombre_ui_efectivo() (no ui_desde_interno()): tiene que
+    // respetar el nombre personalizado que el usuario haya puesto en
+    // Configuración para este pulsador, igual que ya lo respeta el
+    // resto de la UI tras reiniciar — si se usa ui_desde_interno()
+    // acá, el botón capturador muestra el nombre de fábrica aunque
+    // haya un override guardado.
+    let nombre = crate::pulsadores::nombre_ui_efectivo(&codigo);
 
     EntradaCapturaUI {
         tipo: fuente.to_string(),
