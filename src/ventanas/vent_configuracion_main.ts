@@ -1130,6 +1130,9 @@ const TODAS_LAS_PESTANAS: ReadonlyArray<readonly [HTMLButtonElement, Pestana]> =
     [tabAvanzado, pestanaAvanzado],
   ];
 
+const filaAcciones = document.createElement("div");
+filaAcciones.className = "configuracion-fila-slot";
+
 const barraGlobal = document.createElement("div");
 barraGlobal.className = "configuracion-acciones";
 
@@ -1145,7 +1148,47 @@ botonGuardarGlobal.className =
 botonGuardarGlobal.textContent = "Guardar cambios";
 
 barraGlobal.append(botonRestablecerGlobal, botonGuardarGlobal);
-card.append(barraGlobal);
+filaAcciones.append(barraGlobal);
+
+// --------------------------------------------------------
+// Fila de confirmación (reemplaza el window.confirm() nativo
+// de "Restablecer esta pestaña") — misma barra inferior, se
+// alarga hacia arriba mostrando el mensaje + Cancelar/
+// Confirmar en vez de abrir un popup del sistema aparte.
+// --------------------------------------------------------
+
+const filaConfirmacionSlot = document.createElement("div");
+filaConfirmacionSlot.className = "configuracion-fila-slot oculto";
+
+const filaConfirmacion = document.createElement("div");
+filaConfirmacion.className = "configuracion-confirmacion";
+
+const textoConfirmacion = document.createElement("span");
+textoConfirmacion.className = "configuracion-confirmacion-texto";
+
+const botonCancelarConfirmacion = document.createElement("button");
+botonCancelarConfirmacion.type = "button";
+botonCancelarConfirmacion.className = "configuracion-boton";
+botonCancelarConfirmacion.textContent = "Cancelar";
+
+const botonConfirmarConfirmacion = document.createElement("button");
+botonConfirmarConfirmacion.type = "button";
+botonConfirmarConfirmacion.className =
+  "configuracion-boton configuracion-boton-primario";
+botonConfirmarConfirmacion.textContent = "Restablecer";
+
+filaConfirmacion.append(
+  textoConfirmacion,
+  botonCancelarConfirmacion,
+  botonConfirmarConfirmacion,
+);
+filaConfirmacionSlot.append(filaConfirmacion);
+
+const barraAcciones = document.createElement("div");
+barraAcciones.className = "configuracion-barra";
+barraAcciones.append(filaConfirmacionSlot, filaAcciones);
+
+card.append(barraAcciones);
 
 function pestanaActiva(): Pestana {
   const par = TODAS_LAS_PESTANAS.find(([boton]) =>
@@ -1155,16 +1198,25 @@ function pestanaActiva(): Pestana {
   return par ? par[1] : pestanaGeneral;
 }
 
-botonRestablecerGlobal.addEventListener("click", async () => {
+botonRestablecerGlobal.addEventListener("click", () => {
   const activa = pestanaActiva();
 
-  const confirmado = window.confirm(activa.textoConfirmacionRestablecer);
+  textoConfirmacion.textContent = activa.textoConfirmacionRestablecer;
 
-  if (!confirmado) {
-    return;
-  }
+  filaAcciones.classList.add("oculto");
+  filaConfirmacionSlot.classList.remove("oculto");
+});
 
-  botonRestablecerGlobal.disabled = true;
+botonCancelarConfirmacion.addEventListener("click", () => {
+  filaConfirmacionSlot.classList.add("oculto");
+  filaAcciones.classList.remove("oculto");
+});
+
+botonConfirmarConfirmacion.addEventListener("click", async () => {
+  const activa = pestanaActiva();
+
+  botonConfirmarConfirmacion.disabled = true;
+  botonCancelarConfirmacion.disabled = true;
 
   try {
     await activa.restablecerPestana();
@@ -1172,7 +1224,11 @@ botonRestablecerGlobal.addEventListener("click", async () => {
   } catch (error) {
     window.alert(`No se pudo restablecer: ${String(error)}`);
   } finally {
-    botonRestablecerGlobal.disabled = false;
+    botonConfirmarConfirmacion.disabled = false;
+    botonCancelarConfirmacion.disabled = false;
+
+    filaConfirmacionSlot.classList.add("oculto");
+    filaAcciones.classList.remove("oculto");
   }
 });
 

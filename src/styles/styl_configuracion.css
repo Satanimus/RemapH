@@ -240,10 +240,49 @@
   display: none;
 }
 
+.configuracion-barra {
+  display: flex;
+  flex-direction: column;
+  border-top: 1px solid var(--border);
+  background: var(--panel);
+}
+
+.configuracion-fila-slot {
+  display: grid;
+  grid-template-rows: 1fr;
+  overflow: hidden;
+  min-height: 0;
+  transition: grid-template-rows var(--speed);
+}
+
+.configuracion-fila-slot.oculto {
+  grid-template-rows: 0fr;
+}
+
+.configuracion-fila-slot>* {
+  overflow: hidden;
+  min-height: 0;
+}
+
 .configuracion-acciones {
   display: flex;
   justify-content: flex-end;
+  align-items: center;
   gap: var(--gap8);
+  padding: var(--gap12) var(--gap16);
+}
+
+.configuracion-confirmacion {
+  display: flex;
+  align-items: center;
+  gap: var(--gap12);
+  padding: var(--gap12) var(--gap16);
+}
+
+.configuracion-confirmacion-texto {
+  flex: 1;
+  color: var(--text);
+  font-size: var(--fs13);
 }
 
 .configuracion-boton {
