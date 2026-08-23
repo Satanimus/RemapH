@@ -90,11 +90,7 @@ import {
 } from "../core/core_multimedia";
 import type { OpcionMultimedia } from "../core/core_multimedia";
 
-import {
-  esRutaExe,
-  nombreDeRuta,
-  extensionDeRuta,
-} from "../core/core_abrir";
+import { esRutaExe, nombreDeRuta, extensionDeRuta } from "../core/core_abrir";
 
 import {
   crearGrupoOpciones,
@@ -482,13 +478,13 @@ function montarEditor(
   // explícitos (más abajo) en vez de dejar que se recalcule.
   let posicionYaAjustada = false;
 
-  // Id del paso actualmente en "modo Mover" (activado desde el
-  // ítem "Mover" del menú Opciones — ver crearMenuAsa) — null si
-  // ninguno. Espejo propio del Set `seleccionadas` que vive DENTRO
-  // de controladorArrastre, porque ese controlador se destruye y
-  // recrea en cada dibujar() (spec punto 4, ver comentario en el
-  // callback de activarModoMoverPara más abajo).
-  let idPasoEnModoMover: string | null = null;
+  // Ids de los pasos actualmente en "modo Mover" — espejo propio del
+  // Set `seleccionadas` que vive DENTRO de controladorArrastre, porque
+  // ese controlador se destruye y recrea en cada dibujar(). Guarda
+  // TODA la selección (no solo la fila inicial) para que arrastres y
+  // movimientos con flecha, que disparan redibujar() vía onReordenar,
+  // restauren el grupo completo en el controlador nuevo.
+  let idsPasosEnModoMover: string[] = [];
 
   const redibujar = (): void => {
     dibujar();
@@ -848,6 +844,16 @@ function montarEditor(
 
   function dibujar(): void {
     if (controladorArrastre) {
+      // Capturar la selección completa ANTES de destruir — incluye
+      // todas las filas del grupo (selección múltiple con Ctrl),
+      // no solo idsPasosEnModoMover que puede quedar desactualizado
+      // entre un Ctrl+click y el siguiente redibujo.
+      const seleccionActual = controladorArrastre.obtenerSeleccionadas();
+
+      if (seleccionActual.length > 0) {
+        idsPasosEnModoMover = seleccionActual;
+      }
+
       controladorArrastre.destruir();
 
       controladorArrastre = null;
@@ -1022,7 +1028,7 @@ function montarEditor(
             // mover"), por ejemplo el que dispara moverGrupoConFlecha
             // al mover con las flechas. Se restaura más abajo, justo
             // después de crear el controlador nuevo.
-            idPasoEnModoMover = idPasoAMover;
+            idsPasosEnModoMover = [idPasoAMover];
 
             // El controlador se reasigna en cada dibujar() — se lee
             // en el momento del click (no se captura antes), porque
@@ -1166,12 +1172,12 @@ function montarEditor(
       onSalirModoMover: () => {
         // Limpiar el espejo propio (spec punto 4) — si no se hace
         // acá, el próximo redibujado (por cualquier otro motivo)
-        // volvería a activar el modo Mover sobre esta fila aunque
+        // volvería a activar el modo Mover sobre estas filas aunque
         // el usuario ya haya salido explícitamente (click afuera,
         // Escape). No hace falta redibujar: salirModoMover ya
         // limpió las clases de selección directamente sobre el DOM
         // existente.
-        idPasoEnModoMover = null;
+        idsPasosEnModoMover = [];
       },
     });
 
@@ -1194,15 +1200,27 @@ function montarEditor(
 
     // Recién acá, con todas las filas ya registradas, se puede
     // restaurar el modo Mover en el controlador nuevo (spec punto
-    // 4) — si el paso todavía existe (pudo haber sido eliminado
-    // mientras estaba en modo Mover).
-    if (
-      idPasoEnModoMover &&
-      macroArchivo.pasos.some((p) => idDePaso(p) === idPasoEnModoMover)
-    ) {
-      controladorArrastre.activarModoMoverPara(idPasoEnModoMover);
+    // 4). Se restauran TODOS los ids del grupo, filtrando los que
+    // ya no existan (el paso pudo haberse eliminado mientras estaba
+    // seleccionado). El primero usa activarModoMoverPara (reemplaza
+    // la selección); los adicionales usan seleccionarAdicional para
+    // sumar al grupo sin borrar lo anterior.
+    const idsRestaurados = idsPasosEnModoMover.filter((id) =>
+      macroArchivo.pasos.some((p) => idDePaso(p) === id),
+    );
+
+    if (idsRestaurados.length > 0) {
+      // El primero activa el modo Mover (reemplaza cualquier selección).
+      controladorArrastre.activarModoMoverPara(idsRestaurados[0]);
+
+      // Los adicionales se agregan a la selección existente.
+      idsRestaurados.slice(1).forEach((id) => {
+        controladorArrastre!.seleccionarAdicional(id);
+      });
+
+      idsPasosEnModoMover = idsRestaurados;
     } else {
-      idPasoEnModoMover = null;
+      idsPasosEnModoMover = [];
     }
 
     // Cerrar el popup anidado abierto (Opción/Tipo/Extra — spec

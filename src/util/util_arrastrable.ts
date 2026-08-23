@@ -148,6 +148,11 @@ export interface ControladorArrastre {
 
   estaSeleccionada(id: string): boolean;
 
+  // Devuelve una copia del Set de ids actualmente seleccionados.
+  // Usado por el editor de Macros para capturar la selección completa
+  // antes de un redibujo (que destruye y recrea el controlador).
+  obtenerSeleccionadas(): string[];
+
   estaEnModoMover(): boolean;
 
   salirModoMover(): void;
@@ -160,6 +165,11 @@ export interface ControladorArrastre {
   // por sí sola: a partir de acá el usuario arrastra con el
   // mouse desde el fondo de la fila, o mueve con las flechas.
   activarModoMoverPara(id: string): void;
+
+  // Agrega una fila a la selección existente sin reemplazarla —
+  // usado por el editor de Macros para restaurar una selección
+  // múltiple tras recrear el controlador en cada redibujo.
+  seleccionarAdicional(id: string): void;
 
   // No pedido en la interfaz original — agregado porque este
   // controlador engancha listeners en `document` (clic afuera,
@@ -869,7 +879,7 @@ export function crearControladorArrastre(
     }
   }
 
-  function manejarAsaPointerUp(): void {
+  function manejarAsaPointerUp(evento: PointerEvent): void {
     if (!presionAsaActual) return;
 
     const { id, convertidaEnMover } = presionAsaActual;
@@ -879,7 +889,26 @@ export function crearControladorArrastre(
 
     presionAsaActual = null;
 
-    if (!convertidaEnMover) return; // clic corto normal: se deja pasar tal cual.
+    if (!convertidaEnMover) {
+      // Ctrl+click simple sobre el asa con modo Mover ya activo:
+      // alterna la selección de esta fila (igual que Ctrl+click sobre
+      // el fondo) y suprime el click para que no abra el popup de
+      // opciones. Sin modo Mover activo, Ctrl no cambia nada — el
+      // click pasa normal y abre el popup.
+      if (evento.ctrlKey && seleccionadas.size > 0) {
+        const asa = filas.get(id)?.asa;
+
+        if (asa) asasASuprimirClick.add(asa);
+
+        if (seleccionadas.has(id)) {
+          deseleccionar(id);
+        } else {
+          seleccionar(id);
+        }
+      }
+
+      return;
+    }
 
     const asa = filas.get(id)?.asa;
 
@@ -887,8 +916,28 @@ export function crearControladorArrastre(
 
     if (arrastreActual && !arrastreActual.seMovio) {
       // Se mantuvo pero nunca se movió: no hay nada que
-      // reordenar, se cancela el arrastre visual limpio.
-      manejarPointerUpArrastre();
+      // reordenar — se limpia el estado visual (fantasma,
+      // placeholder, clases) sin llamar a onReordenar ni a
+      // aplicarNuevoOrden. Esto es importante en el editor de
+      // Macros, donde onReordenar dispara un redibujar() completo
+      // (con setTimeout 0) que destruiría el controlador y borraría
+      // la selección recién activada, haciendo que al soltar el
+      // botón la fila quedara deseleccionada en vez de en modo Mover.
+      const { idsGrupo, fantasma, placeholder } = arrastreActual;
+
+      document.removeEventListener("pointermove", manejarPointerMoveArrastre);
+      document.removeEventListener("pointerup", manejarPointerUpArrastre);
+
+      placeholder.remove();
+      fantasma.remove();
+
+      contenedor.classList.remove(CLASE_CONTENEDOR_ARRASTRANDO);
+
+      idsGrupo.forEach((id) => {
+        filas.get(id)?.elemento.classList.remove(CLASE_FILA_OCULTA);
+      });
+
+      arrastreActual = null;
     }
   }
 
@@ -1071,9 +1120,13 @@ export function crearControladorArrastre(
   return {
     registrarFila,
     estaSeleccionada: (id: string) => seleccionadas.has(id),
+    obtenerSeleccionadas: () => [...seleccionadas],
     estaEnModoMover: () => seleccionadas.size > 0,
     salirModoMover,
     activarModoMoverPara,
+    seleccionarAdicional: (id: string) => {
+      if (filas.has(id)) seleccionar(id);
+    },
     destruir,
   };
 }
