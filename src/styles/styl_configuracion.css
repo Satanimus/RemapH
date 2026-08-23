@@ -192,6 +192,10 @@
   margin-right: auto;
 }
 
+.configuracion-acciones-tema.oculto {
+  display: none;
+}
+
 .configuracion-input-tema {
   padding: var(--gap8);
   background: var(--panel2);
@@ -252,11 +256,13 @@
   grid-template-rows: 1fr;
   overflow: hidden;
   min-height: 0;
+  visibility: visible;
   transition: grid-template-rows var(--speed);
 }
 
 .configuracion-fila-slot.oculto {
   grid-template-rows: 0fr;
+  visibility: hidden;
 }
 
 .configuracion-fila-slot>* {

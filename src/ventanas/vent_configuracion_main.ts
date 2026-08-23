@@ -157,6 +157,11 @@ function activarTab(botonElegido: HTMLButtonElement): void {
 
     panel.classList.toggle("oculto", !activa);
   }
+
+  // Nombre/Guardar/Cargar tema solo tienen sentido en Apariencia —
+  // se ocultan en la barra global al cambiar a otra pestaña (ver
+  // "BARRA DE ACCIONES GLOBAL").
+  contenedorTema.classList.toggle("oculto", botonElegido !== tabApariencia);
 }
 
 tabGeneral.addEventListener("click", () => activarTab(tabGeneral));
@@ -317,11 +322,6 @@ interface OpcionesPestana {
 
   textoConfirmacionRestablecer: string;
 
-  // Elementos extra a agregar en el pie de la tabla, dentro del panel
-  // de esta pestaña (solo lo usa Apariencia, para Guardar/Cargar tema
-  // — ver "PESTAÑA APARIENCIA" al final del archivo).
-  accionesExtra?: HTMLElement[];
-
   // Se llama después de un guardado o restablecido exitoso, además
   // del toast de confirmación (solo lo usa Apariencia, para pedirle
   // al backend que recargue el resto de ventanas y así se vea el
@@ -362,7 +362,6 @@ function crearPestanaEditable(opciones: OpcionesPestana): Pestana {
     guardarLote,
     restablecer,
     textoConfirmacionRestablecer,
-    accionesExtra,
     despuesDeAplicar,
   } = opciones;
 
@@ -400,13 +399,6 @@ function crearPestanaEditable(opciones: OpcionesPestana): Pestana {
   mensajeError.className = "configuracion-error oculto";
 
   panel.append(scrollTabla, mensajeError);
-
-  if (accionesExtra && accionesExtra.length > 0) {
-    const contenedorExtra = document.createElement("div");
-    contenedorExtra.className = "configuracion-acciones-extra";
-    contenedorExtra.append(...accionesExtra);
-    panel.append(contenedorExtra);
-  }
 
   // ----------------------------------------------------
   // Estado propio de esta pestaña
@@ -888,7 +880,8 @@ const pestanaTeclas = crearPestanaEditable({
 // Reutiliza crearPestanaEditable() igual que General/Teclas,
 // agrupando filas en "Colores" y "Tamaños" (apariencia.tsv ya
 // viene ordenado así, ver ese archivo). Es la única pestaña
-// con accionesExtra (Guardar/Cargar tema) y con
+// con controles de Guardar/Cargar tema (mostrados en la barra
+// de acciones global, ver "BARRA DE ACCIONES GLOBAL") y con
 // despuesDeAplicar (aplica el cambio en esta misma ventana y
 // le pide al backend que recargue el resto — ver
 // core_apariencia.ts / comandos.rs).
@@ -939,7 +932,7 @@ botonCargarTema.className = "configuracion-boton";
 botonCargarTema.textContent = "Cargar tema…";
 
 const contenedorTema = document.createElement("div");
-contenedorTema.className = "configuracion-acciones-tema";
+contenedorTema.className = "configuracion-acciones-tema oculto";
 contenedorTema.append(inputNombreTema, botonGuardarTema, botonCargarTema);
 
 // Asignada más abajo, apenas se crea pestanaApariencia — los
@@ -1003,8 +996,6 @@ const pestanaApariencia = crearPestanaEditable({
   panel: panelApariencia,
 
   encabezados: ["Nombre", "Valor por defecto", "Valor personalizado"],
-
-  accionesExtra: [contenedorTema],
 
   cargarFilas: async () => {
     const crudas = await invoke<FilaCssCruda[]>(
@@ -1147,7 +1138,7 @@ botonGuardarGlobal.className =
   "configuracion-boton configuracion-boton-primario";
 botonGuardarGlobal.textContent = "Guardar cambios";
 
-barraGlobal.append(botonRestablecerGlobal, botonGuardarGlobal);
+barraGlobal.append(contenedorTema, botonRestablecerGlobal, botonGuardarGlobal);
 filaAcciones.append(barraGlobal);
 
 // --------------------------------------------------------
