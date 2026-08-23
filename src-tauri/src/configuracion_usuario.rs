@@ -80,12 +80,6 @@
 //     leyendo el archivo completo y descartando las
 //     claves con prefijo (css./pulsador.).
 //
-// guardar_override(clave, valor)
-//     Valida que la clave exista en el catálogo de
-//     General, la aplica en caliente (aplicar_valor) y
-//     persiste el archivo completo (preservando las
-//     claves con prefijo que ya hubiera).
-//
 // aplicar_valor(clave, valor)
 //     Parsea "valor" según el tipo de "clave" (numero /
 //     numero_par / texto) y llama al setter de config.rs
@@ -508,6 +502,10 @@ pub fn aplicar_valor(clave: &str, valor: &str) -> Result<(), String> {
             config::establecer_tiempo_maximo_retenido(parsear_numero(valor)?)
         }
 
+        "tiempo_inactividad_captura" => {
+            config::establecer_tiempo_inactividad_captura(parsear_numero(valor)?)
+        }
+
         "tecla_guardar_coordenada" => {
             let valor_limpio = valor.trim();
 
@@ -596,28 +594,6 @@ pub fn aplicar_valor(clave: &str, valor: &str) -> Result<(), String> {
     }
 
     Ok(())
-}
-
-// ======================================================
-// 💾 GUARDAR OVERRIDE (una clave, valida + aplica + persiste)
-// ======================================================
-
-pub fn guardar_override(clave: &str, valor: &str) -> Result<(), String> {
-    let existe = cargar_catalogo()
-        .iter()
-        .any(|entrada| entrada.clave == clave);
-
-    if !existe {
-        return Err(format!("Clave de configuración desconocida: \"{}\"", clave));
-    }
-
-    aplicar_valor(clave, valor)?;
-
-    let mut mapa = leer_mapa_completo()?;
-
-    mapa.insert(clave.to_string(), valor.to_string());
-
-    escribir_mapa_completo(&mapa)
 }
 
 // ======================================================

@@ -524,8 +524,9 @@ fn iniciar_espera_mantenido(
         // se cae a Simple: la tecla sigue físicamente abajo en este
         // punto (todavía no llegó ningún Up), así que commitear a
         // Simple acá adentro es lo correcto — resolver_match() de
-        // ahí en más decide solo, con teclas_vivas()/
-        // requiere_up_real(), si corresponde modo diferido (Normal/
+        // ahí en más decide solo, con requiere_up_real() más el
+        // estado real de RUNTIME.presionadas, si corresponde modo
+        // diferido (Normal/
         // Turbo/Mantenido: repite u ocupa hasta el Up real) o
         // instantáneo (Extra Simple: dispara una vez y listo).
         let entrada_actual = runtime.sesiones[idx].entrada.clone();
@@ -750,28 +751,6 @@ fn resolver_match(remapeo: RemapeoCache, entrada: Vec<InputId>, _id: u64, restan
 
     resembrar_fantasma(restantes);
     entrada::consumir(&[]);
-}
-
-/// Subconjunto de `entrada` que sigue físicamente presionado AHORA.
-/// Se apoya en `RUNTIME.presionadas` (Etapa 4) — nunca en
-/// `Sesion.entrada` (que, como está documentado en la struct, es
-/// historial y a propósito no se achica). Se llama con el lock de
-/// RUNTIME siempre ya liberado por el caller (resolver_match), así
-/// que acá lo vuelve a pedir un instante, sin anidar.
-///
-/// [FIX] Antes esto era `algo_sigue_presionado() -> bool` — solo
-/// decía SI había alguna tecla viva, pero resolver_match() nunca
-/// llegaba a saber CUÁLES eran para pasárselas a entrada::consumir()
-/// (que antes tampoco las pedía). Ahora devuelve la lista completa,
-/// que es lo que entrada.rs necesita para abrir su propio grupo
-/// DEVOLVIENDO y vigilar esos repeats/Up reales correctamente.
-fn teclas_vivas(entrada: &[InputId]) -> Vec<InputId> {
-    let runtime = RUNTIME.lock().unwrap();
-    entrada
-        .iter()
-        .filter(|i| runtime.presionadas.contains(i))
-        .cloned()
-        .collect()
 }
 
 /// Reemplaza cualquier sesión fantasma existente por una nueva con

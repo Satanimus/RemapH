@@ -295,6 +295,7 @@ use windows_sys::Win32::UI::Input::KeyboardAndMouse::{
 };
 
 use crate::back_portapapeles_captura::{self, ContenidoPortapapeles};
+use crate::config;
 use crate::perfil_cache::{ComportamientoMenu, TamanoBotonPortapapeles, TamanoMenu, UbicacionMenu};
 
 // ======================================================
@@ -329,7 +330,9 @@ pub struct ElementoPortapapeles {
 fn carpeta() -> Result<PathBuf, String> {
     let appdata = std::env::var("APPDATA").map_err(|error| error.to_string())?;
 
-    let carpeta = PathBuf::from(appdata).join("RemapH").join("Portapapeles");
+    let carpeta = PathBuf::from(appdata)
+        .join(config::NOMBRE_APP)
+        .join("Portapapeles");
 
     fs::create_dir_all(&carpeta).map_err(|error| error.to_string())?;
 

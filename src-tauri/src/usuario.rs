@@ -62,6 +62,7 @@
 // perfil_actual() → perfil_Juegos.json
 // ======================================================
 
+use crate::config;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::SystemTime;
@@ -73,7 +74,9 @@ use std::time::SystemTime;
 pub(crate) fn carpeta() -> Result<PathBuf, String> {
     let appdata = std::env::var("APPDATA").map_err(|error| error.to_string())?;
 
-    let carpeta = PathBuf::from(appdata).join("RemapH").join("Usuario");
+    let carpeta = PathBuf::from(appdata)
+        .join(config::NOMBRE_APP)
+        .join("Usuario");
 
     fs::create_dir_all(&carpeta).map_err(|error| error.to_string())?;
 

@@ -135,11 +135,12 @@
 //     iniciar(). Carga el teclado/mouse primario guardado la
 //     sesión anterior como valor inicial (sin confirmar) —
 //     ver "Reglas de dispositivo primario" arriba.
-// con_sesion_entrada() / activar_filtros() / desactivar_filtros()
-//     La sesión de Interception para ENTRADA se crea UNA
-//     sola vez por vida del proceso (perezosa, thread_local,
-//     nunca se destruye entre transiciones de modo — ver
-//     comentario junto a SESION_ENTRADA). activar_filtros()
+// activar_filtros() / desactivar_filtros()
+//     La sesión de Interception para ENTRADA (SESION_ENTRADA)
+//     se crea UNA sola vez por vida del proceso (perezosa,
+//     thread_local, nunca se destruye entre transiciones de
+//     modo — ver comentario junto a SESION_ENTRADA).
+//     activar_filtros()
 //     prende la captura de teclado/mouse al entrar a
 //     Interception; desactivar_filtros() la apaga (filtro
 //     vacío) al volver a Portable, sin tocar el contexto.
@@ -343,18 +344,6 @@ fn mouse_primario() -> Option<Device> {
 
 thread_local! {
     static SESION_ENTRADA: RefCell<Option<Interception>> = RefCell::new(None);
-}
-
-fn con_sesion_entrada<R>(usar: impl FnOnce(&Interception) -> R) -> R {
-    SESION_ENTRADA.with(|celda| {
-        let mut sesion = celda.borrow_mut();
-
-        if sesion.is_none() {
-            *sesion = Some(Interception::new().expect("No se pudo iniciar Interception (entrada)"));
-        }
-
-        usar(sesion.as_ref().unwrap())
-    })
 }
 
 fn activar_filtros(ict: &Interception) {

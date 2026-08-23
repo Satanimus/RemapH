@@ -40,6 +40,7 @@
 //     nombre personalizado ("Nueva Macro" sin escribir nada).
 // ======================================================
 
+use crate::config;
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -51,7 +52,7 @@ fn carpeta() -> Result<PathBuf, String> {
     let appdata = std::env::var("APPDATA").map_err(|error| error.to_string())?;
 
     let carpeta = PathBuf::from(appdata)
-        .join("RemapH")
+        .join(config::NOMBRE_APP)
         .join("Usuario")
         .join("Macros");
 
@@ -154,7 +155,7 @@ pub fn carpeta_cache() -> Result<PathBuf, String> {
     let appdata = std::env::var("APPDATA").map_err(|error| error.to_string())?;
 
     let carpeta = PathBuf::from(appdata)
-        .join("RemapH")
+        .join(config::NOMBRE_APP)
         .join("Usuario")
         .join("MacrosCache");
 
