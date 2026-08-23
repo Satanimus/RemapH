@@ -1224,6 +1224,16 @@ pub async fn configuracion_restablecer_seccion(prefijo: Option<String>) -> Resul
     configuracion_usuario::restablecer_seccion(prefijo.as_deref())
 }
 
+// Ver configuracion_usuario::restablecer_claves — restablece un
+// subconjunto explícito de claves del catálogo de General (usado por
+// General para excluir los tamaños que se muestran en Apariencia, y
+// por Apariencia para restablecer solo esos tamaños).
+#[tauri::command]
+pub async fn configuracion_restablecer_claves(claves: Vec<String>) -> Result<(), String> {
+    let referencias: Vec<&str> = claves.iter().map(|clave| clave.as_str()).collect();
+    configuracion_usuario::restablecer_claves(&referencias)
+}
+
 // ======================================================
 // ⌨️ CONFIGURACIÓN — PESTAÑA TECLAS (Etapa 5)
 // ------------------------------------------------------

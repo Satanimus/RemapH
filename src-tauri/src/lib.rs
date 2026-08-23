@@ -173,6 +173,7 @@ pub fn run() {
             comandos::configuracion_listar_general,
             comandos::configuracion_guardar_lote,
             comandos::configuracion_restablecer_seccion,
+            comandos::configuracion_restablecer_claves,
             comandos::configuracion_listar_teclas,
             comandos::configuracion_guardar_lote_teclas,
             comandos::configuracion_listar_apariencia,

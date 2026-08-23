@@ -692,6 +692,39 @@ interface FilaGeneralCruda {
   valor_personalizado: string | null;
 }
 
+// Claves de configuracion.tsv que se muestran en la pestaña
+// Apariencia (tamaños de botón/texto de MenuExpress y Portapapeles)
+// en vez de en General — mismo catálogo backend (config.rs /
+// configuracion_listar_general), solo cambia dónde se ven y con qué
+// subconjunto se restablece cada "Restablecer esta pestaña" (ver
+// configuracion_restablecer_claves). Declarada acá porque General la
+// usa para excluirlas de su tabla; Apariencia la importa más abajo.
+const CLAVES_TAMANOS_EN_APARIENCIA: readonly string[] = [
+  "menu_boton_pequeno",
+  "menu_boton_mediano",
+  "menu_boton_grande",
+  "menu_texto_pequeno",
+  "menu_texto_mediano",
+  "menu_texto_grande",
+  "portapapeles_boton_pequeno",
+  "portapapeles_boton_mediano",
+  "portapapeles_boton_grande",
+];
+
+// Agrupa el resto de General en dos categorías: "Varios" arriba
+// (tecla de atajo, sensibilidad, paso de volumen — todo lo que no es
+// un tiempo) y "Tiempo (ms)" abajo (todas las claves de temporización
+// del catálogo). Cualquier clave nueva que no sea de tiempo cae en
+// "Varios" por defecto (catch-all), así que sigue viéndose aunque no
+// esté prevista acá.
+function grupoGeneral(clave: string, nombreUi: string): string {
+  if (clave.startsWith("tiempo_") || clave.startsWith("delay_")) {
+    return "Tiempo (ms)";
+  }
+
+  return nombreUi.includes("(ms)") ? "Tiempo (ms)" : "Varios";
+}
+
 const pestanaGeneral = crearPestanaEditable({
   panel: panelGeneral,
 
@@ -702,21 +735,44 @@ const pestanaGeneral = crearPestanaEditable({
       "configuracion_listar_general",
     );
 
-    return crudas.map((cruda) => ({
+    const propiasDeGeneral = crudas.filter(
+      (cruda) => !CLAVES_TAMANOS_EN_APARIENCIA.includes(cruda.clave),
+    );
+
+    // "Varios" antes que "Tiempo (ms)" (ver montarFilaSubtitulo /
+    // ultimoGrupo en crearPestanaEditable: el orden de salida define
+    // el orden de las secciones, no hay sort propio acá).
+    const orden = ["Varios", "Tiempo (ms)"];
+
+    const filas = propiasDeGeneral.map((cruda) => ({
       clave: cruda.clave,
       nombreMostrado: cruda.nombre_ui,
-      grupo: null,
+      grupo: grupoGeneral(cruda.clave, cruda.nombre_ui),
       tipo: cruda.tipo as TipoValorConfiguracion,
       valorDefecto: cruda.valor_defecto,
       valorPersonalizado: cruda.valor_personalizado,
     }));
+
+    filas.sort((a, b) => orden.indexOf(a.grupo) - orden.indexOf(b.grupo));
+
+    return filas;
   },
 
   guardarLote: (cambios) =>
     invoke<ResultadoGuardado>("configuracion_guardar_lote", { cambios }),
 
   restablecer: async () => {
-    await invoke("configuracion_restablecer_seccion", { prefijo: null });
+    const crudas = await invoke<FilaGeneralCruda[]>(
+      "configuracion_listar_general",
+    );
+
+    const clavesPropias = crudas
+      .map((cruda) => cruda.clave)
+      .filter((clave) => !CLAVES_TAMANOS_EN_APARIENCIA.includes(clave));
+
+    await invoke("configuracion_restablecer_claves", {
+      claves: clavesPropias,
+    });
   },
 
   textoConfirmacionRestablecer:
@@ -998,11 +1054,12 @@ const pestanaApariencia = crearPestanaEditable({
   encabezados: ["Nombre", "Valor por defecto", "Valor personalizado"],
 
   cargarFilas: async () => {
-    const crudas = await invoke<FilaCssCruda[]>(
-      "configuracion_listar_apariencia",
-    );
+    const [crudasCss, crudasGeneral] = await Promise.all([
+      invoke<FilaCssCruda[]>("configuracion_listar_apariencia"),
+      invoke<FilaGeneralCruda[]>("configuracion_listar_general"),
+    ]);
 
-    return crudas.map((cruda) => ({
+    const filasCss = crudasCss.map((cruda) => ({
       clave: cruda.clave,
       nombreMostrado: cruda.nombre_ui,
       grupo: grupoApariencia(cruda.tipo),
@@ -1010,15 +1067,66 @@ const pestanaApariencia = crearPestanaEditable({
       valorDefecto: cruda.valor_defecto,
       valorPersonalizado: cruda.valor_personalizado,
     }));
+
+    // Tamaños de botón/texto de MenuExpress y Portapapeles — mismo
+    // catálogo que General (config.rs), solo mostrados acá (ver
+    // CLAVES_TAMANOS_EN_APARIENCIA). Van al final, en su propia
+    // sección.
+    const filasTamanos = crudasGeneral
+      .filter((cruda) => CLAVES_TAMANOS_EN_APARIENCIA.includes(cruda.clave))
+      .map((cruda) => ({
+        clave: cruda.clave,
+        nombreMostrado: cruda.nombre_ui,
+        grupo: "Tamaños de botones",
+        tipo: cruda.tipo as TipoValorConfiguracion,
+        valorDefecto: cruda.valor_defecto,
+        valorPersonalizado: cruda.valor_personalizado,
+      }));
+
+    return [...filasCss, ...filasTamanos];
   },
 
-  guardarLote: (cambios) =>
-    invoke<ResultadoGuardado>("configuracion_guardar_lote_apariencia", {
-      cambios,
-    }),
+  // Cada cambio va a su catálogo de origen: los de
+  // CLAVES_TAMANOS_EN_APARIENCIA son claves de General (config.rs),
+  // el resto son CSS (Apariencia propiamente). Se guardan con los dos
+  // comandos correspondientes y se fusionan los errores, para que la
+  // barra global los trate como un solo guardado.
+  guardarLote: async (cambios) => {
+    const cambiosTamanos = cambios.filter((cambio) =>
+      CLAVES_TAMANOS_EN_APARIENCIA.includes(cambio.clave),
+    );
+    const cambiosCss = cambios.filter(
+      (cambio) => !CLAVES_TAMANOS_EN_APARIENCIA.includes(cambio.clave),
+    );
 
+    const resultados = await Promise.all([
+      cambiosCss.length > 0
+        ? invoke<ResultadoGuardado>("configuracion_guardar_lote_apariencia", {
+            cambios: cambiosCss,
+          })
+        : Promise.resolve<ResultadoGuardado>({ errores: [] }),
+
+      cambiosTamanos.length > 0
+        ? invoke<ResultadoGuardado>("configuracion_guardar_lote", {
+            cambios: cambiosTamanos,
+          })
+        : Promise.resolve<ResultadoGuardado>({ errores: [] }),
+    ]);
+
+    return { errores: resultados.flatMap((resultado) => resultado.errores) };
+  },
+
+  // Restablece ambos catálogos por separado: el CSS por prefijo
+  // ("css.", como antes) y los tamaños por su lista explícita de
+  // claves (ver configuracion_restablecer_claves — no comparten
+  // prefijo con punto con el resto de General).
   restablecer: async () => {
-    await invoke("configuracion_restablecer_seccion", { prefijo: "css." });
+    await Promise.all([
+      invoke("configuracion_restablecer_seccion", { prefijo: "css." }),
+      invoke("configuracion_restablecer_claves", {
+        claves: CLAVES_TAMANOS_EN_APARIENCIA,
+      }),
+    ]);
   },
 
   despuesDeAplicar: refrescarTrasCambioApariencia,

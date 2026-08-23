@@ -246,6 +246,7 @@
 
 .configuracion-barra {
   display: flex;
+  flex: 0 0 auto;
   flex-direction: column;
   border-top: 1px solid var(--border);
   background: var(--panel);
@@ -253,21 +254,10 @@
 
 .configuracion-fila-slot {
   display: grid;
-  grid-template-rows: 1fr;
-  overflow: hidden;
-  min-height: 0;
-  visibility: visible;
-  transition: grid-template-rows var(--speed);
 }
 
 .configuracion-fila-slot.oculto {
-  grid-template-rows: 0fr;
-  visibility: hidden;
-}
-
-.configuracion-fila-slot>* {
-  overflow: hidden;
-  min-height: 0;
+  display: none;
 }
 
 .configuracion-acciones {

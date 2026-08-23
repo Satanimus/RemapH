@@ -698,6 +698,38 @@ pub fn restablecer_seccion(prefijo: Option<&str>) -> Result<(), String> {
 }
 
 // ======================================================
+// ♻️ RESTABLECER UN SUBCONJUNTO EXPLÍCITO DE CLAVES
+// ------------------------------------------------------
+// Variante de restablecer_seccion() para cuando el subconjunto no
+// comparte un prefijo con punto (ej. los tamaños de botón/texto de
+// Menú Express y Portapapeles, que viven en el mismo catálogo sin
+// puntos que General pero se muestran en la pestaña Apariencia — ver
+// "Restablecer esta pestaña" ahí). Recibe la lista de claves tal
+// cual, las quita del mapa de overrides y reaplica su valor de
+// fábrica (mismo catálogo que General, cargar_catalogo()).
+// ======================================================
+
+pub fn restablecer_claves(claves: &[&str]) -> Result<(), String> {
+    let mut mapa = leer_mapa_completo()?;
+
+    for clave in claves {
+        mapa.remove(*clave);
+    }
+
+    escribir_mapa_completo(&mapa)?;
+
+    let catalogo = cargar_catalogo();
+
+    for clave in claves {
+        if let Some(entrada) = catalogo.iter().find(|entrada| &entrada.clave == clave) {
+            let _ = aplicar_valor(&entrada.clave, &entrada.valor_defecto);
+        }
+    }
+
+    Ok(())
+}
+
+// ======================================================
 // 🚀 CARGAR AL INICIAR
 // ------------------------------------------------------
 // Se llama una sola vez, desde setup() en lib.rs. Nunca
