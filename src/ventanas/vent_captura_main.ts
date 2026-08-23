@@ -140,6 +140,11 @@ botonCancelar.addEventListener("click", () => {
   cerrar();
 });
 
+// Regla 7: Esc cancela esta ventana (equivalente a Cancelar).
+document.addEventListener("keydown", (evento) => {
+  if (evento.key === "Escape") cerrar();
+});
+
 function cerrar(): void {
   detenerPolling();
 

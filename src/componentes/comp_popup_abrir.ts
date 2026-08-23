@@ -598,16 +598,16 @@ export function abrirPopupModificador(
   lista.className = "popup-lista";
 
   // ----------------------------------
-  // ➕ WIN +
+  // ➕ ESC +
   // ----------------------------------
 
   const botonWin = document.createElement("button");
 
   botonWin.className = "ui-btn";
-  botonWin.textContent = "Win +";
+  botonWin.textContent = "Esc +";
 
   botonWin.addEventListener("click", () => {
-    const entrada = crearModificador("Win +");
+    const entrada = crearModificador("Esc +");
 
     const trigger =
       destino === "Trigger" ? filaPerfil.trigger : filaPerfil.accion;
@@ -660,8 +660,8 @@ export function abrirPopupModificador(
 
 function crearModificador(texto: string) {
   switch (texto) {
-    case "Win +":
-      return crearEntrada("Teclado", "MetaLeft", "Win");
+    case "Esc +":
+      return crearEntrada("Teclado", "Escape", "Esc");
 
     default:
       return null;
