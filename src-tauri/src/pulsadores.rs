@@ -64,6 +64,18 @@
 // por_ui()
 //     Busca un pulsador por nombre visible.
 //
+// por_scancode()
+//     Busca un pulsador por scan code crudo Set 1 +
+//     es_extendida (columnas "scancode"/"extendida" — ver
+//     comentario de esas columnas en pulsadores.tsv). Usado
+//     por Modo Portable (back_windows.rs) para resolver la
+//     entrada SIN pasar por "nativo"/VK, que resultó no ser
+//     confiable para teclas OEM en layouts no-US. Si
+//     es_extendida=true y no hay fila con extendida=1 para
+//     ese scancode, cae a la fila normal (extendida=0) con
+//     el mismo scancode — mismo criterio de fallback que
+//     nombre_interception() en back_teclas.rs.
+//
 // todos()
 //     Devuelve el diccionario completo.
 //
@@ -74,6 +86,7 @@
 // interno_a_ui()
 // interception_a_interno()
 // ui_a_interno()
+// scancode_a_interno()
 //     Conversiones entre formatos.
 //
 // ui_desde_interno()
@@ -120,6 +133,14 @@ pub struct Pulsador {
     pub interception: String,
 
     pub ui: String,
+
+    // Set 1 crudo (ver columna "scancode" de pulsadores.tsv). None
+    // para fuente=mouse, que no tiene fila de 7 columnas (no aplica).
+    pub scancode: Option<u16>,
+
+    // Ver columna "extendida" de pulsadores.tsv. false por defecto
+    // para las filas de 5 columnas (mouse), donde no aplica.
+    pub extendida: bool,
 }
 
 // ======================================================
@@ -147,24 +168,28 @@ fn cargar() -> &'static Vec<Pulsador> {
 
             let columnas: Vec<&str> = linea.split('\t').collect();
 
-            if columnas.len() != 5 {
+            // 5 columnas: fila "mouse" (scancode/extendida no aplican,
+            // no tienen scan code Set 1 de teclado). 7 columnas: fila
+            // "keyboard", con scancode/extendida al final. Cualquier
+            // otro largo es un error real de formato.
+            if columnas.len() != 5 && columnas.len() != 7 {
                 panic!(
                     "❌ Error interno en pulsadores.tsv. Línea {}",
                     numero_linea + 1
                 );
             }
 
-            // Fila de encabezado ("fuente  nativo  interno  interception  ui").
-            // No empieza con '#' (así se ve en un editor tabular como
-            // columnas reales), así que hay que descartarla explícitamente
-            // por contenido — igual que configuracion.tsv/apariencia.tsv
-            // descartan su fila "clave  nombre_ui  ...". Antes se hacía
-            // por número de línea (`numero_linea == 0`), pero esa cuenta
-            // incluye los comentarios de arriba del archivo, así que el
-            // salto caía en la primera línea de comentario y no en el
-            // encabezado real: el header terminaba procesado como un
-            // pulsador más (interno "interno", ui "ui"), visible en la
-            // pestaña Teclas dentro de "Símbolos".
+            // Fila de encabezado ("fuente  nativo  interno  interception  ui
+            // scancode  extendida"). No empieza con '#' (así se ve en un
+            // editor tabular como columnas reales), así que hay que
+            // descartarla explícitamente por contenido — igual que
+            // configuracion.tsv/apariencia.tsv descartan su fila
+            // "clave  nombre_ui  ...". Antes se hacía por número de línea
+            // (`numero_linea == 0`), pero esa cuenta incluye los
+            // comentarios de arriba del archivo, así que el salto caía en
+            // la primera línea de comentario y no en el encabezado real:
+            // el header terminaba procesado como un pulsador más (interno
+            // "interno", ui "ui").
             if columnas[0].trim() == "fuente" {
                 continue;
             }
@@ -178,6 +203,35 @@ fn cargar() -> &'static Vec<Pulsador> {
             let interception = columnas[3].trim();
 
             let ui = columnas[4].trim();
+
+            // scancode/extendida solo existen en filas de 7 columnas.
+            // Un scancode vacío en una fila de 7 columnas se trata como
+            // "no tiene" (None) en vez de forzar el parseo hex — por
+            // robustez, no porque hoy exista ese caso en el archivo.
+            let (scancode, extendida) = if columnas.len() == 7 {
+                let scancode_txt = columnas[5].trim();
+
+                let scancode = if scancode_txt.is_empty() {
+                    None
+                } else {
+                    Some(
+                        u16::from_str_radix(scancode_txt.trim_start_matches("0x"), 16)
+                            .unwrap_or_else(|_| {
+                                panic!(
+                                    "❌ Scancode inválido \"{}\". Línea {}",
+                                    scancode_txt,
+                                    numero_linea + 1
+                                )
+                            }),
+                    )
+                };
+
+                let extendida = columnas[6].trim() == "1";
+
+                (scancode, extendida)
+            } else {
+                (None, false)
+            };
 
             if fuente.is_empty() {
                 panic!("❌ Pulsador sin fuente. Línea {}", numero_linea + 1);
@@ -195,6 +249,23 @@ fn cargar() -> &'static Vec<Pulsador> {
                 panic!("❌ Nativo duplicado: {}", nativo);
             }
 
+            // scancode SÍ se repite a propósito (ej. 0x47 en NumPad7 y en
+            // Home) — lo que debe ser único es el PAR (scancode,
+            // extendida), no el scancode solo.
+            if let Some(codigo) = scancode {
+                if pulsadores
+                    .iter()
+                    .any(|p: &Pulsador| p.scancode == Some(codigo) && p.extendida == extendida)
+                {
+                    panic!(
+                        "❌ Scancode duplicado: {:#04X} (extendida={}). Línea {}",
+                        codigo,
+                        extendida,
+                        numero_linea + 1
+                    );
+                }
+            }
+
             pulsadores.push(Pulsador {
                 fuente: fuente.to_string(),
 
@@ -205,6 +276,10 @@ fn cargar() -> &'static Vec<Pulsador> {
                 interception: interception.to_string(),
 
                 ui: ui.to_string(),
+
+                scancode,
+
+                extendida,
             });
         }
 
@@ -247,6 +322,34 @@ pub fn por_ui(ui: &str) -> Option<&'static Pulsador> {
 }
 
 // ======================================================
+// 🔍 BUSCAR POR SCANCODE
+// ------------------------------------------------------
+// Ver nota completa en la sección 5 del encabezado del
+// archivo. Si extendida=true no encuentra fila con
+// extendida=1 para ese scancode, cae a la fila normal
+// (extendida=0) con el mismo scancode — mismo fallback que
+// nombre_interception() en back_teclas.rs, para las teclas
+// extendidas que no tienen fila propia (ej. Enter de numpad).
+// ======================================================
+
+pub fn por_scancode(scancode: u16, extendida: bool) -> Option<&'static Pulsador> {
+    let todos = cargar();
+
+    if extendida {
+        if let Some(pulsador) = todos
+            .iter()
+            .find(|p| p.extendida && p.scancode == Some(scancode))
+        {
+            return Some(pulsador);
+        }
+    }
+
+    todos
+        .iter()
+        .find(|p| !p.extendida && p.scancode == Some(scancode))
+}
+
+// ======================================================
 // 📋 TODOS
 // ======================================================
 
@@ -280,6 +383,10 @@ pub fn interno_a_ui(interno: &str) -> Option<&'static str> {
 
 pub fn interception_a_interno(interception: &str) -> Option<&'static str> {
     por_interception(interception).map(|p| p.interno.as_str())
+}
+
+pub fn scancode_a_interno(scancode: u16, extendida: bool) -> Option<&'static str> {
+    por_scancode(scancode, extendida).map(|p| p.interno.as_str())
 }
 
 pub fn ui_a_interno(ui: &str) -> Option<&'static str> {

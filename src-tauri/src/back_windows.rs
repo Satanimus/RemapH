@@ -88,10 +88,9 @@
 //     sincrónico decide; si no, CallNextHookEx.
 // traducir_teclado() [privada]
 //     KBDLLHOOKSTRUCT (scanCode + flags extendida) →
-//     Option<InputEvent>: resuelve el VK correcto según el
-//     layout de la ventana en foco (MapVirtualKeyExW), y
-//     consulta pulsadores::por_nativo() con ese VK. Ver
-//     layout_activo() y su nota completa.
+//     Option<InputEvent>: resuelve directo por posición
+//     física vía pulsadores::scancode_a_interno(), sin pasar
+//     por VK. Ver esa función y su nota completa.
 // traducir_mouse() [privada]
 //     MSLLHOOKSTRUCT + wparam → Option<InputEvent>,
 //     consultando pulsadores::por_nativo() con el código
@@ -105,19 +104,21 @@
 //     evento traducido).
 // emitir_evento()
 //     InputEvent → INPUT(s) físicos vía SendInput.
-//     Teclado: KEYBDINPUT con wVk. Mouse: MOUSEINPUT con
-//     los flags del botón/rueda correspondiente.
+//     Teclado: KEYBDINPUT con wScan (posición física) +
+//     KEYEVENTF_SCANCODE. Mouse: MOUSEINPUT con los flags
+//     del botón/rueda correspondiente.
 // emitir_teclado() [privada]
 //     Construye y envía un KEYBDINPUT (down o up).
-// vk_desde_interno() [privada]
-//     Nombre interno (InputId) → Option<u16> con el VK
-//     real a usar en wVk, vía pulsadores::interno_a_nativo().
-// es_extendida() [privada]
-//     VK → bool. Marca los VK que Windows considera
-//     "extendidos" (ver KEYEVENTF_EXTENDEDKEY más abajo).
+// scancode_desde_interno() [privada]
+//     Nombre interno (InputId) → Option<(u16, bool)> con el
+//     scan code físico + es_extendida a usar en wScan, vía
+//     pulsadores::por_interno(). Igual criterio que ya usa
+//     Interception al emitir (por posición, no por VK) — ver
+//     nota completa en enviar_tecla().
 // enviar_tecla() [privada]
-//     Construye y envía un KEYBDINPUT (down o up),
-//     agregando KEYEVENTF_EXTENDEDKEY cuando corresponde.
+//     Construye y envía un KEYBDINPUT (down o up) con
+//     KEYEVENTF_SCANCODE, agregando KEYEVENTF_EXTENDEDKEY
+//     cuando corresponde.
 // emitir_mouse() [privada]
 //     Construye y envía un MOUSEINPUT (botón o rueda).
 // emitir_mouse_button() [privada]
@@ -163,18 +164,18 @@ use std::sync::mpsc::{self, Sender};
 use windows_sys::Win32::Foundation::{LPARAM, LRESULT, WPARAM};
 
 use windows_sys::Win32::UI::Input::KeyboardAndMouse::{
-    GetKeyboardLayout, MapVirtualKeyExW, SendInput, INPUT, INPUT_0, INPUT_KEYBOARD, INPUT_MOUSE,
-    KEYBDINPUT, KEYEVENTF_EXTENDEDKEY, KEYEVENTF_KEYUP, MAPVK_VSC_TO_VK_EX, MOUSEEVENTF_LEFTDOWN,
-    MOUSEEVENTF_LEFTUP, MOUSEEVENTF_MIDDLEDOWN, MOUSEEVENTF_MIDDLEUP, MOUSEEVENTF_RIGHTDOWN,
-    MOUSEEVENTF_RIGHTUP, MOUSEEVENTF_WHEEL, MOUSEEVENTF_XDOWN, MOUSEEVENTF_XUP, MOUSEINPUT,
+    SendInput, INPUT, INPUT_0, INPUT_KEYBOARD, INPUT_MOUSE, KEYBDINPUT, KEYEVENTF_EXTENDEDKEY,
+    KEYEVENTF_KEYUP, KEYEVENTF_SCANCODE, MOUSEEVENTF_LEFTDOWN, MOUSEEVENTF_LEFTUP,
+    MOUSEEVENTF_MIDDLEDOWN, MOUSEEVENTF_MIDDLEUP, MOUSEEVENTF_RIGHTDOWN, MOUSEEVENTF_RIGHTUP,
+    MOUSEEVENTF_WHEEL, MOUSEEVENTF_XDOWN, MOUSEEVENTF_XUP, MOUSEINPUT,
 };
 
 use windows_sys::Win32::UI::WindowsAndMessaging::{
-    CallNextHookEx, GetForegroundWindow, GetMessageW, GetWindowThreadProcessId, PostThreadMessageW,
-    SetWindowsHookExW, UnhookWindowsHookEx, KBDLLHOOKSTRUCT, MSG, MSLLHOOKSTRUCT, WH_KEYBOARD_LL,
-    WH_MOUSE_LL, WM_KEYDOWN, WM_KEYUP, WM_LBUTTONDOWN, WM_LBUTTONUP, WM_MBUTTONDOWN, WM_MBUTTONUP,
-    WM_MOUSEMOVE, WM_MOUSEWHEEL, WM_QUIT, WM_RBUTTONDOWN, WM_RBUTTONUP, WM_SYSKEYDOWN, WM_SYSKEYUP,
-    WM_XBUTTONDOWN, WM_XBUTTONUP,
+    CallNextHookEx, GetMessageW, PostThreadMessageW, SetWindowsHookExW, UnhookWindowsHookEx,
+    KBDLLHOOKSTRUCT, MSG, MSLLHOOKSTRUCT, WH_KEYBOARD_LL, WH_MOUSE_LL, WM_KEYDOWN, WM_KEYUP,
+    WM_LBUTTONDOWN, WM_LBUTTONUP, WM_MBUTTONDOWN, WM_MBUTTONUP, WM_MOUSEMOVE, WM_MOUSEWHEEL,
+    WM_QUIT, WM_RBUTTONDOWN, WM_RBUTTONUP, WM_SYSKEYDOWN, WM_SYSKEYUP, WM_XBUTTONDOWN,
+    WM_XBUTTONUP,
 };
 
 use crate::eventos::{InputId, InputState};
@@ -494,56 +495,23 @@ unsafe extern "system" fn hook_mouse(codigo: i32, wparam: WPARAM, lparam: LPARAM
 }
 
 // ======================================================
-// 🌐 LAYOUT DE TECLADO ACTIVO
-// ------------------------------------------------------
-// KBDLLHOOKSTRUCT.vkCode ya viene traducido por Windows según
-// el layout del hilo que tiene el foco en cada momento — pero
-// eso puede no coincidir con el layout que RemapH necesita
-// (reportado: layout LatAm/España, vkCode entregado no siempre
-// corresponde al símbolo esperado en el capturador). Se resuelve
-// scanCode -> vkCode a mano, con el layout de la ventana en
-// foco explícito (no el del proceso de RemapH), para que el
-// resultado sea siempre el símbolo que el usuario ve en su
-// teclado físico, sin importar en qué ventana esté escribiendo.
-// ======================================================
-
-unsafe fn layout_activo() -> *mut std::ffi::c_void {
-    let ventana = GetForegroundWindow();
-    let id_hilo = GetWindowThreadProcessId(ventana, std::ptr::null_mut());
-
-    GetKeyboardLayout(id_hilo)
-}
-
-// ======================================================
 // 🎹 TRADUCIR TECLADO
+// ------------------------------------------------------
+// Resuelve directo por posición física (scan code Set 1 +
+// bit E0), vía pulsadores::scancode_a_interno() — igual
+// criterio que ya usa Interception (back_teclas.rs::convertir(),
+// que también parte de un ScanCode y nunca de un VK). Antes
+// pasaba por MapVirtualKeyExW + pulsadores::por_nativo(), pero
+// esa API no respeta el layout activo para teclas OEM en
+// layouts no-US (confirmado con logs: layout español detectado
+// bien, VK devuelto correspondía a la posición equivalente en
+// layout US) — ver Etapa A/B de pulsadores.tsv/pulsadores.rs
+// para el detalle de las columnas scancode/extendida.
 // ======================================================
 
 fn traducir_teclado(scan_code: u32, es_extendida: bool, presionado: bool) -> Option<InputEvent> {
-    // MAPVK_VSC_TO_VK_EX resuelve el scan code (posición física,
-    // independiente del layout) al VK correspondiente en el layout
-    // recibido — así el resultado es siempre consistente con lo que
-    // el usuario ve impreso en esa tecla, igual que ya hace
-    // Interception (ver back_teclas.rs::convertir(), que parte de
-    // ScanCode y nunca de un VK). Para teclas extendidas (E0: Insert,
-    // Supr, flechas, RePág/AvPág, etc.) hay que poner el bit alto del
-    // scan code (0xE000) — sin esto MapVirtualKeyExW no distingue,
-    // por ejemplo, la flecha derecha extendida de la tecla "6" del
-    // numpad, que comparten el mismo scan code base.
-    let scan_code_extendido = if es_extendida {
-        0xE000 | scan_code
-    } else {
-        scan_code
-    };
-
-    let vk = unsafe { MapVirtualKeyExW(scan_code_extendido, MAPVK_VSC_TO_VK_EX, layout_activo()) };
-
-    if vk == 0 {
-        return None;
-    }
-
-    let nativo = format!("0x{:X}", vk);
-    let pulsador = pulsadores::por_nativo(&nativo)?;
-    let input = InputId::new("keyboard", &pulsador.interno);
+    let interno = pulsadores::scancode_a_interno(scan_code as u16, es_extendida)?;
+    let input = InputId::new("keyboard", interno);
 
     if presionado {
         Some(InputEvent::down(input))
@@ -622,95 +590,67 @@ pub fn emitir_evento(evento: InputEvent) {
 // ======================================================
 
 fn emitir_teclado(evento: &InputEvent) {
-    // Caso especial por paridad estructural con
-    // back_interception.rs::emitir_teclado (mismo chequeo sobre
-    // evento.input.control()) — pero la mecánica de fake-shift de la
-    // Regla 7 no aplica acá: esa mecánica existe solo porque
-    // Interception opera en Set 1/Set 2 crudo, donde Impr Pant sin el
-    // par fake-shift+tecla no se traduce a nada (ver comentario en
-    // back_interception.rs, líneas 513-521). SendInput ya traduce
-    // Impr Pant correctamente como una tecla suelta más, vía el wVk
-    // real (0x2C) + KEYEVENTF_EXTENDEDKEY (ver es_extendida()).
-    if evento.input.control() == Some("PrintScreen") {
-        match evento.state {
-            InputState::Down => enviar_tecla(0x2C, false),
-            InputState::Up => enviar_tecla(0x2C, true),
-            InputState::Pulse => {
-                enviar_tecla(0x2C, false);
-                enviar_tecla(0x2C, true);
-            }
-        }
-
-        return;
-    }
-
-    let Some(vk) = vk_desde_interno(evento) else {
+    let Some((scancode, extendida)) = scancode_desde_interno(evento) else {
         return;
     };
 
     match evento.state {
-        InputState::Down => enviar_tecla(vk, false),
-        InputState::Up => enviar_tecla(vk, true),
+        InputState::Down => enviar_tecla(scancode, extendida, false),
+        InputState::Up => enviar_tecla(scancode, extendida, true),
         InputState::Pulse => {
-            enviar_tecla(vk, false);
-            enviar_tecla(vk, true);
+            enviar_tecla(scancode, extendida, false);
+            enviar_tecla(scancode, extendida, true);
         }
     }
 }
 
-fn vk_desde_interno(evento: &InputEvent) -> Option<u16> {
+fn scancode_desde_interno(evento: &InputEvent) -> Option<(u16, bool)> {
     let interno = evento.input.control()?;
-    let nativo = pulsadores::interno_a_nativo(interno)?;
+    let pulsador = pulsadores::por_interno(interno)?;
 
-    nativo
-        .strip_prefix("0x")
-        .and_then(|valor| u16::from_str_radix(valor, 16).ok())
+    Some((pulsador.scancode?, pulsador.extendida))
 }
 
 // ======================================================
-// 🧩 ES_EXTENDIDA
+// ⌨️ ENVIAR TECLA
 // ------------------------------------------------------
-// VK que Windows considera parte del "grupo extendido"
-// (ver KEYBDINPUT/KEYEVENTF_EXTENDEDKEY en MSDN): Ctrl/Alt
-// derecho, el bloque de navegación (Inicio/Fin/RePág/AvPág/
-// flechas/Insert/Supr), Impr Pant, Num Lock, la tecla Win, y
-// el "/" del numpad (Divide). Sin esto, SendInput con solo
-// wVk las manda como si fueran su par no-extendido (ej. el
-// numpad), igual que el problema que Regla 7/TABLA_EXTENDIDA
-// resuelve del lado de back_teclas.rs para Interception —acá
-// no hace falta una tabla de ambigüedad porque el VK ya es
-// único por tecla (ver columna "nativo" de pulsadores.tsv);
-// solo falta marcar el flag para que Windows la trate igual
-// que la manda un teclado físico real.
+// Emite por posición física (scan code Set 1 + bit E0),
+// vía KEYEVENTF_SCANCODE — no por VK (wVk). Antes se armaba
+// el KEYBDINPUT con wVk, pero eso le pide a Windows que
+// traduzca ese VK a carácter usando el layout activo EN ESE
+// MOMENTO en la ventana de destino: es la misma traducción
+// dependiente de layout que ya vimos con MapVirtualKeyExW en
+// la entrada (Etapa C), solo que ahora en la dirección
+// contraria. Como "nativo"/"ui" en pulsadores.tsv están
+// calibrados para el layout "Español (Latinoamérica)", un
+// layout activo distinto (ej. Español de España) traduce ese
+// mismo VK a otro carácter (confirmado: interno "Grado", VK
+// pensado para imprimir "°", se emitía como "ñ"; "Interrogacion",
+// pensado para "¡", se emitía como "+").
+//
+// Con KEYEVENTF_SCANCODE, en cambio, Windows recibe la
+// posición física y la traduce con el layout que sea, dando
+// siempre el carácter real de esa tecla en ese layout — igual
+// que ya hace Interception al emitir (nunca tuvo este bug).
 // ======================================================
 
-fn es_extendida(vk: u16) -> bool {
-    matches!(
-        vk,
-        0x21..=0x28 // RePág, AvPág, Fin, Inicio, Izquierda, Arriba, Derecha, Abajo
-            | 0x2C..=0x2E // Impr Pant, Insert, Supr
-            | 0x5B // Win (LeftMeta)
-            | 0x6F // Divide (Numpad /)
-            | 0x90 // Num Lock
-            | 0xA3 // Ctrl derecho
-            | 0xA5 // Alt derecho
-    )
-}
+fn enviar_tecla(scancode: u16, extendida: bool, arriba: bool) {
+    let mut flags = KEYEVENTF_SCANCODE;
 
-fn enviar_tecla(vk: u16, arriba: bool) {
-    let flags = match (es_extendida(vk), arriba) {
-        (true, true) => KEYEVENTF_EXTENDEDKEY | KEYEVENTF_KEYUP,
-        (true, false) => KEYEVENTF_EXTENDEDKEY,
-        (false, true) => KEYEVENTF_KEYUP,
-        (false, false) => 0,
-    };
+    if extendida {
+        flags |= KEYEVENTF_EXTENDEDKEY;
+    }
+
+    if arriba {
+        flags |= KEYEVENTF_KEYUP;
+    }
 
     let input = INPUT {
         r#type: INPUT_KEYBOARD,
         Anonymous: INPUT_0 {
             ki: KEYBDINPUT {
-                wVk: vk,
-                wScan: 0,
+                wVk: 0,
+                wScan: scancode,
                 dwFlags: flags,
                 time: 0,
                 dwExtraInfo: 0,
