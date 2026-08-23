@@ -135,9 +135,14 @@
 //     iniciar(). Carga el teclado/mouse primario guardado la
 //     sesión anterior como valor inicial (sin confirmar) —
 //     ver "Reglas de dispositivo primario" arriba.
-// crear()
-//     Arranca la sesión de Interception para ENTRADA,
-//     configura los filtros de teclado/mouse a escuchar.
+// con_sesion_entrada() / activar_filtros() / desactivar_filtros()
+//     La sesión de Interception para ENTRADA se crea UNA
+//     sola vez por vida del proceso (perezosa, thread_local,
+//     nunca se destruye entre transiciones de modo — ver
+//     comentario junto a SESION_ENTRADA). activar_filtros()
+//     prende la captura de teclado/mouse al entrar a
+//     Interception; desactivar_filtros() la apaga (filtro
+//     vacío) al volver a Portable, sin tocar el contexto.
 // recibir()
 //     Bloquea hasta el próximo evento, devuelve el
 //     Stroke crudo junto a su Device de origen.
@@ -308,12 +313,51 @@ fn mouse_primario() -> Option<Device> {
 }
 
 // ======================================================
-// 🚀 CREAR (sesión de entrada)
+// 🚀 SESIÓN DE ENTRADA (thread_local, creada UNA sola vez)
+// ------------------------------------------------------
+// [FIX] Bug "Portable→Interception deja teclado/mouse
+// bloqueados (solo se mueve el puntero)": antes, crear()
+// llamaba Interception::new() de nuevo en cada transición
+// Portable→Interception, y el contexto anterior se cerraba
+// (Drop) recién un instante antes al salir de Portable. El
+// driver Interception queda en un estado roto al crear un
+// segundo contexto tan pronto después de destruir el
+// primero dentro del mismo proceso — no lanza error
+// (Interception::new() no falla), pero el wait()/receive()
+// de la sesión nueva deja de traer eventos aunque el filtro
+// sí sigue capturando a nivel driver (por eso el teclado/
+// clics quedan mudos pero el puntero se sigue moviendo: el
+// mouse MOVE nunca estuvo en el filtro).
+//
+// Fix: el contexto de entrada se crea UNA sola vez por vida
+// del proceso (perezoso, primera vez que se necesita) y
+// nunca se destruye entre transiciones de modo. Lo que
+// cambia entre Interception y Portable es el FILTRO, no el
+// contexto: activar_filtros() prende la captura al entrar a
+// Interception, desactivar_filtros() la apaga (filtro vacío
+// = el driver deja pasar todo, tal como si no hubiera
+// contexto) al volver a Portable. Mismo patrón que
+// SESION_SALIDA más abajo — misma restricción !Send/!Sync,
+// por eso thread_local en vez de estático simple.
 // ======================================================
 
-fn crear() -> Interception {
-    let ict = Interception::new().expect("No se pudo iniciar Interception (entrada)");
+thread_local! {
+    static SESION_ENTRADA: RefCell<Option<Interception>> = RefCell::new(None);
+}
 
+fn con_sesion_entrada<R>(usar: impl FnOnce(&Interception) -> R) -> R {
+    SESION_ENTRADA.with(|celda| {
+        let mut sesion = celda.borrow_mut();
+
+        if sesion.is_none() {
+            *sesion = Some(Interception::new().expect("No se pudo iniciar Interception (entrada)"));
+        }
+
+        usar(sesion.as_ref().unwrap())
+    })
+}
+
+fn activar_filtros(ict: &Interception) {
     ict.set_filter(
         interception::is_keyboard,
         // E0/E1: sin esto, el driver descarta antes de llegar acá
@@ -342,8 +386,22 @@ fn crear() -> Interception {
     );
 
     println!("📥 Backend de entrada iniciado.");
+}
 
-    ict
+// Deja pasar todo sin capturar nada — se llama al salir hacia
+// Portable, para que el contexto siga vivo (evita el
+// Interception::new() repetido, ver comentario de arriba) sin
+// seguir bloqueando teclado/mouse a nivel driver mientras
+// Portable maneja la entrada con hooks WinAPI.
+fn desactivar_filtros(ict: &Interception) {
+    ict.set_filter(
+        interception::is_keyboard,
+        Filter::KeyFilter(KeyFilter::empty()),
+    );
+    ict.set_filter(
+        interception::is_mouse,
+        Filter::MouseFilter(MouseFilter::empty()),
+    );
 }
 
 // ======================================================
@@ -422,10 +480,28 @@ pub fn solicitar_detener() {
 // ======================================================
 
 pub fn iniciar(mut procesar: impl FnMut(InputEvent), debe_tragar_no_traducible: impl Fn() -> bool) {
-    let ict = crear();
+    SESION_ENTRADA.with(|celda| {
+        let mut sesion = celda.borrow_mut();
 
+        if sesion.is_none() {
+            *sesion = Some(Interception::new().expect("No se pudo iniciar Interception (entrada)"));
+        }
+
+        let ict = sesion.as_ref().unwrap();
+
+        activar_filtros(ict);
+        iniciar_loop(ict, &mut procesar, &debe_tragar_no_traducible);
+        desactivar_filtros(ict);
+    });
+}
+
+fn iniciar_loop(
+    ict: &Interception,
+    procesar: &mut impl FnMut(InputEvent),
+    debe_tragar_no_traducible: &impl Fn() -> bool,
+) {
     loop {
-        let Some((device, stroke)) = recibir(&ict) else {
+        let Some((device, stroke)) = recibir(ict) else {
             continue;
         };
 
