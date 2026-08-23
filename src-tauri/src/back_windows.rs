@@ -390,23 +390,27 @@ unsafe extern "system" fn hook_teclado(codigo: i32, wparam: WPARAM, lparam: LPAR
 
     match traducir_teclado(datos.scanCode, es_extendida, presionado) {
         Some(evento) => {
-            // Evento traducido: SIEMPRE se bloquea el físico original
-            // (nunca CallNextHookEx acá) — mismo modelo que Interception,
-            // que intercepta todo por default. Se ENCOLA para el hilo
-            // worker (ver COLA más arriba) en vez de llamar evaluar()
-            // acá mismo: ese es el trabajo variable/pesado (locks +
-            // posible SendInput de reinyección) que causaba el lag
-            // general del sistema al correr dentro de este hook de
-            // baja latencia. El evento físico ya quedó bloqueado con
-            // este mismo return, así que encolarlo y seguir es seguro
-            // — nada se pierde, solo se procesa un instante después.
+            // Evento traducido: se bloquea el físico original SOLO si
+            // hay un worker activo para encolarlo y eventualmente
+            // reinyectarlo (SendInput) — si COLA ya es None (backend
+            // cerrándose, ver detener()/iniciar() al final del
+            // archivo), no hay nadie que vaya a reinyectar este
+            // evento nunca: bloquearlo lo perdería para siempre y
+            // dejaría la tecla/botón físicamente "abajo" para Windows.
+            // Mismo bug para teclado y mouse — ver hook_mouse() más
+            // abajo.
             let cola = COLA.lock().unwrap();
 
-            if let Some(tx) = cola.as_ref() {
-                let _ = tx.send(evento);
+            match cola.as_ref() {
+                Some(tx) => {
+                    let _ = tx.send(evento);
+                    return 1;
+                }
+                None => {
+                    drop(cola);
+                    return CallNextHookEx(std::ptr::null_mut(), codigo, wparam, lparam);
+                }
             }
-
-            return 1;
         }
         None => {
             // No traducible: tragar si hay captura activa, pasar si
@@ -476,15 +480,20 @@ unsafe extern "system" fn hook_mouse(codigo: i32, wparam: WPARAM, lparam: LPARAM
     match traducir_mouse(wparam, datos) {
         Some(evento) => {
             // Ver nota equivalente en hook_teclado(): un evento
-            // traducido siempre bloquea el físico original y se
-            // encola para el hilo worker, sin llamar evaluar() acá.
+            // traducido solo bloquea el físico si hay worker activo
+            // para reinyectarlo; si COLA ya es None, se deja pasar.
             let cola = COLA.lock().unwrap();
 
-            if let Some(tx) = cola.as_ref() {
-                let _ = tx.send(evento);
+            match cola.as_ref() {
+                Some(tx) => {
+                    let _ = tx.send(evento);
+                    return 1;
+                }
+                None => {
+                    drop(cola);
+                    return CallNextHookEx(std::ptr::null_mut(), codigo, wparam, lparam);
+                }
             }
-
-            return 1;
         }
         None => {
             let debe_tragar = ESTADO_HOOK.with(|estado| {
