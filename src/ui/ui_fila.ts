@@ -50,7 +50,9 @@ export function crearFila(
   if (infoSeparador) {
     fila.style.setProperty(
       "--separador-color",
-      infoSeparador.color ? `var(--tag-${infoSeparador.color})` : "var(--border-light)",
+      infoSeparador.color
+        ? `var(--tag-${infoSeparador.color})`
+        : "var(--border-light)",
     );
 
     fila.classList.add("en-separador");
@@ -79,7 +81,7 @@ export function crearFila(
 
     switch (col.id) {
       case "estado":
-        celda.append(crearEstado(contexto, filaPerfil));
+        celda.append(crearEstado(contexto, filaPerfil, alModificar));
 
         break;
 
@@ -91,7 +93,7 @@ export function crearFila(
         break;
 
       case "app":
-        celda.append(crearApp(contexto, filaPerfil));
+        celda.append(crearApp(contexto, filaPerfil, alModificar));
 
         break;
 
@@ -103,7 +105,7 @@ export function crearFila(
         break;
 
       case "tipo":
-        celda.append(crearTipo(contexto, filaPerfil));
+        celda.append(crearTipo(contexto, filaPerfil, alModificar));
 
         break;
 
@@ -117,12 +119,12 @@ export function crearFila(
       case "extra":
         celda.dataset.control = "extra";
 
-        celda.append(crearExtra(contexto, filaPerfil));
+        celda.append(crearExtra(contexto, filaPerfil, alModificar));
 
         break;
 
       case "nota":
-        celda.append(crearNota(filaPerfil));
+        celda.append(crearNota(filaPerfil, alModificar));
 
         break;
     }

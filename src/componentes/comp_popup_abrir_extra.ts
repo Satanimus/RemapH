@@ -65,6 +65,7 @@ export async function abrirPopupExtraAbrir(
   evento: MouseEvent,
   contexto: ContextoFila,
   filaPerfil: FilaPerfil,
+  alModificar: () => void,
 ): Promise<void> {
   const abrirExtra = filaPerfil.abrirExtra;
 
@@ -94,6 +95,7 @@ export async function abrirPopupExtraAbrir(
           abrirExtra.iniciar = valor;
 
           reconstruirFila(contexto.id);
+          alModificar();
           dibujar();
         }),
       ),
@@ -118,6 +120,7 @@ export async function abrirPopupExtraAbrir(
             abrirExtra.instancias = valor;
 
             reconstruirFila(contexto.id);
+            alModificar();
             dibujar();
           },
         ),
@@ -142,6 +145,7 @@ export async function abrirPopupExtraAbrir(
         abrirExtra.argumento = input.value;
 
         reconstruirFila(contexto.id);
+        alModificar();
       };
 
       input.addEventListener("blur", confirmar);
@@ -166,7 +170,7 @@ export async function abrirPopupExtraAbrir(
 
       if (abrirConExpandido) {
         popup.append(
-          await crearListaAbrirCon(contexto, filaPerfil, () => {
+          await crearListaAbrirCon(contexto, filaPerfil, alModificar, () => {
             abrirConExpandido = false;
             dibujar();
           }),

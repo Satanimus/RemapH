@@ -452,6 +452,12 @@ export function crearNota(
     alModificar();
   });
 
+  input.addEventListener("keydown", (evento) => {
+    if (evento.key === "Enter") {
+      input.blur();
+    }
+  });
+
   const btnEmoji = document.createElement("button");
 
   btnEmoji.className = "btn-emoji";

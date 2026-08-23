@@ -106,6 +106,7 @@ function crearCampoNumero(
 function crearFilaLimitarCuadricula(
   contexto: ContextoFila,
   filaPerfil: FilaPerfil,
+  alModificar: () => void,
   redibujar: () => void,
 ): HTMLElement {
   const menuExtra = filaPerfil.menuExtra;
@@ -139,6 +140,7 @@ function crearFilaLimitarCuadricula(
     menuExtra.filas = 0;
 
     reconstruirFila(contexto.id);
+    alModificar();
     redibujar();
   });
 
@@ -158,6 +160,7 @@ function crearFilaLimitarCuadricula(
     menuExtra.columnas = 0;
 
     reconstruirFila(contexto.id);
+    alModificar();
     redibujar();
   });
 
@@ -178,6 +181,7 @@ export function abrirPopupExtraMenuExpress(
   evento: MouseEvent,
   contexto: ContextoFila,
   filaPerfil: FilaPerfil,
+  alModificar: () => void,
 ): void {
   const menuExtra = filaPerfil.menuExtra;
 
@@ -186,7 +190,7 @@ export function abrirPopupExtraMenuExpress(
   popup.className = "popup-extra";
 
   const redibujar = () =>
-    abrirPopupExtraMenuExpress(evento, contexto, filaPerfil);
+    abrirPopupExtraMenuExpress(evento, contexto, filaPerfil, alModificar);
 
   // ----------------------------------
   // FORMA
@@ -204,6 +208,7 @@ export function abrirPopupExtraMenuExpress(
         menuExtra.forma = valor;
 
         reconstruirFila(contexto.id);
+        alModificar();
         redibujar();
       }),
     ),
@@ -216,7 +221,9 @@ export function abrirPopupExtraMenuExpress(
   if (menuExtra.forma === "cuadricula") {
     popup.append(crearSeparador());
 
-    popup.append(crearFilaLimitarCuadricula(contexto, filaPerfil, redibujar));
+    popup.append(
+      crearFilaLimitarCuadricula(contexto, filaPerfil, alModificar, redibujar),
+    );
   }
 
   popup.append(crearSeparador());
@@ -241,6 +248,7 @@ export function abrirPopupExtraMenuExpress(
           menuExtra.comportamiento = valor;
 
           reconstruirFila(contexto.id);
+          alModificar();
           redibujar();
         },
       ),
@@ -263,6 +271,7 @@ export function abrirPopupExtraMenuExpress(
         menuExtra.ubicacion = valor;
 
         reconstruirFila(contexto.id);
+        alModificar();
         redibujar();
       }),
     ),
@@ -287,6 +296,7 @@ export function abrirPopupExtraMenuExpress(
         menuExtra.tamanoBoton = valor;
 
         reconstruirFila(contexto.id);
+        alModificar();
         redibujar();
       }),
     ),

@@ -415,8 +415,6 @@ export function crearTabla(alModificar: () => void): HTMLElement {
     if (celda?.dataset.columna !== "opciones") {
       controladorArrastre.salirModoMover();
     }
-
-    alModificar();
   });
 
   viewport.append(cabecera, filas);

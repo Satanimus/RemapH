@@ -96,6 +96,7 @@ export function abrirPopupExtraPortapapeles(
   evento: MouseEvent,
   contexto: ContextoFila,
   filaPerfil: FilaPerfil,
+  alModificar: () => void,
 ): void {
   const portapapelesExtra = filaPerfil.portapapelesExtra;
 
@@ -104,7 +105,7 @@ export function abrirPopupExtraPortapapeles(
   popup.className = "popup-extra";
 
   const redibujar = () =>
-    abrirPopupExtraPortapapeles(evento, contexto, filaPerfil);
+    abrirPopupExtraPortapapeles(evento, contexto, filaPerfil, alModificar);
 
   // ----------------------------------
   // COMPORTAMIENTO
@@ -128,6 +129,7 @@ export function abrirPopupExtraPortapapeles(
           portapapelesExtra.comportamiento = valor;
 
           reconstruirFila(contexto.id);
+          alModificar();
           redibujar();
         },
       ),
@@ -153,6 +155,7 @@ export function abrirPopupExtraPortapapeles(
           portapapelesExtra.ubicacion = valor;
 
           reconstruirFila(contexto.id);
+          alModificar();
           redibujar();
         },
       ),
@@ -184,6 +187,7 @@ export function abrirPopupExtraPortapapeles(
           portapapelesExtra.tamanoBoton = valor;
 
           reconstruirFila(contexto.id);
+          alModificar();
           redibujar();
         },
       ),
@@ -213,6 +217,7 @@ export function abrirPopupExtraPortapapeles(
           portapapelesExtra.tamanoTexto = valor;
 
           reconstruirFila(contexto.id);
+          alModificar();
           redibujar();
         },
       ),
@@ -232,6 +237,7 @@ export function abrirPopupExtraPortapapeles(
         portapapelesExtra.limite = nuevoValor;
 
         reconstruirFila(contexto.id);
+        alModificar();
         redibujar();
       }),
     ),

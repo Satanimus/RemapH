@@ -142,6 +142,7 @@ function crearBotonPrograma(
   filaPerfil: FilaPerfil,
   programa: ProgramaJson,
   activo: boolean,
+  alModificar: () => void,
   alSeleccionar: () => void,
 ): HTMLButtonElement {
   const boton = document.createElement("button");
@@ -183,6 +184,8 @@ function crearBotonPrograma(
 
     reconstruirFila(contexto.id);
 
+    alModificar();
+
     alSeleccionar();
   });
 
@@ -201,6 +204,7 @@ function crearBotonPredeterminado(
   contexto: ContextoFila,
   filaPerfil: FilaPerfil,
   activo: boolean,
+  alModificar: () => void,
   alSeleccionar: () => void,
 ): HTMLButtonElement {
   const boton = document.createElement("button");
@@ -234,6 +238,8 @@ function crearBotonPredeterminado(
 
     reconstruirFila(contexto.id);
 
+    alModificar();
+
     alSeleccionar();
   });
 
@@ -253,6 +259,7 @@ function crearBotonPredeterminado(
 function crearBotonExaminar(
   contexto: ContextoFila,
   filaPerfil: FilaPerfil,
+  alModificar: () => void,
   alSeleccionar: () => void,
 ): HTMLButtonElement {
   const boton = document.createElement("button");
@@ -288,6 +295,8 @@ function crearBotonExaminar(
 
     reconstruirFila(contexto.id);
 
+    alModificar();
+
     alSeleccionar();
   });
 
@@ -322,6 +331,7 @@ function crearSeparador(): HTMLElement {
 export async function crearListaAbrirCon(
   contexto: ContextoFila,
   filaPerfil: FilaPerfil,
+  alModificar: () => void,
   alSeleccionar: () => void,
 ): Promise<HTMLElement> {
   const extension = extensionDeRuta(filaPerfil.abrirAccion.ruta);
@@ -346,6 +356,7 @@ export async function crearListaAbrirCon(
       contexto,
       filaPerfil,
       abrirCon === null,
+      alModificar,
       alSeleccionar,
     ),
   );
@@ -357,6 +368,7 @@ export async function crearListaAbrirCon(
         filaPerfil,
         programa,
         programa.ruta === abrirCon,
+        alModificar,
         alSeleccionar,
       ),
     );
@@ -370,7 +382,9 @@ export async function crearListaAbrirCon(
 
   contenedor.append(crearSeparador());
 
-  contenedor.append(crearBotonExaminar(contexto, filaPerfil, alSeleccionar));
+  contenedor.append(
+    crearBotonExaminar(contexto, filaPerfil, alModificar, alSeleccionar),
+  );
 
   return contenedor;
 }
