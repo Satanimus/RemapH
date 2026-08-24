@@ -135,11 +135,13 @@ export function crearToolbar(alGuardar: () => Promise<void>): HTMLElement {
 
             <div class="cambios-pendientes">
 
+                <span class="cambios-pendientes-texto">Cambios en perfil:</span>
+
                 <button
                     class="btn-guardar-cambios"
                     type="button"
                 >
-                    Guardar cambios
+                    Guardar
                 </button>
 
                 <button
@@ -177,7 +179,7 @@ export function crearToolbar(alGuardar: () => Promise<void>): HTMLElement {
     ".perfil-estado",
   ) as HTMLButtonElement | null;
 
-  botonEstadoInicial?.append(nombrePerfil, cacheDot, textoEstado);
+  botonEstadoInicial?.append(nombrePerfil, textoEstado);
 
   // ==================================================
   // 📄 PERFIL ACTUAL
@@ -217,17 +219,7 @@ export function crearToolbar(alGuardar: () => Promise<void>): HTMLElement {
     botonEstado.disabled = true;
 
     try {
-      if (estadoActual === "editado") {
-        await alGuardar();
-
-        salirModoMoverTabla();
-
-        reconstruirTabla();
-
-        const activo = await invoke<boolean>("obtener_estado_cache");
-
-        marcarPerfilSegunCache(toolbar, cacheDot, activo);
-      } else if (estadoActual === "activo") {
+      if (estadoActual === "activo") {
         await invoke("desactivar_perfil");
 
         marcarPerfilSegunCache(toolbar, cacheDot, false);
@@ -394,22 +386,6 @@ function marcarPerfilSegunCache(
 // ======================================================
 
 export function marcarPerfilEditado(toolbar: HTMLElement): void {
-  const botonEstado = toolbar.querySelector(
-    ".perfil-estado",
-  ) as HTMLButtonElement | null;
-
-  const textoEstado = botonEstado?.querySelector(".perfil-estado-texto");
-
-  if (!botonEstado || !textoEstado) {
-    return;
-  }
-
-  const nombre = nombresPorToolbar.get(toolbar)?.textContent ?? "";
-
-  textoEstado.textContent = `${nombre} - Perfil editado, ¿guardar?`;
-
-  botonEstado.dataset.estado = "editado";
-
   toolbar.querySelector(".cambios-pendientes")?.classList.add("visible");
 }
 
@@ -428,9 +404,7 @@ export function marcarPerfilActivo(toolbar: HTMLElement): void {
     return;
   }
 
-  const nombre = nombresPorToolbar.get(toolbar)?.textContent ?? "";
-
-  textoEstado.textContent = `${nombre} - Perfil Activo`;
+  textoEstado.textContent = "Perfil Activo";
 
   botonEstado.dataset.estado = "activo";
 
@@ -452,9 +426,7 @@ export function marcarPerfilInactivo(toolbar: HTMLElement): void {
     return;
   }
 
-  const nombre = nombresPorToolbar.get(toolbar)?.textContent ?? "";
-
-  textoEstado.textContent = `${nombre} - Perfil inactivo`;
+  textoEstado.textContent = "Perfil inactivo";
 
   botonEstado.dataset.estado = "inactivo";
 
@@ -472,14 +444,13 @@ export function obtenerEstadoPerfilActual(
 
   const cacheDot = cacheDotsPorToolbar.get(toolbar);
 
-  const botonEstado = toolbar.querySelector(
-    ".perfil-estado",
-  ) as HTMLButtonElement | null;
-
   return {
     nombreActual: nombrePerfil?.textContent ?? "",
 
-    estaEditado: botonEstado?.dataset.estado === "editado",
+    estaEditado:
+      toolbar
+        .querySelector(".cambios-pendientes")
+        ?.classList.contains("visible") ?? false,
 
     cacheActivo: cacheDot?.dataset.estado === "activo",
   };

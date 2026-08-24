@@ -57,16 +57,20 @@ export function crearLayout(alGuardar: () => Promise<void>): HTMLElement {
     },
   );
 
+  const layoutCuerpo = document.createElement("div");
+
+  layoutCuerpo.className = "layout-cuerpo";
+
+  layoutCuerpo.append(panelLateral, tabla);
+
   const fragment = document.createDocumentFragment();
 
   fragment.append(
     toolbar,
 
-    tabla,
+    layoutCuerpo,
 
     statusbar,
-
-    panelLateral,
 
     crearContenedorPopup(),
   );

@@ -10,33 +10,27 @@
    ====================================================== */
 
 .panel-lateral {
-    position: fixed;
+    flex-shrink: 0;
 
-    top: var(--toolbar-height);
+    width: 0;
 
-    left: 0;
+    min-width: 0;
 
-    width: 260px;
-
-    height: calc(100vh - var(--toolbar-height));
+    height: 100%;
 
     background: var(--panel);
 
     border-right: 1px solid var(--border);
 
-    box-shadow: 2px 0 12px rgba(0, 0, 0, .35);
+    transition: width var(--speed);
 
-    transform: translateX(-100%);
-
-    transition: transform var(--speed);
-
-    z-index: 15;
-
-    overflow-y: auto;
+    overflow: hidden;
 }
 
 .panel-lateral.abierto {
-    transform: translateX(0);
+    width: max-content;
+
+    max-width: 260px;
 }
 
 .panel-lateral-cuerpo {
@@ -47,6 +41,28 @@
     gap: 0;
 
     padding: var(--gap8);
+
+    width: max-content;
+
+    max-width: 260px;
+
+    height: 100%;
+}
+
+.panel-lateral-espacio {
+    flex: 1;
+}
+
+.panel-lateral-subtitulo {
+    color: var(--text-soft);
+
+    font-size: var(--fs11);
+
+    text-transform: uppercase;
+
+    letter-spacing: 0.04em;
+
+    padding: var(--gap8) 0 var(--gap4);
 }
 
 /* ======================================================
@@ -88,6 +104,8 @@
 
     border-color: var(--highlight);
 
+    color: var(--highlight);
+
     border-radius: var(--r4);
 }
 
@@ -121,30 +139,6 @@
     text-overflow: ellipsis;
 }
 
-.panel-lateral-revertir-icono {
-    margin-left: auto;
-
-    color: var(--text-soft);
-
-    font-size: 16px;
-
-    line-height: 1;
-}
-
-.panel-lateral-item:hover .panel-lateral-revertir-icono {
-    color: var(--highlight);
-}
-
-.panel-lateral-revertir {
-    color: var(--red);
-
-    border-color: var(--highlight-red) !important;
-
-    background: transparent !important;
-
-    border-radius: var(--r4) !important;
-}
-
 /* ======================================================
    SEPARADOR
    ====================================================== */
@@ -173,6 +167,16 @@
     justify-content: flex-start;
 
     text-align: left;
+
+    background: transparent;
+
+    border-color: transparent;
+}
+
+.panel-lateral-acciones .ui-btn:not(.panel-lateral-eliminar):hover {
+    border-color: var(--highlight);
+
+    color: var(--highlight);
 }
 
 .panel-lateral-eliminar {
@@ -199,4 +203,20 @@
     justify-content: flex-start;
 
     text-align: left;
+
+    background: transparent;
+
+    border-color: transparent;
+}
+
+.panel-lateral-configuracion:hover {
+    border-color: var(--highlight);
+
+    color: var(--highlight);
+}
+
+.panel-lateral-configuracion-icono {
+    font-variant-emoji: text;
+
+    margin-right: var(--gap8);
 }

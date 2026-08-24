@@ -641,6 +641,15 @@
     display: flex;
 }
 
+.cambios-pendientes-texto {
+
+    font-size: var(--fs13);
+
+    color: var(--text-soft);
+
+    white-space: nowrap;
+}
+
 .btn-guardar-cambios,
 .btn-revertir-cambios {
 

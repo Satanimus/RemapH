@@ -21,6 +21,14 @@
   grid-template-rows: var(--toolbar-height) 1fr var(--status-height);
 }
 
+.layout-cuerpo {
+  display: flex;
+
+  height: 100%;
+
+  overflow: hidden;
+}
+
 /* ======================================================
    TOOLBAR
    ====================================================== */
@@ -145,14 +153,6 @@
 
 .perfil-estado[data-estado="inactivo"]:hover {
   background: var(--red);
-}
-
-.perfil-estado[data-estado="editado"] {
-  background: var(--yellow-dark);
-}
-
-.perfil-estado[data-estado="editado"]:hover {
-  background: var(--yellow);
 }
 
 /* ======================================================

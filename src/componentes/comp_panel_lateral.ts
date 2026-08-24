@@ -145,6 +145,8 @@ async function recargarContenidoPanel(): Promise<void> {
   }
 
   cuerpoPanel.replaceChildren(
+    crearSubtitulo("Perfiles"),
+
     crearListaPerfiles(
       perfiles,
       nombreActual,
@@ -156,12 +158,16 @@ async function recargarContenidoPanel(): Promise<void> {
 
     crearSeparador(),
 
+    crearSubtitulo("Opciones de perfil"),
+
     crearAcciones(
       nombreActual,
       estaEditado,
       alGuardarActual,
       alCambiarPerfilActual,
     ),
+
+    crearEspacioFlexible(),
 
     crearSeparador(),
 
@@ -225,24 +231,8 @@ function crearListaPerfiles(
     );
 
     // ==================================================
-    // 🔄 ICONO SOLO PERFIL ACTUAL
+    // 🔄 CLICK
     // ==================================================
-
-    let iconoRevertir: HTMLSpanElement | null = null;
-
-    if (esActual) {
-      iconoRevertir = document.createElement("span");
-
-      iconoRevertir.className = "panel-lateral-revertir-icono";
-
-      iconoRevertir.textContent = "↻";
-
-      iconoRevertir.title = "Revertir cambios";
-
-      boton.append(iconoRevertir);
-    }
-
-    let confirmandoRevertir = false;
 
     boton.addEventListener("click", async (evento) => {
       // ==================================================
@@ -250,38 +240,6 @@ function crearListaPerfiles(
       // ==================================================
 
       if (esActual) {
-        if (!estaEditado) {
-          cerrarPanelLateral();
-
-          return;
-        }
-
-        if (!confirmandoRevertir) {
-          confirmandoRevertir = true;
-
-          boton.classList.add("panel-lateral-revertir");
-
-          nombreElemento.textContent = "¿Revertir cambios?";
-
-          if (iconoRevertir) {
-            iconoRevertir.textContent = "↻";
-          }
-
-          return;
-        }
-
-        try {
-          const resultado = await invoke<ResultadoPerfil>(
-            "restaurar_perfil_actual",
-          );
-
-          alCambiarPerfil(resultado);
-
-          cerrarPanelLateral();
-        } catch (error) {
-          console.error("❌ No se pudieron revertir los cambios:", error);
-        }
-
         return;
       }
 
@@ -306,11 +264,11 @@ function crearListaPerfiles(
         });
 
         alCambiarPerfil(resultado);
+
+        await recargarContenidoPanel();
       } catch (error) {
         console.error("❌ No se pudo seleccionar el perfil:", error);
       }
-
-      cerrarPanelLateral();
     });
 
     lista.append(boton);
@@ -332,6 +290,32 @@ function crearSeparador(): HTMLElement {
 }
 
 // ======================================================
+// SUBTÍTULO
+// ======================================================
+
+function crearSubtitulo(texto: string): HTMLElement {
+  const subtitulo = document.createElement("span");
+
+  subtitulo.className = "panel-lateral-subtitulo";
+
+  subtitulo.textContent = texto;
+
+  return subtitulo;
+}
+
+// ======================================================
+// ESPACIO FLEXIBLE
+// ======================================================
+
+function crearEspacioFlexible(): HTMLElement {
+  const espacio = document.createElement("div");
+
+  espacio.className = "panel-lateral-espacio";
+
+  return espacio;
+}
+
+// ======================================================
 // ACCIONES
 // ======================================================
 
@@ -350,7 +334,7 @@ function crearAcciones(
   // ==================================================
 
   const botonNuevo = crearBoton({
-    texto: "Nuevo perfil",
+    texto: "Nuevo",
   });
 
   botonNuevo.addEventListener("click", async (evento) => {
@@ -381,7 +365,7 @@ function crearAcciones(
   // ==================================================
 
   const botonClonar = crearBoton({
-    texto: "Clonar perfil",
+    texto: "Clonar",
   });
 
   botonClonar.addEventListener("click", async () => {
@@ -401,7 +385,7 @@ function crearAcciones(
   // ==================================================
 
   const botonRenombrar = crearBoton({
-    texto: "Renombrar perfil",
+    texto: "Renombrar",
   });
 
   botonRenombrar.addEventListener("click", async (evento) => {
@@ -465,7 +449,9 @@ function crearAcciones(
 
 function crearItemConfiguracion(): HTMLElement {
   const boton = crearBoton({
-    texto: "Configuración ⚙",
+    texto: "Configuración",
+
+    html: '<span class="panel-lateral-configuracion-icono">⚙\uFE0E</span><span>Configuración</span>',
 
     clase: "panel-lateral-configuracion",
   });
