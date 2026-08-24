@@ -322,7 +322,18 @@ export function crearTabla(alModificar: () => void): HTMLElement {
 
         filas.append(headerElemento);
 
-        carrilLista.append(crearExpandirSeparador(item.separador, alModificar));
+        const botonEstadoSeparador = crearEstadoSeparador(
+          item.separador,
+          alModificar,
+        );
+
+        carrilLista.append(
+          crearExpandirSeparador(
+            item.separador,
+            alModificar,
+            botonEstadoSeparador,
+          ),
+        );
 
         const botonOpciones = headerElemento.querySelector(
           ".opciones-asa",
@@ -465,31 +476,25 @@ export function crearTabla(alModificar: () => void): HTMLElement {
 
       separadoresActualizados.add(separadorPadre.id);
 
-      // Buscar el header del separador en el DOM y reemplazar solo su botón estado
-      const headerEl = filas.querySelector<HTMLElement>(
-        `.fila-separador[data-id="${separadorPadre.id}"]`,
+      // Buscar el slot Expandir/On-Off del separador en el carril
+      // (ya no vive en el header, ver Etapa D) y reemplazar solo el
+      // botón estado (primer hijo del slot).
+      const slotEl = carrilLista.querySelector<HTMLElement>(
+        `.carril-expandir-slot[data-id="${separadorPadre.id}"]`,
       );
 
-      if (!headerEl) {
+      if (!slotEl) {
         continue;
       }
 
-      const celdaEstado = headerEl.querySelector<HTMLElement>(
-        ".celda.separador-estado",
-      );
-
-      if (!celdaEstado) {
-        continue;
-      }
-
-      const botonViejo = celdaEstado.querySelector("button");
+      const botonViejo = slotEl.querySelector<HTMLElement>(".estado-toggle");
 
       const botonNuevo = crearEstadoSeparador(separadorPadre, alModificar);
 
       if (botonViejo) {
-        celdaEstado.replaceChild(botonNuevo, botonViejo);
+        slotEl.replaceChild(botonNuevo, botonViejo);
       } else {
-        celdaEstado.append(botonNuevo);
+        slotEl.prepend(botonNuevo);
       }
     }
   };

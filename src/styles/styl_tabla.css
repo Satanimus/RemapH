@@ -115,10 +115,11 @@
 
     align-items: center;
 
-    /* Botón a la derecha del On/Off (Etapa D lo agrega en el
-       espacio de --col-carril-numeros, a la izquierda de este
-       slot) — el margen lo separa del borde de la tabla. */
-    justify-content: flex-end;
+    /* Etapa D: On/Off del separador (izquierda) y botón Expandir
+       (derecha) lado a lado dentro del mismo slot — el On/Off ya
+       no se superpone a nada acá (a diferencia de fila normal),
+       ocupa su lugar en el flujo. */
+    justify-content: space-between;
 
     padding-right: var(--carril-expandir-margen);
 
@@ -202,32 +203,59 @@
     background: var(--row-hover-bg);
 }
 
-.fila.en-separador {
+/* Etapa E: el tinte de separador se acota a las celdas
+   Opciones→Extra (ya no a la fila completa) — Nota queda sin
+   color, ver .celda.nota-en-fila-separador más abajo. */
+.celda.en-separador {
 
     background: color-mix(in srgb, var(--separador-color) 18%, var(--row-bg));
-
-    border-left: 1px solid var(--separador-color);
-
-    border-right: 1px solid var(--separador-color);
 
     box-sizing: border-box;
 }
 
-.fila.en-separador:hover {
+.fila:hover .celda.en-separador {
 
     background: color-mix(in srgb, var(--separador-color) 30%, var(--row-bg));
 }
 
-.fila.primera-del-separador {
+.celda.en-separador-inicio {
+
+    border-left: 1px solid var(--separador-color);
+}
+
+.celda.en-separador-fin {
+
+    border-right: 1px solid var(--separador-color);
+}
+
+.celda.en-separador.primera-del-separador {
 
     border-top: 1px solid var(--separador-color);
 }
 
-.fila.ultima-del-separador {
+.celda.en-separador.ultima-del-separador {
 
     border-bottom: 1px solid var(--separador-color);
+}
 
-    border-radius: 0 0 var(--r8) var(--r8);
+.celda.en-separador-inicio.primera-del-separador {
+
+    border-top-left-radius: var(--r8);
+}
+
+.celda.en-separador-fin.primera-del-separador {
+
+    border-top-right-radius: var(--r8);
+}
+
+.celda.en-separador-inicio.ultima-del-separador {
+
+    border-bottom-left-radius: var(--r8);
+}
+
+.celda.en-separador-fin.ultima-del-separador {
+
+    border-bottom-right-radius: var(--r8);
 }
 
 .fila-separador {
@@ -241,6 +269,25 @@
     height: var(--row-height);
 
     box-sizing: border-box;
+}
+
+/* Etapa E7: el tinte/fondo/border-radius del separador (antes en
+   .fila-separador, cubriendo toda la fila) se acota al ancho de
+   Opciones→Extra — misma regla que en fila normal (Etapa E3).
+   Nota queda fuera, en .celda.nota-separador (nota al margen). */
+.separador-cuerpo {
+
+    display: flex;
+
+    align-items: center;
+
+    height: 100%;
+
+    box-sizing: border-box;
+
+    flex-shrink: 0;
+
+    width: calc(var(--col-options) + var(--col-app) + var(--col-trigger) + var(--col-type) + var(--col-action) + var(--col-behavior));
 
     background: color-mix(in srgb, var(--separador-color, var(--panel2)) 55%, transparent);
 
@@ -320,6 +367,22 @@
 }
 
 .celda.nota-separador .nota {
+
+    font: var(--separador-nota-fuente);
+}
+
+/* Etapa E: Nota de una fila dentro de un separador no lleva el
+   tinte de separador (recortado a Opciones→Extra) — se separa
+   visualmente del cuerpo teñido, leyéndose como nota al margen,
+   igual criterio que .celda.nota-separador del header. */
+.celda.nota-en-fila-separador {
+
+    border-left: 1px solid var(--border-light);
+
+    font-style: italic;
+}
+
+.celda.nota-en-fila-separador .nota {
 
     font: var(--separador-nota-fuente);
 }

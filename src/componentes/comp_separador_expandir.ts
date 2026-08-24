@@ -1,18 +1,19 @@
 // ======================================================
 // ↴ comp_Separador_Expandir
 // ------------------------------------------------------
-// Botón Expandir/Contraer de un header de Separadores.
-// Vive en el carril de números (no dentro de .fila-separador),
-// ocupando el slot que le correspondería al número en esa
-// posición — ver nota de arquitectura de la Etapa B.
+// Botón Expandir/Contraer de un header de Separadores, más
+// el botón On/Off del separador (Etapa D) a su izquierda,
+// lado a lado dentro del mismo slot. Vive en el carril de
+// números (no dentro de .fila-separador) — ver nota de
+// arquitectura de la Etapa B.
 //
 // El slot (.carril-expandir-slot) reserva SIEMPRE el mismo
-// alto que una fila (var(--row-height)) y centra el botón
-// adentro — el botón en sí conserva su alto natural de
-// .ui-btn (28px). Sin este slot, el alto real del botón
-// definía el alto de esa entrada del carril y desincronizaba
-// la columna de números contra la tabla principal apenas se
-// agregaba un separador.
+// alto que una fila (var(--row-height)) y centra los botones
+// adentro — cada botón conserva su alto natural de .ui-btn.
+// Sin este slot, el alto real de los botones definía el alto
+// de esa entrada del carril y desincronizaba la columna de
+// números contra la tabla principal apenas se agregaba un
+// separador.
 // ======================================================
 
 import type { SeparadorPerfil } from "../core/core_perfil";
@@ -22,10 +23,13 @@ import { reconstruirTabla } from "../ui/ui_tabla_control";
 export function crearExpandirSeparador(
   separador: SeparadorPerfil,
   alModificar: () => void,
+  botonEstado: HTMLElement,
 ): HTMLElement {
   const slot = document.createElement("div");
 
   slot.className = "carril-expandir-slot";
+
+  slot.dataset.id = separador.id;
 
   slot.style.setProperty(
     "--separador-color",
@@ -46,7 +50,7 @@ export function crearExpandirSeparador(
     reconstruirTabla();
   });
 
-  slot.append(boton);
+  slot.append(botonEstado, boton);
 
   return slot;
 }

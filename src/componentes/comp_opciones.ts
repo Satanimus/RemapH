@@ -2,8 +2,9 @@
 // ⁝ comp_Opciones
 // ------------------------------------------------------
 // Columna "Opciones": botón "⁝" con popup (Color / Clonar /
-// Mover / Eliminar). Reemplaza a comp_numero.ts (Etapa C del
-// plan "tabla-perfil-ui") — el número ordinal sigue viviendo
+// Mover / Eliminar). Reemplaza al viejo componente de número
+// con popup (Etapa C del plan "tabla-perfil-ui") — el número
+// ordinal sigue viviendo
 // en el carril fijo a la izquierda de la tabla (ver
 // ui_tabla.ts), sincronizado con el scroll pero indiferente
 // a esta fila. Este botón sirve también de asa para el

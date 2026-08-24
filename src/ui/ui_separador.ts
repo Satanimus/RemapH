@@ -1,16 +1,16 @@
 // ======================================================
 // ui_Separador
 // ------------------------------------------------------
-// Header de un Separador: div.fila-separador con Estado,
-// Opciones ("⁝") y Nota — sin las celdas App/Trigger/Tipo/
-// Acción/Extra que sí tiene una fila normal. No lleva celda
-// de número: el botón expandir/contraer vive en el carril
-// (ver comp_separador_expandir.ts).
+// Header de un Separador: div.fila-separador con Opciones
+// ("⁝") y Nota — sin las celdas App/Trigger/Tipo/Acción/
+// Extra que sí tiene una fila normal. No lleva celda de
+// número ni de estado: el botón expandir/contraer y el
+// On/Off viven en el carril, lado a lado (ver
+// comp_separador_expandir.ts).
 // ======================================================
 
 import type { SeparadorPerfil } from "../core/core_perfil";
 
-import { crearEstadoSeparador } from "../componentes/comp_separador_estado";
 import { crearBoton } from "../componentes/comp_boton";
 import { crearNota } from "../componentes/comp_controles";
 import { abrirPopupSeparadores } from "../componentes/comp_popup_separadores";
@@ -22,13 +22,6 @@ import { COLUMNAS } from "./ui_columnas";
 // desalineada con la columna Opciones de la cabecera y de una fila
 // normal (y sin reaccionar al redimensionado de columnas, ver
 // ui_redimension_columnas.ts).
-//
-// anchoEstado ya NO sale de COLUMNAS (Etapa C: "estado" desapareció
-// de la tabla de filas normales) — se referencia --col-state directo
-// para mantener alineada la celda propia del separador. Pendiente
-// Etapa D: mover también el On/Off del separador al carril y borrar
-// celdaEstado/anchoEstado de este archivo.
-const anchoEstado = "var(--col-state)";
 const anchoOpciones =
   COLUMNAS.find((col) => col.id === "opciones")?.ancho ?? "";
 
@@ -42,23 +35,24 @@ export function crearSeparadorHeader(
 
   fila.dataset.id = separador.id;
 
+  // Etapa E6: el tinte de separador (fondo/border-radius de
+  // .fila-separador) debe terminar en el borde derecho de "Extra",
+  // igual que en fila normal — se mueve --separador-color y el
+  // fondo del contenedor "fila" a un wrapper interno (celdaCuerpo)
+  // que sí mide Opciones→Extra. celdaNota queda fuera de ese
+  // wrapper, sin heredar la variable, con estilo de nota al margen.
+  const celdaCuerpo = document.createElement("div");
+
+  celdaCuerpo.className = "separador-cuerpo";
+
   if (separador.color) {
-    fila.style.setProperty(
+    celdaCuerpo.style.setProperty(
       "--separador-color",
       `var(--tag-${separador.color})`,
     );
   } else {
-    fila.style.removeProperty("--separador-color");
+    celdaCuerpo.style.removeProperty("--separador-color");
   }
-
-  const celdaEstado = document.createElement("div");
-
-  celdaEstado.className = "celda separador-estado";
-
-  celdaEstado.style.width = anchoEstado;
-  celdaEstado.style.flexBasis = anchoEstado;
-
-  celdaEstado.append(crearEstadoSeparador(separador, alModificar));
 
   const celdaOpciones = document.createElement("div");
 
@@ -79,13 +73,15 @@ export function crearSeparadorHeader(
 
   celdaOpciones.append(botonOpciones);
 
+  celdaCuerpo.append(celdaOpciones);
+
   const celdaNota = document.createElement("div");
 
   celdaNota.className = "celda nota-separador";
 
   celdaNota.append(crearNota(separador, alModificar));
 
-  fila.append(celdaEstado, celdaOpciones, celdaNota);
+  fila.append(celdaCuerpo, celdaNota);
 
   return fila;
 }

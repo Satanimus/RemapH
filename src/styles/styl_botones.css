@@ -531,14 +531,14 @@
     cursor: not-allowed;
 }
 
-.estado-toggle.estado-separador-mixto {
+.estado-toggle[data-mixto="true"] {
 
     background: transparent;
 
     border-color: var(--text-disabled);
 }
 
-.estado-toggle.estado-separador-mixto:hover {
+.estado-toggle[data-mixto="true"]:hover {
 
     background: transparent;
 

@@ -46,27 +46,6 @@ export function crearFila(
     fila.style.removeProperty("--fila-color");
   }
 
-  if (infoSeparador) {
-    fila.style.setProperty(
-      "--separador-color",
-      infoSeparador.color
-        ? `var(--tag-${infoSeparador.color})`
-        : "var(--border-light)",
-    );
-
-    fila.classList.add("en-separador");
-
-    if (infoSeparador.primera) {
-      fila.classList.add("primera-del-separador");
-    }
-
-    if (infoSeparador.ultima) {
-      fila.classList.add("ultima-del-separador");
-    }
-  } else {
-    fila.style.removeProperty("--separador-color");
-  }
-
   COLUMNAS.forEach((col) => {
     const celda = document.createElement("div");
 
@@ -77,6 +56,41 @@ export function crearFila(
     celda.style.width = col.ancho;
 
     celda.style.flexBasis = col.ancho;
+
+    // Etapa E: el tinte de separador (fondo + bordes) ya no cubre
+    // la fila completa — se acota a las celdas Opciones→Extra
+    // (Nota queda fuera, con estilo de nota al margen). Se aplica
+    // por celda en vez de en el contenedor .fila.
+    if (infoSeparador && col.id !== "nota") {
+      celda.style.setProperty(
+        "--separador-color",
+        infoSeparador.color
+          ? `var(--tag-${infoSeparador.color})`
+          : "var(--border-light)",
+      );
+
+      celda.classList.add("en-separador");
+
+      if (col.id === "opciones") {
+        celda.classList.add("en-separador-inicio");
+      }
+
+      if (col.id === "extra") {
+        celda.classList.add("en-separador-fin");
+      }
+
+      if (infoSeparador.primera) {
+        celda.classList.add("primera-del-separador");
+      }
+
+      if (infoSeparador.ultima) {
+        celda.classList.add("ultima-del-separador");
+      }
+    }
+
+    if (infoSeparador && col.id === "nota") {
+      celda.classList.add("nota-en-fila-separador");
+    }
 
     switch (col.id) {
       case "opciones":

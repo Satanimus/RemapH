@@ -59,6 +59,7 @@ export function crearEstadoSeparador(
 
   boton.dataset.estado = separador.estadoVisual === "on" ? "on" : "off";
   boton.dataset.conflicto = hayAlerta ? "true" : "false";
+  boton.dataset.mixto = esMixto ? "true" : "false";
 
   if (hayAlerta) {
     const alerta = document.createElement("span");
@@ -68,14 +69,6 @@ export function crearEstadoSeparador(
     alerta.textContent = "⚠";
 
     boton.append(alerta);
-  } else if (esMixto) {
-    boton.classList.add("estado-separador-mixto");
-
-    const texto = document.createElement("span");
-
-    texto.textContent = "⨂";
-
-    boton.append(texto);
   } else {
     const texto = document.createElement("span");
 
