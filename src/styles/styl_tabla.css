@@ -483,3 +483,33 @@
     /* o el cyan que ya uses */
 
 }
+
+/* ==========================
+   Tooltip custom del botón Extra (ícono 🔧)
+   — ver comp_tooltip_extra.ts
+   ========================== */
+
+.extra-tooltip {
+    position: fixed;
+    z-index: 20;
+    max-width: 260px;
+    padding: 8px 10px;
+    background: rgba(15, 15, 20, 0.97);
+    border: 1px solid var(--border-light);
+    border-radius: 6px;
+    color: #ffffff;
+    font-size: var(--fs12);
+    line-height: 1.4;
+    white-space: pre-wrap;
+    word-break: break-word;
+    pointer-events: none;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+
+.extra-tooltip-linea+.extra-tooltip-linea {
+    margin-top: 2px;
+}
+
+.extra-tooltip-subtitulo {
+    color: #9a9a9a;
+}

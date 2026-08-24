@@ -10,6 +10,7 @@
 // ======================================================
 
 import { crearBoton } from "./comp_boton";
+import { activarTooltipExtra } from "./comp_tooltip_extra";
 
 export interface PopupOpciones {
   titulo: string;
@@ -19,9 +20,12 @@ export interface PopupOpciones {
 export function crearPopup(opciones: PopupOpciones): HTMLButtonElement {
   const boton = crearBoton({
     texto: "🔧",
-    titulo: opciones.titulo,
     clase: "extra-control",
   });
+  // Tooltip custom (colorea "Subtítulo:" distinto del valor) en vez
+  // del title nativo — ver comp_tooltip_extra.ts.
+  boton.removeAttribute("title");
+  activarTooltipExtra(boton, opciones.titulo);
 
   if (opciones.onClick) {
     boton.addEventListener("click", opciones.onClick);
