@@ -60,7 +60,9 @@ let panelElemento: HTMLElement | null = null;
 let cuerpoPanel: HTMLElement | null = null;
 let alGuardarActual: (() => Promise<void>) | null = null;
 let obtenerEstadoActualFn: (() => EstadoPerfilActual) | null = null;
-let alCambiarPerfilActual: ((resultado: ResultadoPerfil) => void) | null = null;
+let alCambiarPerfilActual:
+  | ((resultado: ResultadoPerfil) => void | Promise<void>)
+  | null = null;
 
 // ======================================================
 // CREAR PANEL
@@ -69,7 +71,7 @@ let alCambiarPerfilActual: ((resultado: ResultadoPerfil) => void) | null = null;
 export function crearPanelLateral(
   alGuardar: () => Promise<void>,
   obtenerEstadoActual: () => EstadoPerfilActual,
-  alCambiarPerfil: (resultado: ResultadoPerfil) => void,
+  alCambiarPerfil: (resultado: ResultadoPerfil) => void | Promise<void>,
 ): HTMLElement {
   alGuardarActual = alGuardar;
   obtenerEstadoActualFn = obtenerEstadoActual;
@@ -181,7 +183,7 @@ function crearListaPerfiles(
   nombreActual: string,
   estaEditado: boolean,
   alGuardar: () => Promise<void>,
-  alCambiarPerfil: (resultado: ResultadoPerfil) => void,
+  alCambiarPerfil: (resultado: ResultadoPerfil) => void | Promise<void>,
 ): HTMLElement {
   const lista = document.createElement("div");
 
@@ -241,7 +243,7 @@ function crearListaPerfiles(
           nombre,
         });
 
-        alCambiarPerfil(resultado);
+        await alCambiarPerfil(resultado);
 
         await recargarContenidoPanel();
       } catch (error) {
@@ -301,7 +303,7 @@ function crearAcciones(
   nombreActual: string,
   estaEditado: boolean,
   alGuardar: () => Promise<void>,
-  alCambiarPerfil: (resultado: ResultadoPerfil) => void,
+  alCambiarPerfil: (resultado: ResultadoPerfil) => void | Promise<void>,
 ): HTMLElement {
   const acciones = document.createElement("div");
 
@@ -330,7 +332,7 @@ function crearAcciones(
     try {
       const resultado = await invoke<ResultadoPerfil>("crear_perfil_nuevo");
 
-      alCambiarPerfil(resultado);
+      await alCambiarPerfil(resultado);
 
       await recargarContenidoPanel();
     } catch (error) {
@@ -350,7 +352,7 @@ function crearAcciones(
     try {
       const resultado = await invoke<ResultadoPerfil>("clonar_perfil");
 
-      alCambiarPerfil(resultado);
+      await alCambiarPerfil(resultado);
 
       await recargarContenidoPanel();
     } catch (error) {
@@ -405,7 +407,7 @@ function crearAcciones(
     try {
       const resultado = await invoke<ResultadoPerfil>("eliminar_perfil_actual");
 
-      alCambiarPerfil(resultado);
+      await alCambiarPerfil(resultado);
 
       await recargarContenidoPanel();
     } catch (error) {
@@ -438,8 +440,6 @@ function crearItemConfiguracion(): HTMLElement {
     invoke("abrir_ventana_configuracion").catch((error) => {
       console.error("❌ No se pudo abrir la ventana de configuración:", error);
     });
-
-    cerrarPanelLateral();
   });
 
   return boton;
@@ -452,7 +452,7 @@ function crearItemConfiguracion(): HTMLElement {
 function abrirFormularioRenombrar(
   nombreActual: string,
   evento: MouseEvent,
-  alCambiarPerfil: (resultado: ResultadoPerfil) => void,
+  alCambiarPerfil: (resultado: ResultadoPerfil) => void | Promise<void>,
 ): void {
   const contenedor = document.createElement("div");
 
@@ -492,7 +492,9 @@ function abrirFormularioRenombrar(
         nuevoNombre,
       });
 
-      alCambiarPerfil(resultado);
+      await alCambiarPerfil(resultado);
+
+      await recargarContenidoPanel();
     } catch (error) {
       console.error("❌ No se pudo renombrar el perfil:", error);
     }

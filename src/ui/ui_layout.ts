@@ -52,9 +52,7 @@ export function crearLayout(alGuardar: () => Promise<void>): HTMLElement {
   const panelLateral = crearPanelLateral(
     alGuardar,
     () => obtenerEstadoPerfilActual(toolbar),
-    (resultado) => {
-      void aplicarResultadoPerfilEnToolbar(toolbar, resultado);
-    },
+    (resultado) => aplicarResultadoPerfilEnToolbar(toolbar, resultado),
   );
 
   const layoutCuerpo = document.createElement("div");
