@@ -589,11 +589,11 @@
 
     padding: 0 var(--gap12);
 
-    background: var(--button-bg);
+    background: transparent;
 
     color: var(--text-soft);
 
-    border: 1px solid var(--border-light);
+    border: 1px solid transparent;
 
     border-radius: var(--r4);
 

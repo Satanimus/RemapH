@@ -50,7 +50,7 @@
 .toolbar-left {
   justify-content: flex-start;
 
-  gap: var(--gap12);
+  gap: 0;
 }
 
 .toolbar-center {
