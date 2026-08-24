@@ -315,15 +315,6 @@
    👤 SELECTOR DE PERFIL
    ====================================================== */
 
-.perfil-selector {
-
-    gap: var(--gap8);
-
-    padding-left: var(--gap8);
-
-    padding-right: var(--gap8);
-}
-
 .perfil-selector-nombre {
 
     overflow: hidden;
@@ -355,11 +346,6 @@
 .indicador[data-estado="activo"] {
 
     background: var(--green);
-}
-
-.perfil-selector-indicador {
-
-    margin: 0;
 }
 
 /* ======================================================
@@ -576,13 +562,14 @@
 }
 
 /* ======================================================
-   ➕ AGREGAR FILA
+   ➕ AGREGAR FILA / ☰ MENÚ LATERAL
    ------------------------------------------------------
-   Botón "+ Fila" en la barra superior, a la derecha del
-   título "RemapH" (antes era un círculo con "+" anclado
-   debajo de la última fila de la tabla).
+   Botones ghost agrupados en toolbar-left. "+ Fila" antes
+   era un círculo con "+" anclado debajo de la última fila
+   de la tabla.
    ====================================================== */
 
+.btn-menu-lateral,
 .btn-agregar-fila,
 .btn-agregar-separador {
 
@@ -621,8 +608,96 @@
         color .12s ease;
 }
 
+.btn-menu-lateral:hover,
 .btn-agregar-fila:hover,
 .btn-agregar-separador:hover {
+
+    border-color: var(--highlight);
+
+    color: var(--highlight);
+}
+
+/* ======================================================
+   💾 CAMBIOS PENDIENTES
+   ------------------------------------------------------
+   Box independiente en toolbar-right, visible solo cuando
+   hay ediciones sin guardar (ver ui_toolbar.ts::
+   marcarPerfilEditado / marcarPerfilActivo / marcarPerfilInactivo).
+   ====================================================== */
+
+.cambios-pendientes {
+
+    display: none;
+
+    align-items: center;
+
+    gap: var(--gap8);
+
+    height: 28px;
+}
+
+.cambios-pendientes.visible {
+
+    display: flex;
+}
+
+.btn-guardar-cambios,
+.btn-revertir-cambios {
+
+    display: flex;
+
+    align-items: center;
+
+    justify-content: center;
+
+    flex-shrink: 0;
+
+    white-space: nowrap;
+
+    height: 28px;
+
+    margin: 0;
+
+    padding: 0 var(--gap12);
+
+    color: var(--text);
+
+    border: 1px solid transparent;
+
+    border-radius: var(--r4);
+
+    font-family: var(--font);
+
+    font-size: var(--fs13);
+
+    cursor: pointer;
+
+    transition:
+        background .12s ease,
+        border-color .12s ease,
+        color .12s ease;
+}
+
+.btn-guardar-cambios {
+
+    background: var(--green-dark);
+}
+
+.btn-guardar-cambios:hover {
+
+    background: var(--green);
+}
+
+.btn-revertir-cambios {
+
+    background: var(--button-bg);
+
+    color: var(--text-soft);
+
+    border-color: var(--border-light);
+}
+
+.btn-revertir-cambios:hover {
 
     border-color: var(--highlight);
 

@@ -92,10 +92,6 @@ export function crearToolbar(alGuardar: () => Promise<void>): HTMLElement {
 
         <div class="toolbar-left">
 
-            <div class="titulo">
-                RemapH
-            </div>
-
             <button
                 class="btn-menu-lateral"
                 type="button"
@@ -129,9 +125,7 @@ export function crearToolbar(alGuardar: () => Promise<void>): HTMLElement {
                 <button
                     class="perfil-estado"
                     type="button"
-                >
-                    Perfil Activo
-                </button>
+                ></button>
 
             </div>
 
@@ -139,17 +133,30 @@ export function crearToolbar(alGuardar: () => Promise<void>): HTMLElement {
 
         <div class="toolbar-right">
 
+            <div class="cambios-pendientes">
+
+                <button
+                    class="btn-guardar-cambios"
+                    type="button"
+                >
+                    Guardar cambios
+                </button>
+
+                <button
+                    class="btn-revertir-cambios"
+                    type="button"
+                >
+                    Revertir
+                </button>
+
+            </div>
+
         </div>
 
     `;
 
   // ==================================================
   // 🟢🔴 INDICADOR DE CACHE
-  // ------------------------------------------------------
-  // nombrePerfil/cacheDot quedan sin montar en el DOM por ahora
-  // (antes vivían dentro de .perfil-selector, eliminado — ver
-  // Etapa D, que los reintegra al botón .perfil-estado
-  // simplificado).
   // ==================================================
 
   const cacheDot = crearIndicador("cache-dot");
@@ -161,6 +168,16 @@ export function crearToolbar(alGuardar: () => Promise<void>): HTMLElement {
   nombrePerfil.className = "perfil-selector-nombre";
 
   nombresPorToolbar.set(toolbar, nombrePerfil);
+
+  const textoEstado = document.createElement("span");
+
+  textoEstado.className = "perfil-estado-texto";
+
+  const botonEstadoInicial = toolbar.querySelector(
+    ".perfil-estado",
+  ) as HTMLButtonElement | null;
+
+  botonEstadoInicial?.append(nombrePerfil, cacheDot, textoEstado);
 
   // ==================================================
   // 📄 PERFIL ACTUAL
@@ -237,6 +254,58 @@ export function crearToolbar(alGuardar: () => Promise<void>): HTMLElement {
   });
 
   // ==================================================
+  // 💾 GUARDAR / ↩️ REVERTIR CAMBIOS PENDIENTES
+  // ==================================================
+
+  const botonGuardarCambios = toolbar.querySelector(
+    ".btn-guardar-cambios",
+  ) as HTMLButtonElement | null;
+
+  botonGuardarCambios?.addEventListener("click", async () => {
+    botonGuardarCambios.disabled = true;
+
+    try {
+      await alGuardar();
+
+      salirModoMoverTabla();
+
+      reconstruirTabla();
+
+      const activo = await invoke<boolean>("obtener_estado_cache");
+
+      marcarPerfilSegunCache(toolbar, cacheDot, activo);
+    } catch (error) {
+      console.error("❌ No se pudo guardar el perfil:", error);
+
+      window.alert(error instanceof Error ? error.message : String(error));
+    } finally {
+      botonGuardarCambios.disabled = false;
+    }
+  });
+
+  const botonRevertirCambios = toolbar.querySelector(
+    ".btn-revertir-cambios",
+  ) as HTMLButtonElement | null;
+
+  botonRevertirCambios?.addEventListener("click", async () => {
+    botonRevertirCambios.disabled = true;
+
+    try {
+      const resultado = await invoke<ResultadoPerfil>(
+        "restaurar_perfil_actual",
+      );
+
+      await aplicarResultadoPerfilEnToolbar(toolbar, resultado);
+    } catch (error) {
+      console.error("❌ No se pudieron revertir los cambios:", error);
+
+      window.alert(error instanceof Error ? error.message : String(error));
+    } finally {
+      botonRevertirCambios.disabled = false;
+    }
+  });
+
+  // ==================================================
   // ☰ MENÚ LATERAL
   // ==================================================
 
@@ -252,8 +321,7 @@ export function crearToolbar(alGuardar: () => Promise<void>): HTMLElement {
   // ➕ AGREGAR FILA
   // ------------------------------------------------------
   // Antes vivía debajo de la última fila de la tabla (ver
-  // comp_opciones.ts) — se movió acá, a la barra superior,
-  // junto al título.
+  // comp_opciones.ts) — se movió acá, a la barra superior.
   // ==================================================
 
   const botonAgregarFila = toolbar.querySelector(
@@ -330,13 +398,19 @@ export function marcarPerfilEditado(toolbar: HTMLElement): void {
     ".perfil-estado",
   ) as HTMLButtonElement | null;
 
-  if (!botonEstado) {
+  const textoEstado = botonEstado?.querySelector(".perfil-estado-texto");
+
+  if (!botonEstado || !textoEstado) {
     return;
   }
 
-  botonEstado.textContent = "Perfil editado, ¿guardar?";
+  const nombre = nombresPorToolbar.get(toolbar)?.textContent ?? "";
+
+  textoEstado.textContent = `${nombre} - Perfil editado, ¿guardar?`;
 
   botonEstado.dataset.estado = "editado";
+
+  toolbar.querySelector(".cambios-pendientes")?.classList.add("visible");
 }
 
 // ======================================================
@@ -348,13 +422,19 @@ export function marcarPerfilActivo(toolbar: HTMLElement): void {
     ".perfil-estado",
   ) as HTMLButtonElement | null;
 
-  if (!botonEstado) {
+  const textoEstado = botonEstado?.querySelector(".perfil-estado-texto");
+
+  if (!botonEstado || !textoEstado) {
     return;
   }
 
-  botonEstado.textContent = "Perfil Activo";
+  const nombre = nombresPorToolbar.get(toolbar)?.textContent ?? "";
+
+  textoEstado.textContent = `${nombre} - Perfil Activo`;
 
   botonEstado.dataset.estado = "activo";
+
+  toolbar.querySelector(".cambios-pendientes")?.classList.remove("visible");
 }
 
 // ======================================================
@@ -366,13 +446,19 @@ export function marcarPerfilInactivo(toolbar: HTMLElement): void {
     ".perfil-estado",
   ) as HTMLButtonElement | null;
 
-  if (!botonEstado) {
+  const textoEstado = botonEstado?.querySelector(".perfil-estado-texto");
+
+  if (!botonEstado || !textoEstado) {
     return;
   }
 
-  botonEstado.textContent = "Perfil inactivo";
+  const nombre = nombresPorToolbar.get(toolbar)?.textContent ?? "";
+
+  textoEstado.textContent = `${nombre} - Perfil inactivo`;
 
   botonEstado.dataset.estado = "inactivo";
+
+  toolbar.querySelector(".cambios-pendientes")?.classList.remove("visible");
 }
 
 // ======================================================
