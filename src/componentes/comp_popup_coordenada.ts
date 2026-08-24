@@ -113,7 +113,7 @@ function textoOpcionNivel1(
 }
 
 // ======================================================
-// 📝 TOOLTIP DEL BOTÓN EXTRA (columna de la tabla, ícono 🔧)
+// 📝 TOOLTIP DEL BOTÓN EXTRA (columna de la tabla, ícono ⁘)
 // ------------------------------------------------------
 // Lista de líneas "Subtítulo: Elección". "Repetición" siempre
 // presente; el resto de las líneas (Coordenada en adelante)

@@ -1,7 +1,7 @@
 // ======================================================
-// 🔧💬 comp_Tooltip_Extra
+// ⁘💬 comp_Tooltip_Extra
 // ------------------------------------------------------
-// Tooltip flotante custom para el botón Extra (ícono 🔧) de la
+// Tooltip flotante custom para el botón Extra (ícono ⁘) de la
 // tabla — reemplaza el title nativo del navegador porque este
 // no permite colorear el "Subtítulo:" de cada línea distinto
 // del valor. Mismo patrón de posicionamiento (fixed, clamp al

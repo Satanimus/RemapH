@@ -124,7 +124,7 @@ export function extensionDeRuta(ruta: string | null): string {
 }
 
 // ======================================================
-// 📝 TOOLTIP DEL BOTÓN EXTRA (columna Extra, ícono 🔧)
+// 📝 TOOLTIP DEL BOTÓN EXTRA (columna Extra, ícono ⁘)
 // ------------------------------------------------------
 // Lista de líneas "Subtítulo: Elección" — todos los campos de
 // abrirExtra. "Argumento" o "Abrir con" según esRutaExe(ruta),

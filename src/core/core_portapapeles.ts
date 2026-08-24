@@ -121,7 +121,7 @@ export function textoPortapapelesAccion(
 }
 
 // ======================================================
-// 📋 TOOLTIP DEL BOTÓN EXTRA (columna Extra, ícono 🔧)
+// 📋 TOOLTIP DEL BOTÓN EXTRA (columna Extra, ícono ⁘)
 // ------------------------------------------------------
 // Lista de líneas "Subtítulo: Elección" — todos los campos de
 // portapapelesExtra.

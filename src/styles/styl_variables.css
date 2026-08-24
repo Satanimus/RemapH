@@ -211,7 +211,7 @@
    --col-action: 150px;
 
    /* Antes 150px: la columna Extra mostraba el texto de la
-       opción elegida. Ahora es un botón solo-ícono (🔧, ver
+       opción elegida. Ahora es un botón solo-ícono (⁘, ver
        .extra-control en styl_botones.css) — mismo ancho que
        --col-type. */
    --col-behavior: 60px;

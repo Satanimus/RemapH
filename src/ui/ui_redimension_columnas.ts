@@ -14,7 +14,7 @@ export const ANCHOS_DEFAULT = {
 
   tipo: 60,
   accion: 150,
-  extra: 150,
+  extra: 52,
 
   nota: 220,
 };
