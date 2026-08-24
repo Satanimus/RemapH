@@ -793,12 +793,15 @@
    del asa ⁝ de cada paso del editor.
    ====================================================== */
 
-.ui-btn.popup-btn-peligro {
+.ui-btn.popup-btn-peligro,
+.ui-btn.popup-perfil-eliminar {
   color: var(--highlight-red);
 }
 
 .ui-btn.popup-btn-peligro:hover,
-.popup-capa .ui-btn.popup-btn-peligro:hover {
+.popup-capa .ui-btn.popup-btn-peligro:hover,
+.ui-btn.popup-perfil-eliminar:hover,
+.popup-capa .ui-btn.popup-perfil-eliminar:hover {
   color: var(--highlight-red);
   border-color: var(--highlight-red);
 }

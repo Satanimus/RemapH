@@ -79,6 +79,8 @@ export function crearCapturador(
 
     capturando = true;
 
+    boton.dataset.abierto = "true";
+
     boton.textContent = "Esperando...";
 
     // ==============================================
@@ -114,6 +116,8 @@ export function crearCapturador(
           }
 
           capturando = false;
+
+          boton.dataset.abierto = "false";
 
           if (trigger === null) {
             // Captura inválida (ej: Click izquierdo solo como

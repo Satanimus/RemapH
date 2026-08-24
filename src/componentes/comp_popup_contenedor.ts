@@ -12,6 +12,12 @@
 let capaPopup: HTMLElement | null = null;
 let alCerrarActual: (() => void) | null = null;
 let popupFijoActual = false;
+let origenActual: HTMLElement | null = null;
+
+// Último botón (.ui-btn) sobre el que se hizo mousedown —
+// capturado globalmente para no tener que cambiar todas las
+// llamadas a mostrarPopup que ya pasan solo coordenadas.
+let ultimoBotonPulsado: HTMLElement | null = null;
 
 export function crearContenedorPopup(): HTMLElement {
   if (capaPopup) {
@@ -32,10 +38,6 @@ export function crearContenedorPopup(): HTMLElement {
     }
   });
 
-  // Regla 3/4: Esc cierra cualquier popup no fijo (mismo camino
-  // que click afuera). El editor de Macro (popupFijoActual=true)
-  // queda excluido. stopPropagation para no acumular con otros
-  // listeners (Regla 9: un solo Esc cierra una sola capa).
   document.addEventListener("keydown", (evento) => {
     if (evento.key !== "Escape") return;
     if (popupFijoActual) return;
@@ -45,6 +47,16 @@ export function crearContenedorPopup(): HTMLElement {
     ocultarPopup();
   });
 
+  // Captura el botón origen antes de que mostrarPopup se llame
+  document.addEventListener(
+    "mousedown",
+    (evento) => {
+      const el = evento.target as HTMLElement;
+      ultimoBotonPulsado = el.closest(".ui-btn");
+    },
+    true,
+  );
+
   return capaPopup;
 }
 
@@ -53,8 +65,9 @@ export function mostrarPopup(
   x?: number,
   y?: number,
   alCerrar?: () => void,
+  origen?: HTMLElement,
 ): void {
-  mostrarPopupInterno(contenido, x, y, alCerrar, false);
+  mostrarPopupInterno(contenido, x, y, alCerrar, false, origen);
 }
 
 // ======================================================
@@ -72,8 +85,9 @@ export function mostrarPopupFijo(
   x?: number,
   y?: number,
   alCerrar?: () => void,
+  origen?: HTMLElement,
 ): void {
-  mostrarPopupInterno(contenido, x, y, alCerrar, true);
+  mostrarPopupInterno(contenido, x, y, alCerrar, true, origen);
 }
 
 function mostrarPopupInterno(
@@ -82,9 +96,16 @@ function mostrarPopupInterno(
   y: number | undefined,
   alCerrar: (() => void) | undefined,
   fijo: boolean,
+  origen: HTMLElement | undefined,
 ): void {
   if (!capaPopup) {
     return;
+  }
+
+  // Limpiar origen anterior
+  if (origenActual) {
+    origenActual.dataset.abierto = "false";
+    origenActual = null;
   }
 
   capaPopup.innerHTML = "";
@@ -96,6 +117,13 @@ function mostrarPopupInterno(
   alCerrarActual = alCerrar ?? null;
 
   popupFijoActual = fijo;
+
+  // Usar el origen explícito o el último botón pulsado
+  origenActual = origen ?? ultimoBotonPulsado ?? null;
+
+  if (origenActual) {
+    origenActual.dataset.abierto = "true";
+  }
 
   if (x !== undefined && y !== undefined) {
     contenido.style.position = "fixed";
@@ -110,10 +138,6 @@ function mostrarPopupInterno(
   }
 }
 
-// Elige la esquina del popup usada como referencia (izquierda/derecha,
-// arriba/abajo) según cuál deja el contenido completo dentro de la
-// ventana. Si el popup es más grande que el espacio disponible en algún
-// eje, se lo pega directo al borde correspondiente.
 function ajustarPosicionDentroDeVentana(
   contenido: HTMLElement,
   x: number,
@@ -156,6 +180,11 @@ export function ocultarPopup(): void {
   capaPopup.style.display = "none";
 
   popupFijoActual = false;
+
+  if (origenActual) {
+    origenActual.dataset.abierto = "false";
+    origenActual = null;
+  }
 
   const alCerrar = alCerrarActual;
 
