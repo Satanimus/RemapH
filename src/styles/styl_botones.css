@@ -462,85 +462,98 @@
 }
 
 /* ======================================================
-   🟢🔴 ESTADO (interruptor ON/OFF de fila)
+   🟢🔴 ESTADO (interruptor ON/OFF, superpuesto al número)
    ------------------------------------------------------
-   Misma lógica de color que .perfil-estado: oscuro en
-   reposo, color sólido al pasar el mouse.
-   ====================================================== */
-
-/* ======================================================
-   ESTADO DE FILA
+   Círculo pequeño, justo para tapar el número y contener
+   el triángulo de alerta. ON: invisible en reposo, borde
+   rojo transparente al hover. OFF/Alerta: círculo rojo
+   sólido. Separador mixto: borde gris, fondo transparente
+   (siempre visible, no solo al hover). El texto ◉/⨉/⨂ que
+   trae el markup actual se oculta por CSS: el círculo y el
+   número (o el triángulo) alcanzan como indicador.
    ====================================================== */
 
 .estado-toggle {
 
-    height: 22px;
+    width: 20px;
+
+    height: 20px;
+
+    min-width: 20px;
+
+    padding: 0;
+
+    box-sizing: border-box;
 
     border-width: 1px;
 
     border-style: solid;
 
-    border-color: #000;
+    border-color: transparent;
 
     border-radius: 999px;
+
+    background: transparent;
 
     color: #FFF;
 }
 
-.estado-toggle[data-estado="on"] {
+.estado-toggle span:not(.estado-alerta) {
 
-    background: var(--green-dark);
+    display: none;
 }
 
 .estado-toggle[data-estado="on"]:hover {
 
-    background: var(--green);
+    border-color: var(--red);
+
+    background: transparent;
 }
 
-.estado-toggle[data-estado="off"] {
-
-    background: var(--red-dark);
-}
-
-.estado-toggle[data-estado="off"]:hover {
-
-    background: var(--red);
-}
-
+.estado-toggle[data-estado="off"],
 .estado-toggle[data-conflicto="true"] {
 
     background: var(--red-dark);
 
-    cursor: not-allowed;
+    border-color: var(--red-dark);
 }
 
+.estado-toggle[data-estado="off"]:hover,
 .estado-toggle[data-conflicto="true"]:hover {
 
     background: var(--red);
+
+    border-color: var(--red);
+}
+
+.estado-toggle[data-conflicto="true"] {
+
+    cursor: not-allowed;
 }
 
 .estado-toggle.estado-separador-mixto {
 
-    background: var(--text-disabled);
+    background: transparent;
 
-    color: var(--text);
-
-    border-color: #000;
+    border-color: var(--text-disabled);
 }
 
 .estado-toggle.estado-separador-mixto:hover {
 
-    background: var(--text-soft);
+    background: transparent;
+
+    border-color: var(--text-soft);
 }
 
 .estado-alerta {
-
-    margin-left: var(--gap4);
 
     color: var(--yellow);
 
     font-weight: bold;
 
+    font-size: var(--fs12);
+
+    line-height: 1;
 }
 
 /* ======================================================
