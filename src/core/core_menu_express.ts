@@ -133,11 +133,54 @@ export function textoMenuAccion(menuAccion: MenuAccionPerfil): string {
 }
 
 // ======================================================
-// 📝 TEXTO EXTRA (columna Extra de la tabla)Forma elegida
+// 📝 TOOLTIP DEL BOTÓN EXTRA (columna Extra, ícono 🔧)
+// ------------------------------------------------------
+// Lista de líneas "Subtítulo: Elección" — todos los campos de
+// menuExtra. Columnas/Filas solo si forma === "cuadricula".
+// "Botones" combina tamaño+color en una línea (mismo criterio
+// que la fila fusionada del popup, ver
+// comp_popup_menu_express_extra.ts::crearFilaBotones).
 // ======================================================
 
-export function textoMenuExtra(menuExtra: MenuExpressExtraPerfil): string {
-  const forma = menuExtra.forma === "cuadricula" ? "⊞ Cuadrícula" : "⊗ Radial";
+function textoTamanoMenu(tamano: TamanoMenu): string {
+  switch (tamano) {
+    case "pequeno":
+      return "Pequeño";
 
-  return `${forma}`;
+    case "mediano":
+      return "Mediano";
+
+    case "grande":
+      return "Grande";
+  }
+}
+
+export function textoMenuExtra(menuExtra: MenuExpressExtraPerfil): string {
+  const forma = menuExtra.forma === "cuadricula" ? "Cuadrícula" : "Radial";
+
+  const lineas = [`Forma: ${forma}`];
+
+  if (menuExtra.forma === "cuadricula") {
+    lineas.push(
+      `Columnas: ${menuExtra.columnas === 0 ? "Auto" : menuExtra.columnas}`,
+    );
+
+    lineas.push(`Filas: ${menuExtra.filas === 0 ? "Auto" : menuExtra.filas}`);
+  }
+
+  lineas.push(
+    `Comportamiento: ${menuExtra.comportamiento === "efimero" ? "Efímero" : "Toggle"}`,
+  );
+
+  lineas.push(
+    `Ubicación: ${menuExtra.ubicacion === "cursor" ? "Cursor" : "Persistente"}`,
+  );
+
+  const color = menuExtra.colorBoton === "color" ? "Color" : "Monocromo";
+
+  lineas.push(`Botones: ${textoTamanoMenu(menuExtra.tamanoBoton)} ${color}`);
+
+  lineas.push(`Texto: ${textoTamanoMenu(menuExtra.tamanoTexto)}`);
+
+  return lineas.join("\n");
 }

@@ -833,6 +833,22 @@
 }
 
 /* ======================================================
+   🔧 COLUMNA EXTRA — botón solo ícono (ventana principal)
+   ------------------------------------------------------
+   Antes mostraba el texto de la opción elegida (ver
+   comp_popup.ts). Ahora solo el ícono 🔧, centrado — las
+   opciones elegidas quedan como tooltip (title), mismo
+   criterio que .tipo-control arriba.
+   ====================================================== */
+
+.extra-control {
+
+    font-size: var(--fs16);
+
+    line-height: 1;
+}
+
+/* ======================================================
    🔤🎵⚡🧩📝📂 POPUP TIPO — ícono al lado del nombre
    ====================================================== */
 

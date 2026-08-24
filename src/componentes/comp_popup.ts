@@ -1,32 +1,30 @@
 // ======================================================
-// ▼ comp_Popup
+// 🔧 comp_Popup
 // ------------------------------------------------------
-// Ya no antepone la flecha "▾" al texto — la columna Extra
-// (único consumidor de este helper) queda con el texto solo,
-// mismo criterio que la columna Tipo (ver comp_popup_abrir.ts,
-// iconoDeTipo) y App (ver crearApp en este mismo archivo).
+// La columna Extra (único consumidor de este helper) ya no
+// muestra texto: es solo el ícono 🔧, mismo criterio icon-only
+// que la columna Tipo (ver comp_popup_abrir.ts, iconoDeTipo).
+// Las opciones elegidas quedan como tooltip (title), con formato
+// "Subtítulo: Elección" por línea — cada texto*Extra()/textoMenuExtra()/
+// etc. arma ese contenido.
 // ======================================================
 
 import { crearBoton } from "./comp_boton";
 
 export interface PopupOpciones {
-  texto: string;
-  titulo?: string;
-  onClick?: (evento: MouseEvent, actualizar: (texto: string) => void) => void;
+  titulo: string;
+  onClick?: (evento: MouseEvent) => void;
 }
 
 export function crearPopup(opciones: PopupOpciones): HTMLButtonElement {
   const boton = crearBoton({
-    texto: opciones.texto,
+    texto: "🔧",
     titulo: opciones.titulo,
+    clase: "extra-control",
   });
 
   if (opciones.onClick) {
-    boton.addEventListener("click", (evento) => {
-      opciones.onClick!(evento, (texto: string) => {
-        boton.textContent = texto;
-      });
-    });
+    boton.addEventListener("click", opciones.onClick);
   }
 
   return boton;

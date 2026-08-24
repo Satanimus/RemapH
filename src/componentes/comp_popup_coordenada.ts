@@ -19,15 +19,17 @@
 //          No excluyente con el nivel de arriba: se puede
 //          combinar cualquier repetición con Coordenada. Al
 //          activarse, expande debajo:
-//   NIVEL 2 — Ubicación (Absoluta/Relativa a cursor/Relativa a
-//            ventana). Si es Relativa a ventana, se agrega una
-//            caja interna (otro nivel visual, mismo popup) con
-//            Método de medición (Porcentaje/Píxeles) y, solo
-//            en Píxeles, Punto de referencia.
+//   NIVEL 2 — "En relación a:" (Absoluta/Relativa a cursor/
+//            Relativa a ventana). Si es Relativa a ventana, se
+//            agrega una caja interna (otro nivel visual, mismo
+//            popup) con "Medido en:" (Porcentaje/Píxeles) y,
+//            solo en Píxeles, "Medido desde:".
 //   BOTÓN   — 📌 Capturar Coordenada (abre la ventana de
 //            captura — ver comandos.rs; conecta el polling
-//            del resultado). Botón principal, cyan oscuro.
-//   NIVEL 3 — Post-acción (Posición inicial/Posición final)
+//            del resultado). Botón principal, cyan oscuro. Ya
+//            no agrega "(desde Sup-Izq)" al valor — queda solo
+//            el valor (ver textoCoordenada en core_coordenada.ts).
+//   NIVEL 3 — "Finalizar en:" (Posición inicial/Posición final)
 //
 // El pin 📌 solo queda como emoji del texto del botón de
 // captura y del texto del botón Extra de la tabla (ver
@@ -53,6 +55,13 @@ import type {
 } from "../core/core_coordenada";
 
 import { textoCoordenada } from "../core/core_coordenada";
+
+import {
+  textoPuntoReferencia,
+  textoUbicacionCoordenada,
+  textoModoVentanaCoordenada,
+  textoPostAccionCoordenada,
+} from "../core/core_coordenada";
 
 import {
   crearGrupoOpciones,
@@ -104,9 +113,14 @@ function textoOpcionNivel1(
 }
 
 // ======================================================
-// 📝 TEXTO DEL BOTÓN EXTRA (columna de la tabla)
+// 📝 TOOLTIP DEL BOTÓN EXTRA (columna de la tabla, ícono 🔧)
 // ------------------------------------------------------
-// Repetición + pin 📌 si Coordenada está activa.
+// Lista de líneas "Subtítulo: Elección". "Repetición" siempre
+// presente; el resto de las líneas (Coordenada en adelante)
+// solo se agregan si corresponde: el bloque completo solo si
+// el toggle Coordenada está activo, "Medido en"/"Medido desde"
+// solo si la ubicación/modo los vuelve relevantes — mismas
+// condiciones que muestran esas filas dentro del popup.
 // ======================================================
 
 export function textoExtraTeclaMouse(filaPerfil: FilaPerfil): string {
@@ -118,7 +132,35 @@ export function textoExtraTeclaMouse(filaPerfil: FilaPerfil): string {
     ? textoOpcionNivel1(opcion, esGatilloRueda(filaPerfil.trigger))
     : filaPerfil.extra;
 
-  return filaPerfil.coordenada.activa ? `📌 ${base}` : base;
+  const lineas = [`Repetición: ${base}`];
+
+  const coordenada = filaPerfil.coordenada;
+
+  if (coordenada.activa) {
+    lineas.push(
+      `En relación a: ${textoUbicacionCoordenada(coordenada.ubicacion)}`,
+    );
+
+    if (coordenada.ubicacion === "relativa_ventana") {
+      lineas.push(
+        `Medido en: ${textoModoVentanaCoordenada(coordenada.modoVentana)}`,
+      );
+
+      if (coordenada.modoVentana === "pixeles") {
+        lineas.push(
+          `Medido desde: ${textoPuntoReferencia(coordenada.puntoReferencia)}`,
+        );
+      }
+    }
+
+    lineas.push(
+      `Finalizar en: ${textoPostAccionCoordenada(coordenada.postAccion)}`,
+    );
+
+    lineas.push(`Coordenada: ${textoCoordenada(coordenada)}`);
+  }
+
+  return lineas.join("\n");
 }
 
 // ======================================================
@@ -180,7 +222,7 @@ function crearCajaVentana(
 
   caja.append(
     crearFilaPopup(
-      "Método de Medición",
+      "Medido en:",
       crearGrupoOpciones(modoOpciones, coordenada.modoVentana, (valor) => {
         coordenada.modoVentana = valor;
 
@@ -213,7 +255,7 @@ function crearCajaVentana(
 
     caja.append(
       crearFilaPopup(
-        "Punto de Referencia",
+        "Medido desde:",
         crearGrupoOpciones(
           puntoOpciones,
           coordenada.puntoReferencia,
@@ -395,7 +437,7 @@ export function abrirPopupExtraTeclaMouse(
 
   popup.append(
     crearFilaPopup(
-      "Ubicación relativa a:",
+      "En relación a:",
       crearGrupoOpciones(ubicacionOpciones, coordenada.ubicacion, (valor) => {
         coordenada.ubicacion = valor;
 
@@ -431,7 +473,7 @@ export function abrirPopupExtraTeclaMouse(
 
   popup.append(
     crearFilaPopup(
-      "Al finalizar ir a:",
+      "Finalizar en:",
       crearGrupoOpciones(postAccionOpciones, coordenada.postAccion, (valor) => {
         coordenada.postAccion = valor;
 

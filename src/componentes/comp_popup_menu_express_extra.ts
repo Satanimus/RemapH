@@ -18,9 +18,9 @@
 //     (solo visible si forma === "cuadricula")
 //   COMPORTAMIENTO      → menuExtra.comportamiento
 //   UBICACIÓN           → menuExtra.ubicacion
-//   TAMAÑO DE BOTONES   → menuExtra.tamanoBoton
-//   TAMAÑO DE TEXTO     → menuExtra.tamanoTexto
-//   COLOR BOTÓN         → menuExtra.colorBoton (pulido)
+//   BOTONES             → menuExtra.tamanoBoton + menuExtra.colorBoton
+//     (misma fila — antes "Tamaño de Botones" y "Color Botón" separados)
+//   TEXTO               → menuExtra.tamanoTexto (antes "Tamaño de Texto")
 // ======================================================
 
 import { mostrarPopup } from "./comp_popup_contenedor";
@@ -51,6 +51,49 @@ function crearSeparador(): HTMLElement {
   separador.className = "app-popup-separador";
 
   return separador;
+}
+
+// ======================================================
+// 🔘🎨 FILA "BOTONES" (Tamaño + Color, misma línea)
+// ------------------------------------------------------
+// Fusiona lo que antes eran dos filas separadas ("Tamaño de
+// Botones" y "Color Botón") en una sola — el prefijo "Tamaño
+// de" se omite acá, mismo criterio que la fila "Texto" de
+// abajo (antes "Tamaño de Texto").
+// ======================================================
+
+function crearFilaBotones(
+  contexto: ContextoFila,
+  filaPerfil: FilaPerfil,
+  alModificar: () => void,
+  redibujar: () => void,
+  tamanoOpciones: { texto: string; valor: TamanoMenu }[],
+  colorBotonOpciones: { texto: string; valor: ColorBotonMenu }[],
+): HTMLElement {
+  const menuExtra = filaPerfil.menuExtra;
+
+  const grupo = document.createElement("div");
+
+  grupo.className = "popup-grupo-doble";
+
+  grupo.append(
+    crearGrupoOpciones(tamanoOpciones, menuExtra.tamanoBoton, (valor) => {
+      menuExtra.tamanoBoton = valor;
+
+      reconstruirFila(contexto.id);
+      alModificar();
+      redibujar();
+    }),
+
+    crearGrupoOpciones(colorBotonOpciones, menuExtra.colorBoton, (valor) => {
+      menuExtra.colorBoton = valor;
+
+      reconstruirFila(contexto.id);
+      redibujar();
+    }),
+  );
+
+  return crearFilaPopup("Botones", grupo);
 }
 
 // ======================================================
@@ -280,7 +323,7 @@ export function abrirPopupExtraMenuExpress(
   popup.append(crearSeparador());
 
   // ----------------------------------
-  // TAMAÑO DE BOTONES
+  // BOTONES (Tamaño + Color, misma línea)
   // ----------------------------------
 
   const tamanoOpciones: { texto: string; valor: TamanoMenu }[] = [
@@ -289,55 +332,36 @@ export function abrirPopupExtraMenuExpress(
     { texto: "Grande", valor: "grande" },
   ];
 
-  popup.append(
-    crearFilaPopup(
-      "Tamaño de Botones",
-      crearGrupoOpciones(tamanoOpciones, menuExtra.tamanoBoton, (valor) => {
-        menuExtra.tamanoBoton = valor;
-
-        reconstruirFila(contexto.id);
-        alModificar();
-        redibujar();
-      }),
-    ),
-  );
-
-  // ----------------------------------
-  // TAMAÑO DE TEXTO
-  // ----------------------------------
-
-  popup.append(
-    crearFilaPopup(
-      "Tamaño de Texto",
-      crearGrupoOpciones(tamanoOpciones, menuExtra.tamanoTexto, (valor) => {
-        menuExtra.tamanoTexto = valor;
-
-        reconstruirFila(contexto.id);
-        redibujar();
-      }),
-    ),
-  );
-
-  // ----------------------------------
-  // COLOR BOTÓN
-  // ------------------------------------------------------
   // Monocromo (default): los botones heredan el color de fondo de
   // la ventana (color de la fila MenuExpress, sin cambios acá).
   // Color: cada botón toma el borde del color de SU PROPIA fila
   // referenciada — resuelto del lado de Rust (compilador.rs), esta
   // fila del popup solo elige el modo.
-  // ----------------------------------
-
   const colorBotonOpciones: { texto: string; valor: ColorBotonMenu }[] = [
     { texto: "Color", valor: "color" },
     { texto: "Monocromo", valor: "monocromo" },
   ];
 
   popup.append(
+    crearFilaBotones(
+      contexto,
+      filaPerfil,
+      alModificar,
+      redibujar,
+      tamanoOpciones,
+      colorBotonOpciones,
+    ),
+  );
+
+  // ----------------------------------
+  // TEXTO (antes "Tamaño de Texto")
+  // ----------------------------------
+
+  popup.append(
     crearFilaPopup(
-      "Color Botón",
-      crearGrupoOpciones(colorBotonOpciones, menuExtra.colorBoton, (valor) => {
-        menuExtra.colorBoton = valor;
+      "Texto",
+      crearGrupoOpciones(tamanoOpciones, menuExtra.tamanoTexto, (valor) => {
+        menuExtra.tamanoTexto = valor;
 
         reconstruirFila(contexto.id);
         redibujar();

@@ -11,8 +11,8 @@
 // Secciones (ver spec "Extra (popup)"):
 //   COMPORTAMIENTO      → portapapelesExtra.comportamiento
 //   UBICACIÓN           → portapapelesExtra.ubicacion
-//   TAMAÑO DE BOTONES   → portapapelesExtra.tamanoBoton
-//   TAMAÑO DE TEXTO     → portapapelesExtra.tamanoTexto
+//   BOTONES             → portapapelesExtra.tamanoBoton (antes "Tamaño de Botones")
+//   TEXTO               → portapapelesExtra.tamanoTexto (antes "Tamaño de Texto")
 //   LÍMITE DE ELEMENTOS → portapapelesExtra.limite (solo rotatorios —
 //     el límite REAL que aplica el pool compartido es el mayor entre
 //     todos los Portapapeles en modo Registro, ver back_portapapeles.rs;
@@ -179,7 +179,7 @@ export function abrirPopupExtraPortapapeles(
 
   popup.append(
     crearFilaPopup(
-      "Tamaño de Botones",
+      "Botones",
       crearGrupoOpciones(
         tamanoBotonOpciones,
         portapapelesExtra.tamanoBoton,
@@ -209,7 +209,7 @@ export function abrirPopupExtraPortapapeles(
 
   popup.append(
     crearFilaPopup(
-      "Tamaño de Texto",
+      "Texto",
       crearGrupoOpciones(
         tamanoTextoOpciones,
         portapapelesExtra.tamanoTexto,

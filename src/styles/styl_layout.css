@@ -711,6 +711,18 @@
 }
 
 /* ======================================================
+   Fila "Botones" del popup Extra de MenúExpress: dos grupos
+   (Tamaño + Color) uno al lado del otro en la misma línea.
+   ====================================================== */
+
+.popup-grupo-doble {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--gap12);
+}
+
+/* ======================================================
    Modificador: fuerza 3 columnas parejas, para grupos que
    necesitan un orden de grilla fijo (ej. Punto de Referencia:
    3 arriba, 2 abajo) en vez del wrap natural del flex.

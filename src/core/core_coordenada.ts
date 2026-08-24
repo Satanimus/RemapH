@@ -105,8 +105,48 @@ export function textoCoordenada(coordenada: CoordenadaPerfil): string {
         return `H: ${coordenada.x}%, V: ${coordenada.y}%`;
       }
 
-      return `X: ${coordenada.x}, Y: ${coordenada.y} (desde ${textoPuntoReferencia(coordenada.puntoReferencia)})`;
+      // Antes agregaba "(desde Sup-Izq)" acá — ahora el botón
+      // Capturar Coordenada queda solo con el valor; "Medido
+      // desde" ya se ve como línea propia en el popup y en el
+      // resumen flotante del botón Extra (ver textoExtraTeclaMouse
+      // en comp_popup_coordenada.ts).
+      return `X: ${coordenada.x}, Y: ${coordenada.y}`;
   }
+}
+
+// ======================================================
+// 📝 TEXTO DE UBICACIÓN / MEDICIÓN / POST-ACCIÓN
+// ------------------------------------------------------
+// Usados por el resumen flotante del botón Extra (ver
+// textoExtraTeclaMouse en comp_popup_coordenada.ts) — mismos
+// textos que muestran los grupos de opciones del popup.
+// ======================================================
+
+export function textoUbicacionCoordenada(
+  ubicacion: UbicacionCoordenada,
+): string {
+  switch (ubicacion) {
+    case "absoluta":
+      return "Absoluta";
+
+    case "relativa_cursor":
+      return "Cursor";
+
+    case "relativa_ventana":
+      return "Ventana";
+  }
+}
+
+export function textoModoVentanaCoordenada(
+  modo: ModoVentanaCoordenada,
+): string {
+  return modo === "porcentaje" ? "Porcentaje" : "Píxeles";
+}
+
+export function textoPostAccionCoordenada(
+  postAccion: PostAccionCoordenada,
+): string {
+  return postAccion === "inicial" ? "Posición Inicial" : "Posición Final";
 }
 
 // ======================================================

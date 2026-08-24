@@ -160,9 +160,9 @@ export function iconoDeTipo(valor: string): string {
 }
 
 export function extraATexto(valor: string): string {
-  return (
-    EXTRA_OPCIONES.find((opcion) => opcion.valor === valor)?.texto ?? valor
-  );
+  const opcion = EXTRA_OPCIONES.find((opcion) => opcion.valor === valor);
+
+  return `Repetición: ${opcion ? opcion.texto : valor}`;
 }
 
 export function abrirPopupCondicion(

@@ -124,17 +124,42 @@ export function extensionDeRuta(ruta: string | null): string {
 }
 
 // ======================================================
-// 📝 TEXTO EXTRA (columna Extra de la tabla)
+// 📝 TOOLTIP DEL BOTÓN EXTRA (columna Extra, ícono 🔧)
 // ------------------------------------------------------
-// Mismo criterio que textoPortapapelesExtra: una sola palabra que
-// resume el estado más relevante para decidir de un vistazo, sin
-// tener que abrir el popup. Instancias es lo más relevante acá (si
-// reutiliza la ventana ya abierta o no) — Iniciar/Abrir con quedan
-// solo dentro del popup.
+// Lista de líneas "Subtítulo: Elección" — todos los campos de
+// abrirExtra. "Argumento" o "Abrir con" según esRutaExe(ruta),
+// mutuamente excluyentes acá igual que en el popup (ver
+// comp_popup_abrir_extra.ts).
 // ======================================================
 
-export function textoAbrirExtra(abrirExtra: AbrirExtraPerfil): string {
-  return abrirExtra.instancias === "unica" ? "Única" : "Múltiple";
+const INICIAR_TEXTO: Record<IniciarAbrir, string> = {
+  ventana: "Ventana",
+  minimizado: "Minimizado",
+  maximizado: "Maximizado",
+};
+
+export function textoAbrirExtra(
+  abrirExtra: AbrirExtraPerfil,
+  ruta: string | null,
+): string {
+  const instancias = abrirExtra.instancias === "unica" ? "Única" : "Múltiple";
+
+  const lineas = [
+    `Iniciar: ${INICIAR_TEXTO[abrirExtra.iniciar]}`,
+    `Instancias: ${instancias}`,
+  ];
+
+  if (esRutaExe(ruta)) {
+    lineas.push(
+      `Argumento: ${abrirExtra.argumento ? abrirExtra.argumento : "Sin argumento"}`,
+    );
+  } else {
+    lineas.push(
+      `Abrir con: ${abrirExtra.abrirCon ? nombreDeRuta(abrirExtra.abrirCon) : "Predeterminado"}`,
+    );
+  }
+
+  return lineas.join("\n");
 }
 
 // ======================================================

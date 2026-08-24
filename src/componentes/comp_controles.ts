@@ -217,7 +217,7 @@ export function crearExtra(
   // totalmente distinto del popup simple que usan los demás tipos.
   if (filaPerfil.tipo === "tecla_mouse") {
     return crearPopup({
-      texto: textoExtraTeclaMouse(filaPerfil),
+      titulo: textoExtraTeclaMouse(filaPerfil),
       onClick: (evento) => {
         abrirPopupExtraTeclaMouse(evento, contexto, filaPerfil, alModificar);
       },
@@ -228,7 +228,7 @@ export function crearExtra(
   // de persistente que el de Tecla/Mouse, pero mucho más chico.
   if (filaPerfil.tipo === "multimedia") {
     return crearPopup({
-      texto: textoExtraMultimedia(filaPerfil.extraMultimedia),
+      titulo: textoExtraMultimedia(filaPerfil.extraMultimedia),
       onClick: (evento) => {
         abrirPopupExtraMultimedia(evento, contexto, filaPerfil, alModificar);
       },
@@ -240,7 +240,7 @@ export function crearExtra(
   // persistente que los anteriores.
   if (filaPerfil.tipo === "menu_express") {
     return crearPopup({
-      texto: textoMenuExtra(filaPerfil.menuExtra),
+      titulo: textoMenuExtra(filaPerfil.menuExtra),
       onClick: (evento) => {
         abrirPopupExtraMenuExpress(evento, contexto, filaPerfil, alModificar);
       },
@@ -252,7 +252,7 @@ export function crearExtra(
   // anteriores.
   if (filaPerfil.tipo === "portapapeles") {
     return crearPopup({
-      texto: textoPortapapelesExtra(filaPerfil.portapapelesExtra),
+      titulo: textoPortapapelesExtra(filaPerfil.portapapelesExtra),
       onClick: (evento) => {
         abrirPopupExtraPortapapeles(evento, contexto, filaPerfil, alModificar);
       },
@@ -266,7 +266,7 @@ export function crearExtra(
   // instalados del registro, sin tocar este enganche.
   if (filaPerfil.tipo === "abrir") {
     return crearPopup({
-      texto: textoAbrirExtra(filaPerfil.abrirExtra),
+      titulo: textoAbrirExtra(filaPerfil.abrirExtra, filaPerfil.abrirAccion.ruta),
       onClick: (evento) => {
         abrirPopupExtraAbrir(evento, contexto, filaPerfil, alModificar);
       },
@@ -280,7 +280,7 @@ export function crearExtra(
   // igual de persistente que el resto de los popups Extra propios.
   if (filaPerfil.tipo === "macro") {
     return crearPopup({
-      texto: textoComportamientoMacro(filaPerfil.macroExtra.comportamiento),
+      titulo: textoComportamientoMacro(filaPerfil.macroExtra.comportamiento),
       onClick: (evento) => {
         abrirPopupExtraMacro(evento, contexto, filaPerfil, alModificar);
       },
@@ -288,7 +288,7 @@ export function crearExtra(
   }
 
   return crearPopup({
-    texto: extraATexto(filaPerfil.extra),
+    titulo: extraATexto(filaPerfil.extra),
     onClick: (evento) => {
       abrirPopupExtra(evento, contexto, filaPerfil, alModificar);
     },

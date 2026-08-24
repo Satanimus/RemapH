@@ -121,11 +121,41 @@ export function textoPortapapelesAccion(
 }
 
 // ======================================================
-// 📋 TEXTO EXTRA (columna Extra de la tabla)
+// 📋 TOOLTIP DEL BOTÓN EXTRA (columna Extra, ícono 🔧)
+// ------------------------------------------------------
+// Lista de líneas "Subtítulo: Elección" — todos los campos de
+// portapapelesExtra.
 // ======================================================
+
+function textoTamanoPortapapeles(
+  tamano: TamanoBotonPortapapeles | TamanoTextoPortapapeles,
+): string {
+  switch (tamano) {
+    case "pequeno":
+      return "Pequeño";
+
+    case "mediano":
+      return "Mediano";
+
+    case "grande":
+      return "Grande";
+  }
+}
 
 export function textoPortapapelesExtra(
   portapapelesExtra: PortapapelesExtraPerfil,
 ): string {
-  return portapapelesExtra.comportamiento === "efimero" ? "Efímero" : "Toggle";
+  const comportamiento =
+    portapapelesExtra.comportamiento === "efimero" ? "Efímero" : "Toggle";
+
+  const ubicacion =
+    portapapelesExtra.ubicacion === "cursor" ? "Cursor" : "Persistente";
+
+  return [
+    `Comportamiento: ${comportamiento}`,
+    `Ubicación: ${ubicacion}`,
+    `Botones: ${textoTamanoPortapapeles(portapapelesExtra.tamanoBoton)}`,
+    `Texto: ${textoTamanoPortapapeles(portapapelesExtra.tamanoTexto)}`,
+    `Límite: ${portapapelesExtra.limite}`,
+  ].join("\n");
 }
