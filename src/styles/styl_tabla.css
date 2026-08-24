@@ -50,6 +50,19 @@
     overflow: hidden;
 
     background: transparent;
+
+    transition: width var(--speed);
+}
+
+/* Perfil con al menos un separador: el carril se ensancha lo
+   justo para el botón Expandir/Contraer (que se dibuja a la
+   derecha del On/Off, ver .carril-expandir-slot) + un margen
+   chico. Las filas normales no usan ese espacio extra: su
+   número sigue centrado en los --col-carril-numeros de siempre,
+   el ancho de más queda vacío a la derecha. */
+.carril-numeros.tiene-separadores {
+
+    width: calc(var(--col-carril-numeros) + var(--carril-expandir-ancho) + var(--carril-expandir-margen));
 }
 
 .carril-numeros-espaciador {
@@ -59,7 +72,11 @@
 
 .carril-numero {
 
+    position: relative;
+
     height: var(--row-height);
+
+    width: var(--col-carril-numeros);
 
     display: flex;
 
@@ -84,7 +101,12 @@
 
     align-items: center;
 
-    justify-content: center;
+    /* Botón a la derecha del On/Off (Etapa D lo agrega en el
+       espacio de --col-carril-numeros, a la izquierda de este
+       slot) — el margen lo separa del borde de la tabla. */
+    justify-content: flex-end;
+
+    padding-right: var(--carril-expandir-margen);
 
     box-sizing: border-box;
 }

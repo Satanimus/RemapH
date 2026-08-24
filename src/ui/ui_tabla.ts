@@ -260,6 +260,13 @@ export function crearTabla(alModificar: () => void): HTMLElement {
 
     const plan = construirPlanVisual(perfil);
 
+    // Etapa B: el carril solo se ensancha (espacio para el botón
+    // Expandir/Contraer) cuando hay al menos un separador visible.
+    carrilNumeros.classList.toggle(
+      "tiene-separadores",
+      plan.some((item) => item.tipo === "separador"),
+    );
+
     // Regla 18: la numeración del carril solo cuenta filas normales,
     // saltando los separadores en la secuencia.
     let numeroVisible = 0;
