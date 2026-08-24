@@ -1,6 +1,15 @@
 // ======================================================
-// comp_Popup_Perfil
+// 📋 comp_Panel_Lateral
+// ------------------------------------------------------
+// Panel lateral persistente (toggle ☰). Reemplaza al popup
+// flotante de selección de perfil (antes comp_popup_perfil.ts):
+// mismo comportamiento y llamadas a backend, pero montado como
+// panel fijo en vez de popup posicionado por click.
 //
+// El contenido (lista de perfiles + acciones) se reconstruye
+// cada vez que el panel se abre, para reflejar el estado actual
+// (nombre de perfil, editado/no editado, caché activa/inactiva),
+// que se obtiene vía obtenerEstadoActual() pasado en la creación.
 // ======================================================
 
 import { invoke } from "@tauri-apps/api/core";
@@ -17,10 +26,6 @@ import type { AdvertenciaCompilacion } from "../core/core_advertencias_compilaci
 
 // ======================================================
 // RESULTADO PERFIL
-// ------------------------------------------------------
-// advertencias: null cuando la operación no recompiló (ver
-// perfil.rs::restaurar_perfil_actual / ui_toolbar.ts::
-// aplicarResultadoPerfil).
 // ======================================================
 
 export interface ResultadoPerfil {
@@ -36,17 +41,99 @@ export interface ResultadoPerfil {
 }
 
 // ======================================================
-// ABRIR POPUP
+// ESTADO ACTUAL (leído al abrir el panel)
 // ======================================================
 
-export async function abrirPopupPerfil(
-  evento: MouseEvent,
-  nombreActual: string,
-  estaEditado: boolean,
-  cacheActivo: boolean,
+export interface EstadoPerfilActual {
+  nombreActual: string;
+
+  estaEditado: boolean;
+
+  cacheActivo: boolean;
+}
+
+// ======================================================
+// MÓDULO: referencias del panel activo
+// ------------------------------------------------------
+// Un solo panel por app (mismo patrón que comp_tooltip_extra.ts).
+// ======================================================
+
+let panelElemento: HTMLElement | null = null;
+let cuerpoPanel: HTMLElement | null = null;
+let alGuardarActual: (() => Promise<void>) | null = null;
+let obtenerEstadoActualFn: (() => EstadoPerfilActual) | null = null;
+let alCambiarPerfilActual: ((resultado: ResultadoPerfil) => void) | null = null;
+
+// ======================================================
+// CREAR PANEL
+// ======================================================
+
+export function crearPanelLateral(
   alGuardar: () => Promise<void>,
+  obtenerEstadoActual: () => EstadoPerfilActual,
   alCambiarPerfil: (resultado: ResultadoPerfil) => void,
-): Promise<void> {
+): HTMLElement {
+  alGuardarActual = alGuardar;
+  obtenerEstadoActualFn = obtenerEstadoActual;
+  alCambiarPerfilActual = alCambiarPerfil;
+
+  const panel = document.createElement("div");
+
+  panel.className = "panel-lateral";
+
+  cuerpoPanel = document.createElement("div");
+
+  cuerpoPanel.className = "panel-lateral-cuerpo";
+
+  panel.append(cuerpoPanel);
+
+  panelElemento = panel;
+
+  return panel;
+}
+
+// ======================================================
+// 🔌 ABRIR / CERRAR / ALTERNAR
+// ======================================================
+
+export function abrirPanelLateral(): void {
+  if (!panelElemento || !cuerpoPanel) {
+    return;
+  }
+
+  void recargarContenidoPanel();
+
+  panelElemento.classList.add("abierto");
+}
+
+export function cerrarPanelLateral(): void {
+  panelElemento?.classList.remove("abierto");
+}
+
+export function alternarPanelLateral(): void {
+  if (panelElemento?.classList.contains("abierto")) {
+    cerrarPanelLateral();
+  } else {
+    abrirPanelLateral();
+  }
+}
+
+// ======================================================
+// 🔄 RECARGAR CONTENIDO
+// ======================================================
+
+async function recargarContenidoPanel(): Promise<void> {
+  if (
+    !cuerpoPanel ||
+    !obtenerEstadoActualFn ||
+    !alGuardarActual ||
+    !alCambiarPerfilActual
+  ) {
+    return;
+  }
+
+  const { nombreActual, estaEditado, cacheActivo } = obtenerEstadoActualFn();
+
   let perfiles: string[];
 
   try {
@@ -57,26 +144,29 @@ export async function abrirPopupPerfil(
     return;
   }
 
-  const contenedor = document.createElement("div");
-
-  contenedor.className = "popup-perfil";
-
-  contenedor.append(
+  cuerpoPanel.replaceChildren(
     crearListaPerfiles(
       perfiles,
       nombreActual,
       estaEditado,
       cacheActivo,
-      alGuardar,
-      alCambiarPerfil,
+      alGuardarActual,
+      alCambiarPerfilActual,
     ),
 
     crearSeparador(),
 
-    crearAcciones(nombreActual, estaEditado, alGuardar, alCambiarPerfil),
-  );
+    crearAcciones(
+      nombreActual,
+      estaEditado,
+      alGuardarActual,
+      alCambiarPerfilActual,
+    ),
 
-  mostrarPopup(contenedor, evento.clientX, evento.clientY);
+    crearSeparador(),
+
+    crearItemConfiguracion(),
+  );
 }
 
 // ======================================================
@@ -93,7 +183,7 @@ function crearListaPerfiles(
 ): HTMLElement {
   const lista = document.createElement("div");
 
-  lista.className = "popup-perfil-lista";
+  lista.className = "panel-lateral-lista";
 
   perfiles.forEach((nombre) => {
     const esActual = nombre === nombreActual;
@@ -101,7 +191,7 @@ function crearListaPerfiles(
     const boton = crearBoton({
       texto: nombre,
 
-      clase: "popup-perfil-item",
+      clase: "panel-lateral-item",
     });
 
     // ==================================================
@@ -110,12 +200,12 @@ function crearListaPerfiles(
 
     const espacioIndicador = document.createElement("span");
 
-    espacioIndicador.className = "popup-perfil-indicador-espacio";
+    espacioIndicador.className = "panel-lateral-indicador-espacio";
 
     if (esActual) {
       const indicador = document.createElement("span");
 
-      indicador.className = "indicador popup-perfil-indicador";
+      indicador.className = "indicador panel-lateral-indicador";
 
       indicador.dataset.estado = cacheActivo ? "activo" : "inactivo";
 
@@ -124,7 +214,7 @@ function crearListaPerfiles(
 
     const nombreElemento = document.createElement("span");
 
-    nombreElemento.className = "popup-perfil-nombre";
+    nombreElemento.className = "panel-lateral-nombre";
 
     nombreElemento.textContent = nombre;
 
@@ -143,7 +233,7 @@ function crearListaPerfiles(
     if (esActual) {
       iconoRevertir = document.createElement("span");
 
-      iconoRevertir.className = "popup-perfil-revertir-icono";
+      iconoRevertir.className = "panel-lateral-revertir-icono";
 
       iconoRevertir.textContent = "↻";
 
@@ -161,7 +251,7 @@ function crearListaPerfiles(
 
       if (esActual) {
         if (!estaEditado) {
-          ocultarPopup();
+          cerrarPanelLateral();
 
           return;
         }
@@ -169,7 +259,7 @@ function crearListaPerfiles(
         if (!confirmandoRevertir) {
           confirmandoRevertir = true;
 
-          boton.classList.add("popup-perfil-revertir");
+          boton.classList.add("panel-lateral-revertir");
 
           nombreElemento.textContent = "¿Revertir cambios?";
 
@@ -187,7 +277,7 @@ function crearListaPerfiles(
 
           alCambiarPerfil(resultado);
 
-          ocultarPopup();
+          cerrarPanelLateral();
         } catch (error) {
           console.error("❌ No se pudieron revertir los cambios:", error);
         }
@@ -220,7 +310,7 @@ function crearListaPerfiles(
         console.error("❌ No se pudo seleccionar el perfil:", error);
       }
 
-      ocultarPopup();
+      cerrarPanelLateral();
     });
 
     lista.append(boton);
@@ -236,7 +326,7 @@ function crearListaPerfiles(
 function crearSeparador(): HTMLElement {
   const separador = document.createElement("div");
 
-  separador.className = "popup-perfil-separador";
+  separador.className = "panel-lateral-separador";
 
   return separador;
 }
@@ -253,7 +343,7 @@ function crearAcciones(
 ): HTMLElement {
   const acciones = document.createElement("div");
 
-  acciones.className = "popup-perfil-acciones";
+  acciones.className = "panel-lateral-acciones";
 
   // ==================================================
   // NUEVO PERFIL
@@ -283,7 +373,7 @@ function crearAcciones(
       console.error("❌ No se pudo crear el perfil:", error);
     }
 
-    ocultarPopup();
+    cerrarPanelLateral();
   });
 
   // ==================================================
@@ -303,7 +393,7 @@ function crearAcciones(
       console.error("❌ No se pudo clonar el perfil:", error);
     }
 
-    ocultarPopup();
+    cerrarPanelLateral();
   });
 
   // ==================================================
@@ -336,7 +426,7 @@ function crearAcciones(
   const botonEliminar = crearBoton({
     texto: "Eliminar perfil",
 
-    clase: "popup-perfil-eliminar",
+    clase: "panel-lateral-eliminar",
   });
 
   let confirmando = false;
@@ -358,12 +448,37 @@ function crearAcciones(
       console.error("❌ No se pudo eliminar el perfil:", error);
     }
 
-    ocultarPopup();
+    cerrarPanelLateral();
   });
 
   acciones.append(botonNuevo, botonClonar, botonRenombrar, botonEliminar);
 
   return acciones;
+}
+
+// ======================================================
+// ITEM CONFIGURACIÓN
+// ------------------------------------------------------
+// Antes vivía como botón propio en la barra superior
+// (ver ui_toolbar.ts, botón .configuracion) — se movió acá.
+// ======================================================
+
+function crearItemConfiguracion(): HTMLElement {
+  const boton = crearBoton({
+    texto: "Configuración ⚙",
+
+    clase: "panel-lateral-configuracion",
+  });
+
+  boton.addEventListener("click", () => {
+    invoke("abrir_ventana_configuracion").catch((error) => {
+      console.error("❌ No se pudo abrir la ventana de configuración:", error);
+    });
+
+    cerrarPanelLateral();
+  });
+
+  return boton;
 }
 
 // ======================================================
@@ -377,7 +492,7 @@ function abrirFormularioRenombrar(
 ): void {
   const contenedor = document.createElement("div");
 
-  contenedor.className = "popup-perfil-renombrar";
+  contenedor.className = "panel-lateral-renombrar";
 
   const input = document.createElement("input");
 

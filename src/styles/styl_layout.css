@@ -281,7 +281,7 @@
   z-index: 9999;
 }
 
-.popup-capa > div {
+.popup-capa>div {
   width: max-content;
 
   min-width: 180px;
@@ -306,102 +306,10 @@
 }
 
 /* ======================================================
-   👤 POPUP PERFIL
+   ✏️ RENOMBRAR PERFIL (formulario, panel lateral)
    ====================================================== */
 
-.popup-perfil {
-  min-width: 220px;
-}
-
-.popup-perfil-lista {
-  display: flex;
-
-  flex-direction: column;
-
-  gap: 0;
-
-  max-height: 240px;
-
-  overflow-y: auto;
-}
-
-.popup-perfil-acciones {
-  display: flex;
-
-  flex-direction: column;
-
-  gap: 0;
-}
-
-.popup-perfil-item {
-  display: flex;
-
-  align-items: center;
-
-  justify-content: flex-start;
-
-  width: 100%;
-
-  gap: 0;
-}
-
-.popup-perfil-indicador-espacio {
-  display: flex;
-
-  align-items: center;
-
-  justify-content: center;
-
-  width: 18px;
-
-  min-width: 18px;
-
-  margin-right: var(--gap8);
-}
-
-.popup-perfil-indicador {
-  margin: 0;
-}
-
-.popup-perfil-nombre {
-  flex: 1;
-
-  text-align: left;
-
-  white-space: nowrap;
-
-  overflow: hidden;
-
-  text-overflow: ellipsis;
-}
-
-.popup-perfil-revertir-icono {
-  margin-left: auto;
-
-  color: var(--text-soft);
-
-  font-size: 16px;
-
-  line-height: 1;
-}
-
-.popup-perfil-item:hover .popup-perfil-revertir-icono {
-  color: var(--highlight);
-}
-
-.popup-perfil-separador {
-  height: 1px;
-
-  background: var(--border);
-
-  margin: var(--gap4) 0;
-}
-
-/* ======================================================
-   ✏️ RENOMBRAR PERFIL
-   ====================================================== */
-
-.popup-perfil-renombrar {
+.panel-lateral-renombrar {
   display: flex;
 
   flex-direction: column;
@@ -1332,10 +1240,7 @@
        ancho acumulado que numero+asa+tipo+extra en la fila real,
        con sus 3 gaps intermedios (numero↔asa, asa↔tipo, tipo↔extra
        — .popup-macro-editor-paso-fila usa gap: var(--gap8)). */
-  width: calc(
-    var(--col-numero-width) + var(--col-asa-width) + var(--col-tipo-width) +
-      var(--col-extra-width) + (var(--gap8) * 3)
-  );
+  width: calc(var(--col-numero-width) + var(--col-asa-width) + var(--col-tipo-width) + var(--col-extra-width) + (var(--gap8) * 3));
   box-sizing: border-box;
   padding: var(--gap8);
   background: var(--bg);
@@ -1363,10 +1268,7 @@
   /* Mismo criterio de ancho que .popup-macro-editor-menu-asa (spec
        punto 4): llega hasta el separador Extra↔Nota, no hasta el
        borde derecho de la tabla. */
-  width: calc(
-    var(--col-numero-width) + var(--col-asa-width) + var(--col-tipo-width) +
-      var(--col-extra-width) + (var(--gap8) * 3)
-  );
+  width: calc(var(--col-numero-width) + var(--col-asa-width) + var(--col-tipo-width) + var(--col-extra-width) + (var(--gap8) * 3));
   box-sizing: border-box;
   display: flex;
   flex-direction: column;

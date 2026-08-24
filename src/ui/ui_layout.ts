@@ -6,6 +6,8 @@ import {
   crearToolbar,
   marcarPerfilEditado,
   refrescarEstadoDesdeBackend,
+  obtenerEstadoPerfilActual,
+  aplicarResultadoPerfilEnToolbar,
 } from "./ui_toolbar";
 
 import { crearTabla } from "./ui_tabla";
@@ -13,6 +15,8 @@ import { crearTabla } from "./ui_tabla";
 import { crearStatusbar, actualizarStatusbar } from "./ui_statusbar";
 
 import { crearContenedorPopup } from "../componentes/comp_popup_contenedor";
+
+import { crearPanelLateral } from "../componentes/comp_panel_lateral";
 
 import { obtenerPerfilUi } from "../core/core_perfil_ui";
 
@@ -45,6 +49,14 @@ export function crearLayout(alGuardar: () => Promise<void>): HTMLElement {
     marcarPerfilEditado(toolbar);
   });
 
+  const panelLateral = crearPanelLateral(
+    alGuardar,
+    () => obtenerEstadoPerfilActual(toolbar),
+    (resultado) => {
+      void aplicarResultadoPerfilEnToolbar(toolbar, resultado);
+    },
+  );
+
   const fragment = document.createDocumentFragment();
 
   fragment.append(
@@ -53,6 +65,8 @@ export function crearLayout(alGuardar: () => Promise<void>): HTMLElement {
     tabla,
 
     statusbar,
+
+    panelLateral,
 
     crearContenedorPopup(),
   );

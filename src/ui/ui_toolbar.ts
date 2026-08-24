@@ -18,9 +18,12 @@
 
 import { invoke } from "@tauri-apps/api/core";
 
-import { abrirPopupPerfil } from "../componentes/comp_popup_perfil";
+import { alternarPanelLateral } from "../componentes/comp_panel_lateral";
 
-import type { ResultadoPerfil } from "../componentes/comp_popup_perfil";
+import type {
+  EstadoPerfilActual,
+  ResultadoPerfil,
+} from "../componentes/comp_panel_lateral";
 
 import { convertirperfil_json } from "../core/core_perfil_json";
 
@@ -55,6 +58,8 @@ import {
 // ======================================================
 
 const cacheDotsPorToolbar = new WeakMap<HTMLElement, HTMLElement>();
+
+const nombresPorToolbar = new WeakMap<HTMLElement, HTMLElement>();
 
 export async function refrescarEstadoDesdeBackend(
   toolbar: HTMLElement,
@@ -92,6 +97,14 @@ export function crearToolbar(alGuardar: () => Promise<void>): HTMLElement {
             </div>
 
             <button
+                class="btn-menu-lateral"
+                type="button"
+                title="Menú"
+            >
+                <span>☰</span>
+            </button>
+
+            <button
                 class="btn-agregar-fila"
                 type="button"
                 title="Agregar fila"
@@ -114,11 +127,6 @@ export function crearToolbar(alGuardar: () => Promise<void>): HTMLElement {
             <div class="perfil-box">
 
                 <button
-                    class="perfil-selector"
-                    type="button"
-                ></button>
-
-                <button
                     class="perfil-estado"
                     type="button"
                 >
@@ -131,32 +139,20 @@ export function crearToolbar(alGuardar: () => Promise<void>): HTMLElement {
 
         <div class="toolbar-right">
 
-            <button
-                class="configuracion"
-                type="button"
-            >
-                ⚙
-            </button>
-
         </div>
 
     `;
 
   // ==================================================
   // 🟢🔴 INDICADOR DE CACHE
+  // ------------------------------------------------------
+  // nombrePerfil/cacheDot quedan sin montar en el DOM por ahora
+  // (antes vivían dentro de .perfil-selector, eliminado — ver
+  // Etapa D, que los reintegra al botón .perfil-estado
+  // simplificado).
   // ==================================================
 
   const cacheDot = crearIndicador("cache-dot");
-
-  const botonSelector = toolbar.querySelector(
-    ".perfil-selector",
-  ) as HTMLButtonElement | null;
-
-  if (!botonSelector) {
-    return toolbar;
-  }
-
-  botonSelector.append(cacheDot);
 
   cacheDotsPorToolbar.set(toolbar, cacheDot);
 
@@ -164,7 +160,7 @@ export function crearToolbar(alGuardar: () => Promise<void>): HTMLElement {
 
   nombrePerfil.className = "perfil-selector-nombre";
 
-  botonSelector.append(nombrePerfil);
+  nombresPorToolbar.set(toolbar, nombrePerfil);
 
   // ==================================================
   // 📄 PERFIL ACTUAL
@@ -241,25 +237,15 @@ export function crearToolbar(alGuardar: () => Promise<void>): HTMLElement {
   });
 
   // ==================================================
-  // 👤 SELECTOR DE PERFIL
+  // ☰ MENÚ LATERAL
   // ==================================================
 
-  botonSelector.addEventListener("click", (evento) => {
-    abrirPopupPerfil(
-      evento,
+  const botonMenuLateral = toolbar.querySelector(
+    ".btn-menu-lateral",
+  ) as HTMLButtonElement | null;
 
-      nombrePerfil.textContent ?? "",
-
-      botonEstado?.dataset.estado === "editado",
-
-      cacheDot.dataset.estado === "activo",
-
-      alGuardar,
-
-      (resultado) => {
-        void aplicarResultadoPerfil(toolbar, nombrePerfil, cacheDot, resultado);
-      },
-    );
+  botonMenuLateral?.addEventListener("click", () => {
+    alternarPanelLateral();
   });
 
   // ==================================================
@@ -314,51 +300,7 @@ export function crearToolbar(alGuardar: () => Promise<void>): HTMLElement {
     reconstruirTabla();
   });
 
-  // ==================================================
-  // ⚙️ CONFIGURACIÓN
-  // ==================================================
-
-  const botonConfiguracion = toolbar.querySelector(
-    ".configuracion",
-  ) as HTMLButtonElement | null;
-
-  botonConfiguracion?.addEventListener("click", () => {
-    invoke("abrir_ventana_configuracion").catch((error) => {
-      console.error("❌ No se pudo abrir la ventana de configuración:", error);
-    });
-  });
-
   return toolbar;
-}
-
-// ======================================================
-// APLICAR RESULTADO PERFIL
-// ------------------------------------------------------
-// resultado.advertencias es null cuando la operación no recompiló
-// (revertir cambios sin guardar, ver perfil.rs::
-// restaurar_perfil_actual) — en ese caso se dejan las advertencias
-// vigentes tal como están, sin pisarlas con una lista vacía.
-// ======================================================
-
-async function aplicarResultadoPerfil(
-  toolbar: HTMLElement,
-  nombrePerfil: HTMLElement,
-  cacheDot: HTMLElement,
-  resultado: ResultadoPerfil,
-): Promise<void> {
-  const perfil = await convertirperfil_json(resultado.perfil);
-
-  establecerPerfilUi(perfil);
-
-  if (resultado.advertencias !== null) {
-    establecerAdvertenciasCompilacion(resultado.advertencias);
-  }
-
-  reconstruirTabla();
-
-  nombrePerfil.textContent = resultado.nombre;
-
-  marcarPerfilSegunCache(toolbar, cacheDot, resultado.cache_activo);
 }
 
 // ======================================================
@@ -431,4 +373,65 @@ export function marcarPerfilInactivo(toolbar: HTMLElement): void {
   botonEstado.textContent = "Perfil inactivo";
 
   botonEstado.dataset.estado = "inactivo";
+}
+
+// ======================================================
+// 📋 ESTADO ACTUAL DEL PERFIL (consumido por el panel lateral)
+// ======================================================
+
+export function obtenerEstadoPerfilActual(
+  toolbar: HTMLElement,
+): EstadoPerfilActual {
+  const nombrePerfil = nombresPorToolbar.get(toolbar);
+
+  const cacheDot = cacheDotsPorToolbar.get(toolbar);
+
+  const botonEstado = toolbar.querySelector(
+    ".perfil-estado",
+  ) as HTMLButtonElement | null;
+
+  return {
+    nombreActual: nombrePerfil?.textContent ?? "",
+
+    estaEditado: botonEstado?.dataset.estado === "editado",
+
+    cacheActivo: cacheDot?.dataset.estado === "activo",
+  };
+}
+
+// ======================================================
+// 🔁 APLICAR RESULTADO PERFIL (llamado desde el panel lateral
+// al cambiar/crear/clonar/renombrar/revertir un perfil)
+// ------------------------------------------------------
+// resultado.advertencias es null cuando la operación no recompiló
+// (revertir cambios sin guardar, ver perfil.rs::
+// restaurar_perfil_actual) — en ese caso se dejan las advertencias
+// vigentes tal como están, sin pisarlas con una lista vacía.
+// ======================================================
+
+export async function aplicarResultadoPerfilEnToolbar(
+  toolbar: HTMLElement,
+  resultado: ResultadoPerfil,
+): Promise<void> {
+  const nombrePerfil = nombresPorToolbar.get(toolbar);
+
+  const cacheDot = cacheDotsPorToolbar.get(toolbar);
+
+  const perfil = await convertirperfil_json(resultado.perfil);
+
+  establecerPerfilUi(perfil);
+
+  if (resultado.advertencias !== null) {
+    establecerAdvertenciasCompilacion(resultado.advertencias);
+  }
+
+  reconstruirTabla();
+
+  if (nombrePerfil) {
+    nombrePerfil.textContent = resultado.nombre;
+  }
+
+  if (cacheDot) {
+    marcarPerfilSegunCache(toolbar, cacheDot, resultado.cache_activo);
+  }
 }

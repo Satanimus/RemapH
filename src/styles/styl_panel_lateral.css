@@ -1,0 +1,202 @@
+/* ======================================================
+   📋 PANEL LATERAL
+   ------------------------------------------------------
+   Panel deslizante fijo (toggle ☰, ver ui_toolbar.ts +
+   comp_panel_lateral.ts). Reemplaza al viejo popup de
+   selección de perfil (.popup-perfil*, ver historial en
+   styl_layout.css/styl_botones.css) — mismas clases de
+   contenido, adaptadas de popup posicionado por click a
+   panel fijo deslizante.
+   ====================================================== */
+
+.panel-lateral {
+    position: fixed;
+
+    top: var(--toolbar-height);
+
+    left: 0;
+
+    width: 260px;
+
+    height: calc(100vh - var(--toolbar-height));
+
+    background: var(--panel);
+
+    border-right: 1px solid var(--border);
+
+    box-shadow: 2px 0 12px rgba(0, 0, 0, .35);
+
+    transform: translateX(-100%);
+
+    transition: transform var(--speed);
+
+    z-index: 15;
+
+    overflow-y: auto;
+}
+
+.panel-lateral.abierto {
+    transform: translateX(0);
+}
+
+.panel-lateral-cuerpo {
+    display: flex;
+
+    flex-direction: column;
+
+    gap: 0;
+
+    padding: var(--gap8);
+}
+
+/* ======================================================
+   LISTA DE PERFILES
+   ====================================================== */
+
+.panel-lateral-lista {
+    display: flex;
+
+    flex-direction: column;
+
+    gap: 0;
+
+    max-height: 240px;
+
+    overflow-y: auto;
+}
+
+.panel-lateral-item {
+    display: flex;
+
+    align-items: center;
+
+    justify-content: flex-start;
+
+    width: 100%;
+
+    gap: 0;
+
+    background: transparent;
+
+    border: 1px solid transparent;
+
+    border-radius: var(--r4);
+}
+
+.panel-lateral-item:hover {
+    background: transparent;
+
+    border-color: var(--highlight);
+
+    border-radius: var(--r4);
+}
+
+.panel-lateral-indicador-espacio {
+    display: flex;
+
+    align-items: center;
+
+    justify-content: center;
+
+    width: 18px;
+
+    min-width: 18px;
+
+    margin-right: var(--gap8);
+}
+
+.panel-lateral-indicador {
+    margin: 0;
+}
+
+.panel-lateral-nombre {
+    flex: 1;
+
+    text-align: left;
+
+    white-space: nowrap;
+
+    overflow: hidden;
+
+    text-overflow: ellipsis;
+}
+
+.panel-lateral-revertir-icono {
+    margin-left: auto;
+
+    color: var(--text-soft);
+
+    font-size: 16px;
+
+    line-height: 1;
+}
+
+.panel-lateral-item:hover .panel-lateral-revertir-icono {
+    color: var(--highlight);
+}
+
+.panel-lateral-revertir {
+    color: var(--red);
+
+    border-color: var(--highlight-red) !important;
+
+    background: transparent !important;
+
+    border-radius: var(--r4) !important;
+}
+
+/* ======================================================
+   SEPARADOR
+   ====================================================== */
+
+.panel-lateral-separador {
+    height: 1px;
+
+    background: var(--border);
+
+    margin: var(--gap4) 0;
+}
+
+/* ======================================================
+   ACCIONES (Nuevo / Clonar / Renombrar / Eliminar)
+   ====================================================== */
+
+.panel-lateral-acciones {
+    display: flex;
+
+    flex-direction: column;
+
+    gap: 0;
+}
+
+.panel-lateral-acciones .ui-btn {
+    justify-content: flex-start;
+
+    text-align: left;
+}
+
+.panel-lateral-eliminar {
+    color: var(--red);
+
+    border-color: transparent;
+}
+
+.panel-lateral-eliminar:hover {
+    color: var(--red);
+
+    background: transparent;
+
+    border-color: var(--highlight-red) !important;
+
+    border-radius: var(--r4);
+}
+
+/* ======================================================
+   CONFIGURACIÓN
+   ====================================================== */
+
+.panel-lateral-configuracion {
+    justify-content: flex-start;
+
+    text-align: left;
+}
