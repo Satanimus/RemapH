@@ -14,7 +14,6 @@ import { crearOpciones } from "../componentes/comp_opciones";
 import type { FilaPerfil } from "../core/core_perfil";
 
 import {
-  crearEstado,
   crearTipo,
   crearExtra,
   crearApp,
@@ -80,11 +79,6 @@ export function crearFila(
     celda.style.flexBasis = col.ancho;
 
     switch (col.id) {
-      case "estado":
-        celda.append(crearEstado(contexto, filaPerfil, alModificar));
-
-        break;
-
       case "opciones":
         celda.append(
           crearOpciones(contexto, filaPerfil, esUltima, alModificar),

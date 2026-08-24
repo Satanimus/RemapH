@@ -71,11 +71,12 @@ import { esSeparador } from "../core/core_separadores";
 
 // ======================================================
 // 🟢🔴 ESTADO (interruptor ON/OFF)
+// ------------------------------------------------------
+// Etapa C: ya no vive en una celda de la fila — se dibuja
+// superpuesto al número en el carril (ver ui_tabla.ts).
 // ======================================================
 
 export function crearEstado(
-  _contexto: ContextoFila,
-
   filaPerfil: FilaPerfil,
 
   alModificar: () => void,
@@ -83,6 +84,8 @@ export function crearEstado(
   const boton = document.createElement("button");
 
   boton.className = "ui-btn estado-toggle";
+
+  boton.title = "On/Off";
 
   // Mismo aviso "OFF ⚠️" para dos motivos distintos: conflicto entre
   // filas (recalculado en vivo, ver core_conflictos.ts) o advertencia

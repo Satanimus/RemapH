@@ -91,6 +91,20 @@
     font-size: var(--fs12);
 }
 
+/* Etapa C: botón On/Off (.estado-toggle, ver styl_botones.css)
+   superpuesto y centrado sobre el número — la fila-normal ya no
+   tiene celda "estado" propia. */
+.carril-numero .estado-toggle {
+
+    position: absolute;
+
+    top: 50%;
+
+    left: 50%;
+
+    transform: translate(-50%, -50%);
+}
+
 .carril-expandir-slot {
 
     height: var(--row-height);

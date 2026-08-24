@@ -13,6 +13,8 @@ import { crearEstadoSeparador } from "../componentes/comp_separador_estado";
 
 import { crearExpandirSeparador } from "../componentes/comp_separador_expandir";
 
+import { crearEstado } from "../componentes/comp_controles";
+
 import { obtenerPerfilUi } from "../core/core_perfil_ui";
 
 import {
@@ -306,6 +308,10 @@ export function crearTabla(alModificar: () => void): HTMLElement {
 
         numero.className = "carril-numero";
         numero.textContent = String(numeroVisible);
+
+        // Etapa C: On/Off superpuesto al número (absolute, ver
+        // .carril-numero .estado-toggle en styl_tabla.css).
+        numero.append(crearEstado(item.fila, alModificar));
 
         carrilLista.append(numero);
       } else {

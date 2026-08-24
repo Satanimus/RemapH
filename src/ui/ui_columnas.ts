@@ -19,13 +19,6 @@ export interface Columna {
 
 export const COLUMNAS: Columna[] = [
   {
-    id: "estado",
-    titulo: "On/Off",
-    grupo: "general",
-    ancho: "var(--col-state)",
-  },
-
-  {
     id: "opciones",
     titulo: "⁝",
     grupo: "general",

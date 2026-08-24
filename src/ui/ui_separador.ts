@@ -16,13 +16,19 @@ import { crearNota } from "../componentes/comp_controles";
 import { abrirPopupSeparadores } from "../componentes/comp_popup_separadores";
 import { COLUMNAS } from "./ui_columnas";
 
-// [FIX] Ancho tomado de la misma fuente única de verdad que usa
-// ui_fila.ts para las filas normales — antes estas dos celdas no
-// llevaban ningún ancho inline y quedaban del tamaño de su
-// contenido, desalineadas con las columnas Estado/Opciones de la
-// cabecera y de una fila normal (y sin reaccionar al redimensionado
-// de columnas, ver ui_redimension_columnas.ts).
-const anchoEstado = COLUMNAS.find((col) => col.id === "estado")?.ancho ?? "";
+// [FIX] Ancho de Opciones tomado de la misma fuente única de verdad
+// que usa ui_fila.ts para las filas normales — antes esta celda no
+// llevaba ningún ancho inline y quedaba del tamaño de su contenido,
+// desalineada con la columna Opciones de la cabecera y de una fila
+// normal (y sin reaccionar al redimensionado de columnas, ver
+// ui_redimension_columnas.ts).
+//
+// anchoEstado ya NO sale de COLUMNAS (Etapa C: "estado" desapareció
+// de la tabla de filas normales) — se referencia --col-state directo
+// para mantener alineada la celda propia del separador. Pendiente
+// Etapa D: mover también el On/Off del separador al carril y borrar
+// celdaEstado/anchoEstado de este archivo.
+const anchoEstado = "var(--col-state)";
 const anchoOpciones =
   COLUMNAS.find((col) => col.id === "opciones")?.ancho ?? "";
 
