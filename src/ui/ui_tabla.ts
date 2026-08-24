@@ -413,6 +413,32 @@ export function crearTabla(alModificar: () => void): HTMLElement {
     filaActual.replaceWith(filaNueva);
 
     registrarFilaArrastrable(filaNueva);
+
+    // [FIX bug 2] El botón On/Off con estado de alerta vive
+    // superpuesto al número, en el carril (carrilLista), no dentro
+    // de la fila reconstruida arriba — sin este paso, una fila que
+    // entra/sale de conflicto o advertencia no actualizaba su
+    // círculo hasta el próximo reconstruirTabla() completo. Se
+    // ubica el mismo índice visual en carrilLista (incluye slots de
+    // separador) y se reemplaza solo su .estado-toggle.
+    const indiceCarril = plan.indexOf(planItem);
+
+    const numeroActual = carrilLista.children[indiceCarril] as
+      | HTMLElement
+      | undefined;
+
+    if (numeroActual?.classList.contains("carril-numero")) {
+      const botonViejo =
+        numeroActual.querySelector<HTMLElement>(".estado-toggle");
+
+      const botonNuevo = crearEstado(planItem.fila, alModificar);
+
+      if (botonViejo) {
+        numeroActual.replaceChild(botonNuevo, botonViejo);
+      } else {
+        numeroActual.append(botonNuevo);
+      }
+    }
   };
 
   // ==================================================
@@ -491,10 +517,14 @@ export function crearTabla(alModificar: () => void): HTMLElement {
 
       const botonNuevo = crearEstadoSeparador(separadorPadre, alModificar);
 
-      if (botonViejo) {
-        slotEl.replaceChild(botonNuevo, botonViejo);
+      if (botonViejo?.parentElement) {
+        botonViejo.parentElement.replaceChild(botonNuevo, botonViejo);
       } else {
-        slotEl.prepend(botonNuevo);
+        const wrapperEstado = slotEl.querySelector<HTMLElement>(
+          ".carril-expandir-slot-numero",
+        );
+
+        wrapperEstado?.append(botonNuevo);
       }
     }
   };

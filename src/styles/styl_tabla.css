@@ -51,6 +51,10 @@
 
     background: transparent;
 
+    /* Separación del borde de la barra lateral — antes el carril
+       quedaba pegado directamente contra ella. */
+    margin-left: var(--gap8);
+
     transition: width var(--speed);
 }
 
@@ -105,6 +109,15 @@
     transform: translate(-50%, -50%);
 }
 
+/* [FIX] .ui-btn:active pisa el transform de centrado de arriba
+   con translateY(1px) — mismo botón quedaba corrido en diagonal
+   al hacer click (perdía el translate(-50%,-50%)). Se conserva
+   el centrado y se anula el desplazamiento de :active acá. */
+.carril-numero .estado-toggle:active {
+
+    transform: translate(-50%, -50%);
+}
+
 .carril-expandir-slot {
 
     height: var(--row-height);
@@ -115,15 +128,61 @@
 
     align-items: center;
 
-    /* Etapa D: On/Off del separador (izquierda) y botón Expandir
-       (derecha) lado a lado dentro del mismo slot — el On/Off ya
-       no se superpone a nada acá (a diferencia de fila normal),
-       ocupa su lugar en el flujo. */
-    justify-content: space-between;
+    /* [FIX] Etapa D: On/Off del separador debe caer en el mismo
+       eje horizontal que el On/Off superpuesto de una fila normal
+       (centrado en los --col-carril-numeros de siempre) — con
+       justify-content: space-between el botón quedaba pegado al
+       borde izquierdo del carril YA ensanchado, desalineado. Se
+       reserva ese ancho fijo para el On/Off y se centra ahí; el
+       botón Expandir ocupa el resto del slot, alineado a la derecha.
 
-    padding-right: var(--carril-expandir-margen);
+       [FIX] gap entre ambos botones = mismo margen que separa
+       Expandir de la tabla (--carril-expandir-margen), en vez del
+       hueco variable que dejaba margin-left:auto en .carril-expandir. */
+    gap: var(--carril-expandir-margen);
 
     box-sizing: border-box;
+}
+
+.carril-expandir-slot .estado-toggle {
+
+    /* [FIX] flex-basis en --col-carril-numeros (28px) forzaba el
+       ANCHO del botón a 28px manteniendo su alto de 20px — salía
+       ovalado en vez de circular. flex-shrink/grow en 0 alcanza
+       para que no lo estire el flex del slot; el centrado dentro
+       de los 28px reservados para el número lo da el wrapper de
+       abajo (.carril-expandir-slot-numero), no el botón mismo. */
+    flex: 0 0 auto;
+
+    margin: 0;
+}
+
+.carril-expandir-slot-numero {
+
+    flex: 0 0 var(--col-carril-numeros);
+
+    display: flex;
+
+    align-items: center;
+
+    justify-content: center;
+}
+
+.carril-expandir-slot .carril-expandir {
+
+    /* [FIX] margin-left:auto empujaba este botón al extremo derecho
+       del slot, dejando todo el espacio libre entre él y el On/Off
+       (el gap del slot no alcanzaba a compensarlo). Sin el auto, el
+       gap fijo de arriba es la única separación entre ambos. */
+    margin-right: var(--carril-expandir-margen);
+}
+
+/* [FIX] mismo problema que el On/Off de fila normal: .ui-btn:active
+   corre el botón con translateY(1px), acá visible como un salto
+   leve al click. Se anula para mantenerlo fijo en su lugar. */
+.carril-expandir-slot .estado-toggle:active {
+
+    transform: none;
 }
 
 .ui-btn.carril-expandir {

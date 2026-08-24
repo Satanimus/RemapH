@@ -50,7 +50,18 @@ export function crearExpandirSeparador(
     reconstruirTabla();
   });
 
-  slot.append(botonEstado, boton);
+  // [FIX] El botón estado no puede reservar su propio espacio con
+  // flex-basis: eso lo estira a un óvalo (ancho de 28px, alto de
+  // 20px). Se envuelve en un wrapper que reserva los 28px y centra
+  // el círculo adentro, igual criterio que el número superpuesto
+  // de fila normal.
+  const wrapperEstado = document.createElement("div");
+
+  wrapperEstado.className = "carril-expandir-slot-numero";
+
+  wrapperEstado.append(botonEstado);
+
+  slot.append(wrapperEstado, boton);
 
   return slot;
 }
