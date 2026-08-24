@@ -48,8 +48,6 @@ export interface EstadoPerfilActual {
   nombreActual: string;
 
   estaEditado: boolean;
-
-  cacheActivo: boolean;
 }
 
 // ======================================================
@@ -132,7 +130,7 @@ async function recargarContenidoPanel(): Promise<void> {
     return;
   }
 
-  const { nombreActual, estaEditado, cacheActivo } = obtenerEstadoActualFn();
+  const { nombreActual, estaEditado } = obtenerEstadoActualFn();
 
   let perfiles: string[];
 
@@ -151,7 +149,6 @@ async function recargarContenidoPanel(): Promise<void> {
       perfiles,
       nombreActual,
       estaEditado,
-      cacheActivo,
       alGuardarActual,
       alCambiarPerfilActual,
     ),
@@ -183,7 +180,6 @@ function crearListaPerfiles(
   perfiles: string[],
   nombreActual: string,
   estaEditado: boolean,
-  cacheActivo: boolean,
   alGuardar: () => Promise<void>,
   alCambiarPerfil: (resultado: ResultadoPerfil) => void,
 ): HTMLElement {
@@ -200,22 +196,8 @@ function crearListaPerfiles(
       clase: "panel-lateral-item",
     });
 
-    // ==================================================
-    // 📐 ESTRUCTURA ALINEADA
-    // ==================================================
-
-    const espacioIndicador = document.createElement("span");
-
-    espacioIndicador.className = "panel-lateral-indicador-espacio";
-
     if (esActual) {
-      const indicador = document.createElement("span");
-
-      indicador.className = "indicador panel-lateral-indicador";
-
-      indicador.dataset.estado = cacheActivo ? "activo" : "inactivo";
-
-      espacioIndicador.append(indicador);
+      boton.classList.add("panel-lateral-item--actual");
     }
 
     const nombreElemento = document.createElement("span");
@@ -224,11 +206,7 @@ function crearListaPerfiles(
 
     nombreElemento.textContent = nombre;
 
-    boton.replaceChildren(
-      espacioIndicador,
-
-      nombreElemento,
-    );
+    boton.replaceChildren(nombreElemento);
 
     // ==================================================
     // 🔄 CLICK
@@ -353,11 +331,11 @@ function crearAcciones(
       const resultado = await invoke<ResultadoPerfil>("crear_perfil_nuevo");
 
       alCambiarPerfil(resultado);
+
+      await recargarContenidoPanel();
     } catch (error) {
       console.error("❌ No se pudo crear el perfil:", error);
     }
-
-    cerrarPanelLateral();
   });
 
   // ==================================================
@@ -373,11 +351,11 @@ function crearAcciones(
       const resultado = await invoke<ResultadoPerfil>("clonar_perfil");
 
       alCambiarPerfil(resultado);
+
+      await recargarContenidoPanel();
     } catch (error) {
       console.error("❌ No se pudo clonar el perfil:", error);
     }
-
-    cerrarPanelLateral();
   });
 
   // ==================================================
@@ -428,11 +406,11 @@ function crearAcciones(
       const resultado = await invoke<ResultadoPerfil>("eliminar_perfil_actual");
 
       alCambiarPerfil(resultado);
+
+      await recargarContenidoPanel();
     } catch (error) {
       console.error("❌ No se pudo eliminar el perfil:", error);
     }
-
-    cerrarPanelLateral();
   });
 
   acciones.append(botonNuevo, botonClonar, botonRenombrar, botonEliminar);

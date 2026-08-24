@@ -54,7 +54,7 @@
 }
 
 .panel-lateral-subtitulo {
-    color: var(--text-soft);
+    color: var(--border-light);
 
     font-size: var(--fs11);
 
@@ -109,22 +109,8 @@
     border-radius: var(--r4);
 }
 
-.panel-lateral-indicador-espacio {
-    display: flex;
-
-    align-items: center;
-
-    justify-content: center;
-
-    width: 18px;
-
-    min-width: 18px;
-
-    margin-right: var(--gap8);
-}
-
-.panel-lateral-indicador {
-    margin: 0;
+.panel-lateral-item--actual {
+    border-color: var(--highlight);
 }
 
 .panel-lateral-nombre {

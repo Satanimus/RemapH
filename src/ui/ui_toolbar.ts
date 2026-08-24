@@ -266,6 +266,8 @@ export function crearToolbar(alGuardar: () => Promise<void>): HTMLElement {
       const activo = await invoke<boolean>("obtener_estado_cache");
 
       marcarPerfilSegunCache(toolbar, cacheDot, activo);
+
+      toolbar.querySelector(".cambios-pendientes")?.classList.remove("visible");
     } catch (error) {
       console.error("❌ No se pudo guardar el perfil:", error);
 
@@ -407,8 +409,6 @@ export function marcarPerfilActivo(toolbar: HTMLElement): void {
   textoEstado.textContent = "Perfil Activo";
 
   botonEstado.dataset.estado = "activo";
-
-  toolbar.querySelector(".cambios-pendientes")?.classList.remove("visible");
 }
 
 // ======================================================
@@ -429,8 +429,6 @@ export function marcarPerfilInactivo(toolbar: HTMLElement): void {
   textoEstado.textContent = "Perfil inactivo";
 
   botonEstado.dataset.estado = "inactivo";
-
-  toolbar.querySelector(".cambios-pendientes")?.classList.remove("visible");
 }
 
 // ======================================================
@@ -442,8 +440,6 @@ export function obtenerEstadoPerfilActual(
 ): EstadoPerfilActual {
   const nombrePerfil = nombresPorToolbar.get(toolbar);
 
-  const cacheDot = cacheDotsPorToolbar.get(toolbar);
-
   return {
     nombreActual: nombrePerfil?.textContent ?? "",
 
@@ -451,8 +447,6 @@ export function obtenerEstadoPerfilActual(
       toolbar
         .querySelector(".cambios-pendientes")
         ?.classList.contains("visible") ?? false,
-
-    cacheActivo: cacheDot?.dataset.estado === "activo",
   };
 }
 
@@ -483,6 +477,8 @@ export async function aplicarResultadoPerfilEnToolbar(
   }
 
   reconstruirTabla();
+
+  toolbar.querySelector(".cambios-pendientes")?.classList.remove("visible");
 
   if (nombrePerfil) {
     nombrePerfil.textContent = resultado.nombre;
