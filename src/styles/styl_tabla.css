@@ -534,6 +534,17 @@
     border: none;
 }
 
+.nota::placeholder {
+
+    color: transparent;
+}
+
+.nota-contenedor:focus-within .nota::placeholder,
+.nota-contenedor:hover .nota::placeholder {
+
+    color: var(--text-disabled);
+}
+
 
 /* ======================================================
    COLORES CABECERA
@@ -658,6 +669,8 @@
 
     cursor: pointer;
 
+    font-style: normal;
+
     opacity: 0;
 
     pointer-events: none;
@@ -666,7 +679,8 @@
 
 }
 
-.nota-contenedor:focus-within .btn-emoji {
+.nota-contenedor:focus-within .btn-emoji,
+.nota-contenedor:hover .btn-emoji {
 
     opacity: 1;
 
@@ -674,7 +688,8 @@
 
 }
 
-.nota-contenedor:focus-within .nota {
+.nota-contenedor:focus-within .nota,
+.nota-contenedor:hover .nota {
 
     padding-right: 26px;
 

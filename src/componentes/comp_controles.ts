@@ -269,7 +269,10 @@ export function crearExtra(
   // instalados del registro, sin tocar este enganche.
   if (filaPerfil.tipo === "abrir") {
     return crearPopup({
-      titulo: textoAbrirExtra(filaPerfil.abrirExtra, filaPerfil.abrirAccion.ruta),
+      titulo: textoAbrirExtra(
+        filaPerfil.abrirExtra,
+        filaPerfil.abrirAccion.ruta,
+      ),
       onClick: (evento) => {
         abrirPopupExtraAbrir(evento, contexto, filaPerfil, alModificar);
       },
@@ -447,7 +450,7 @@ export function crearNota(
 
   const input = document.createElement("input");
   input.className = "nota";
-  input.placeholder = "...";
+  input.placeholder = "Nota...";
   input.value = objetivo.nota;
 
   input.addEventListener("input", () => {

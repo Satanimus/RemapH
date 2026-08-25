@@ -202,9 +202,17 @@
 
     cursor: pointer;
 
+    opacity: 0;
+
     transition:
         color var(--speed),
-        background var(--speed);
+        background var(--speed),
+        opacity var(--speed);
+}
+
+.capturador:hover .trigger-extra {
+
+    opacity: 1;
 }
 
 .capturador {
@@ -513,15 +521,15 @@
 .estado-toggle[data-estado="off"],
 .estado-toggle[data-conflicto="true"] {
 
-    background: var(--red-dark);
+    background: rgba(143, 37, 37, 0.20);
 
-    border-color: var(--red-dark);
+    border-color: rgba(143, 37, 37, 0.85);
 }
 
 .estado-toggle[data-estado="off"]:hover,
 .estado-toggle[data-conflicto="true"]:hover {
 
-    background: var(--red);
+    background: rgba(198, 40, 40, 0.75);
 
     border-color: var(--red);
 }
