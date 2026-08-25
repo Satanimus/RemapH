@@ -239,7 +239,7 @@
 .configuracion-error {
   color: var(--text-red);
   font-size: var(--fs13);
-  background: rgba(198, 40, 40, 0.12);
+  background: color-mix(in srgb, var(--highlight-red) 12%, transparent);
   border: 1px solid var(--highlight-red);
   border-radius: var(--r4);
   padding: var(--gap8);
@@ -288,7 +288,7 @@
 
 .configuracion-boton {
   padding: var(--gap8) var(--gap16);
-  background: var(--button-bg);
+  background: var(--bg);
   border: 1px solid var(--border-light);
   border-radius: var(--r4);
   color: var(--text);
@@ -305,8 +305,8 @@
 }
 
 .configuracion-boton-primario {
-  background: var(--blue);
-  border-color: var(--blue);
+  background: var(--highlight);
+  border-color: var(--highlight);
 }
 
 .configuracion-toast {

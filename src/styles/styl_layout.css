@@ -163,7 +163,7 @@
 .perfil-estado[data-estado="activo"] {
   background: var(--green-dark);
 
-  border-color: #66BB6A;
+  border-color: var(--tag-green);
 
   color: var(--text);
 
@@ -177,7 +177,7 @@
 .perfil-estado[data-estado="inactivo"] {
   background: var(--red-dark);
 
-  border-color: #EF5350;
+  border-color: var(--tag-red);
 
   color: var(--text);
 
@@ -659,7 +659,7 @@
   height: 18px;
   min-width: 32px;
   border-radius: 9px;
-  background: var(--button-bg);
+  background: var(--bg);
   border: 1px solid var(--border-light);
   transition:
     background var(--speed),

@@ -176,7 +176,7 @@ function aplicarColorFondo(color: string): void {
 
   card.style.setProperty(
     "--menu-color",
-    `color-mix(in srgb, ${variable} 45%, rgba(20, 20, 30, 0.6))`,
+    `color-mix(in srgb, ${variable} 45%, color-mix(in srgb, var(--overlay-superficie) 60%, transparent))`,
   );
 
   card.style.setProperty(

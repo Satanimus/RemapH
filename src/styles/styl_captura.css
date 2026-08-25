@@ -32,7 +32,7 @@ body {
   height: 100%;
   display: flex;
   flex-direction: column;
-  background: rgba(20, 20, 30, 0.85);
+  background: color-mix(in srgb, var(--overlay-superficie) 85%, transparent);
   border: 1px solid var(--border-light);
   border-radius: 6px;
   overflow: hidden;
@@ -43,7 +43,7 @@ body {
   align-items: center;
   gap: 6px;
   padding: 6px 8px;
-  background: rgba(255, 255, 255, 0.06);
+  background: color-mix(in srgb, var(--overlay-contraste) 6%, transparent);
   cursor: move;
 }
 

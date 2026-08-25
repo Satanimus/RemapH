@@ -226,13 +226,13 @@
 
     height: var(--header-height);
 
-    background: rgba(10, 10, 14, 0.65);
+    background: color-mix(in srgb, var(--bg) 65%, transparent);
 
     backdrop-filter: blur(8px);
 
     -webkit-backdrop-filter: blur(8px);
 
-    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    border-bottom: 1px solid color-mix(in srgb, var(--overlay-contraste) 6%, transparent);
 
     font-size: var(--fs13);
 
@@ -388,8 +388,6 @@
 
     border: 1px dashed var(--border-light);
 
-    font-style: italic;
-
     color: var(--text-disabled);
 }
 
@@ -434,7 +432,7 @@
 
 .celda:not(:last-child) {
 
-    border-right: 1px solid rgba(255, 255, 255, .025);
+    border-right: 1px solid color-mix(in srgb, var(--overlay-contraste) 2.5%, transparent);
 }
 
 .celda.nota-separador {
@@ -455,12 +453,14 @@
    veía como línea gris entre Extra y Nota en TODAS las filas de
    un separador (con o sin color) — no dependía de en-separador-fin
    ni de en-separador-borde-fin, por eso ningún fix anterior lo
-   tocaba. Se saca el borde: la nota se distingue del cuerpo
-   teñido solo por su propio estilo (cursiva/fuente), sin línea. */
-.celda.nota-en-fila-separador {
-
-    font-style: italic;
-}
+   tocaba. Se saca el borde: la nota queda sin borde propio, solo
+   se distingue del cuerpo teñido por no llevar el tinte de
+   separador (ver comentario arriba de .celda.nota-separador).
+   Antes llevaba cursiva como marca visual adicional, pero se
+   sacó: deformaba los emoji que el usuario escribe en la nota.
+   La clase .celda.nota-en-fila-separador se sigue asignando desde
+   TS como marcador (usada por el selector de abajo), aunque ya no
+   tenga estilos propios acá. */
 
 .celda.nota-en-fila-separador .nota {
 
@@ -516,7 +516,7 @@
 .celda.separador-opciones .ui-btn:hover,
 .celda.separador-opciones .ui-btn[data-abierto="true"] {
 
-    background: rgba(0, 217, 255, 0.08);
+    background: color-mix(in srgb, var(--highlight) 8%, transparent);
 
     border-color: var(--highlight);
 }
@@ -709,7 +709,7 @@
     z-index: 20;
     max-width: 260px;
     padding: 8px 10px;
-    background: rgba(15, 15, 20, 0.97);
+    background: color-mix(in srgb, var(--overlay-tooltip) 97%, transparent);
     border: 1px solid var(--border-light);
     border-radius: 6px;
     color: var(--text);

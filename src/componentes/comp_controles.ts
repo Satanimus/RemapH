@@ -118,7 +118,7 @@ export function crearEstado(
 
     alerta.className = "estado-alerta";
 
-    alerta.textContent = "⚠";
+    alerta.textContent = "⚠️";
 
     boton.append(alerta);
   } else {

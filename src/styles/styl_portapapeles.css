@@ -49,7 +49,7 @@ body {
   flex-direction: column;
   background: var(
     --portapapeles-gradient,
-    var(--portapapeles-color, rgba(20, 20, 30, 0.6))
+    var(--portapapeles-color, color-mix(in srgb, var(--overlay-superficie) 60%, transparent))
   );
   border: 1px solid var(--border-light);
   border-radius: 8px;
@@ -65,7 +65,7 @@ body {
   align-items: center;
   gap: 4px;
   padding: 2px 4px;
-  background: rgba(255, 255, 255, 0.08);
+  background: color-mix(in srgb, var(--overlay-contraste) 8%, transparent);
   flex-shrink: 0;
   cursor: move;
 }
@@ -155,19 +155,19 @@ body {
 .portapapeles-cuerpo::-webkit-scrollbar-thumb {
   background: var(
     --portapapeles-gradient,
-    var(--portapapeles-color, rgba(255, 255, 255, 0.3))
+    var(--portapapeles-color, color-mix(in srgb, var(--overlay-contraste) 30%, transparent))
   );
   border-radius: 4px;
 }
 
 .portapapeles-cuerpo::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.4);
+  background: color-mix(in srgb, var(--overlay-contraste) 40%, transparent);
 }
 
 .portapapeles-separador {
   height: 1px;
   margin: 2px 4px;
-  background: rgba(255, 255, 255, 0.15);
+  background: color-mix(in srgb, var(--overlay-contraste) 15%, transparent);
   flex-shrink: 0;
 }
 
@@ -200,8 +200,8 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(20, 20, 30, 0.7);
-  border: 1px solid rgba(255, 255, 255, 0.25);
+  background: color-mix(in srgb, var(--overlay-superficie) 70%, transparent);
+  border: 1px solid color-mix(in srgb, var(--overlay-contraste) 25%, transparent);
   border-radius: 6px;
   color: var(--text);
   font-size: var(--fs13);
@@ -210,7 +210,7 @@ body {
 }
 
 .portapapeles-boton-fijar:hover {
-  background: rgba(255, 255, 255, 0.12);
+  background: color-mix(in srgb, var(--overlay-contraste) 12%, transparent);
 }
 
 .portapapeles-boton-fijar.fijado {
@@ -224,8 +224,8 @@ body {
   display: flex;
   align-items: center;
   padding: 0 10px;
-  background: rgba(20, 20, 30, 0.9);
-  border: 1px solid rgba(255, 255, 255, 0.35);
+  background: color-mix(in srgb, var(--overlay-superficie) 90%, transparent);
+  border: 1px solid color-mix(in srgb, var(--overlay-contraste) 35%, transparent);
   border-radius: 6px;
   color: var(--text);
   text-align: left;
@@ -238,15 +238,15 @@ body {
 
 .portapapeles-boton-nombre:hover {
   background:
-    linear-gradient(rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0.12)),
-    rgba(20, 20, 30, 0.9);
+    linear-gradient(color-mix(in srgb, var(--overlay-contraste) 12%, transparent), color-mix(in srgb, var(--overlay-contraste) 12%, transparent)),
+    color-mix(in srgb, var(--overlay-superficie) 90%, transparent);
 }
 
 .portapapeles-boton-nombre:active,
 .portapapeles-boton-nombre.presionado {
   background:
-    linear-gradient(rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0.2)),
-    rgba(20, 20, 30, 0.9);
+    linear-gradient(color-mix(in srgb, var(--overlay-contraste) 20%, transparent), color-mix(in srgb, var(--overlay-contraste) 20%, transparent)),
+    color-mix(in srgb, var(--overlay-superficie) 90%, transparent);
 }
 
 .portapapeles-boton-opciones {
@@ -256,7 +256,7 @@ body {
   align-items: center;
   justify-content: center;
   background: transparent;
-  border: 1px solid rgba(255, 255, 255, 0.25);
+  border: 1px solid color-mix(in srgb, var(--overlay-contraste) 25%, transparent);
   border-radius: 6px;
   color: var(--text-disabled);
   font-size: var(--fs13);
@@ -266,7 +266,7 @@ body {
 }
 
 .portapapeles-boton-opciones:hover {
-  background: rgba(255, 255, 255, 0.12);
+  background: color-mix(in srgb, var(--overlay-contraste) 12%, transparent);
   color: var(--text);
 }
 
@@ -279,7 +279,7 @@ body {
   z-index: 20;
   max-width: 260px;
   padding: 8px 10px;
-  background: rgba(15, 15, 20, 0.97);
+  background: color-mix(in srgb, var(--overlay-tooltip) 97%, transparent);
   border: 1px solid var(--border-light);
   border-radius: 6px;
   color: var(--text);
@@ -288,7 +288,7 @@ body {
   white-space: pre-wrap;
   word-break: break-word;
   pointer-events: none;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  box-shadow: 0 4px 12px color-mix(in srgb, #000000 40%, transparent);
 }
 
 .portapapeles-tooltip img {
@@ -308,7 +308,7 @@ body {
   gap: 6px;
   padding: 6px;
   flex-shrink: 0;
-  background: rgba(255, 255, 255, 0.06);
+  background: color-mix(in srgb, var(--overlay-contraste) 6%, transparent);
 }
 
 .portapapeles-boton-barra {
@@ -317,8 +317,8 @@ body {
   align-items: center;
   justify-content: center;
   padding: 6px 8px;
-  background: rgba(20, 20, 30, 0.85);
-  border: 1px solid rgba(255, 255, 255, 0.25);
+  background: color-mix(in srgb, var(--overlay-superficie) 85%, transparent);
+  border: 1px solid color-mix(in srgb, var(--overlay-contraste) 25%, transparent);
   border-radius: 6px;
   color: var(--text);
   font-size: var(--fs11);
@@ -327,7 +327,7 @@ body {
 }
 
 .portapapeles-boton-barra:hover {
-  background: rgba(255, 255, 255, 0.12);
+  background: color-mix(in srgb, var(--overlay-contraste) 12%, transparent);
 }
 
 /* ==========================
@@ -351,7 +351,7 @@ body {
   height: 16px;
   min-width: 28px;
   border-radius: 8px;
-  background: var(--button-bg);
+  background: var(--bg);
   border: 1px solid var(--border-light);
   transition:
     background var(--speed),
@@ -408,7 +408,7 @@ body {
   background: color-mix(
     in srgb,
     var(--highlight-red) 18%,
-    rgba(20, 20, 30, 0.85)
+    color-mix(in srgb, var(--overlay-superficie) 85%, transparent)
   );
 }
 
@@ -425,7 +425,7 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(0, 0, 0, 0.45);
+  background: color-mix(in srgb, #000000 45%, transparent);
 }
 
 .portapapeles-popup {
@@ -435,10 +435,10 @@ body {
   flex-direction: column;
   gap: 8px;
   padding: 10px;
-  background: rgba(25, 25, 32, 0.98);
+  background: color-mix(in srgb, var(--overlay-popup) 98%, transparent);
   border: 1px solid var(--border-light);
   border-radius: 8px;
-  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 6px 18px color-mix(in srgb, #000000 50%, transparent);
 }
 
 .portapapeles-popup-titulo {
@@ -485,8 +485,8 @@ body {
 
 .portapapeles-popup-opcion {
   padding: 6px 8px;
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: color-mix(in srgb, var(--overlay-contraste) 6%, transparent);
+  border: 1px solid color-mix(in srgb, var(--overlay-contraste) 20%, transparent);
   border-radius: 6px;
   color: var(--text);
   text-align: left;
@@ -495,7 +495,7 @@ body {
 }
 
 .portapapeles-popup-opcion:hover {
-  background: rgba(255, 255, 255, 0.14);
+  background: color-mix(in srgb, var(--overlay-contraste) 14%, transparent);
 }
 
 .portapapeles-popup-opcion.peligro {
@@ -505,7 +505,7 @@ body {
 
 .portapapeles-popup-input {
   padding: 6px 8px;
-  background: rgba(0, 0, 0, 0.35);
+  background: color-mix(in srgb, #000000 35%, transparent);
   border: 1px solid var(--border-light);
   border-radius: 6px;
   color: var(--text);
@@ -517,7 +517,7 @@ body {
   min-height: 90px;
   resize: vertical;
   padding: 6px 8px;
-  background: rgba(0, 0, 0, 0.35);
+  background: color-mix(in srgb, #000000 35%, transparent);
   border: 1px solid var(--border-light);
   border-radius: 6px;
   color: var(--text);
@@ -533,8 +533,8 @@ body {
 
 .portapapeles-popup-boton {
   padding: 5px 10px;
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.25);
+  background: color-mix(in srgb, var(--overlay-contraste) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--overlay-contraste) 25%, transparent);
   border-radius: 6px;
   color: var(--text);
   font-size: var(--fs11);
@@ -542,10 +542,10 @@ body {
 }
 
 .portapapeles-popup-boton:hover {
-  background: rgba(255, 255, 255, 0.16);
+  background: color-mix(in srgb, var(--overlay-contraste) 16%, transparent);
 }
 
 .portapapeles-popup-boton.primario {
-  background: color-mix(in srgb, var(--highlight) 35%, rgba(20, 20, 30, 0.85));
+  background: color-mix(in srgb, var(--highlight) 35%, color-mix(in srgb, var(--overlay-superficie) 85%, transparent));
   border-color: var(--highlight);
 }

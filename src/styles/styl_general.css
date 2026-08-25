@@ -91,5 +91,5 @@ select:focus {
 
 ::-webkit-scrollbar-thumb:hover {
 
-    background: #666;
+    background: color-mix(in srgb, var(--border-light) 80%, white);
 }
