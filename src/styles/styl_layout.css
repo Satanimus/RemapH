@@ -420,11 +420,11 @@
 
 .popup-menu-editor-toggle.popup-menu-editor-agregar {
   color: var(--text-highlight);
-  border-color: var(--tag-green);
+  border-color: var(--highlight);
 }
 
 .popup-menu-editor-toggle.popup-menu-editor-agregar:hover {
-  background: var(--tag-green);
+  background: var(--highlight);
   color: var(--text);
 }
 
