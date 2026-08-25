@@ -247,6 +247,7 @@ export function crearControladorArrastre(
   interface EstadoArrastre {
     idsGrupo: string[];
     fantasma: HTMLElement;
+    contador: HTMLElement | null;
     placeholder: HTMLElement;
     offsetX: number;
     offsetY: number;
@@ -503,19 +504,26 @@ export function crearControladorArrastre(
       fantasma.appendChild(clon);
     }
 
-    if (idsGrupo.length > 1) {
-      const contador = document.createElement("div");
-
-      contador.className = CLASE_FANTASMA_CONTADOR;
-
-      contador.textContent = `+${idsGrupo.length - 1}`;
-
-      fantasma.appendChild(contador);
-    }
-
     document.body.appendChild(fantasma);
 
     return fantasma;
+  }
+
+  // Contador "+N" de filas extra en el grupo arrastrado — elemento
+  // propio (no hijo de .arr-fantasma, que recorta con overflow:
+  // hidden) para poder anclarlo directo a la posición del cursor,
+  // no a una esquina fija del fantasma (spec: "que se dibuje
+  // completo y siga al mouse").
+  function crearContador(cantidadFilas: number): HTMLElement {
+    const contador = document.createElement("div");
+
+    contador.className = CLASE_FANTASMA_CONTADOR;
+
+    contador.textContent = `+${cantidadFilas}`;
+
+    document.body.appendChild(contador);
+
+    return contador;
   }
 
   function crearPlaceholder(anchoPx: number): HTMLElement {
@@ -695,6 +703,9 @@ export function crearControladorArrastre(
 
     const fantasma = crearFantasma(idsGrupo, rectPrimero);
 
+    const contador =
+      idsGrupo.length > 1 ? crearContador(idsGrupo.length) : null;
+
     const placeholder = crearPlaceholder(rectPrimero.width);
 
     placeholder.style.height = `${rectPrimero.height}px`;
@@ -718,9 +729,18 @@ export function crearControladorArrastre(
       offsetY,
     );
 
+    if (contador) {
+      posicionarContador(
+        contador,
+        eventoInicial.clientX,
+        eventoInicial.clientY,
+      );
+    }
+
     arrastreActual = {
       idsGrupo,
       fantasma,
+      contador,
       placeholder,
       offsetX,
       offsetY,
@@ -729,6 +749,19 @@ export function crearControladorArrastre(
 
     document.addEventListener("pointermove", manejarPointerMoveArrastre);
     document.addEventListener("pointerup", manejarPointerUpArrastre);
+  }
+
+  // El contador sigue al cursor directamente (con un pequeño
+  // desplazamiento para no quedar tapado por el puntero), a
+  // diferencia del fantasma que sigue con el offset del click
+  // original dentro de la fila.
+  function posicionarContador(
+    contador: HTMLElement,
+    clientX: number,
+    clientY: number,
+  ): void {
+    contador.style.left = `${clientX + 12}px`;
+    contador.style.top = `${clientY - 10}px`;
   }
 
   function posicionarFantasma(
@@ -755,6 +788,14 @@ export function crearControladorArrastre(
       arrastreActual.offsetY,
     );
 
+    if (arrastreActual.contador) {
+      posicionarContador(
+        arrastreActual.contador,
+        evento.clientX,
+        evento.clientY,
+      );
+    }
+
     reposicionarPlaceholder(
       arrastreActual.placeholder,
       arrastreActual.idsGrupo,
@@ -765,7 +806,7 @@ export function crearControladorArrastre(
   function manejarPointerUpArrastre(): void {
     if (!arrastreActual) return;
 
-    const { idsGrupo, fantasma, placeholder } = arrastreActual;
+    const { idsGrupo, fantasma, contador, placeholder } = arrastreActual;
 
     document.removeEventListener("pointermove", manejarPointerMoveArrastre);
     document.removeEventListener("pointerup", manejarPointerUpArrastre);
@@ -776,6 +817,7 @@ export function crearControladorArrastre(
 
     placeholder.remove();
     fantasma.remove();
+    contador?.remove();
 
     contenedor.classList.remove(CLASE_CONTENEDOR_ARRASTRANDO);
 
@@ -923,13 +965,14 @@ export function crearControladorArrastre(
       // (con setTimeout 0) que destruiría el controlador y borraría
       // la selección recién activada, haciendo que al soltar el
       // botón la fila quedara deseleccionada en vez de en modo Mover.
-      const { idsGrupo, fantasma, placeholder } = arrastreActual;
+      const { idsGrupo, fantasma, contador, placeholder } = arrastreActual;
 
       document.removeEventListener("pointermove", manejarPointerMoveArrastre);
       document.removeEventListener("pointerup", manejarPointerUpArrastre);
 
       placeholder.remove();
       fantasma.remove();
+      contador?.remove();
 
       contenedor.classList.remove(CLASE_CONTENEDOR_ARRASTRANDO);
 

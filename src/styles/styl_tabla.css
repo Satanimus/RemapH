@@ -204,7 +204,7 @@
 
 .carril-expandir:hover {
 
-    color: var(--highlight);
+    color: var(--text-highlight);
 }
 
 
@@ -370,8 +370,6 @@
     background: color-mix(in srgb, var(--separador-color, var(--panel2)) var(--separador-opacidad-header), transparent);
 
     border-radius: var(--r8);
-
-    box-shadow: var(--separador-sombra);
 }
 
 .fila-separador-placeholder {
@@ -446,7 +444,7 @@
 
 .celda.nota-separador .nota {
 
-    font: var(--separador-nota-fuente);
+    font-size: var(--fs13);
 }
 
 /* Etapa E: Nota de una fila dentro de un separador no lleva el
@@ -466,7 +464,7 @@
 
 .celda.nota-en-fila-separador .nota {
 
-    font: var(--separador-nota-fuente);
+    font-size: var(--fs13);
 }
 
 /* Permite que el botón "+" de agregar fila sobresalga
@@ -480,7 +478,7 @@
 
     font-weight: bold;
 
-    color: var(--text-soft);
+    color: var(--text-disabled);
 }
 
 .celda:last-child,
@@ -697,8 +695,7 @@
 
 .btn-emoji:hover {
 
-    color: var(--highlight);
-    /* o el cyan que ya uses */
+    color: var(--text-highlight);
 
 }
 
@@ -729,5 +726,5 @@
 }
 
 .extra-tooltip-subtitulo {
-    color: var(--text-soft);
+    color: var(--text-disabled);
 }

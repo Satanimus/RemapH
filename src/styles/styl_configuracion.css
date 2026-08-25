@@ -33,7 +33,7 @@
   border: 1px solid transparent;
   border-bottom: none;
   border-radius: var(--r4) var(--r4) 0 0;
-  color: var(--text-soft);
+  color: var(--text-disabled);
   font-size: var(--fs13);
 }
 
@@ -110,7 +110,7 @@
   z-index: 1;
 
   background: var(--panel2);
-  color: var(--text-soft);
+  color: var(--text-disabled);
   text-align: left;
   font-size: var(--fs13);
   font-weight: 600;
@@ -129,7 +129,12 @@
 }
 
 .configuracion-valor-defecto {
-  color: var(--text-soft);
+  color: var(--text-disabled);
+  cursor: pointer;
+}
+
+.configuracion-valor-defecto:hover {
+  color: var(--text);
 }
 
 /* El swatch de color (Apariencia) necesita ir en línea junto al
@@ -159,7 +164,7 @@
    Símbolos, Mouse). */
 .configuracion-subtitulo td {
   padding-top: var(--gap16);
-  color: var(--text-soft);
+  color: var(--text-disabled);
   font-size: var(--fs13);
   font-weight: 600;
   text-transform: uppercase;
@@ -224,7 +229,7 @@
 
 /* Fila con un valor inválido, marcada al intentar guardar. */
 .configuracion-fila-error .configuracion-valor-personalizado input {
-  border-color: var(--highlight-red);
+  border-color: var(--text-red);
 }
 
 /* ======================================================
@@ -232,7 +237,7 @@
    ====================================================== */
 
 .configuracion-error {
-  color: var(--highlight-red);
+  color: var(--text-red);
   font-size: var(--fs13);
   background: rgba(198, 40, 40, 0.12);
   border: 1px solid var(--highlight-red);

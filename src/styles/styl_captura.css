@@ -70,7 +70,7 @@ body {
 
 .captura-cancelar:hover {
   border-color: var(--highlight-red);
-  color: var(--highlight-red);
+  color: var(--text-red);
 }
 
 .captura-cuerpo {
@@ -88,12 +88,12 @@ body {
 }
 
 .captura-valor {
-  color: var(--highlight);
+  color: var(--text-highlight);
   font-weight: 600;
 }
 
 .captura-guardado {
-  color: var(--green);
+  color: var(--text-highlight);
   font-weight: 600;
   text-align: center;
   font-size: var(--fs13);

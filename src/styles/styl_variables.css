@@ -20,243 +20,233 @@
 
 :root {
 
-   /* ==========================
+    /* ==========================
        Tipografía
        ========================== */
 
-   --font: "Segoe UI", sans-serif;
+    --font: "Segoe UI", sans-serif;
 
-   --fs11: 11px;
-   --fs13: 13px;
-   --fs16: 16px;
+    --fs11: 11px;
+    --fs13: 13px;
+    --fs16: 16px;
 
-   /* ==========================
+    /* ==========================
       Colores interactivos
       ========================== */
 
-   --highlight: #00D9FF;
-   --highlight-red: #C62828;
+    --highlight: #00D9FF;
+    --highlight-red: #C62828;
 
-   /* ==========================
+    /* ==========================
          Estados de perfil
          ========================== */
 
-   --green-dark: #2E6F32;
-   --red-dark: #8F2525;
+    --green-dark: #2E6F32;
+    --red-dark: #8F2525;
 
-   /* ==========================
+    /* ==========================
        Fondos
        ========================== */
 
-   --bg: #181818;
+    --bg: #181818;
 
-   --panel: #222222;
+    --panel: #222222;
 
-   --panel2: #2B2B2B;
+    --panel2: #2B2B2B;
 
 
-   /* ==========================
+    /* ==========================
        Bordes
        ========================== */
 
-   --border: #404040;
+    --border: #404040;
 
-   --border-light: #555555;
+    --border-light: #555555;
 
 
-   /* ==========================
+    /* ==========================
        Texto
        ========================== */
 
-   --text: #F2F2F2;
+    --text: #F2F2F2;
 
-   --text-soft: #BDBDBD;
+    --text-disabled: #777777;
 
-   --text-disabled: #777777;
+    --text-highlight: #03A9F4;
 
-   /* Texto oscuro sobre fondo --highlight (ej. btn-guardar-cambios) —
-      no comparte token con --text, que es claro sobre fondo oscuro. */
-   --text-on-highlight: #05202a;
+    --text-red: #C62828;
+
+    --text-yellow: #D8A628;
+
+    /* Texto oscuro sobre fondo --highlight (ej. btn-guardar-cambios,
+      badge de arrastre múltiple, marcador de macro activo) — no
+      comparte token con --text, que es claro sobre fondo oscuro. */
+    --text-highdark: #05202a;
 
 
-   /* ==========================
+    /* ==========================
        Colores principales
        ========================== */
 
-   --green: #388E3C;
+    --green: #388E3C;
 
-   --green-dark: #2E7D32;
+    --green-dark: #2E7D32;
 
-   --yellow: #D8A628;
-
-
-   --blue: #1976D2;
+    --yellow: #D8A628;
 
 
-   /* ==========================
+    --blue: #1976D2;
+
+
+    /* ==========================
        🎨 COLOR DE RESALTADO UI
        ========================== */
 
-   --highlight: #03A9F4;
+    --highlight: #03A9F4;
 
-   /* ==========================
+    /* ==========================
        🎨 Color fila y file resaltada
        ========================== */
 
-   --row-bg: #202020;
-   --row-hover-bg: #0400ff3c;
+    --row-bg: #202020;
+    --row-hover-bg: #0400ff3c;
 
-   /* ==========================
+    /* ==========================
      🎨 COLOR fondo boton
      ========================== */
-   --button-bg: #1a1a1a;
+    --button-bg: #1a1a1a;
 
-   /* ==========================
+    /* ==========================
        Colores de filas
        ========================== */
 
-   --tag-none: transparent;
+    --tag-none: transparent;
 
-   --tag-red: #D32F2F;
+    --tag-red: #D32F2F;
 
-   --tag-orange: #F57C00;
+    --tag-orange: #F57C00;
 
-   --tag-yellow: #FBC02D;
+    --tag-yellow: #FBC02D;
 
-   --tag-green: #388E3C;
+    --tag-green: #388E3C;
 
-   --tag-cyan: #03A9F4;
+    --tag-cyan: #03A9F4;
 
-   --cyan-dark: #0B7285;
+    --cyan-dark: #0B7285;
 
-   --tag-blue: #1976D2;
+    --tag-blue: #1976D2;
 
-   --tag-purple: #7B1FA2;
+    --tag-purple: #7B1FA2;
 
-   --tag-pink: #C2185B;
+    --tag-pink: #C2185B;
 
-   --tag-gray: #616161;
-
-
-   /* ==========================
-       Color símbolos capturador
-       ========================== */
-
-   --color-trigger-sintaxis: #1976D2;
+    --tag-gray: #616161;
 
 
-   /* ==========================
+    /* ==========================
        Radios
        ========================== */
 
-   --r4: 4px;
+    --r4: 4px;
 
-   --r6: 6px;
+    --r6: 6px;
 
-   --r8: 8px;
+    --r8: 8px;
 
 
-   /* ==========================
+    /* ==========================
        Espaciados
        ========================== */
 
-   --gap4: 4px;
+    --gap4: 4px;
 
-   --gap8: 8px;
+    --gap8: 8px;
 
-   --gap12: 12px;
+    --gap12: 12px;
 
-   --gap16: 16px;
+    --gap16: 16px;
 
-   --gap24: 24px;
+    --gap24: 24px;
 
 
-   /* ==========================
+    /* ==========================
        Alturas
        ========================== */
 
-   --toolbar-height: 48px;
+    --toolbar-height: 48px;
 
-   --header-height: 34px;
+    --header-height: 34px;
 
-   --row-height: 40px;
+    --row-height: 40px;
 
-   --status-height: 26px;
+    --status-height: 26px;
 
 
-   /* ==========================
+    /* ==========================
        Columnas
        ========================== */
 
-   --col-min-width: 52px;
+    --col-min-width: 52px;
 
-   --col-num: 42px;
+    --col-num: 42px;
 
-   /* Ancho fijo del carril de números (fuera de la tabla,
+    /* Ancho fijo del carril de números (fuera de la tabla,
        ver .carril-numeros en styl_tabla.css). Antes compartía
        --col-num con la columna "#" de la tabla y cambiaba de
        tamaño junto a ella; ahora es independiente. Se elimina
        cuando la columna "#" desaparezca (Etapa B). */
-   --col-carril-numeros: 28px;
+    --col-carril-numeros: 28px;
 
-   /* Espacio extra que suma el carril de números cuando el
+    /* Espacio extra que suma el carril de números cuando el
        perfil tiene al menos un separador (botón Expandir/Contraer,
        ver .carril-numeros.tiene-separadores en styl_tabla.css). */
-   --carril-expandir-ancho: 22px;
+    --carril-expandir-ancho: 22px;
 
-   --carril-expandir-margen: 6px;
+    --carril-expandir-margen: 6px;
 
-   --col-app: 52px;
+    --col-app: 52px;
 
-   --col-trigger: 150px;
+    --col-trigger: 150px;
 
-   --col-type: 60px;
+    --col-type: 60px;
 
-   --col-action: 150px;
+    --col-action: 150px;
 
-   /* Antes 150px: la columna Extra mostraba el texto de la
+    /* Antes 150px: la columna Extra mostraba el texto de la
        opción elegida. Ahora es un botón solo-ícono (∴, ver
        .extra-control en styl_botones.css) — mismo ancho que
        --col-type. */
-   --col-behavior: 60px;
+    --col-behavior: 60px;
 
-   --col-color: 52px;
+    --col-color: 52px;
 
-   /* Ancho de la futura columna "Opciones" (⁝), Etapa C/D.
+    /* Ancho de la futura columna "Opciones" (⁝), Etapa C/D.
        Se define ya para no volver a tocar este archivo en
        esa etapa. --col-color se elimina cuando la columna
        Color desaparezca de la tabla (Etapa B). */
-   --col-options: 42px;
+    --col-options: 42px;
 
-   --col-note: 220px;
+    --col-note: 220px;
 
 
-   /* ==========================
+    /* ==========================
        Mínimos columnas
        ========================== */
 
-   --col-min: 52px;
+    --col-min: 52px;
 
 
-   /* ==========================
+    /* ==========================
        Animaciones
        ========================== */
 
-   --speed: .15s;
+    --speed: .15s;
 
-   /* ==========================
+    /* ==========================
        Separador
        ========================== */
 
-   /* Sombra interna de la fila-header del Separador (bug: color de
-      fondo muy plano) — no está en apariencia.tsv todavía: los tipos
-      soportados ahí hoy son solo "color"/"pixeles" (ver
-      configuracion_usuario.rs::TipoValorCss), un box-shadow completo
-      no entra en ninguno de los dos. Queda como variable CSS lista
-      para sumarse el día que se agregue un tipo "texto libre". */
-   --separador-sombra: inset 0 0 14px rgba(0, 0, 0, .3);
-
-   /* [FIX] Opacidad del tinte de color del separador — misma
+    /* [FIX] Opacidad del tinte de color del separador — misma
        técnica (color-mix contra transparent) en la cabecera del
        separador y en el fondo que genera sobre las filas de abajo,
        así ambas se comportan igual (tiñen el fondo real en vez de
@@ -264,16 +254,9 @@
        - --separador-opacidad-header: cabecera del separador (.fila-separador)
        - --separador-opacidad-fila: filas debajo, en reposo (.celda.en-separador)
        - --separador-opacidad-fila-hover: filas debajo, al pasar el mouse */
-   --separador-opacidad-header: 18%;
+    --separador-opacidad-header: 18%;
 
-   --separador-opacidad-fila: 5%;
+    --separador-opacidad-fila: 5%;
 
-   --separador-opacidad-fila-hover: 10%;
-
-   /* Fuente propia del texto de Nota del Separador — ahí funciona
-      como título del separador, no como una nota común, así que no
-      comparte variable con la tipografía general (--font). Mismo
-      motivo que --separador-sombra: no personalizable todavía desde
-      Apariencia por faltar un tipo "texto libre" en el catálogo. */
-   --separador-nota-fuente: 600 var(--fs13) var(--font);
+    --separador-opacidad-fila-hover: 10%;
 }

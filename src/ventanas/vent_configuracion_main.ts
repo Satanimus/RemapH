@@ -296,6 +296,31 @@ function crearInputColor(valorInicial: string): HTMLInputElement {
   return input;
 }
 
+// Inversa de construirValorDesdeInputs(): escribe valorDefecto en
+// el/los inputs de la fila según su tipo, disparando "input" en
+// cada uno para reusar el flujo normal de marcarEditando/validación
+// (ver dblclick en tdDefecto, dentro de montarFila).
+function aplicarValorEnInputs(
+  fila: FilaConfiguracion,
+  inputs: HTMLInputElement[],
+  valor: string,
+): void {
+  if (fila.tipo === "numero_par") {
+    const [ancho, alto] = valor.split(",");
+
+    inputs[0].value = (ancho ?? "").trim();
+    inputs[1].value = (alto ?? "").trim();
+  } else if (fila.tipo === "pixeles") {
+    inputs[0].value = valor.replace(/px$/, "");
+  } else {
+    inputs[0].value = valor;
+  }
+
+  for (const input of inputs) {
+    input.dispatchEvent(new Event("input", { bubbles: false }));
+  }
+}
+
 // ======================================================
 // 🏭 FÁBRICA DE PESTAÑA EDITABLE (tabla + acciones)
 // ------------------------------------------------------
@@ -535,6 +560,15 @@ function crearPestanaEditable(opciones: OpcionesPestana): Pestana {
     for (const input of inputs) {
       input.addEventListener("input", () => marcarEditando(fila.clave, tr));
     }
+
+    // Doble click en "Valor por defecto" → lo copia a "Valor
+    // personalizado" (spec: acceso rápido para restablecer una
+    // sola fila sin pasar por "Restablecer esta pestaña", que
+    // afecta a todas).
+    tdDefecto.title = "Doble click para usar este valor";
+    tdDefecto.addEventListener("dblclick", () => {
+      aplicarValorEnInputs(fila, inputs, fila.valorDefecto);
+    });
 
     tr.append(tdNombre, tdDefecto, tdPersonalizado);
     tbody.append(tr);
@@ -952,7 +986,17 @@ interface FilaCssCruda {
   valor_personalizado: string | null;
 }
 
-function grupoApariencia(tipo: string): string {
+function grupoApariencia(clave: string, tipo: string): string {
+  if (
+    clave.startsWith("text-") ||
+    clave === "text" ||
+    clave === "fs11" ||
+    clave === "fs13" ||
+    clave === "fs16" ||
+    clave === "font"
+  ) {
+    return "Texto";
+  }
   if (tipo === "color") return "Colores";
   if (tipo === "texto") return "Texto libre";
   return "Tamaños";
@@ -1062,11 +1106,21 @@ const pestanaApariencia = crearPestanaEditable({
     const filasCss = crudasCss.map((cruda) => ({
       clave: cruda.clave,
       nombreMostrado: cruda.nombre_ui,
-      grupo: grupoApariencia(cruda.tipo),
+      grupo: grupoApariencia(cruda.clave, cruda.tipo),
       tipo: cruda.tipo as TipoValorConfiguracion,
       valorDefecto: cruda.valor_defecto,
       valorPersonalizado: cruda.valor_personalizado,
     }));
+
+    // Orden de secciones fijo: el resto de filasCss mantiene el
+    // orden del tsv dentro de cada grupo, pero "Texto" va primero
+    // (agrupa colores + tamaños + fuente de texto, ver
+    // grupoApariencia) para que no quede intercalado entre
+    // "Colores" y "Tamaños".
+    const ordenGrupos = ["Texto", "Colores", "Texto libre", "Tamaños"];
+    filasCss.sort(
+      (a, b) => ordenGrupos.indexOf(a.grupo) - ordenGrupos.indexOf(b.grupo),
+    );
 
     // Tamaños de botón/texto de MenuExpress y Portapapeles — mismo
     // catálogo que General (config.rs), solo mostrados acá (ver

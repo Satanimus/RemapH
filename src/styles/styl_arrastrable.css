@@ -27,7 +27,7 @@
 .arr-asa--activa::before {
     content: "⁝⁝";
     margin-right: var(--gap4);
-    color: var(--highlight);
+    color: var(--text-highlight);
     font-weight: bold;
     line-height: 1;
 }
@@ -84,9 +84,9 @@
 }
 
 .arr-fantasma-contador {
-    position: absolute;
-    top: -8px;
-    right: -8px;
+    position: fixed;
+    z-index: 10001;
+    pointer-events: none;
     min-width: 18px;
     height: 18px;
     padding: 0 4px;
@@ -94,7 +94,7 @@
     align-items: center;
     justify-content: center;
     background: var(--highlight);
-    color: var(--bg);
+    color: var(--text-highdark);
     font-size: var(--fs11);
     font-weight: bold;
     border-radius: var(--r8);

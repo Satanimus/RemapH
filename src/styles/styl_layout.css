@@ -207,7 +207,7 @@
 
   border-top: 1px solid var(--border);
 
-  color: var(--text-soft);
+  color: var(--text-disabled);
 }
 
 .statusbar-texto {
@@ -229,7 +229,7 @@
 
   border-left: 1px solid var(--border);
 
-  color: var(--text-soft);
+  color: var(--text-disabled);
 }
 
 /* ======================================================
@@ -369,7 +369,7 @@
 
 .popup-menu-editor-numero {
   font-size: var(--fs11);
-  color: var(--text-soft);
+  color: var(--text-disabled);
   min-width: 26px;
 }
 
@@ -419,7 +419,7 @@
 }
 
 .popup-menu-editor-toggle.popup-menu-editor-agregar {
-  color: var(--tag-green);
+  color: var(--text-highlight);
   border-color: var(--tag-green);
 }
 
@@ -429,8 +429,8 @@
 }
 
 .popup-menu-editor-toggle.popup-menu-editor-quitar {
-  color: var(--highlight-red);
-  border-color: var(--highlight-red);
+  color: var(--text-red);
+  border-color: var(--text-red);
 }
 
 .popup-menu-editor-toggle.popup-menu-editor-quitar:hover {
@@ -542,13 +542,13 @@
    ------------------------------------------------------
    Mismo patrón visual que popup-fila-label / popup-grupo,
    pero con texto oscuro (var(--text)) en vez del tenue
-   (var(--border-light)) porque acá funciona como encabezado
+   (var(--text-disabled)) porque acá funciona como encabezado
    de sección, no como etiqueta secundaria de un control.
    ====================================================== */
 
 .app-popup-lista-titulo {
   font-size: var(--fs11);
-  color: var(--border-light);
+  color: var(--text-disabled);
 }
 
 .app-popup-lista-caja {
@@ -578,7 +578,7 @@
 
 .popup-fila-label {
   font-size: var(--fs11);
-  color: var(--border-light);
+  color: var(--text-disabled);
 }
 
 .popup-grupo {
@@ -690,7 +690,7 @@
 }
 
 .popup-switch[data-activo="false"] {
-  color: var(--text-soft);
+  color: var(--text-disabled);
 }
 
 /* ======================================================
@@ -744,7 +744,7 @@
   width: 18px;
   min-width: 18px;
   height: 18px;
-  color: var(--text-soft);
+  color: var(--text-disabled);
   font-size: var(--fs13);
   line-height: 1;
   flex-shrink: 0;
@@ -760,7 +760,7 @@
 }
 
 .app-segundo-plano-indicador {
-  color: var(--green);
+  color: var(--text-highlight);
   font-size: var(--fs16);
   font-weight: bold;
   line-height: 1;
@@ -823,8 +823,8 @@
 .popup-capa .ui-btn.popup-btn-peligro:hover,
 .ui-btn.popup-perfil-eliminar:hover,
 .popup-capa .ui-btn.popup-perfil-eliminar:hover {
-  color: var(--highlight-red);
-  border-color: var(--highlight-red);
+  color: var(--text-red);
+  border-color: var(--text-red);
 }
 
 /* ======================================================
@@ -939,7 +939,7 @@
 }
 
 .popup-macro-funciones-titulo {
-  color: var(--text-soft);
+  color: var(--text-disabled);
   font-size: var(--fs11);
   text-transform: uppercase;
   letter-spacing: 0.04em;
@@ -976,7 +976,7 @@
        (ambas viven dentro del mismo padding acumulado de la lista). */
   padding: 0 calc(var(--gap4) * 2);
   margin-bottom: var(--gap4);
-  color: var(--text-soft);
+  color: var(--text-disabled);
   font-size: var(--fs11);
   font-weight: 600;
 }
@@ -1098,7 +1098,7 @@
   flex: 0 0 auto;
   width: var(--col-numero-width);
   font-size: var(--fs11);
-  color: var(--text-soft);
+  color: var(--text-disabled);
   text-align: center;
 }
 
@@ -1119,7 +1119,7 @@
 }
 
 .ui-btn.popup-macro-editor-marcador[data-activo="true"] {
-  color: var(--bg);
+  color: var(--text-highdark);
   background: var(--highlight);
   border-color: var(--highlight);
 }
@@ -1131,13 +1131,13 @@
    invierte a fondo transparente + letra cyan, mismo criterio visual
    que el ícono de Bucle (data-es-bucle="true") de acá arriba. */
 .ui-btn.popup-macro-editor-marcador[data-activo="true"]:hover {
-  color: var(--highlight);
+  color: var(--text-highlight);
   background: transparent;
   border-color: var(--highlight);
 }
 
 .ui-btn.popup-macro-editor-marcador[data-es-bucle="true"] {
-  color: var(--highlight);
+  color: var(--text-highlight);
   background: transparent;
   border-color: var(--highlight);
   cursor: default;
@@ -1227,7 +1227,7 @@
 }
 
 .popup-macro-editor-eliminar {
-  color: var(--highlight-red);
+  color: var(--text-red);
 }
 
 .popup-macro-editor-eliminar:hover {
@@ -1269,7 +1269,7 @@
   height: 28px;
   padding: 0 var(--gap8);
   background: transparent;
-  color: var(--text-soft);
+  color: var(--text-disabled);
   font-style: italic;
   border: 1px solid transparent;
   border-radius: var(--r4);

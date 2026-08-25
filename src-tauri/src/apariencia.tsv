@@ -35,8 +35,11 @@ panel	Fondo de panel	#222222	color
 panel2	Fondo de panel secundario	#2B2B2B	color
 border	Color de borde	#404040	color
 text	Color de texto principal	#F2F2F2	color
-text-soft	Color de texto secundario	#BDBDBD	color
 text-disabled	Color de texto deshabilitado	#777777	color
+text-highlight	Color de texto resaltado	#03A9F4	color
+text-red	Color de texto (alerta)	#C62828	color
+text-yellow	Color de texto (aviso)	#D8A628	color
+text-highdark	Color de texto oscuro sobre resaltado	#05202a	color
 row-bg	Fondo de fila	#202020	color
 button-bg	Fondo de botón	#1a1a1a	color
 green	Verde (éxito)	#388E3C	color
@@ -54,7 +57,7 @@ tag-blue	Etiqueta de fila — azul	#1976D2	color
 tag-purple	Etiqueta de fila — violeta	#7B1FA2	color
 tag-pink	Etiqueta de fila — rosa	#C2185B	color
 tag-gray	Etiqueta de fila — gris	#616161	color
-color-trigger-sintaxis	Color de sintaxis (capturador)	#1976D2	color
+font	Fuente de texto	"Segoe UI", sans-serif	texto
 fs11	Tamaño de texto pequeño	11px	pixeles
 fs13	Tamaño de texto normal	13px	pixeles
 fs16	Tamaño de texto grande	16px	pixeles
@@ -63,5 +66,3 @@ row-height	Alto de fila	40px	pixeles
 r6	Radio de bordes	6px	pixeles
 gap8	Espaciado estándar	8px	pixeles
 gap16	Espaciado grande	16px	pixeles
-separador-sombra	Sombra interna del separador de grupo	inset 0 0 14px rgba(0, 0, 0, .3)	texto
-separador-nota-fuente	Fuente del texto de separador de grupo	600 13px "Segoe UI", sans-serif	texto

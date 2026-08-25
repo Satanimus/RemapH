@@ -100,7 +100,7 @@ body {
 
 .portapapeles-cerrar:hover {
   border-color: var(--highlight-red);
-  color: var(--highlight-red);
+  color: var(--text-red);
 }
 
 .portapapeles-boton-otros {
@@ -258,7 +258,7 @@ body {
   background: transparent;
   border: 1px solid rgba(255, 255, 255, 0.25);
   border-radius: 6px;
-  color: var(--text-soft);
+  color: var(--text-disabled);
   font-size: var(--fs13);
   line-height: 1;
   cursor: pointer;
@@ -397,13 +397,13 @@ body {
    ========================== */
 
 .portapapeles-boton-limpiar:hover {
-  color: var(--highlight-red);
+  color: var(--text-red);
   border-color: var(--highlight-red);
 }
 
 .portapapeles-boton-limpiar.confirmando,
 .portapapeles-boton-limpiar.confirmando:hover {
-  color: var(--highlight-red);
+  color: var(--text-red);
   border-color: var(--highlight-red);
   background: color-mix(
     in srgb,
@@ -499,7 +499,7 @@ body {
 }
 
 .portapapeles-popup-opcion.peligro {
-  color: var(--highlight-red);
+  color: var(--text-red);
   border-color: var(--highlight-red);
 }
 

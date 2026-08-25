@@ -58,7 +58,7 @@
 }
 
 .panel-lateral-subtitulo {
-    color: var(--border-light);
+    color: var(--text-disabled);
 
     font-size: var(--fs11);
 
@@ -108,7 +108,7 @@
 
     border-color: var(--highlight);
 
-    color: var(--highlight);
+    color: var(--text-highlight);
 
     border-radius: var(--r4);
 }
@@ -166,7 +166,7 @@
 .panel-lateral-acciones .ui-btn:not(.panel-lateral-eliminar):hover {
     border-color: var(--highlight);
 
-    color: var(--highlight);
+    color: var(--text-highlight);
 }
 
 .panel-lateral-eliminar {
@@ -176,7 +176,7 @@
 }
 
 .panel-lateral-eliminar:hover {
-    color: var(--highlight-red);
+    color: var(--text-red);
 
     background: transparent;
 
@@ -202,7 +202,7 @@
 .panel-lateral-configuracion:hover {
     border-color: var(--highlight);
 
-    color: var(--highlight);
+    color: var(--text-highlight);
 }
 
 .panel-lateral-configuracion-icono {

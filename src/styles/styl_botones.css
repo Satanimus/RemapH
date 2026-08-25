@@ -177,7 +177,7 @@
 
     margin-right: 0;
 
-    color: var(--color-trigger-sintaxis);
+    color: var(--text-highlight);
 
     font-size: var(--fs16);
 
@@ -224,7 +224,7 @@
 
     border-radius: 4px;
 
-    color: var(--highlight-red);
+    color: var(--text-red);
 
     font-size: var(--fs13);
 
@@ -262,12 +262,12 @@
 
 .trigger-tecla {
 
-    color: var(--text-soft);
+    color: var(--text-disabled);
 }
 
 .trigger-sintaxis {
 
-    color: var(--color-trigger-sintaxis);
+    color: var(--text-highlight);
 }
 
 /* Botones de Acción sin markup propio (Multimedia, MenuExpress,
@@ -276,7 +276,7 @@
    apagado una vez que ya tienen uno guardado. */
 .capturador.con-valor {
 
-    color: var(--text-soft);
+    color: var(--text-disabled);
 }
 
 /* ======================================================
@@ -542,12 +542,12 @@
 
     background: transparent;
 
-    border-color: var(--text-soft);
+    border-color: var(--text-disabled);
 }
 
 .estado-alerta {
 
-    color: var(--yellow);
+    color: var(--text-yellow);
 
     font-weight: bold;
 
@@ -609,7 +609,7 @@
 
     background: transparent;
 
-    color: var(--text-soft);
+    color: var(--text-disabled);
 
     border: 1px solid transparent;
 
@@ -673,7 +673,7 @@
 
     font-size: var(--fs13);
 
-    color: var(--text-soft);
+    color: var(--text-disabled);
 
     white-space: nowrap;
 }
@@ -719,7 +719,7 @@
 
     background: var(--highlight);
 
-    color: var(--text-on-highlight);
+    color: var(--text-highdark);
 
     font-weight: 600;
 }
@@ -735,7 +735,7 @@
 
     background: rgba(0, 217, 255, 0.12);
 
-    color: var(--text-soft);
+    color: var(--text-disabled);
 
     border-color: rgba(0, 217, 255, 0.35);
 }
