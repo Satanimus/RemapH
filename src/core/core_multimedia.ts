@@ -93,7 +93,7 @@ export function textoAccionMultimedia(comando: string | null): string {
 }
 
 // ======================================================
-// 📝 TOOLTIP DEL BOTÓN EXTRA (columna de la tabla, ícono ⁘)
+// 📝 TOOLTIP DEL BOTÓN EXTRA (columna de la tabla, ícono ∴)
 // ------------------------------------------------------
 // Alcance de ejecución (filaPerfil.extraMultimedia) — usado por
 // comp_controles.ts::crearExtra() cuando tipo === "multimedia".

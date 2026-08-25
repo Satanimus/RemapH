@@ -32,7 +32,7 @@ body {
   background: transparent;
   font-family: var(--font);
   font-size: var(--fs13);
-  color: #ffffff;
+  color: var(--text);
   user-select: none;
 }
 
@@ -57,7 +57,7 @@ body {
   background: rgba(20, 20, 30, 0.9);
   border: 1px solid rgba(255, 255, 255, 0.35);
   border-radius: 6px;
-  color: #ffffff;
+  color: var(--text);
   cursor: pointer;
   white-space: nowrap;
   overflow: hidden;
@@ -131,7 +131,7 @@ body {
   background: transparent;
   border: 1px solid var(--border-light);
   border-radius: 3px;
-  color: #ffffff;
+  color: var(--text);
   font-size: var(--fs11);
   line-height: 1;
   padding: 0;
@@ -276,7 +276,7 @@ body {
 .menu-express-radial-centro-titulo {
   max-width: 100%;
   text-align: center;
-  font-size: var(--fs12);
+  font-size: var(--fs13);
   opacity: 0.85;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -292,7 +292,7 @@ body {
 
 .menu-express-vacio {
   margin: auto;
-  font-size: var(--fs12);
+  font-size: var(--fs13);
   opacity: 0.7;
   text-align: center;
   padding: 12px;
@@ -344,20 +344,4 @@ body {
 
 .menu-express-boton.tam-grande {
   height: 50px;
-}
-
-/* ==========================
-   Tamaños de texto (menu_extra.tamanoTexto)
-   ========================== */
-
-.menu-express-boton.txt-pequeno {
-  font-size: 10px;
-}
-
-.menu-express-boton.txt-mediano {
-  font-size: 13px;
-}
-
-.menu-express-boton.txt-grande {
-  font-size: 16px;
 }

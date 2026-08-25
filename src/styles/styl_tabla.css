@@ -92,7 +92,7 @@
 
     color: var(--text-disabled);
 
-    font-size: var(--fs12);
+    font-size: var(--fs13);
 }
 
 /* Etapa C: botón On/Off (.estado-toggle, ver styl_botones.css)
@@ -204,7 +204,7 @@
 
 .carril-expandir:hover {
 
-    color: var(--tag-cyan);
+    color: var(--highlight);
 }
 
 
@@ -234,7 +234,7 @@
 
     border-bottom: 1px solid rgba(255, 255, 255, 0.06);
 
-    font-size: var(--fs12);
+    font-size: var(--fs13);
 
     font-weight: 500;
 
@@ -661,8 +661,8 @@
     background: none;
     outline: none;
 
-    font-family: "Segoe UI Symbol", "Segoe UI", "Segoe UI Emoji", sans-serif;
-    font-size: 15px;
+    font-family: var(--font);
+    font-size: var(--fs16);
     color: var(--text-disabled);
 
     line-height: 22px;
@@ -703,7 +703,7 @@
 }
 
 /* ==========================
-   Tooltip custom del botón Extra (ícono ⁘)
+   Tooltip custom del botón Extra (ícono ∴)
    — ver comp_tooltip_extra.ts
    ========================== */
 
@@ -715,8 +715,8 @@
     background: rgba(15, 15, 20, 0.97);
     border: 1px solid var(--border-light);
     border-radius: 6px;
-    color: #ffffff;
-    font-size: var(--fs12);
+    color: var(--text);
+    font-size: var(--fs13);
     line-height: 1.4;
     white-space: pre-wrap;
     word-break: break-word;
@@ -729,5 +729,5 @@
 }
 
 .extra-tooltip-subtitulo {
-    color: #9a9a9a;
+    color: var(--text-soft);
 }

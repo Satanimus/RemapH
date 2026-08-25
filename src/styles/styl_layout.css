@@ -414,7 +414,7 @@
   padding: 0;
   border-radius: 50%;
   font-weight: 700;
-  font-size: var(--fs14);
+  font-size: var(--fs13);
   line-height: 22px;
 }
 
@@ -425,7 +425,7 @@
 
 .popup-menu-editor-toggle.popup-menu-editor-agregar:hover {
   background: var(--tag-green);
-  color: #fff;
+  color: var(--text);
 }
 
 .popup-menu-editor-toggle.popup-menu-editor-quitar {
@@ -435,7 +435,7 @@
 
 .popup-menu-editor-toggle.popup-menu-editor-quitar:hover {
   background: var(--highlight-red);
-  color: #fff;
+  color: var(--text);
 }
 
 /* ======================================================
@@ -475,7 +475,7 @@
 
   border-radius: 50%;
 
-  background: var(--red);
+  background: var(--highlight-red);
 
   margin-left: var(--gap8);
 }
@@ -622,7 +622,7 @@
   height: 8px;
   min-width: 8px;
   border-radius: 50%;
-  background: var(--tag-cyan);
+  background: var(--highlight);
 }
 
 /* ======================================================
@@ -680,12 +680,12 @@
 }
 
 .popup-switch[data-activo="true"] .popup-switch-pista {
-  background: rgba(3, 169, 244, 0.18);
-  border-color: var(--tag-cyan);
+  background: color-mix(in srgb, var(--highlight) 18%, transparent);
+  border-color: var(--highlight);
 }
 
 .popup-switch[data-activo="true"] .popup-switch-bolita {
-  background: var(--tag-cyan);
+  background: var(--highlight);
   transform: translateX(14px);
 }
 
@@ -745,7 +745,7 @@
   min-width: 18px;
   height: 18px;
   color: var(--text-soft);
-  font-size: var(--fs14);
+  font-size: var(--fs13);
   line-height: 1;
   flex-shrink: 0;
 }
@@ -1120,8 +1120,8 @@
 
 .ui-btn.popup-macro-editor-marcador[data-activo="true"] {
   color: var(--bg);
-  background: var(--tag-cyan);
-  border-color: var(--tag-cyan);
+  background: var(--highlight);
+  border-color: var(--highlight);
 }
 
 /* Sin esto, la regla genérica .ui-btn:hover (color: var(--text))
@@ -1131,15 +1131,15 @@
    invierte a fondo transparente + letra cyan, mismo criterio visual
    que el ícono de Bucle (data-es-bucle="true") de acá arriba. */
 .ui-btn.popup-macro-editor-marcador[data-activo="true"]:hover {
-  color: var(--tag-cyan);
+  color: var(--highlight);
   background: transparent;
-  border-color: var(--tag-cyan);
+  border-color: var(--highlight);
 }
 
 .ui-btn.popup-macro-editor-marcador[data-es-bucle="true"] {
-  color: var(--tag-cyan);
+  color: var(--highlight);
   background: transparent;
-  border-color: var(--tag-cyan);
+  border-color: var(--highlight);
   cursor: default;
   pointer-events: none;
 }
@@ -1223,7 +1223,7 @@
 .ui-btn.popup-macro-editor-asa[data-abierto="true"],
 .ui-btn.popup-macro-editor-tipo[data-abierto="true"],
 .ui-btn.popup-macro-editor-accion[data-abierto="true"] {
-  border-color: var(--tag-cyan);
+  border-color: var(--highlight);
 }
 
 .popup-macro-editor-eliminar {
@@ -1232,7 +1232,7 @@
 
 .popup-macro-editor-eliminar:hover {
   background: var(--highlight-red);
-  color: #fff;
+  color: var(--text);
 }
 
 .popup-macro-editor-detalle {

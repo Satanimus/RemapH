@@ -30,7 +30,7 @@ body {
   background: transparent;
   font-family: var(--font);
   font-size: var(--fs13);
-  color: #ffffff;
+  color: var(--text);
   user-select: none;
 }
 
@@ -90,7 +90,7 @@ body {
   background: transparent;
   border: 1px solid var(--border-light);
   border-radius: 3px;
-  color: #ffffff;
+  color: var(--text);
   font-size: var(--fs11);
   line-height: 1;
   padding: 0;
@@ -113,8 +113,8 @@ body {
   background: transparent;
   border: 1px solid transparent;
   border-radius: 3px;
-  color: #ffffff;
-  font-size: 9px;
+  color: var(--text);
+  font-size: var(--fs11);
   line-height: 1;
   padding: 0;
   cursor: pointer;
@@ -179,7 +179,7 @@ body {
   text-align: center;
   padding: 12px;
   color: var(--text-disabled);
-  font-size: var(--fs12);
+  font-size: var(--fs13);
 }
 
 /* ==========================
@@ -203,7 +203,7 @@ body {
   background: rgba(20, 20, 30, 0.7);
   border: 1px solid rgba(255, 255, 255, 0.25);
   border-radius: 6px;
-  color: #ffffff;
+  color: var(--text);
   font-size: var(--fs13);
   cursor: pointer;
   transition: background-color 0.1s ease;
@@ -227,7 +227,7 @@ body {
   background: rgba(20, 20, 30, 0.9);
   border: 1px solid rgba(255, 255, 255, 0.35);
   border-radius: 6px;
-  color: #ffffff;
+  color: var(--text);
   text-align: left;
   white-space: nowrap;
   overflow: hidden;
@@ -259,7 +259,7 @@ body {
   border: 1px solid rgba(255, 255, 255, 0.25);
   border-radius: 6px;
   color: var(--text-soft);
-  font-size: var(--fs12);
+  font-size: var(--fs13);
   line-height: 1;
   cursor: pointer;
   transition: background-color 0.1s ease;
@@ -267,7 +267,7 @@ body {
 
 .portapapeles-boton-opciones:hover {
   background: rgba(255, 255, 255, 0.12);
-  color: #ffffff;
+  color: var(--text);
 }
 
 /* ==========================
@@ -282,8 +282,8 @@ body {
   background: rgba(15, 15, 20, 0.97);
   border: 1px solid var(--border-light);
   border-radius: 6px;
-  color: #ffffff;
-  font-size: var(--fs12);
+  color: var(--text);
+  font-size: var(--fs13);
   line-height: 1.4;
   white-space: pre-wrap;
   word-break: break-word;
@@ -320,7 +320,7 @@ body {
   background: rgba(20, 20, 30, 0.85);
   border: 1px solid rgba(255, 255, 255, 0.25);
   border-radius: 6px;
-  color: #ffffff;
+  color: var(--text);
   font-size: var(--fs11);
   cursor: pointer;
   transition: background-color 0.1s ease;
@@ -372,12 +372,12 @@ body {
 }
 
 .portapapeles-switch-registro[data-activo="true"] .portapapeles-switch-pista {
-  background: rgba(3, 169, 244, 0.18);
-  border-color: var(--tag-cyan);
+  background: color-mix(in srgb, var(--highlight) 18%, transparent);
+  border-color: var(--highlight);
 }
 
 .portapapeles-switch-registro[data-activo="true"] .portapapeles-switch-bolita {
-  background: var(--tag-cyan);
+  background: var(--highlight);
   transform: translateX(12px);
 }
 
@@ -386,7 +386,7 @@ body {
 }
 
 .portapapeles-switch-registro[data-activo="true"] {
-  color: #ffffff;
+  color: var(--text);
 }
 
 /* ==========================
@@ -442,7 +442,7 @@ body {
 }
 
 .portapapeles-popup-titulo {
-  font-size: var(--fs12);
+  font-size: var(--fs13);
   opacity: 0.85;
 }
 
@@ -488,9 +488,9 @@ body {
   background: rgba(255, 255, 255, 0.06);
   border: 1px solid rgba(255, 255, 255, 0.2);
   border-radius: 6px;
-  color: #ffffff;
+  color: var(--text);
   text-align: left;
-  font-size: var(--fs12);
+  font-size: var(--fs13);
   cursor: pointer;
 }
 
@@ -508,8 +508,8 @@ body {
   background: rgba(0, 0, 0, 0.35);
   border: 1px solid var(--border-light);
   border-radius: 6px;
-  color: #ffffff;
-  font-size: var(--fs12);
+  color: var(--text);
+  font-size: var(--fs13);
   font-family: var(--font);
 }
 
@@ -520,8 +520,8 @@ body {
   background: rgba(0, 0, 0, 0.35);
   border: 1px solid var(--border-light);
   border-radius: 6px;
-  color: #ffffff;
-  font-size: var(--fs12);
+  color: var(--text);
+  font-size: var(--fs13);
   font-family: var(--font);
 }
 
@@ -536,7 +536,7 @@ body {
   background: rgba(255, 255, 255, 0.08);
   border: 1px solid rgba(255, 255, 255, 0.25);
   border-radius: 6px;
-  color: #ffffff;
+  color: var(--text);
   font-size: var(--fs11);
   cursor: pointer;
 }

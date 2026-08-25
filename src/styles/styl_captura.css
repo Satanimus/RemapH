@@ -23,7 +23,7 @@ body {
   background: transparent;
   font-family: var(--font);
   font-size: var(--fs13);
-  color: #ffffff;
+  color: var(--text);
   user-select: none;
 }
 
@@ -61,7 +61,7 @@ body {
 .captura-cancelar {
   background: transparent;
   border: 1px solid var(--border-light);
-  color: #ffffff;
+  color: var(--text);
   border-radius: 4px;
   padding: 2px 8px;
   font-size: var(--fs11);
@@ -83,7 +83,7 @@ body {
 }
 
 .captura-linea {
-  font-size: var(--fs12);
+  font-size: var(--fs13);
   opacity: 0.85;
 }
 
@@ -93,8 +93,8 @@ body {
 }
 
 .captura-guardado {
-  color: #4caf50;
+  color: var(--green);
   font-weight: 600;
   text-align: center;
-  font-size: var(--fs14);
+  font-size: var(--fs13);
 }

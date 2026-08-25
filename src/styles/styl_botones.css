@@ -105,7 +105,7 @@
 
     border-color: transparent;
 
-    color: #FFF;
+    color: var(--text);
 }
 
 /* ------------------------------
@@ -139,31 +139,9 @@
 
 .ui-btn.estado[data-estado="inactivo"]:hover {
 
-    background: color-mix(in srgb, var(--red) 10%, transparent);
+    background: color-mix(in srgb, var(--highlight-red) 10%, transparent);
 
-    border-color: var(--red);
-}
-
-/* ------------------------------
-   EDITADO
-   ------------------------------ */
-
-.ui-btn.estado[data-estado="editado"] {
-
-    background: var(--yellow-dark);
-
-    border-color: var(--yellow-dark);
-
-    color: #FFF;
-}
-
-.ui-btn.estado[data-estado="editado"]:hover {
-
-    background: var(--yellow);
-
-    border-color: var(--yellow);
-
-    color: #111;
+    border-color: var(--highlight-red);
 }
 
 /* ======================================================
@@ -201,7 +179,7 @@
 
     color: var(--color-trigger-sintaxis);
 
-    font-size: 16px;
+    font-size: var(--fs16);
 
     font-weight: 700;
 
@@ -246,9 +224,9 @@
 
     border-radius: 4px;
 
-    color: var(--red);
+    color: var(--highlight-red);
 
-    font-size: var(--fs12);
+    font-size: var(--fs13);
 
     font-weight: 700;
 
@@ -259,7 +237,7 @@
 
 .capturador-cancelar:hover {
 
-    background: var(--red);
+    background: var(--highlight-red);
 
     color: var(--text);
 }
@@ -367,7 +345,7 @@
 
     border-radius: 50%;
 
-    background: var(--red);
+    background: var(--highlight-red);
 }
 
 .indicador[data-estado="activo"] {
@@ -415,15 +393,15 @@
 
     border-color: var(--cyan-dark);
 
-    color: #FFF;
+    color: var(--text);
 
 }
 
 .popup-capa .popup-extra-capturar:hover {
 
-    background: var(--tag-cyan);
+    background: var(--highlight);
 
-    border-color: var(--tag-cyan);
+    border-color: var(--highlight);
 }
 
 /* ======================================================
@@ -517,7 +495,7 @@
 
     background: transparent;
 
-    color: #FFF;
+    color: var(--text);
 }
 
 .estado-toggle span:not(.estado-alerta) {
@@ -527,7 +505,7 @@
 
 .estado-toggle[data-estado="on"]:hover {
 
-    border-color: var(--red);
+    border-color: var(--highlight-red);
 
     background: transparent;
 }
@@ -545,7 +523,7 @@
 
     background: rgba(198, 40, 40, 0.75);
 
-    border-color: var(--red);
+    border-color: var(--highlight-red);
 }
 
 .estado-toggle[data-conflicto="true"] {
@@ -573,7 +551,7 @@
 
     font-weight: bold;
 
-    font-size: var(--fs12);
+    font-size: var(--fs13);
 
     line-height: 1;
 }
@@ -741,7 +719,7 @@
 
     background: var(--highlight);
 
-    color: #05202a;
+    color: var(--text-on-highlight);
 
     font-weight: 600;
 }
@@ -788,10 +766,10 @@
 }
 
 /* ======================================================
-   ⁘ COLUMNA EXTRA — botón solo ícono (ventana principal)
+   ∴ COLUMNA EXTRA — botón solo ícono (ventana principal)
    ------------------------------------------------------
    Antes mostraba el texto de la opción elegida (ver
-   comp_popup.ts). Ahora solo el ícono ⁘, centrado — las
+   comp_popup.ts). Ahora solo el ícono ∴, centrado — las
    opciones elegidas quedan como tooltip (title), mismo
    criterio que .tipo-control arriba.
    ====================================================== */
@@ -828,5 +806,5 @@
 
     flex: none;
 
-    font-size: var(--fs14);
+    font-size: var(--fs13);
 }

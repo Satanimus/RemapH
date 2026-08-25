@@ -1,8 +1,8 @@
 // ======================================================
-// ⁘ comp_Popup
+// ∴ comp_Popup
 // ------------------------------------------------------
 // La columna Extra (único consumidor de este helper) ya no
-// muestra texto: es solo el ícono ⁘, mismo criterio icon-only
+// muestra texto: es solo el ícono ∴, mismo criterio icon-only
 // que la columna Tipo (ver comp_popup_abrir.ts, iconoDeTipo).
 // Las opciones elegidas quedan como tooltip (title), con formato
 // "Subtítulo: Elección" por línea — cada texto*Extra()/textoMenuExtra()/
@@ -19,7 +19,7 @@ export interface PopupOpciones {
 
 export function crearPopup(opciones: PopupOpciones): HTMLButtonElement {
   const boton = crearBoton({
-    texto: "⁘",
+    texto: "∴",
     clase: "extra-control",
   });
   // Tooltip custom (colorea "Subtítulo:" distinto del valor) en vez

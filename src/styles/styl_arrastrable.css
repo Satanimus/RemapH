@@ -12,7 +12,7 @@
    ========================== */
 
 .arr-fila--seleccionada {
-    box-shadow: inset 0 0 0 2px var(--tag-cyan);
+    box-shadow: inset 0 0 0 2px var(--highlight);
 }
 
 /* ==========================
@@ -27,7 +27,7 @@
 .arr-asa--activa::before {
     content: "⁝⁝";
     margin-right: var(--gap4);
-    color: var(--tag-cyan);
+    color: var(--highlight);
     font-weight: bold;
     line-height: 1;
 }
@@ -69,7 +69,7 @@
 
 .arr-fantasma-fila {
     background: var(--panel2);
-    box-shadow: inset 0 0 0 2px var(--tag-cyan);
+    box-shadow: inset 0 0 0 2px var(--highlight);
     pointer-events: none;
 }
 
@@ -93,7 +93,7 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    background: var(--tag-cyan);
+    background: var(--highlight);
     color: var(--bg);
     font-size: var(--fs11);
     font-weight: bold;

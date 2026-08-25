@@ -26,11 +26,8 @@
 
    --font: "Segoe UI", sans-serif;
 
-   --fs10: 10px;
    --fs11: 11px;
-   --fs12: 12px;
    --fs13: 13px;
-   --fs14: 14px;
    --fs16: 16px;
 
    /* ==========================
@@ -46,7 +43,6 @@
 
    --green-dark: #2E6F32;
    --red-dark: #8F2525;
-   --yellow-dark: #A77F1C;
 
    /* ==========================
        Fondos
@@ -78,6 +74,10 @@
 
    --text-disabled: #777777;
 
+   /* Texto oscuro sobre fondo --highlight (ej. btn-guardar-cambios) —
+      no comparte token con --text, que es claro sobre fondo oscuro. */
+   --text-on-highlight: #05202a;
+
 
    /* ==========================
        Colores principales
@@ -89,7 +89,6 @@
 
    --yellow: #D8A628;
 
-   --red: #C62828;
 
    --blue: #1976D2;
 
@@ -216,7 +215,7 @@
    --col-action: 150px;
 
    /* Antes 150px: la columna Extra mostraba el texto de la
-       opción elegida. Ahora es un botón solo-ícono (⁘, ver
+       opción elegida. Ahora es un botón solo-ícono (∴, ver
        .extra-control en styl_botones.css) — mismo ancho que
        --col-type. */
    --col-behavior: 60px;
