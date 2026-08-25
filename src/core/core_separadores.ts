@@ -109,6 +109,24 @@ export function construirPlanVisual(perfil: Perfil): ItemVisualTabla[] {
   return plan;
 }
 
+export function construirNumerosAbsolutos(perfil: Perfil): Map<string, number> {
+  const mapa = new Map<string, number>();
+
+  let contador = 0;
+
+  for (const item of perfil.filas) {
+    if (esSeparador(item)) {
+      continue;
+    }
+
+    contador += 1;
+
+    mapa.set(item.id, contador);
+  }
+
+  return mapa;
+}
+
 // ======================================================
 // 📏 TRAMO DE SEPARADOR
 // ------------------------------------------------------

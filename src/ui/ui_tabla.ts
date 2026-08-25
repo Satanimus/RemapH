@@ -19,6 +19,7 @@ import { obtenerPerfilUi } from "../core/core_perfil_ui";
 
 import {
   construirPlanVisual,
+  construirNumerosAbsolutos,
   esSeparador,
   obtenerTramoDeSeparador,
 } from "../core/core_separadores";
@@ -254,6 +255,8 @@ export function crearTabla(alModificar: () => void): HTMLElement {
 
     const plan = construirPlanVisual(perfil);
 
+    const numerosAbsolutos = construirNumerosAbsolutos(perfil);
+
     // Etapa B: el carril solo se ensancha (espacio para el botón
     // Expandir/Contraer) cuando hay al menos un separador visible.
     carrilNumeros.classList.toggle(
@@ -261,14 +264,12 @@ export function crearTabla(alModificar: () => void): HTMLElement {
       plan.some((item) => item.tipo === "separador"),
     );
 
-    // Regla 18: la numeración del carril solo cuenta filas normales,
-    // saltando los separadores en la secuencia.
-    let numeroVisible = 0;
-
-    // Último índice de plan que es una fila, para saber cuál es la
-    // "última" fila visible cuando no pertenece a ningún separador
-    // (zona superior, Regla 4) — item.separador.ultima ya resuelve
-    // ese caso cuando sí hay separador activo.
+    // Regla 18 (revisada): el número de fila es su posición
+    // absoluta entre TODAS las filas del perfil (contando también
+    // las ocultas dentro de separadores contraídos), no la posición
+    // entre las filas visibles — así el número que aparece en un
+    // mensaje de alerta sigue correspondiendo a la misma fila
+    // aunque haya separadores contraídos antes de ella.
     let ultimoIndiceFilaEnPlan = -1;
 
     plan.forEach((item, indicePlan) => {
@@ -294,12 +295,10 @@ export function crearTabla(alModificar: () => void): HTMLElement {
 
         registrarFilaArrastrable(filaElemento);
 
-        numeroVisible += 1;
-
         const numero = document.createElement("div");
 
         numero.className = "carril-numero";
-        numero.textContent = String(numeroVisible);
+        numero.textContent = String(numerosAbsolutos.get(item.fila.id));
 
         // Etapa C: On/Off superpuesto al número (absolute, ver
         // .carril-numero .estado-toggle en styl_tabla.css).
