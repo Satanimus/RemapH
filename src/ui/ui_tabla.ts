@@ -65,14 +65,6 @@ export function crearTabla(alModificar: () => void): HTMLElement {
 
     celda.textContent = col.titulo;
 
-    const divisor = document.createElement("div");
-
-    divisor.className = "divisor-columna";
-
-    celda.append(divisor);
-
-    divisor.style.pointerEvents = "auto";
-
     cabecera.append(celda);
   });
 

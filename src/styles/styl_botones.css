@@ -664,7 +664,7 @@
 
     gap: var(--gap8);
 
-    height: 28px;
+    height: 36px;
 
     padding: 0 var(--gap8) 0 var(--gap12);
 
@@ -704,7 +704,7 @@
 
     white-space: nowrap;
 
-    height: 28px;
+    height: 24px;
 
     margin: 0;
 
@@ -730,28 +730,36 @@
 
 .btn-guardar-cambios {
 
-    background: var(--green-dark);
+    background: var(--highlight);
+
+    color: #05202a;
+
+    font-weight: 600;
 }
 
 .btn-guardar-cambios:hover {
 
-    background: var(--green);
+    background: var(--highlight-strong, var(--highlight));
+
+    filter: brightness(1.1);
 }
 
 .btn-revertir-cambios {
 
-    background: var(--button-bg);
+    background: rgba(0, 217, 255, 0.12);
 
     color: var(--text-soft);
 
-    border-color: var(--border-light);
+    border-color: rgba(0, 217, 255, 0.35);
 }
 
 .btn-revertir-cambios:hover {
 
+    background: rgba(0, 217, 255, 0.22);
+
     border-color: var(--highlight);
 
-    color: var(--highlight);
+    color: var(--text);
 }
 
 /* ======================================================
