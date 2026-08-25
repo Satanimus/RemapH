@@ -302,12 +302,14 @@
     border-left: 1px solid var(--separador-color);
 }
 
-/* [FIX] borde de acento (línea de color) en el borde derecho —
-   clase aparte de "en-separador-fin" (que controla solo la
-   esquina redondeada, ver abajo) para que la línea solo aparezca
-   con color real, nunca con el fallback. Con `.fila` de por
+/* [FIX] simétrico con en-separador-inicio (borde izquierdo): usa
+   var(--separador-color), que ya resuelve al color del separador
+   o a var(--border-light) si no tiene (fallback puesto en
+   ui_fila.ts) — antes esta línea solo se agregaba con color real
+   (clase separada "en-separador-borde-fin"), por eso faltaba el
+   borde derecho en separadores sin color. Con `.fila` de por
    medio para ganarle en especificidad al divisor genérico. */
-.fila .celda.en-separador-borde-fin {
+.fila .celda.en-separador-fin {
 
     border-right: 1px solid var(--separador-color);
 }
@@ -451,9 +453,13 @@
    tinte de separador (recortado a Opciones→Extra) — se separa
    visualmente del cuerpo teñido, leyéndose como nota al margen,
    igual criterio que .celda.nota-separador del header. */
+/* [FIX] tenía un border-left fijo en var(--border-light) que se
+   veía como línea gris entre Extra y Nota en TODAS las filas de
+   un separador (con o sin color) — no dependía de en-separador-fin
+   ni de en-separador-borde-fin, por eso ningún fix anterior lo
+   tocaba. Se saca el borde: la nota se distingue del cuerpo
+   teñido solo por su propio estilo (cursiva/fuente), sin línea. */
 .celda.nota-en-fila-separador {
-
-    border-left: 1px solid var(--border-light);
 
     font-style: italic;
 }

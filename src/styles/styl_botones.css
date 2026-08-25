@@ -127,14 +127,14 @@
 
 .ui-btn.estado[data-estado="inactivo"] {
 
-    background: var(--red-dark);
+    background: color-mix(in srgb, var(--red-dark) 10%, transparent);
 
     border-color: var(--red-dark);
 }
 
 .ui-btn.estado[data-estado="inactivo"]:hover {
 
-    background: var(--red);
+    background: color-mix(in srgb, var(--red) 10%, transparent);
 
     border-color: var(--red);
 }
