@@ -26,7 +26,7 @@
 // (ver core_menu_express.ts).
 // ======================================================
 
-import { mostrarPopup } from "./comp_popup_contenedor";
+import { mostrarPopup, ocultarPopup } from "./comp_popup_contenedor";
 
 import { reconstruirFila } from "../ui/ui_tabla_control";
 
@@ -207,6 +207,12 @@ export function abrirEditorMenuExpress(
     // Acción de la tabla, que sí puede reconstruirse en caliente.
     reconstruirFila(contexto.id);
     alModificar();
+  });
+
+  inputNombre.addEventListener("keydown", (evento) => {
+    if (evento.key === "Enter") {
+      ocultarPopup();
+    }
   });
 
   popup.append(inputNombre);

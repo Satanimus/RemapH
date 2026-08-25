@@ -68,6 +68,11 @@
     border-color: transparent;
 }
 
+.fila .capturador {
+
+    border-color: var(--fila-color, transparent);
+}
+
 .fila .ui-btn:not(:where(.estado-toggle)):hover,
 .fila .ui-btn:not(:where(.estado-toggle))[data-abierto="true"] {
 
@@ -521,7 +526,7 @@
 .estado-toggle[data-estado="off"],
 .estado-toggle[data-conflicto="true"] {
 
-    background: rgba(143, 37, 37, 0.20);
+    background: rgba(143, 37, 37, 0.55);
 
     border-color: rgba(143, 37, 37, 0.85);
 }
@@ -660,6 +665,16 @@
     gap: var(--gap8);
 
     height: 28px;
+
+    padding: 0 var(--gap8) 0 var(--gap12);
+
+    border: 1px solid var(--highlight);
+
+    border-radius: var(--r4);
+
+    background: rgba(0, 217, 255, 0.12);
+
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
 }
 
 .cambios-pendientes.visible {

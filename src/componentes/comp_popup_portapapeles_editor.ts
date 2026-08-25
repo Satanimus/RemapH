@@ -17,7 +17,7 @@
 // clic afuera (mostrarPopup ya resuelve eso).
 // ======================================================
 
-import { mostrarPopup } from "./comp_popup_contenedor";
+import { mostrarPopup, ocultarPopup } from "./comp_popup_contenedor";
 
 import { reconstruirFila } from "../ui/ui_tabla_control";
 
@@ -55,6 +55,12 @@ export function abrirEditorPortapapeles(
     // que el campo Nombre de comp_popup_menu_express_editor.ts.
     reconstruirFila(contexto.id);
     alModificar();
+  });
+
+  inputNombre.addEventListener("keydown", (evento) => {
+    if (evento.key === "Enter") {
+      ocultarPopup();
+    }
   });
 
   popup.append(inputNombre);

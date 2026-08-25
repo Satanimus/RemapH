@@ -89,6 +89,7 @@ function crearFilaBotones(
       menuExtra.colorBoton = valor;
 
       reconstruirFila(contexto.id);
+      alModificar();
       redibujar();
     }),
   );
@@ -364,6 +365,7 @@ export function abrirPopupExtraMenuExpress(
         menuExtra.tamanoTexto = valor;
 
         reconstruirFila(contexto.id);
+        alModificar();
         redibujar();
       }),
     ),

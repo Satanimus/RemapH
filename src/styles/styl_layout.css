@@ -795,7 +795,7 @@
 
 .ui-btn.popup-btn-peligro,
 .ui-btn.popup-perfil-eliminar {
-  color: var(--highlight-red);
+  color: var(--text);
 }
 
 .ui-btn.popup-btn-peligro:hover,

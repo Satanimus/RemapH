@@ -170,13 +170,13 @@
 }
 
 .panel-lateral-eliminar {
-    color: var(--red);
+    color: var(--text);
 
     border-color: transparent;
 }
 
 .panel-lateral-eliminar:hover {
-    color: var(--red);
+    color: var(--highlight-red);
 
     background: transparent;
 
