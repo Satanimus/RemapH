@@ -7,6 +7,17 @@
 // número ni de estado: el botón expandir/contraer y el
 // On/Off viven en el carril, lado a lado (ver
 // comp_separador_expandir.ts).
+//
+// [FIX] Nota funciona como Nombre del separador: ocupa
+// desde donde arrancaría la columna App hasta el borde
+// derecho de la fila (antes quedaba un tramo vacío
+// coloreado entre Opciones y Extra, y la Nota arrancaba
+// recién después de Extra). El color/fondo del separador
+// ahora se pinta en la fila completa (fila-separador), no
+// en un wrapper intermedio — así el botón Opciones queda
+// en el mismo ancho/posición que la celda Opciones de una
+// fila normal, sin una celda "cuerpo" de por medio que
+// antes desalineaba el resto del contenido.
 // ======================================================
 
 import type { SeparadorPerfil } from "../core/core_perfil";
@@ -16,12 +27,8 @@ import { crearNota } from "../componentes/comp_controles";
 import { abrirPopupSeparadores } from "../componentes/comp_popup_separadores";
 import { COLUMNAS } from "./ui_columnas";
 
-// [FIX] Ancho de Opciones tomado de la misma fuente única de verdad
-// que usa ui_fila.ts para las filas normales — antes esta celda no
-// llevaba ningún ancho inline y quedaba del tamaño de su contenido,
-// desalineada con la columna Opciones de la cabecera y de una fila
-// normal (y sin reaccionar al redimensionado de columnas, ver
-// ui_redimension_columnas.ts).
+// Ancho de Opciones tomado de la misma fuente única de verdad
+// que usa ui_fila.ts para las filas normales.
 const anchoOpciones =
   COLUMNAS.find((col) => col.id === "opciones")?.ancho ?? "";
 
@@ -35,23 +42,13 @@ export function crearSeparadorHeader(
 
   fila.dataset.id = separador.id;
 
-  // Etapa E6: el tinte de separador (fondo/border-radius de
-  // .fila-separador) debe terminar en el borde derecho de "Extra",
-  // igual que en fila normal — se mueve --separador-color y el
-  // fondo del contenedor "fila" a un wrapper interno (celdaCuerpo)
-  // que sí mide Opciones→Extra. celdaNota queda fuera de ese
-  // wrapper, sin heredar la variable, con estilo de nota al margen.
-  const celdaCuerpo = document.createElement("div");
-
-  celdaCuerpo.className = "separador-cuerpo";
-
   if (separador.color) {
-    celdaCuerpo.style.setProperty(
+    fila.style.setProperty(
       "--separador-color",
       `var(--tag-${separador.color})`,
     );
   } else {
-    celdaCuerpo.style.removeProperty("--separador-color");
+    fila.style.removeProperty("--separador-color");
   }
 
   const celdaOpciones = document.createElement("div");
@@ -73,15 +70,13 @@ export function crearSeparadorHeader(
 
   celdaOpciones.append(botonOpciones);
 
-  celdaCuerpo.append(celdaOpciones);
-
   const celdaNota = document.createElement("div");
 
   celdaNota.className = "celda nota-separador";
 
   celdaNota.append(crearNota(separador, alModificar));
 
-  fila.append(celdaCuerpo, celdaNota);
+  fila.append(celdaOpciones, celdaNota);
 
   return fila;
 }

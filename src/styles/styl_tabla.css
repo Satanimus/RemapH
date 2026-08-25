@@ -264,17 +264,37 @@
 
 /* Etapa E: el tinte de separador se acota a las celdas
    Opciones→Extra (ya no a la fila completa) — Nota queda sin
-   color, ver .celda.nota-en-fila-separador más abajo. */
+   color, ver .celda.nota-en-fila-separador más abajo.
+   [FIX] se pinta con color-mix(...,transparent) en vez de mezclar
+   contra var(--row-bg) — antes eso computaba un color SÓLIDO
+   nuevo, una capa opaca aparte por encima del fondo real de la
+   fila (que ya varía por fila par/impar y por hover), lo que
+   generaba la costura/línea visible en los bordes. Mezclando
+   contra transparent se tiñe el fondo real en vez de taparlo, y
+   la opacidad queda controlada por una sola variable, igual
+   técnica que usa .fila-separador (mismo criterio, ver abajo). */
 .celda.en-separador {
 
-    background: color-mix(in srgb, var(--separador-color) 18%, var(--row-bg));
+    background: color-mix(in srgb, var(--separador-color) var(--separador-opacidad-fila), transparent);
 
     box-sizing: border-box;
 }
 
+/* [FIX] regla aparte con `.fila` de por medio, para que gane
+   siempre (por especificidad) al divisor gris genérico entre
+   columnas (.celda:not(:last-child), misma especificidad sin
+   el `.fila`), que se veía como una costura dentro del tinte
+   del separador. Dentro de un separador la superficie es
+   continua: solo llevan borde propio los bordes de acento
+   (inicio/fin, ver más abajo). */
+.fila .celda.en-separador {
+
+    border-right: none;
+}
+
 .fila:hover .celda.en-separador {
 
-    background: color-mix(in srgb, var(--separador-color) 30%, var(--row-bg));
+    background: color-mix(in srgb, var(--separador-color) var(--separador-opacidad-fila-hover), transparent);
 }
 
 .celda.en-separador-inicio {
@@ -282,7 +302,12 @@
     border-left: 1px solid var(--separador-color);
 }
 
-.celda.en-separador-fin {
+/* [FIX] borde de acento (línea de color) en el borde derecho —
+   clase aparte de "en-separador-fin" (que controla solo la
+   esquina redondeada, ver abajo) para que la línea solo aparezca
+   con color real, nunca con el fallback. Con `.fila` de por
+   medio para ganarle en especificidad al divisor genérico. */
+.fila .celda.en-separador-borde-fin {
 
     border-right: 1px solid var(--separador-color);
 }
@@ -302,6 +327,10 @@
     border-top-left-radius: var(--r8);
 }
 
+/* [FIX] la esquina redondeada del lado derecho ya no depende de
+   tener color (antes vivía en ".en-separador-fin", que solo se
+   agregaba con color real) — ahora se aplica siempre que la
+   celda sea el final del tinte, tenga o no borde de acento. */
 .celda.en-separador-fin.primera-del-separador {
 
     border-top-right-radius: var(--r8);
@@ -317,6 +346,13 @@
     border-bottom-right-radius: var(--r8);
 }
 
+/* [FIX] El tinte/fondo/border-radius del separador ahora se pinta
+   en la fila completa (antes vivía en un wrapper intermedio,
+   .separador-cuerpo, que solo cubría Opciones→Extra y dejaba a la
+   Nota como una celda aparte empezando después de Extra). La Nota
+   funciona como Nombre del separador: ocupa el resto de la fila
+   desde donde arrancaría la columna App, así que el color debe
+   llegar hasta el borde derecho también. */
 .fila-separador {
 
     display: flex;
@@ -328,29 +364,10 @@
     height: var(--row-height);
 
     box-sizing: border-box;
-}
 
-/* Etapa E7: el tinte/fondo/border-radius del separador (antes en
-   .fila-separador, cubriendo toda la fila) se acota al ancho de
-   Opciones→Extra — misma regla que en fila normal (Etapa E3).
-   Nota queda fuera, en .celda.nota-separador (nota al margen). */
-.separador-cuerpo {
+    background: color-mix(in srgb, var(--separador-color, var(--panel2)) var(--separador-opacidad-header), transparent);
 
-    display: flex;
-
-    align-items: center;
-
-    height: 100%;
-
-    box-sizing: border-box;
-
-    flex-shrink: 0;
-
-    width: calc(var(--col-options) + var(--col-app) + var(--col-trigger) + var(--col-type) + var(--col-action) + var(--col-behavior));
-
-    background: color-mix(in srgb, var(--separador-color, var(--panel2)) 55%, transparent);
-
-    border-radius: var(--r8) var(--r8) 0 0;
+    border-radius: var(--r8);
 
     box-shadow: var(--separador-sombra);
 }

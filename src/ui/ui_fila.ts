@@ -75,8 +75,18 @@ export function crearFila(
         celda.classList.add("en-separador-inicio");
       }
 
+      // [FIX] "en-separador-fin" ahora solo controla la esquina
+      // redondeada del lado derecho (siempre, tenga color o no).
+      // El borde de acento (línea de color) es una clase aparte,
+      // "en-separador-borde-fin", que solo se agrega con color
+      // real — así nunca aparece una línea cuando el separador
+      // no tiene color, pero la esquina se redondea igual.
       if (col.id === "extra") {
         celda.classList.add("en-separador-fin");
+
+        if (infoSeparador.color) {
+          celda.classList.add("en-separador-borde-fin");
+        }
       }
 
       if (infoSeparador.primera) {
