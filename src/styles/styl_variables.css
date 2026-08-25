@@ -267,9 +267,9 @@
        - --separador-opacidad-fila-hover: filas debajo, al pasar el mouse */
    --separador-opacidad-header: 18%;
 
-   --separador-opacidad-fila: 18%;
+   --separador-opacidad-fila: 5%;
 
-   --separador-opacidad-fila-hover: 18%;
+   --separador-opacidad-fila-hover: 10%;
 
    /* Fuente propia del texto de Nota del Separador — ahí funciona
       como título del separador, no como una nota común, así que no

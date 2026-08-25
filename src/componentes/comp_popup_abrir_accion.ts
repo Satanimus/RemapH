@@ -108,6 +108,8 @@ export function crearAccionAbrir(
     filaPerfil.abrirExtra,
   );
 
+  boton.classList.toggle("con-valor", Boolean(filaPerfil.abrirAccion.ruta));
+
   boton.append(nombre);
 
   boton.title = filaPerfil.abrirAccion.ruta ?? "Seleccionar...";

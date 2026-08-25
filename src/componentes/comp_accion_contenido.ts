@@ -24,10 +24,14 @@ export function crearAccionTeclado(): HTMLButtonElement {
 export function crearAccionMultimedia(
   filaPerfil: FilaPerfil,
 ): HTMLButtonElement {
-  return crearBoton({
+  const boton = crearBoton({
     texto: textoAccionMultimedia(filaPerfil.accionReferencia),
     clase: "capturador",
   });
+
+  boton.classList.toggle("con-valor", Boolean(filaPerfil.accionReferencia));
+
+  return boton;
 }
 
 // El editor propio (seleccionados/disponibles) se conecta recién en
@@ -36,10 +40,14 @@ export function crearAccionMultimedia(
 export function crearAccionMenuExpress(
   filaPerfil: FilaPerfil,
 ): HTMLButtonElement {
-  return crearBoton({
+  const boton = crearBoton({
     texto: textoMenuAccion(filaPerfil.menuAccion),
     clase: "capturador",
   });
+
+  boton.classList.toggle("con-valor", Boolean(filaPerfil.menuAccion.nombre));
+
+  return boton;
 }
 
 // El menú real (Abrir/Clonar/Nueva) se conecta desde comp_accion.ts
@@ -47,10 +55,14 @@ export function crearAccionMenuExpress(
 // default "🧩 Seleccionar macro"), mismo criterio que
 // crearAccionMultimedia().
 export function crearAccionMacro(filaPerfil: FilaPerfil): HTMLButtonElement {
-  return crearBoton({
+  const boton = crearBoton({
     texto: textoMacroAccion(filaPerfil.accionReferencia),
     clase: "capturador",
   });
+
+  boton.classList.toggle("con-valor", Boolean(filaPerfil.accionReferencia));
+
+  return boton;
 }
 
 // El editor propio (comp_popup_portapapeles_editor.ts) se conecta
@@ -60,8 +72,15 @@ export function crearAccionMacro(filaPerfil: FilaPerfil): HTMLButtonElement {
 export function crearAccionPortapapeles(
   filaPerfil: FilaPerfil,
 ): HTMLButtonElement {
-  return crearBoton({
+  const boton = crearBoton({
     texto: textoPortapapelesAccion(filaPerfil.portapapelesAccion),
     clase: "capturador",
   });
+
+  boton.classList.toggle(
+    "con-valor",
+    Boolean(filaPerfil.portapapelesAccion.nombre),
+  );
+
+  return boton;
 }

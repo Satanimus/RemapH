@@ -284,12 +284,21 @@
 
 .trigger-tecla {
 
-    color: var(--text);
+    color: var(--text-soft);
 }
 
 .trigger-sintaxis {
 
     color: var(--color-trigger-sintaxis);
+}
+
+/* Botones de Acción sin markup propio (Multimedia, MenuExpress,
+   Macro, Portapapeles, Abrir Archivo/App): mismo criterio que
+   .trigger-tecla — texto brillante mientras esperan un valor,
+   apagado una vez que ya tienen uno guardado. */
+.capturador.con-valor {
+
+    color: var(--text-soft);
 }
 
 /* ======================================================
