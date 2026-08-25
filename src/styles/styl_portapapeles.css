@@ -200,7 +200,7 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: color-mix(in srgb, var(--overlay-superficie) 70%, transparent);
+  background: color-mix(in srgb, var(--overlay-superficie) var(--portapapeles-boton-fijar-opacidad), transparent);
   border: 1px solid color-mix(in srgb, var(--overlay-contraste) 25%, transparent);
   border-radius: 6px;
   color: var(--text);

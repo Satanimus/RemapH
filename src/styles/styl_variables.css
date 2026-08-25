@@ -253,10 +253,13 @@
       para funcionar sobre cualquier fondo de escritorio. Los tonos
       distintos (superficie/popup/tooltip) dan jerarquía visual: cada
       capa que se abre encima de otra es un poco más oscura/opaca.
-      Las variantes con transparencia (bordes, hover, distintas
-      intensidades de fondo) se arman con color-mix() en el CSS de
-      cada ventana a partir de estos 4 colores base — no hay una
-      variable por cada opacidad usada. */
+      La MAYORÍA de las variantes con transparencia (bordes, hover,
+      intensidades de fondo) todavía se arman con color-mix() y un
+      porcentaje fijo en el CSS de cada ventana — no todas tienen
+      variable propia. Las que sí la tienen están en el bloque
+      "Opacidad de objetos" más abajo (ver
+      reglas_opacidad_apariencia.txt: la opacidad es del
+      objeto/contenedor, no del color). */
    --overlay-superficie: #14141e;
 
    --overlay-popup: #191920;
@@ -264,4 +267,17 @@
    --overlay-tooltip: #0f0f14;
 
    --overlay-contraste: #ffffff;
+
+   /* ==========================
+       Opacidad de objetos
+       ========================== */
+
+   /* Cada variable de acá es la opacidad de UN objeto/contenedor
+      concreto, no de un color — dos objetos que usan el mismo color
+      base (ej. --overlay-superficie) pueden tener cada uno su propia
+      opacidad, sin compartir variable entre sí (ver
+      reglas_opacidad_apariencia.txt, reglas 2-4). Piloto: botón
+      "Fijar" de Portapapeles (.portapapeles-boton-fijar en
+      styl_portapapeles.css). */
+   --portapapeles-boton-fijar-opacidad: 70%;
 }

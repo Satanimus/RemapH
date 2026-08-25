@@ -7,8 +7,13 @@
 #   styl_variables.css, SIN el prefijo "--" (ej. clave "bg" ->
 #   variable "--bg"). No puede contener un punto (reservado para el
 #   prefijo "css." de Configuracion_Usuario.txt).
-# - tipo: "color" (string "#RRGGBB", editable con un selector nativo)
-#   o "pixeles" (entero seguido de "px", ej. "16px").
+# - tipo: "color" (string "#RRGGBB", editable con un selector nativo),
+#   "pixeles" (entero seguido de "px", ej. "16px"), "texto" (texto
+#   libre, ej. una lista de font-family) o "porcentaje" (entero 0-100
+#   seguido de "%", ej. "45%" — para opacidad de un objeto/contenedor,
+#   NO del color: ver reglas_opacidad_apariencia.txt. Combina con su
+#   color base vía color-mix() en el CSS, mismo patrón que
+#   --separador-opacidad-header/-fila/-fila-hover).
 # - valor_defecto: mismo valor EFECTIVO que en styl_variables.css
 #   (si una variable está redefinida más de una vez en el archivo,
 #   el que vale en cascada es el último), en el mismo formato que
@@ -43,6 +48,7 @@ overlay-superficie	Fondo de ventanas flotantes	#14141e	color
 overlay-popup	Fondo de popup en ventanas flotantes	#191920	color
 overlay-tooltip	Fondo de tooltip en ventanas flotantes	#0f0f14	color
 overlay-contraste	Contraste (bordes/hover) en ventanas flotantes	#ffffff	color
+portapapeles-boton-fijar-opacidad	Opacidad — botón Fijar (Portapapeles)	70%	porcentaje
 text	Color de texto principal	#F2F2F2	color
 text-disabled	Color de texto deshabilitado	#9e9e9e	color
 text-highlight	Color de texto resaltado	#03A9F4	color

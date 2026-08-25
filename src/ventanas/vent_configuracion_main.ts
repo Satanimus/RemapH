@@ -47,7 +47,8 @@ type TipoValorConfiguracion =
   | "numero_par"
   | "texto"
   | "color"
-  | "pixeles";
+  | "pixeles"
+  | "porcentaje";
 
 interface FilaConfiguracion {
   clave: string;
@@ -221,6 +222,10 @@ function construirValorDesdeInputs(
     return `${inputs[0].value.trim()}px`;
   }
 
+  if (fila.tipo === "porcentaje") {
+    return `${inputs[0].value.trim()}%`;
+  }
+
   return inputs[0].value.trim();
 }
 
@@ -273,6 +278,20 @@ function validarValor(fila: FilaConfiguracion, valor: string): string | null {
 
       return null;
     }
+
+    case "porcentaje": {
+      if (!/^\d{1,3}%$/.test(valor)) {
+        return "Debe ser un porcentaje (ej. 45%)";
+      }
+
+      const numero = Number(valor.slice(0, -1));
+
+      if (numero < 0 || numero > 100) {
+        return "Debe ser un porcentaje entre 0% y 100%";
+      }
+
+      return null;
+    }
   }
 }
 
@@ -296,6 +315,18 @@ function crearInputColor(valorInicial: string): HTMLInputElement {
   return input;
 }
 
+function crearInputPorcentaje(valorInicial: string): HTMLInputElement {
+  const input = document.createElement("input");
+
+  input.type = "number";
+  input.min = "0";
+  input.max = "100";
+  input.step = "1";
+  input.value = valorInicial;
+
+  return input;
+}
+
 // Inversa de construirValorDesdeInputs(): escribe valorDefecto en
 // el/los inputs de la fila según su tipo, disparando "input" en
 // cada uno para reusar el flujo normal de marcarEditando/validación
@@ -312,6 +343,8 @@ function aplicarValorEnInputs(
     inputs[1].value = (alto ?? "").trim();
   } else if (fila.tipo === "pixeles") {
     inputs[0].value = valor.replace(/px$/, "");
+  } else if (fila.tipo === "porcentaje") {
+    inputs[0].value = valor.replace(/%$/, "");
   } else {
     inputs[0].value = valor;
   }
@@ -543,6 +576,16 @@ function crearPestanaEditable(opciones: OpcionesPestana): Pestana {
       tdPersonalizado.append(input);
     } else if (fila.tipo === "color") {
       const input = crearInputColor(valorActual);
+
+      inputs.push(input);
+
+      tdPersonalizado.append(input);
+    } else if (fila.tipo === "porcentaje") {
+      // Mismo criterio que "pixeles": valorActual siempre trae el
+      // sufijo "%" (ver configuracion_listar_apariencia) — el input
+      // numérico solo edita el número, el "%" se reapendea al
+      // construir el valor (ver construirValorDesdeInputs).
+      const input = crearInputPorcentaje(valorActual.replace(/%$/, ""));
 
       inputs.push(input);
 
@@ -999,6 +1042,7 @@ function grupoApariencia(clave: string, tipo: string): string {
   }
   if (tipo === "color") return "Colores";
   if (tipo === "texto") return "Texto libre";
+  if (tipo === "porcentaje") return "Opacidad";
   return "Tamaños";
 }
 
@@ -1116,8 +1160,17 @@ const pestanaApariencia = crearPestanaEditable({
     // orden del tsv dentro de cada grupo, pero "Texto" va primero
     // (agrupa colores + tamaños + fuente de texto, ver
     // grupoApariencia) para que no quede intercalado entre
-    // "Colores" y "Tamaños".
-    const ordenGrupos = ["Texto", "Colores", "Texto libre", "Tamaños"];
+    // "Colores" y "Tamaños". "Opacidad" (tipo porcentaje, ver
+    // reglas_opacidad_apariencia.txt) va justo después de
+    // "Colores": son los objetos/contenedores que aplican
+    // transparencia sobre esos colores, no el color en sí.
+    const ordenGrupos = [
+      "Texto",
+      "Colores",
+      "Opacidad",
+      "Texto libre",
+      "Tamaños",
+    ];
     filasCss.sort(
       (a, b) => ordenGrupos.indexOf(a.grupo) - ordenGrupos.indexOf(b.grupo),
     );

@@ -1340,6 +1340,7 @@ fn tipo_css_a_texto(tipo: &configuracion_usuario::TipoValorCss) -> String {
         configuracion_usuario::TipoValorCss::Color => "color".to_string(),
         configuracion_usuario::TipoValorCss::Pixeles => "pixeles".to_string(),
         configuracion_usuario::TipoValorCss::Texto => "texto".to_string(),
+        configuracion_usuario::TipoValorCss::Porcentaje => "porcentaje".to_string(),
     }
 }
 

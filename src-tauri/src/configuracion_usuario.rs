@@ -845,11 +845,11 @@ pub fn guardar_lote_pulsadores(cambios: &[(String, String)]) -> Result<(), Vec<(
 // ------------------------------------------------------
 // Mismo espíritu que el catálogo de General (cargar_catalogo/
 // EntradaCatalogo), pero para las variables de
-// styl_variables.css: tipo propio (color/pixeles, no numero/
-// numero_par/texto) y ningún setter de config.rs que aplicar
-// — el valor vive únicamente en Configuracion_Usuario.txt y
-// lo consume el frontend (ver comandos.rs, sección Apariencia,
-// y core_apariencia.ts).
+// styl_variables.css: tipo propio (color/pixeles/texto/
+// porcentaje, no numero/numero_par/texto de General) y ningún
+// setter de config.rs que aplicar — el valor vive únicamente en
+// Configuracion_Usuario.txt y lo consume el frontend (ver
+// comandos.rs, sección Apariencia, y core_apariencia.ts).
 // ======================================================
 
 #[derive(Clone, Debug, PartialEq)]
@@ -857,6 +857,7 @@ pub enum TipoValorCss {
     Color,
     Pixeles,
     Texto,
+    Porcentaje,
 }
 
 #[derive(Clone, Debug)]
@@ -925,6 +926,7 @@ pub fn cargar_catalogo_css() -> &'static Vec<EntradaCatalogoCss> {
                 "color" => TipoValorCss::Color,
                 "pixeles" => TipoValorCss::Pixeles,
                 "texto" => TipoValorCss::Texto,
+                "porcentaje" => TipoValorCss::Porcentaje,
                 _ => panic!(
                     "❌ Tipo desconocido \"{}\" en apariencia.tsv. Línea {}",
                     tipo_texto,
@@ -1016,6 +1018,25 @@ fn validar_css_segun_tipo(tipo: &TipoValorCss, valor: &str) -> Result<(), String
                 Err("El valor no puede estar vacío".to_string())
             } else {
                 Ok(())
+            }
+        }
+
+        TipoValorCss::Porcentaje => {
+            let valor = valor.trim();
+
+            let Some(numero) = valor.strip_suffix('%') else {
+                return Err(format!(
+                    "Debe ser un porcentaje entre 0% y 100%, ej. \"45%\": \"{}\"",
+                    valor
+                ));
+            };
+
+            match numero.parse::<u8>() {
+                Ok(n) if n <= 100 => Ok(()),
+                _ => Err(format!(
+                    "Debe ser un porcentaje entre 0% y 100%, ej. \"45%\": \"{}\"",
+                    valor
+                )),
             }
         }
     }
