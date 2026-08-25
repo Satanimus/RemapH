@@ -35,7 +35,7 @@ panel	Fondo de panel	#222222	color
 panel2	Fondo de panel secundario	#2B2B2B	color
 border	Color de borde	#404040	color
 text	Color de texto principal	#F2F2F2	color
-text-disabled	Color de texto deshabilitado	#777777	color
+text-disabled	Color de texto deshabilitado	#9e9e9e	color
 text-highlight	Color de texto resaltado	#03A9F4	color
 text-red	Color de texto (alerta)	#C62828	color
 text-yellow	Color de texto (aviso)	#D8A628	color
