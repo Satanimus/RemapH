@@ -1281,7 +1281,10 @@ botonGuardarGlobal.addEventListener("click", async () => {
 
   if (
     !huboCambioModo &&
-    recolecciones.every(({ resultado }) => resultado.cambios.length === 0)
+    recolecciones.every(
+      ({ pestana, resultado }) =>
+        resultado.cambios.length === 0 && !pestana.hayEdicionesPendientes(),
+    )
   ) {
     return;
   }
@@ -1290,7 +1293,7 @@ botonGuardarGlobal.addEventListener("click", async () => {
 
   try {
     for (const { pestana, resultado } of recolecciones) {
-      if (resultado.cambios.length === 0) {
+      if (resultado.cambios.length === 0 && !pestana.hayEdicionesPendientes()) {
         continue;
       }
 

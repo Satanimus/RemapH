@@ -1595,7 +1595,20 @@ pub fn aplicar_apariencia(cambios: &[(String, String)]) -> Result<(), Vec<(Strin
     let (nombre_sesion, origen_sesion, base) =
         sesion_apariencia_actual().map_err(|error| vec![(String::new(), error)])?;
 
+    // `base` es el tema crudo (sin overrides) — sirve para la columna
+    // "Valor por Defecto" pero NO para persistir, o los overrides ya
+    // guardados en disco que esta vez no se tocaron se perderían
+    // (quedarían pisados por el valor crudo del tema). Se mezclan acá
+    // los overrides vigentes (vacíos si esta sesión cargó un tema
+    // nuevo, porque tema_sesion_cargar ya los limpió) antes de aplicar
+    // los `cambios` de este guardado.
+    let overrides_vigentes = leer_overrides_css().map_err(|error| vec![(String::new(), error)])?;
+
     let mut valores_finales = base;
+
+    for (clave, valor) in overrides_vigentes {
+        valores_finales.insert(clave, valor);
+    }
 
     for (clave, valor) in cambios {
         valores_finales.insert(clave.clone(), valor.trim().to_string());

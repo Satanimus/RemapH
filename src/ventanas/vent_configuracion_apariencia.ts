@@ -553,6 +553,14 @@ export function crearPestanaApariencia(
   // la visibilidad de "Guardar valores editados" en el popup.
   let hayPersonalizadosSesion = false;
 
+  // Se pone en true al elegir un tema en "Cargar ▾". A diferencia de
+  // editar un valor puntual (filasConCambio), cargar un tema no marca
+  // ninguna fila individual — sin este flag, hayEdicionesPendientes()
+  // devolvía false y "Aplicar cambios" no detectaba nada que guardar.
+  // Se apaga al reiniciar la sesión (cargar()) o tras guardar con
+  // éxito (limpiarEstadoTrasGuardado()).
+  let huboCargaDeTema = false;
+
   const botonSelectorTema = document.createElement("button");
   botonSelectorTema.type = "button";
   botonSelectorTema.className = "configuracion-selector-tema oculto";
@@ -595,6 +603,7 @@ export function crearPestanaApariencia(
 
       nombreTemaSesion = tema.nombre;
       origenTemaSesion = tema.origen;
+      huboCargaDeTema = true;
 
       await recargarTablaApariencia();
 
@@ -829,12 +838,13 @@ export function crearPestanaApariencia(
 
     nombreTemaSesion = sesion.nombre;
     origenTemaSesion = sesion.origen;
+    huboCargaDeTema = false;
 
     await recargarTablaApariencia();
   }
 
   function hayEdicionesPendientes(): boolean {
-    return filasConCambio.size > 0;
+    return filasConCambio.size > 0 || huboCargaDeTema;
   }
 
   // H5 (corregido): recolecta los hijos de las filas marcadas. Un
@@ -884,7 +894,11 @@ export function crearPestanaApariencia(
 
     const errores: ErrorConfiguracion[] = [];
 
-    if (aGuardar.length > 0) {
+    // Se llama igual con aGuardar vacío cuando huboCargaDeTema: no hay
+    // ningún campo puntual tocado, pero igual hay que persistir el
+    // tema de sesión completo (y marcarlo como el tema aplicado) —
+    // ver aplicar_apariencia en el backend.
+    if (aGuardar.length > 0 || huboCargaDeTema) {
       const resultado = await invoke<ResultadoGuardado>(
         "configuracion_guardar_lote_apariencia",
         { cambios: aGuardar },
@@ -931,6 +945,7 @@ export function crearPestanaApariencia(
   // H9
   async function limpiarEstadoTrasGuardado(): Promise<void> {
     filasConCambio.clear();
+    huboCargaDeTema = false;
 
     for (const tr of trPorNodo.values()) {
       tr.classList.remove("configuracion-arbol-editando");

@@ -632,7 +632,7 @@
 
     border-color: var(--highlight);
 
-    color: var(--highlight);
+    color: var(--text-highlight);
 }
 
 /* ======================================================
