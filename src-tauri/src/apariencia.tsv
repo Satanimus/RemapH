@@ -78,6 +78,15 @@ nivel	id	nombre_ui	valor_defecto	tipo
 0	overlay-tooltip	Color	#0f0f14	color
 2	overlay-contraste	Contraste (bordes/hover) en ventanas flotantes		
 0	overlay-contraste	Color	#ffffff	color
+2	green	Verde (éxito)		
+0	green	Color	#388E3C	color
+2	green-dark	Verde (estado activo)		
+0	green-dark	Color	#2E7D32	color
+2	red-dark	Rojo (estado activo)		
+0	red-dark	Color	#8F2525	color
+2	cyan-dark	Cian oscurecido (acento UI)		
+0	cyan-dark	Color	#0B7285	color
+1	color-texto	Color de Texto		
 2	text	Color de texto principal		
 0	text	Color	#F2F2F2	color
 2	text-disabled	Color de texto deshabilitado		
@@ -88,14 +97,6 @@ nivel	id	nombre_ui	valor_defecto	tipo
 0	text-red	Color	#C62828	color
 2	text-highdark	Color de texto oscuro sobre resaltado		
 0	text-highdark	Color	#05202a	color
-2	green	Verde (éxito)		
-0	green	Color	#388E3C	color
-2	green-dark	Verde (estado activo)		
-0	green-dark	Color	#2E7D32	color
-2	red-dark	Rojo (estado activo)		
-0	red-dark	Color	#8F2525	color
-2	cyan-dark	Cian oscurecido (acento UI)		
-0	cyan-dark	Color	#0B7285	color
 1	texto	Texto		
 2	font	Fuente de texto		
 0	font	Texto	"Segoe UI", sans-serif	texto

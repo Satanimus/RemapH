@@ -24,6 +24,16 @@
 
 import { invoke } from "@tauri-apps/api/core";
 
+// Claves "--xxx" aplicadas la última vez que corrió esta función en
+// ESTA ventana. Las demás ventanas no lo necesitan (se recargan
+// enteras vía location.reload y arrancan con <html> limpio), pero la
+// propia Ventana de Configuración llama esta función de nuevo sin
+// recargar (ver vent_configuracion_main.ts::refrescarTrasCambioApariencia)
+// — sin este registro, una clave que tenía valor en la llamada
+// anterior y ya no viene en el mapa nuevo (cambio de tema con menos
+// overrides, restablecer, etc.) se quedaba pisando el valor viejo.
+let clavesAplicadasPrevias: string[] = [];
+
 export async function aplicarOverridesApariencia(): Promise<void> {
   try {
     const overrides = await invoke<Record<string, string>>(
@@ -32,9 +42,21 @@ export async function aplicarOverridesApariencia(): Promise<void> {
 
     const raiz = document.documentElement;
 
+    const clavesNuevas = new Set(
+      Object.keys(overrides).map((clave) => `--${clave}`),
+    );
+
+    for (const clave of clavesAplicadasPrevias) {
+      if (!clavesNuevas.has(clave)) {
+        raiz.style.removeProperty(clave);
+      }
+    }
+
     for (const [clave, valor] of Object.entries(overrides)) {
       raiz.style.setProperty(`--${clave}`, valor);
     }
+
+    clavesAplicadasPrevias = [...clavesNuevas];
 
     const modo = overrides["fondo-general-modo"] ?? "plano";
 
