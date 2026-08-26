@@ -236,3 +236,33 @@ pub fn nombre_actual() -> Result<String, String> {
 
     nombre_desde_ruta(&ruta).ok_or_else(|| "No se pudo determinar el nombre del perfil".to_string())
 }
+
+// ======================================================
+// 🎨 LISTAR TEMAS DE USUARIO
+// ======================================================
+
+pub(crate) fn temas() -> Result<Vec<String>, String> {
+    let carpeta = carpeta_temas()?;
+
+    let mut nombres = Vec::new();
+
+    let entradas = fs::read_dir(&carpeta).map_err(|error| error.to_string())?;
+
+    for entrada in entradas {
+        let ruta = entrada.map_err(|error| error.to_string())?.path();
+
+        let Some(nombre) = ruta.file_name().and_then(|nombre| nombre.to_str()) else {
+            continue;
+        };
+
+        let Some(nombre) = nombre.strip_suffix(".theme") else {
+            continue;
+        };
+
+        nombres.push(nombre.to_string());
+    }
+
+    nombres.sort();
+
+    Ok(nombres)
+}

@@ -151,6 +151,7 @@ use crate::usuario;
 use base64::engine::general_purpose::STANDARD as BASE64;
 use base64::Engine as _;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 use tauri::{Manager, WebviewUrl, WebviewWindowBuilder};
 
@@ -1358,6 +1359,8 @@ fn tipo_css_a_texto(tipo: &configuracion_usuario::TipoValorCss) -> String {
 pub async fn configuracion_listar_apariencia() -> Result<Vec<ConfiguracionFilaCssUI>, String> {
     let overrides = configuracion_usuario::leer_overrides_css()?;
 
+    let (_, _, base) = configuracion_usuario::sesion_apariencia_actual()?;
+
     let filas = configuracion_usuario::cargar_catalogo_css()
         .iter()
         .map(|entrada| ConfiguracionFilaCssUI {
@@ -1374,7 +1377,11 @@ pub async fn configuracion_listar_apariencia() -> Result<Vec<ConfiguracionFilaCs
             },
 
             valor_defecto: if entrada.nivel == 0 {
-                Some(entrada.valor_defecto.clone())
+                Some(
+                    base.get(&entrada.id)
+                        .cloned()
+                        .unwrap_or_else(|| entrada.valor_defecto.clone()),
+                )
             } else {
                 None
             },
@@ -1395,7 +1402,7 @@ pub async fn configuracion_guardar_lote_apariencia(
         .map(|cambio| (cambio.clave, cambio.valor))
         .collect();
 
-    match configuracion_usuario::guardar_lote_css(&pares) {
+    match configuracion_usuario::aplicar_apariencia(&pares) {
         Ok(()) => Ok(ConfiguracionResultadoGuardadoUI {
             errores: Vec::new(),
         }),
@@ -1460,6 +1467,66 @@ pub async fn abrir_carpeta_usuario() -> Result<(), String> {
         .map_err(|error| error.to_string())?;
 
     Ok(())
+}
+
+// ======================================================
+// 🖼️ SELECTOR DE TEMAS — listar/cargar/guardar-como/
+//    guardar-editado/renombrar/eliminar
+// ======================================================
+
+#[derive(Serialize)]
+pub struct TemaListadoUI {
+    pub nombre: String,
+    pub origen: String,
+}
+
+#[tauri::command]
+pub async fn configuracion_tema_listar() -> Result<Vec<TemaListadoUI>, String> {
+    Ok(configuracion_usuario::listar_temas()?
+        .into_iter()
+        .map(|tema| TemaListadoUI {
+            nombre: tema.nombre,
+            origen: tema.origen,
+        })
+        .collect())
+}
+
+#[tauri::command]
+pub async fn configuracion_tema_cargar(
+    nombre: String,
+    origen: String,
+) -> Result<HashMap<String, String>, String> {
+    configuracion_usuario::tema_sesion_cargar(&nombre, &origen)
+}
+
+#[tauri::command]
+pub async fn configuracion_tema_guardar_como(nombre: String) -> Result<(), String> {
+    configuracion_usuario::guardar_tema_como(&nombre)
+}
+
+#[tauri::command]
+pub async fn configuracion_tema_guardar_editado(nombre: String) -> Result<(), String> {
+    configuracion_usuario::guardar_tema_editado(&nombre)
+}
+
+#[tauri::command]
+pub async fn configuracion_tema_renombrar(
+    nombre_actual: String,
+    nombre_nuevo: String,
+) -> Result<(), String> {
+    configuracion_usuario::renombrar_tema(&nombre_actual, &nombre_nuevo)
+}
+
+#[tauri::command]
+pub async fn configuracion_tema_eliminar(nombre: String) -> Result<(), String> {
+    configuracion_usuario::eliminar_tema(&nombre)
+}
+
+#[tauri::command]
+pub async fn configuracion_apariencia_iniciar_sesion() -> Result<TemaListadoUI, String> {
+    let (nombre, origen) = configuracion_usuario::sesion_apariencia_reiniciar();
+
+    Ok(TemaListadoUI { nombre, origen })
 }
 
 #[tauri::command]

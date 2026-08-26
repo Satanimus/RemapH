@@ -74,6 +74,36 @@
   color: var(--highlight);
 }
 
+/* E7/Fix: botón ghost del selector de temas, mismo criterio que
+   .configuracion-boton-carpeta — transparente en reposo, borde+color
+   de acento en hover. Vive en la misma barra de acciones global que
+   Restablecer/Aplicar cambios (justify-content: flex-end): el
+   margin-right: auto lo empuja al extremo izquierdo, separado de
+   esos dos botones. Oculto salvo con la pestaña Apariencia activa
+   (ver activarTab en vent_configuracion_main.ts). */
+.configuracion-selector-tema {
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--r4);
+  color: var(--text);
+  font-size: var(--fs13);
+  padding: var(--gap4) var(--gap8);
+  margin-right: auto;
+  cursor: pointer;
+  transition:
+    border-color .12s ease,
+    color .12s ease;
+}
+
+.configuracion-selector-tema.oculto {
+  display: none;
+}
+
+.configuracion-selector-tema:hover {
+  border-color: var(--highlight);
+  color: var(--highlight);
+}
+
 /* ======================================================
    CUERPO / PANELES
    ====================================================== */
@@ -353,30 +383,6 @@
   flex-direction: column;
   gap: var(--gap8);
   min-width: 220px;
-}
-
-/* Grupo de controles de tema (Apariencia) — empujado al borde
-   izquierdo del pie, mientras Restablecer/Guardar quedan a la
-   derecha (el pie sigue siendo flex-end por defecto). */
-.configuracion-acciones-tema {
-  display: flex;
-  align-items: center;
-  gap: var(--gap8);
-  margin-right: auto;
-}
-
-.configuracion-acciones-tema.oculto {
-  display: none;
-}
-
-.configuracion-input-tema {
-  padding: var(--gap8);
-  background: var(--panel2);
-  border: 1px solid var(--border-light);
-  border-radius: var(--r4);
-  color: var(--text);
-  font-size: var(--fs13);
-  width: 160px;
 }
 
 .configuracion-par {

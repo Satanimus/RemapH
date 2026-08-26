@@ -1364,6 +1364,361 @@ pub fn guardar_tema(nombre_sugerido: &str) -> Result<String, String> {
     Ok(nombre_archivo)
 }
 
+// ======================================================
+// 📋 LISTAR TEMAS (predefinidos + usuario)
+// ======================================================
+
+pub struct TemaListado {
+    pub nombre: String,
+    pub origen: String,
+}
+
+pub fn listar_temas() -> Result<Vec<TemaListado>, String> {
+    let mut lista: Vec<TemaListado> = NOMBRES_TEMAS_PREDEFINIDOS
+        .iter()
+        .map(|nombre| TemaListado {
+            nombre: nombre.to_string(),
+            origen: "predefinido".to_string(),
+        })
+        .collect();
+
+    for nombre in usuario::temas()? {
+        if es_tema_predefinido(&nombre) {
+            continue;
+        }
+
+        lista.push(TemaListado {
+            nombre,
+            origen: "usuario".to_string(),
+        });
+    }
+
+    Ok(lista)
+}
+
+// ======================================================
+// 📖 CARGAR TEMA POR NOMBRE (preview de sesión)
+// ------------------------------------------------------
+// Devuelve el mapa completo de valores del tema (clave sin
+// prefijo "css." → valor), no solo los que difieren de
+// fábrica. "predefinido" resuelve directo contra
+// cargar_catalogo_css() (valor_defecto); "usuario" lee el
+// archivo .theme y usa valor_defecto como fallback para
+// claves ausentes en el archivo.
+// ======================================================
+
+pub fn cargar_tema_por_nombre(
+    nombre: &str,
+    origen: &str,
+) -> Result<HashMap<String, String>, String> {
+    let catalogo = cargar_catalogo_css();
+
+    let overrides_archivo: HashMap<String, String> = if origen == "predefinido" {
+        HashMap::new()
+    } else {
+        let ruta = usuario::carpeta_temas()?.join(format!("{}.theme", nombre));
+
+        if !ruta.exists() {
+            return Err(format!("El tema \"{}\" no existe", nombre));
+        }
+
+        let texto = fs::read_to_string(&ruta).map_err(|error| error.to_string())?;
+
+        let mut mapa = HashMap::new();
+
+        for linea in texto.lines() {
+            let linea = linea.trim();
+
+            if linea.is_empty() || linea.starts_with('#') {
+                continue;
+            }
+
+            let Some((clave, valor)) = linea.split_once('=') else {
+                continue;
+            };
+
+            mapa.insert(clave.trim().to_string(), valor.trim().to_string());
+        }
+
+        mapa
+    };
+
+    let mut resultado = HashMap::new();
+
+    for entrada in catalogo.iter().filter(|entrada| entrada.nivel == 0) {
+        let valor = overrides_archivo
+            .get(&entrada.id)
+            .cloned()
+            .unwrap_or_else(|| entrada.valor_defecto.clone());
+
+        resultado.insert(entrada.id.clone(), valor);
+    }
+
+    Ok(resultado)
+}
+
+// ======================================================
+// 🖼️ SESIÓN DE APARIENCIA (Etapa C)
+// ------------------------------------------------------
+// Estado en memoria (no persistido) de la ventana de
+// Configuración: qué tema está de base para la columna
+// "Valor por Defecto" mientras la ventana está abierta.
+// None = todavía no se cargó ningún tema esta sesión, la
+// base es el tema realmente aplicado (persistido en
+// TEMA_APLICADO). Some(...) = se cargó un tema con
+// "Cargar ▾"; sigue siendo solo preview hasta "Aplicar
+// cambios" (ver aplicar_apariencia).
+// ======================================================
+
+static SESION_APARIENCIA: Mutex<Option<(String, String, HashMap<String, String>)>> =
+    Mutex::new(None);
+
+pub fn sesion_apariencia_actual() -> Result<(String, String, HashMap<String, String>), String> {
+    {
+        let mutex = SESION_APARIENCIA.lock().unwrap();
+
+        if let Some(valor) = mutex.clone() {
+            return Ok(valor);
+        }
+    }
+
+    let (nombre, origen) = tema_aplicado_actual();
+
+    let valores = cargar_tema_por_nombre(&nombre, &origen)?;
+
+    Ok((nombre, origen, valores))
+}
+
+fn establecer_sesion_apariencia(valor: Option<(String, String, HashMap<String, String>)>) {
+    let mut mutex = SESION_APARIENCIA.lock().unwrap();
+
+    *mutex = valor;
+}
+
+// ======================================================
+// 🧹 LIMPIAR OVERRIDES CSS VIGENTES
+// ------------------------------------------------------
+// Usada al cargar un tema: descarta TODOS los valores
+// personalizados de Apariencia persistidos hasta ahora
+// (pendientes sin guardar y ya aplicados anteriormente),
+// no solo los de esta sesión — ver tema_sesion_cargar.
+// ======================================================
+
+fn limpiar_overrides_css() -> Result<(), String> {
+    let mut mapa = leer_mapa_completo()?;
+
+    mapa.retain(|clave, _| !clave.starts_with(PREFIJO_CSS));
+
+    escribir_mapa_completo(&mapa)
+}
+
+// ======================================================
+// 📥 CARGAR TEMA EN LA SESIÓN (preview, "Cargar ▾")
+// ------------------------------------------------------
+// A diferencia de cargar_tema_por_nombre (que solo lee y
+// devuelve valores), esto tiene efecto: descarta los
+// overrides CSS vigentes y fija el tema cargado como base
+// de sesión para "Valor por Defecto". Recargar el mismo
+// tema ya abierto también limpia los personalizados, tal
+// como pide la especificación.
+// ======================================================
+
+pub fn tema_sesion_cargar(nombre: &str, origen: &str) -> Result<HashMap<String, String>, String> {
+    let valores = cargar_tema_por_nombre(nombre, origen)?;
+
+    limpiar_overrides_css()?;
+
+    establecer_sesion_apariencia(Some((
+        nombre.to_string(),
+        origen.to_string(),
+        valores.clone(),
+    )));
+
+    Ok(valores)
+}
+
+// ======================================================
+// 🔄 REINICIAR SESIÓN DE APARIENCIA
+// ------------------------------------------------------
+// Descarta el preview de una apertura anterior de la
+// ventana que no se llegó a Aplicar. Sin esto, reabrir la
+// ventana seguiría mostrando el tema recién cargado en vez
+// de "volver a mostrar el último tema realmente aplicado".
+// ======================================================
+
+pub fn sesion_apariencia_reiniciar() -> (String, String) {
+    establecer_sesion_apariencia(None);
+
+    tema_aplicado_actual()
+}
+
+// ======================================================
+// ✅ APLICAR CAMBIOS DE APARIENCIA
+// ------------------------------------------------------
+// A diferencia de guardar_lote_css (que solo persiste las
+// claves tocadas a mano, dejando el resto de los overrides
+// vigentes intactos), esto graba TODAS las claves del tema
+// base de la sesión (con los cambios de la tabla pisando
+// encima), para que el resto del programa (menú,
+// portapapeles, etc.) refleje el tema completo. También
+// persiste cuál es el tema aplicado (guardar_tema_aplicado).
+// ======================================================
+
+pub fn aplicar_apariencia(cambios: &[(String, String)]) -> Result<(), Vec<(String, String)>> {
+    let catalogo = cargar_catalogo_css();
+
+    let mut errores: Vec<(String, String)> = Vec::new();
+
+    for (clave, valor) in cambios {
+        match catalogo
+            .iter()
+            .filter(|entrada| entrada.nivel == 0)
+            .find(|entrada| &entrada.id == clave)
+        {
+            None => errores.push((
+                clave.clone(),
+                format!("Variable CSS desconocida: \"{}\"", clave),
+            )),
+
+            Some(entrada) => {
+                if let Err(mensaje) = validar_css_segun_tipo(&entrada.tipo, valor) {
+                    errores.push((clave.clone(), mensaje));
+                }
+            }
+        }
+    }
+
+    if !errores.is_empty() {
+        return Err(errores);
+    }
+
+    let (nombre_sesion, origen_sesion, base) =
+        sesion_apariencia_actual().map_err(|error| vec![(String::new(), error)])?;
+
+    let mut valores_finales = base;
+
+    for (clave, valor) in cambios {
+        valores_finales.insert(clave.clone(), valor.trim().to_string());
+    }
+
+    let mut mapa = leer_mapa_completo().map_err(|error| vec![(String::new(), error)])?;
+
+    mapa.retain(|clave, _| !clave.starts_with(PREFIJO_CSS));
+
+    for entrada in catalogo.iter().filter(|entrada| entrada.nivel == 0) {
+        if let Some(valor) = valores_finales.get(&entrada.id) {
+            mapa.insert(format!("{}{}", PREFIJO_CSS, entrada.id), valor.clone());
+        }
+    }
+
+    escribir_mapa_completo(&mapa).map_err(|error| vec![(String::new(), error)])?;
+
+    guardar_tema_aplicado(&nombre_sesion, &origen_sesion)
+        .map_err(|error| vec![(String::new(), error)])?;
+
+    establecer_sesion_apariencia(Some((nombre_sesion, origen_sesion, valores_finales)));
+
+    Ok(())
+}
+
+// ======================================================
+// 💾 GUARDAR COMO / GUARDAR EDITADO / RENOMBRAR / ELIMINAR
+// ======================================================
+
+fn validar_nombre_tema(nombre: &str) -> Result<(), String> {
+    let nombre = nombre.trim();
+
+    if nombre.is_empty() {
+        return Err("El nombre del tema está vacío".to_string());
+    }
+
+    if nombre.contains('/') || nombre.contains('\\') || nombre == "." || nombre == ".." {
+        return Err("Nombre de tema inválido".to_string());
+    }
+
+    Ok(())
+}
+
+pub fn guardar_tema_como(nombre: &str) -> Result<(), String> {
+    validar_nombre_tema(nombre)?;
+
+    let contenido = contenido_tema(true)?;
+
+    let ruta = usuario::carpeta_temas()?.join(format!("{}.theme", nombre.trim()));
+
+    fs::write(ruta, contenido).map_err(|error| error.to_string())
+}
+
+pub fn guardar_tema_editado(nombre: &str) -> Result<(), String> {
+    validar_nombre_tema(nombre)?;
+
+    let ruta = usuario::carpeta_temas()?.join(format!("{}.theme", nombre.trim()));
+
+    if !ruta.exists() {
+        return Err(format!("El tema \"{}\" no existe", nombre));
+    }
+
+    let contenido = contenido_tema(true)?;
+
+    fs::write(ruta, contenido).map_err(|error| error.to_string())
+}
+
+pub fn renombrar_tema(nombre_actual: &str, nombre_nuevo: &str) -> Result<(), String> {
+    if es_tema_predefinido(nombre_actual) {
+        return Err("No se puede renombrar un tema predefinido".to_string());
+    }
+
+    validar_nombre_tema(nombre_nuevo)?;
+
+    let nombre_nuevo = nombre_nuevo.trim();
+
+    let carpeta = usuario::carpeta_temas()?;
+
+    let ruta_actual = carpeta.join(format!("{}.theme", nombre_actual));
+
+    if !ruta_actual.exists() {
+        return Err(format!("El tema \"{}\" no existe", nombre_actual));
+    }
+
+    let ruta_nueva = carpeta.join(format!("{}.theme", nombre_nuevo));
+
+    if ruta_nueva.exists() {
+        return Err(format!("Ya existe un tema llamado \"{}\"", nombre_nuevo));
+    }
+
+    fs::rename(&ruta_actual, &ruta_nueva).map_err(|error| error.to_string())?;
+
+    let (nombre_aplicado, origen_aplicado) = tema_aplicado_actual();
+
+    if nombre_aplicado == nombre_actual && origen_aplicado == "usuario" {
+        guardar_tema_aplicado(nombre_nuevo, "usuario")?;
+    }
+
+    Ok(())
+}
+
+pub fn eliminar_tema(nombre: &str) -> Result<(), String> {
+    if es_tema_predefinido(nombre) {
+        return Err("No se puede eliminar un tema predefinido".to_string());
+    }
+
+    let ruta = usuario::carpeta_temas()?.join(format!("{}.theme", nombre));
+
+    if !ruta.exists() {
+        return Err(format!("El tema \"{}\" no existe", nombre));
+    }
+
+    fs::remove_file(ruta).map_err(|error| error.to_string())?;
+
+    let (nombre_aplicado, origen_aplicado) = tema_aplicado_actual();
+
+    if nombre_aplicado == nombre && origen_aplicado == "usuario" {
+        guardar_tema_aplicado("Default", "predefinido")?;
+    }
+
+    Ok(())
+}
+
 pub fn importar_tema(ruta: &std::path::Path) -> Result<(), Vec<(String, String)>> {
     let texto = fs::read_to_string(ruta).map_err(|error| {
         vec![(

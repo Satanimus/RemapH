@@ -20,7 +20,9 @@ import type { Columna } from "../ui/ui_columnas";
 
 import { activarRedimensionColumnas } from "../ui/ui_redimension_columnas";
 
-import { mostrarPopup } from "../componentes/comp_popup_contenedor";
+import { mostrarPopup, ocultarPopup } from "../componentes/comp_popup_contenedor";
+
+import { abrirFormularioNombre } from "../componentes/comp_popup_formulario_nombre";
 
 import {
   crearFilaPopup,
@@ -43,6 +45,12 @@ interface FilaCssCruda {
   tipo: string | null;
   valor_defecto: string | null;
   valor_personalizado: string | null;
+}
+
+// Modelo tal cual lo entrega configuracion_tema_listar (Etapa F).
+interface TemaListadoUI {
+  nombre: string;
+  origen: string;
 }
 
 // Fila de nivel 1/2/3 con sus valores de nivel 0 (hijos) ya agrupados.
@@ -534,6 +542,227 @@ export function crearPestanaApariencia(
 ): Pestana {
   const tbody = crearTablaApariencia(panel);
 
+  // E3: estado de sesión del selector de temas — nombre/origen del
+  // tema que da la base de "Valor por Defecto" (ver
+  // configuracion_apariencia_iniciar_sesion / configuracion_tema_cargar
+  // en comandos.rs). Se completan en cargar().
+  let nombreTemaSesion = "";
+  let origenTemaSesion = "";
+
+  // G1: si el tema de sesión tiene overrides css. vigentes — controla
+  // la visibilidad de "Guardar valores editados" en el popup.
+  let hayPersonalizadosSesion = false;
+
+  const botonSelectorTema = document.createElement("button");
+  botonSelectorTema.type = "button";
+  botonSelectorTema.className = "configuracion-selector-tema oculto";
+  botonSelectorTema.title = "Selector de temas";
+
+  botonSelectorTema.addEventListener("click", (evento) => {
+    abrirPopupSelectorTema(evento);
+  });
+
+  // E4: refleja en el botón el tema de sesión + si hay overrides
+  // pendientes/aplicados (nivel 0 con valor_personalizado no nulo).
+  function actualizarBotonSelectorTema(filas: FilaCssCruda[]): void {
+    const hayPersonalizados = filas.some(
+      (f) => f.nivel === 0 && f.valor_personalizado !== null,
+    );
+
+    hayPersonalizadosSesion = hayPersonalizados;
+
+    botonSelectorTema.textContent = hayPersonalizados
+      ? `${nombreTemaSesion} (editado)`
+      : nombreTemaSesion;
+  }
+
+  // F4: item de la lista de "Cargar ▾" — carga el tema en la sesión
+  // (preview) y refresca la tabla sin reiniciar la sesión.
+  function crearItemTema(
+    tema: TemaListadoUI,
+    alSeleccionar: () => void,
+  ): HTMLButtonElement {
+    const boton = document.createElement("button");
+
+    boton.className = "ui-btn";
+    boton.textContent = tema.nombre;
+
+    boton.addEventListener("click", async () => {
+      await invoke("configuracion_tema_cargar", {
+        nombre: tema.nombre,
+        origen: tema.origen,
+      });
+
+      nombreTemaSesion = tema.nombre;
+      origenTemaSesion = tema.origen;
+
+      await recargarTablaApariencia();
+
+      alSeleccionar();
+    });
+
+    return boton;
+  }
+
+  // F5: caja interna de "Cargar ▾" — predefinidos, separador, temas
+  // de usuario.
+  async function crearCajaCargar(contenedor: HTMLElement): Promise<void> {
+    const temas = await invoke<TemaListadoUI[]>("configuracion_tema_listar");
+
+    const predefinidos = temas.filter((tema) => tema.origen === "predefinido");
+    const usuario = temas.filter((tema) => tema.origen === "usuario");
+
+    for (const tema of predefinidos) {
+      contenedor.append(crearItemTema(tema, () => ocultarPopup()));
+    }
+
+    const separador = document.createElement("div");
+    separador.className = "app-popup-separador";
+    contenedor.append(separador);
+
+    for (const tema of usuario) {
+      contenedor.append(crearItemTema(tema, () => ocultarPopup()));
+    }
+  }
+
+  // F6/G2: popup principal del selector de temas — "Cargar ▾"
+  // (expandible en el mismo popup). "Guardar como" y "Renombrar"
+  // (H4/H5) abren el popup reutilizado abrirFormularioNombre en vez
+  // de expandirse en este mismo popup.
+  function abrirPopupSelectorTema(evento: MouseEvent): void {
+    let cargarExpandido = false;
+    let confirmandoEliminar = false;
+
+    const dibujar = (): void => {
+      const lista = document.createElement("div");
+      lista.className = "popup-lista";
+
+      // ----------------------------------
+      // Cargar ▾
+      // ----------------------------------
+
+      const botonCargar = document.createElement("button");
+      botonCargar.className = "ui-btn";
+      botonCargar.textContent = cargarExpandido ? "Cargar ▴" : "Cargar ▾";
+
+      botonCargar.addEventListener("click", () => {
+        cargarExpandido = !cargarExpandido;
+        dibujar();
+      });
+
+      lista.append(botonCargar);
+
+      if (cargarExpandido) {
+        const caja = document.createElement("div");
+        caja.className = "popup-caja-interna";
+
+        lista.append(caja);
+
+        crearCajaCargar(caja);
+      }
+
+      const separador = document.createElement("div");
+      separador.className = "app-popup-separador";
+      lista.append(separador);
+
+      // ----------------------------------
+      // Guardar como
+      // ----------------------------------
+
+      const botonGuardarComo = document.createElement("button");
+      botonGuardarComo.className = "ui-btn";
+      botonGuardarComo.textContent = "Guardar como";
+
+      botonGuardarComo.addEventListener("click", () => {
+        abrirFormularioNombre("", evento, async (nombre) => {
+          await invoke("configuracion_tema_guardar_como", { nombre });
+        });
+      });
+
+      lista.append(botonGuardarComo);
+
+      // ----------------------------------
+      // G2: opciones extra solo para tema de usuario
+      // ----------------------------------
+
+      if (origenTemaSesion === "usuario") {
+        const separadorUsuario = document.createElement("div");
+        separadorUsuario.className = "app-popup-separador";
+        lista.append(separadorUsuario);
+
+        // G3: Guardar valores editados
+        if (hayPersonalizadosSesion) {
+          const botonGuardarEditado = document.createElement("button");
+          botonGuardarEditado.className = "ui-btn";
+          botonGuardarEditado.textContent = "Guardar valores editados";
+
+          botonGuardarEditado.addEventListener("click", async () => {
+            await invoke("configuracion_tema_guardar_editado", {
+              nombre: nombreTemaSesion,
+            });
+
+            await recargarTablaApariencia();
+
+            ocultarPopup();
+          });
+
+          lista.append(botonGuardarEditado);
+        }
+
+        // G4/H5: Renombrar — reutiliza abrirFormularioNombre
+        const botonRenombrar = document.createElement("button");
+        botonRenombrar.className = "ui-btn";
+        botonRenombrar.textContent = "Renombrar";
+
+        botonRenombrar.addEventListener("click", () => {
+          abrirFormularioNombre(nombreTemaSesion, evento, async (nombreNuevo) => {
+            await invoke("configuracion_tema_renombrar", {
+              nombreActual: nombreTemaSesion,
+              nombreNuevo,
+            });
+
+            nombreTemaSesion = nombreNuevo;
+
+            await recargarTablaApariencia();
+          });
+        });
+
+        lista.append(botonRenombrar);
+
+        // G5: Eliminar Tema (doble verificación, mismo comportamiento
+        // y color que "Eliminar perfil" de la barra lateral)
+        const botonEliminarTema = document.createElement("button");
+        botonEliminarTema.className = "ui-btn popup-perfil-eliminar";
+        botonEliminarTema.textContent = confirmandoEliminar
+          ? "⚠️ Confirmar eliminación"
+          : "Eliminar Tema";
+
+        botonEliminarTema.addEventListener("click", async () => {
+          if (!confirmandoEliminar) {
+            confirmandoEliminar = true;
+            dibujar();
+
+            return;
+          }
+
+          await invoke("configuracion_tema_eliminar", {
+            nombre: nombreTemaSesion,
+          });
+
+          await cargar();
+
+          ocultarPopup();
+        });
+
+        lista.append(botonEliminarTema);
+      }
+
+      mostrarPopup(lista, evento.clientX, evento.clientY);
+    };
+
+    dibujar();
+  }
+
   // H2/H8: estado de edición pendiente, vive fuera de cargar() para
   // sobrevivir entre renders del árbol dentro de la misma sesión de
   // la ventana (se limpia explícitamente al recargar, ver cargar()).
@@ -546,7 +775,10 @@ export function crearPestanaApariencia(
   // borrar" cuando el usuario hace doble click en Valor por Defecto.
   const valoresOriginales = new Map<string, string | null>();
 
-  async function cargar(): Promise<void> {
+  // F1: separada de cargar() para poder refrescar la tabla tras
+  // "Cargar" tema (Etapa F) sin reiniciar la sesión de apariencia —
+  // reiniciarla ahí perdería el preview recién cargado.
+  async function recargarTablaApariencia(): Promise<void> {
     const filas = await invoke<FilaCssCruda[]>(
       "configuracion_listar_apariencia",
     );
@@ -583,6 +815,22 @@ export function crearPestanaApariencia(
 
       tbody.append(tr);
     }
+
+    actualizarBotonSelectorTema(filas);
+  }
+
+  async function cargar(): Promise<void> {
+    // E5: reinicia la sesión de apariencia (descarta preview no
+    // aplicado de una apertura anterior) y toma nombre/origen del
+    // tema realmente aplicado y persistido en disco.
+    const sesion = await invoke<{ nombre: string; origen: string }>(
+      "configuracion_apariencia_iniciar_sesion",
+    );
+
+    nombreTemaSesion = sesion.nombre;
+    origenTemaSesion = sesion.origen;
+
+    await recargarTablaApariencia();
   }
 
   function hayEdicionesPendientes(): boolean {
@@ -715,6 +963,11 @@ export function crearPestanaApariencia(
     marcarErroresGuardado,
     limpiarEstadoTrasGuardado,
     restablecerPestana,
+
+    // Selector de temas: se monta en la barra de acciones global
+    // (ver vent_configuracion_main.ts), no dentro de este panel —
+    // solo visible cuando la pestaña Apariencia está activa.
+    elementoBarra: botonSelectorTema,
 
     textoConfirmacionRestablecer:
       "¿Restablecer todos los valores de Apariencia a los de fábrica? " +

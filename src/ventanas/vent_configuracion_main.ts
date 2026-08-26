@@ -7,7 +7,7 @@
 // contenido real.
 //
 // Las 3 pestañas comparten la misma mecánica (tabla de 3
-// columnas, editar marca en verde, "Guardar cambios" valida
+// columnas, editar marca en verde, "Aplicar cambios" valida
 // y manda un lote, "Restablecer esta pestaña" borra los
 // overrides) armada una sola vez en crearPestanaEditable() y
 // reutilizada con distinta fuente de datos:
@@ -19,9 +19,8 @@
 //   mismo — ver categorizarTecla()).
 // • Apariencia → configuracion_listar_apariencia() / _guardar_lote_apariencia
 //   (catálogo de styl_variables.css, ver apariencia.tsv). Es
-//   la única con controles extra (Guardar/Cargar tema) y con
-//   tipos de campo nuevos ("color" y "pixeles") — ver
-//   crearInputColor()/crearInputPixeles() y el bloque
+//   la única con tipos de campo nuevos ("color" y "pixeles")
+//   — ver crearInputColor()/crearInputPixeles() y el bloque
 //   "PESTAÑA APARIENCIA" al final del archivo.
 // ======================================================
 
@@ -176,6 +175,11 @@ const paresTab: ReadonlyArray<readonly [HTMLButtonElement, HTMLDivElement]> = [
   [tabAvanzado, panelAvanzado],
 ];
 
+// Selector de temas de Apariencia (Pestana.elementoBarra) — se
+// asigna más abajo, junto a la barra de acciones global, pero se
+// referencia acá porque activarTab controla su visibilidad.
+let elementoSelectorTema: HTMLElement | null = null;
+
 function activarTab(botonElegido: HTMLButtonElement): void {
   for (const [boton, panel] of paresTab) {
     const activa = boton === botonElegido;
@@ -185,10 +189,10 @@ function activarTab(botonElegido: HTMLButtonElement): void {
     panel.classList.toggle("oculto", !activa);
   }
 
-  // Nombre/Guardar/Cargar tema solo tienen sentido en Apariencia —
-  // se ocultan en la barra global al cambiar a otra pestaña (ver
-  // "BARRA DE ACCIONES GLOBAL").
-  contenedorTema.classList.toggle("oculto", botonElegido !== tabApariencia);
+  elementoSelectorTema?.classList.toggle(
+    "oculto",
+    botonElegido !== tabApariencia,
+  );
 }
 
 tabGeneral.addEventListener("click", () => activarTab(tabGeneral));
@@ -436,6 +440,12 @@ export interface Pestana {
   limpiarEstadoTrasGuardado: () => Promise<void>;
   restablecerPestana: () => Promise<void>;
   textoConfirmacionRestablecer: string;
+
+  // Elemento propio de la pestaña que se monta en la barra de
+  // acciones global (ver "BARRA DE ACCIONES GLOBAL"), visible solo
+  // mientras esta pestaña está activa. Hoy solo lo usa Apariencia
+  // (botón selector de temas).
+  elementoBarra?: HTMLElement;
 }
 
 function crearPestanaEditable(opciones: OpcionesPestana): Pestana {
@@ -677,11 +687,11 @@ function crearPestanaEditable(opciones: OpcionesPestana): Pestana {
   }
 
   // ----------------------------------------------------
-  // Guardar cambios
+  // Aplicar cambios
   // ----------------------------------------------------
 
   // ----------------------------------------------------
-  // Guardar cambios (API para la barra global — ver
+  // Aplicar cambios (API para la barra global — ver
   // "BARRA DE ACCIONES GLOBAL")
   // ----------------------------------------------------
 
@@ -691,7 +701,7 @@ function crearPestanaEditable(opciones: OpcionesPestana): Pestana {
 
   // Valida y arma la lista de cambios de ESTA pestaña, sin aplicar
   // nada todavía — la barra global junta esto de las 4 pestañas antes
-  // de guardar cualquiera (ver Guardar cambios / errorConsulta P2).
+  // de guardar cualquiera (ver Aplicar cambios / errorConsulta P2).
   function validarYRecolectar(): RecoleccionCambios {
     ocultarError();
 
@@ -1043,86 +1053,6 @@ async function refrescarTrasCambioApariencia(): Promise<void> {
   await invoke("configuracion_refrescar_ventanas_apariencia");
 }
 
-// ----------------------------------------------------
-// Controles extra: Guardar tema / Cargar tema
-// ----------------------------------------------------
-
-const inputNombreTema = document.createElement("input");
-inputNombreTema.type = "text";
-inputNombreTema.className = "configuracion-input-tema";
-inputNombreTema.placeholder = "Nombre del tema";
-
-const botonGuardarTema = document.createElement("button");
-botonGuardarTema.type = "button";
-botonGuardarTema.className = "configuracion-boton";
-botonGuardarTema.textContent = "Guardar tema…";
-
-const botonCargarTema = document.createElement("button");
-botonCargarTema.type = "button";
-botonCargarTema.className = "configuracion-boton";
-botonCargarTema.textContent = "Cargar tema…";
-
-const contenedorTema = document.createElement("div");
-contenedorTema.className = "configuracion-acciones-tema oculto";
-contenedorTema.append(inputNombreTema, botonGuardarTema, botonCargarTema);
-
-// Asignada más abajo, apenas se crea pestanaApariencia — los
-// listeners de clic solo se ejecutan ante una interacción del
-// usuario, muy después de ese punto, así que ya la van a ver
-// asignada.
-let recargarApariencia: () => Promise<void> = async () => {};
-
-botonGuardarTema.addEventListener("click", async () => {
-  botonGuardarTema.disabled = true;
-
-  try {
-    const guardado = await invoke<boolean>("configuracion_guardar_tema", {
-      nombreSugerido: inputNombreTema.value.trim(),
-    });
-
-    if (guardado) {
-      mostrarToast("✅ Tema guardado");
-    }
-  } catch (error) {
-    window.alert(`No se pudo guardar el tema: ${String(error)}`);
-  } finally {
-    botonGuardarTema.disabled = false;
-  }
-});
-
-botonCargarTema.addEventListener("click", async () => {
-  botonCargarTema.disabled = true;
-
-  try {
-    const resultado = await invoke<ResultadoGuardado | null>(
-      "configuracion_cargar_tema",
-    );
-
-    if (resultado === null) {
-      // El usuario canceló el selector de archivo.
-      return;
-    }
-
-    if (resultado.errores.length > 0) {
-      window.alert(
-        "No se pudo cargar el tema:\n" +
-          resultado.errores
-            .map((error) => `• ${error.clave || "General"}: ${error.mensaje}`)
-            .join("\n"),
-      );
-      return;
-    }
-
-    await recargarApariencia();
-    mostrarToast("✅ Tema cargado");
-    await refrescarTrasCambioApariencia();
-  } catch (error) {
-    window.alert(`No se pudo cargar el tema: ${String(error)}`);
-  } finally {
-    botonCargarTema.disabled = false;
-  }
-});
-
 // (nota etapa H pendiente: la fusión de CLAVES_TAMANOS_EN_APARIENCIA
 // al guardar/restablecer, que vivía acá, se reintroduce cuando
 // crearPestanaApariencia tenga persistencia real.)
@@ -1131,8 +1061,6 @@ const pestanaApariencia = crearPestanaApariencia(
   refrescarTrasCambioApariencia,
 );
 
-recargarApariencia = pestanaApariencia.cargar;
-
 // ======================================================
 // 🛠️ PESTAÑA AVANZADO
 // ------------------------------------------------------
@@ -1140,7 +1068,7 @@ recargarApariencia = pestanaApariencia.cargar;
 // crearPestanaEditable (no es una tabla), pero expone la misma
 // interfaz Pestana para integrarse con la barra de acciones global
 // (ver "BARRA DE ACCIONES GLOBAL"): tocar el selector solo marca un
-// cambio pendiente, sin aplicar nada hasta "Guardar cambios".
+// cambio pendiente, sin aplicar nada hasta "Aplicar cambios".
 // ======================================================
 
 const tituloModoMotor = document.createElement("h3");
@@ -1193,7 +1121,7 @@ const pestanaAvanzado: Pestana = {
 
   // Sin validación posible (es un <select> de dos opciones fijas):
   // si hay cambio pendiente, se recolecta como un único "cambio" sin
-  // clave real — Guardar cambios global lo aplica llamando a
+  // clave real — Aplicar cambios global lo aplica llamando a
   // guardarModoMotor() en vez de pasar por guardarLote genérico (ver
   // manejo especial en el bloque "BARRA DE ACCIONES GLOBAL").
   validarYRecolectar: () => ({ cambios: [], erroresLocales: [] }),
@@ -1210,7 +1138,7 @@ const pestanaAvanzado: Pestana = {
 // ======================================================
 // 🧭 BARRA DE ACCIONES GLOBAL
 // ------------------------------------------------------
-// Única y fija para las 4 pestañas: "Guardar cambios" junta y guarda
+// Única y fija para las 4 pestañas: "Aplicar cambios" junta y guarda
 // los cambios pendientes de TODAS las pestañas (no solo la activa).
 // "Restablecer esta pestaña" actúa solo sobre la pestaña activa
 // (título/mensaje cambia según cuál sea).
@@ -1239,9 +1167,15 @@ const botonGuardarGlobal = document.createElement("button");
 botonGuardarGlobal.type = "button";
 botonGuardarGlobal.className =
   "configuracion-boton configuracion-boton-primario";
-botonGuardarGlobal.textContent = "Guardar cambios";
+botonGuardarGlobal.textContent = "Aplicar cambios";
 
-barraGlobal.append(contenedorTema, botonRestablecerGlobal, botonGuardarGlobal);
+barraGlobal.append(botonRestablecerGlobal, botonGuardarGlobal);
+
+if (pestanaApariencia.elementoBarra) {
+  elementoSelectorTema = pestanaApariencia.elementoBarra;
+  barraGlobal.prepend(elementoSelectorTema);
+}
+
 filaAcciones.append(barraGlobal);
 
 // --------------------------------------------------------

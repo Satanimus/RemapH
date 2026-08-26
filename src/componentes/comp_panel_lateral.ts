@@ -14,11 +14,11 @@
 
 import { invoke } from "@tauri-apps/api/core";
 
-import { mostrarPopup, ocultarPopup } from "./comp_popup_contenedor";
-
 import { crearBoton } from "./comp_boton";
 
 import { confirmarPopup } from "./comp_popup_confirmar";
+
+import { abrirFormularioNombre } from "./comp_popup_formulario_nombre";
 
 import type { perfil_json } from "../core/core_perfil_json";
 
@@ -454,77 +454,13 @@ function abrirFormularioRenombrar(
   evento: MouseEvent,
   alCambiarPerfil: (resultado: ResultadoPerfil) => void | Promise<void>,
 ): void {
-  const contenedor = document.createElement("div");
+  abrirFormularioNombre(nombreActual, evento, async (nuevoNombre) => {
+    const resultado = await invoke<ResultadoPerfil>("renombrar_perfil", {
+      nuevoNombre,
+    });
 
-  contenedor.className = "panel-lateral-renombrar";
+    await alCambiarPerfil(resultado);
 
-  const input = document.createElement("input");
-
-  input.className = "popup-input";
-
-  input.type = "text";
-
-  input.value = nombreActual;
-
-  const botones = document.createElement("div");
-
-  botones.className = "popup-confirmar-botones";
-
-  const botonCancelar = crearBoton({
-    texto: "Cancelar",
+    await recargarContenidoPanel();
   });
-
-  const botonGuardar = crearBoton({
-    texto: "Guardar",
-  });
-
-  const confirmar = async (): Promise<void> => {
-    const nuevoNombre = input.value.trim();
-
-    if (!nuevoNombre || nuevoNombre === nombreActual) {
-      ocultarPopup();
-
-      return;
-    }
-
-    try {
-      const resultado = await invoke<ResultadoPerfil>("renombrar_perfil", {
-        nuevoNombre,
-      });
-
-      await alCambiarPerfil(resultado);
-
-      await recargarContenidoPanel();
-    } catch (error) {
-      console.error("❌ No se pudo renombrar el perfil:", error);
-    }
-
-    ocultarPopup();
-  };
-
-  botonGuardar.addEventListener("click", confirmar);
-
-  botonCancelar.addEventListener("click", () => {
-    ocultarPopup();
-  });
-
-  input.addEventListener("keydown", (evento) => {
-    if (evento.key === "Enter") {
-      confirmar();
-    }
-
-    if (evento.key === "Escape") {
-      ocultarPopup();
-    }
-  });
-
-  botones.append(botonCancelar, botonGuardar);
-
-  contenedor.append(input, botones);
-
-  mostrarPopup(contenedor, evento.clientX, evento.clientY);
-
-  input.focus();
-
-  input.select();
 }
