@@ -190,18 +190,27 @@
 /* ======================================================
    TABLA EN ÁRBOL (Apariencia)
    ------------------------------------------------------
-   Esqueleto: mismo alto de fila que .configuracion-tabla,
-   con anchos fijos provisorios para las 4 columnas. El
-   mecanismo real de arrastre de ancho, la sangría/color por
-   nivel y el resto del estilo definitivo llegan en una etapa
-   posterior.
+   Mismo alto de fila que .configuracion-tabla. Ancho de
+   columna arrastrable (Etapa E, reusa .divisor-columna) y
+   sangría/color por nivel ya implementados; falta el resto
+   del estilo definitivo (swatches de color, popup de
+   edición) — llega en etapas F/G.
    ====================================================== */
 
 .configuracion-tabla-arbol {
   border-collapse: collapse;
   width: 100%;
-  table-layout: fixed;
   font-size: var(--fs13);
+}
+
+/* E5: el ancho de cada columna lo da el width inline seteado en
+   vent_configuracion_apariencia.ts (E4) contra las variables de
+   E3; position: relative es requisito de .divisor-columna, que se
+   posiciona absolute respecto a su celda (mismo mecanismo que la
+   tabla principal, ver ui_redimension_columnas.ts). */
+.configuracion-arbol-celda {
+  position: relative;
+  white-space: nowrap;
 }
 
 .configuracion-tabla-arbol thead th {
@@ -228,24 +237,96 @@
   background: var(--row-hover-bg);
 }
 
-.configuracion-tabla-arbol th:nth-child(1),
-.configuracion-tabla-arbol td:nth-child(1) {
-  width: 40%;
+/* F6: cuadradito de color en la columna Valor por Defecto. */
+.configuracion-arbol-swatch {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border-radius: 2px;
+  border: 1px solid var(--border);
+  vertical-align: middle;
+  margin-right: 4px;
 }
 
-.configuracion-tabla-arbol th:nth-child(2),
-.configuracion-tabla-arbol td:nth-child(2) {
-  width: 36%;
+/* F7: indica que la celda funciona como botón (doble click borra
+   el Valor Personalizado de la fila, Regla 34). */
+.configuracion-arbol-defecto {
+  cursor: pointer;
 }
 
-.configuracion-tabla-arbol th:nth-child(3),
-.configuracion-tabla-arbol td:nth-child(3) {
-  width: 8%;
+.configuracion-arbol-defecto:hover {
+  background: var(--row-hover-bg);
 }
 
-.configuracion-tabla-arbol th:nth-child(4),
-.configuracion-tabla-arbol td:nth-child(4) {
-  width: 16%;
+/* E7: sangría/color por nivel (Regla 28: única diferencia visual
+   entre nivel 2 y 3 es la sangría, que ya pone padding-left inline
+   en vent_configuracion_apariencia.ts — acá solo el color). */
+.configuracion-arbol-nivel-1 {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.configuracion-arbol-nivel-2,
+.configuracion-arbol-nivel-3 {
+  color: var(--text-disabled);
+}
+
+/* E8/E9: fila ocultada por el botón Expandir/Contraer de su
+   Título (nivel 1). */
+.configuracion-tabla-arbol tr.oculta {
+  display: none;
+}
+
+/* E9: botón ghost puro, mismo criterio que el resto de botones
+   ghost del proyecto (sin fondo ni borde en reposo). */
+.configuracion-arbol-expandir {
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--r4);
+  color: var(--text-disabled);
+  font-family: var(--font);
+  font-size: var(--fs13);
+  cursor: pointer;
+  padding: 0;
+  margin-right: var(--gap8);
+  transition:
+    border-color .12s ease,
+    color .12s ease;
+}
+
+.configuracion-arbol-expandir:hover {
+  border-color: var(--highlight);
+  color: var(--highlight);
+}
+
+/* G7: botón Editar (ícono lápiz), mismo criterio ghost que
+   .configuracion-arbol-expandir. */
+.configuracion-arbol-editar {
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--r4);
+  color: var(--text-disabled);
+  font-family: var(--font);
+  font-size: var(--fs13);
+  cursor: pointer;
+  padding: 0;
+  transition:
+    border-color .12s ease,
+    color .12s ease;
+}
+
+.configuracion-arbol-editar:hover {
+  border-color: var(--highlight);
+  color: var(--highlight);
+}
+
+/* G7: mini popup de edición (una fila por valor, ver
+   crearFilaPopup en comp_popup_grupo.ts). */
+.popup-editar-apariencia {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap8);
+  min-width: 220px;
 }
 
 /* Grupo de controles de tema (Apariencia) — empujado al borde
@@ -291,6 +372,18 @@
 /* Fila con un valor inválido, marcada al intentar guardar. */
 .configuracion-fila-error .configuracion-valor-personalizado input {
   border-color: var(--text-red);
+}
+
+/* H10: mismo criterio que .configuracion-fila-editando/-error de
+   arriba, pero aplicado al <tr> completo — la tabla en árbol de
+   Apariencia no tiene un input uniforme por fila al que colgarle el
+   borde (cada fila puede agrupar color/opacidad/etc.). */
+.configuracion-arbol-editando {
+  box-shadow: inset 3px 0 0 var(--green);
+}
+
+.configuracion-arbol-error {
+  box-shadow: inset 3px 0 0 var(--text-red);
 }
 
 /* ======================================================

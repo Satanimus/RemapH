@@ -32,7 +32,10 @@ import {
   registrarActivarModoMover,
 } from "./ui_tabla_control";
 
-import { activarRedimensionColumnas } from "./ui_redimension_columnas";
+import {
+  activarRedimensionColumnas,
+  ANCHOS_DEFAULT,
+} from "./ui_redimension_columnas";
 
 import { crearControladorArrastre } from "../util/util_arrastrable";
 
@@ -69,7 +72,7 @@ export function crearTabla(alModificar: () => void): HTMLElement {
     cabecera.append(celda);
   });
 
-  activarRedimensionColumnas(cabecera);
+  activarRedimensionColumnas(cabecera, COLUMNAS, ANCHOS_DEFAULT);
 
   const filas = document.createElement("div");
 

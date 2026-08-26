@@ -2,9 +2,9 @@
 // ↔️ ui_Redimension_Columnas
 // ======================================================
 
-import { COLUMNAS } from "./ui_columnas";
+import type { Columna } from "./ui_columnas";
 
-export const ANCHOS_DEFAULT = {
+export const ANCHOS_DEFAULT: Record<string, number> = {
   //Ancho default al doble click en mover separador
   estado: 58,
   opciones: 42,
@@ -21,8 +21,73 @@ export const ANCHOS_DEFAULT = {
 
 export const ANCHO_MINIMO = 52;
 
-export function activarRedimensionColumnas(cabecera: HTMLElement): void {
-  const celdas = cabecera.querySelectorAll<HTMLElement>(".cabecera-celda");
+// E1: generalizada para recibir columnas/anchosDefault por parámetro
+// en vez de importar COLUMNAS/ANCHOS_DEFAULT fijos (permite reusar el
+// mecanismo de arrastre en la tabla en árbol de Configuración, cuyas
+// columnas son otras). selectorCelda: la tabla principal usa
+// ".cabecera-celda"; la tabla en árbol usa ".configuracion-arbol-celda"
+// (ver E4) — sin este parámetro, el querySelectorAll de abajo no
+// encontraría celdas en la tabla en árbol y activarRedimensionColumnas
+// quedaría sin efecto ahí.
+export function activarRedimensionColumnas(
+  cabecera: HTMLElement,
+  columnas: Columna[],
+  anchosDefault: Record<string, number>,
+  selectorCelda: string = ".cabecera-celda",
+): void {
+  const celdas = cabecera.querySelectorAll<HTMLElement>(selectorCelda);
+
+  function obtenerVariable(indice: number): string {
+    return columnas[indice].ancho.replace("var(", "").replace(")", "");
+  }
+
+  function iniciarArrastre(inicioX: number, indice: number) {
+    const variable = obtenerVariable(indice);
+
+    const estilos = getComputedStyle(document.documentElement);
+
+    const anchoInicial = parseFloat(estilos.getPropertyValue(variable));
+
+    const mover = (evento: MouseEvent) => {
+      const nuevo = Math.max(
+        ANCHO_MINIMO,
+
+        anchoInicial + evento.clientX - inicioX,
+      );
+
+      document.documentElement.style.setProperty(
+        variable,
+
+        `${nuevo}px`,
+      );
+    };
+
+    const soltar = () => {
+      window.removeEventListener("mousemove", mover);
+
+      window.removeEventListener("mouseup", soltar);
+    };
+
+    window.addEventListener("mousemove", mover);
+
+    window.addEventListener("mouseup", soltar);
+  }
+
+  function restaurarAncho(indice: number) {
+    const columna = columnas[indice];
+
+    const valor = anchosDefault[columna.id];
+
+    if (!valor) {
+      return;
+    }
+
+    document.documentElement.style.setProperty(
+      columna.ancho.replace("var(", "").replace(")", ""),
+
+      `${valor}px`,
+    );
+  }
 
   celdas.forEach((celda, indice) => {
     // Nota siempre ocupa espacio restante
@@ -47,56 +112,4 @@ export function activarRedimensionColumnas(cabecera: HTMLElement): void {
       restaurarAncho(indice);
     });
   });
-}
-
-function obtenerVariable(indice: number): string {
-  return COLUMNAS[indice].ancho.replace("var(", "").replace(")", "");
-}
-
-function iniciarArrastre(inicioX: number, indice: number) {
-  const variable = obtenerVariable(indice);
-
-  const estilos = getComputedStyle(document.documentElement);
-
-  const anchoInicial = parseFloat(estilos.getPropertyValue(variable));
-
-  const mover = (evento: MouseEvent) => {
-    const nuevo = Math.max(
-      ANCHO_MINIMO,
-
-      anchoInicial + evento.clientX - inicioX,
-    );
-
-    document.documentElement.style.setProperty(
-      variable,
-
-      `${nuevo}px`,
-    );
-  };
-
-  const soltar = () => {
-    window.removeEventListener("mousemove", mover);
-
-    window.removeEventListener("mouseup", soltar);
-  };
-
-  window.addEventListener("mousemove", mover);
-
-  window.addEventListener("mouseup", soltar);
-}
-
-function restaurarAncho(indice: number) {
-  const columna = COLUMNAS[indice];
-
-  const valor = ANCHOS_DEFAULT[columna.id as keyof typeof ANCHOS_DEFAULT];
-
-  if (!valor) {
-    return;
-  }
-
-  document.documentElement.style.setProperty(
-    columna.ancho.replace("var(", "").replace(")", ""),
-
-    `${valor}px`,
-  );
 }

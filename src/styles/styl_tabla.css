@@ -226,7 +226,7 @@
 
     height: var(--header-height);
 
-    background: color-mix(in srgb, var(--bg) 65%, transparent);
+    background: color-mix(in srgb, var(--cabecera-tabla-color) var(--cabecera-tabla-opacidad), transparent);
 
     backdrop-filter: blur(8px);
 

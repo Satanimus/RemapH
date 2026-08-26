@@ -138,17 +138,17 @@ export function crearToolbar(alGuardar: () => Promise<void>): HTMLElement {
                 <span class="cambios-pendientes-texto">Cambios en perfil:</span>
 
                 <button
-                    class="btn-guardar-cambios"
-                    type="button"
-                >
-                    Guardar
-                </button>
-
-                <button
                     class="btn-revertir-cambios"
                     type="button"
                 >
                     Revertir
+                </button>
+
+                <button
+                    class="btn-guardar-cambios"
+                    type="button"
+                >
+                    Guardar
                 </button>
 
             </div>

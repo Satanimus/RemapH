@@ -1405,6 +1405,16 @@ pub async fn configuracion_guardar_lote_apariencia(
     }
 }
 
+// Ver configuracion_usuario::restablecer_claves_css — quita del mapa
+// de overrides las variables CSS individuales indicadas (con el
+// prefijo "css." resuelto ahí adentro). Usado por "Guardar cambios"
+// de Apariencia cuando el usuario borró un Valor Personalizado que
+// ya estaba persistido (ver vent_configuracion_apariencia.ts).
+#[tauri::command]
+pub async fn configuracion_restablecer_claves_css(claves: Vec<String>) -> Result<(), String> {
+    configuracion_usuario::restablecer_claves_css(&claves)
+}
+
 // ======================================================
 // 🖼️ APARIENCIA — TEMAS (.theme)
 // ------------------------------------------------------

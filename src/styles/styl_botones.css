@@ -76,7 +76,7 @@
 .fila .ui-btn:not(:where(.estado-toggle)):hover,
 .fila .ui-btn:not(:where(.estado-toggle))[data-abierto="true"] {
 
-    background: color-mix(in srgb, var(--highlight) 8%, transparent);
+    background: color-mix(in srgb, var(--highlight) var(--botones-ghost-opacidad-hover), transparent);
 
     border-color: var(--highlight);
 }
@@ -114,9 +114,9 @@
 
 .ui-btn.estado[data-estado="activo"] {
 
-    background: var(--green-dark);
+    background: color-mix(in srgb, var(--perfil-activo-color) var(--perfil-activo-opacidad), transparent);
 
-    border-color: var(--green-dark);
+    border-color: var(--perfil-activo-color);
 }
 
 .ui-btn.estado[data-estado="activo"]:hover {
@@ -132,9 +132,9 @@
 
 .ui-btn.estado[data-estado="inactivo"] {
 
-    background: color-mix(in srgb, var(--red-dark) 10%, transparent);
+    background: color-mix(in srgb, var(--perfil-inactivo-color) var(--perfil-inactivo-opacidad), transparent);
 
-    border-color: var(--red-dark);
+    border-color: var(--perfil-inactivo-color);
 }
 
 .ui-btn.estado[data-estado="inactivo"]:hover {
@@ -513,7 +513,7 @@
 .estado-toggle[data-estado="off"],
 .estado-toggle[data-conflicto="true"] {
 
-    background: color-mix(in srgb, var(--red-dark) 55%, transparent);
+    background: color-mix(in srgb, var(--red-dark) var(--boton-off-opacidad), transparent);
 
     border-color: color-mix(in srgb, var(--red-dark) 85%, transparent);
 }
@@ -628,6 +628,8 @@
 .btn-agregar-fila:hover,
 .btn-agregar-separador:hover {
 
+    background: color-mix(in srgb, var(--highlight) var(--botones-ghost-opacidad-hover), transparent);
+
     border-color: var(--highlight);
 
     color: var(--highlight);
@@ -653,11 +655,11 @@
 
     padding: 0 var(--gap8) 0 var(--gap12);
 
-    border: 1px solid var(--highlight);
+    border: 1px solid var(--cambio-perfil-color);
 
     border-radius: var(--r4);
 
-    background: color-mix(in srgb, var(--highlight) 12%, transparent);
+    background: color-mix(in srgb, var(--cambio-perfil-color) 12%, transparent);
 
     box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
 }
@@ -695,8 +697,6 @@
 
     padding: 0 var(--gap12);
 
-    color: var(--text);
-
     border: 1px solid transparent;
 
     border-radius: var(--r4);
@@ -715,9 +715,9 @@
 
 .btn-guardar-cambios {
 
-    background: var(--highlight);
-
     color: var(--text-highdark);
+
+    background: color-mix(in srgb, var(--guardar-color) var(--guardar-opacidad), transparent);
 
     font-weight: 600;
 }
@@ -729,18 +729,18 @@
     filter: brightness(1.1);
 }
 
+/* I10: ghost puro (Regla 20/21) — sin color propio en el catálogo,
+   reubicado a la izquierda de Guardar (ver orden en ui_toolbar.ts). */
 .btn-revertir-cambios {
 
-    background: color-mix(in srgb, var(--highlight) 12%, transparent);
+    background: transparent;
 
     color: var(--text-disabled);
 
-    border-color: color-mix(in srgb, var(--highlight) 35%, transparent);
+    border-color: transparent;
 }
 
 .btn-revertir-cambios:hover {
-
-    background: color-mix(in srgb, var(--highlight) 22%, transparent);
 
     border-color: var(--highlight);
 

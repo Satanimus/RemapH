@@ -18,7 +18,7 @@
 
     height: 100%;
 
-    background: rgba(34, 34, 34, 0.6);
+    background: color-mix(in srgb, var(--barra-lateral-color) var(--barra-lateral-opacidad), transparent);
 
     backdrop-filter: blur(14px);
 
@@ -114,7 +114,7 @@
 }
 
 .panel-lateral-item--actual {
-    border-color: var(--highlight);
+    border-color: color-mix(in srgb, var(--highlight) var(--panel-lateral-item-actual-opacidad), transparent);
 }
 
 .panel-lateral-nombre {
@@ -180,7 +180,7 @@
 
     background: transparent;
 
-    border-color: var(--highlight-red) !important;
+    border-color: color-mix(in srgb, var(--highlight-red) var(--panel-lateral-eliminar-opacidad), transparent) !important;
 
     border-radius: var(--r4);
 }

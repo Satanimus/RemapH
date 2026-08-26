@@ -27,11 +27,15 @@
 
 import { invoke } from "@tauri-apps/api/core";
 
+import { crearContenedorPopup } from "../componentes/comp_popup_contenedor";
+
 import { aplicarOverridesApariencia } from "../core/core_apariencia";
 import { crearPestanaApariencia } from "./vent_configuracion_apariencia";
 
 import "../styles/styl_variables.css";
 import "../styles/styl_general.css";
+import "../styles/styl_botones.css";
+import "../styles/styl_layout.css";
 import "../styles/styl_configuracion.css";
 
 // La propia Ventana de Configuración también debe reflejar el
@@ -125,6 +129,13 @@ cuerpo.append(panelGeneral, panelApariencia, panelTeclas, panelAvanzado);
 
 card.append(tabs, cuerpo);
 raiz.append(card);
+
+// Capa de popups (crearContenedorPopup) — la ventana principal la monta
+// en ui_layout.ts; esta ventana tiene su propio documento/módulo y
+// necesita la suya propia, o mostrarPopup() (usado por el botón Editar
+// de la pestaña Apariencia) no encuentra dónde montar el contenido y no
+// hace nada.
+raiz.append(crearContenedorPopup());
 
 function crearBotonTab(texto: string, activa: boolean): HTMLButtonElement {
   const boton = document.createElement("button");

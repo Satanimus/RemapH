@@ -883,9 +883,14 @@ pub fn cargar_catalogo_css() -> &'static Vec<EntradaCatalogoCss> {
         let mut catalogo: Vec<EntradaCatalogoCss> = Vec::new();
 
         for (numero_linea, linea) in texto.lines().enumerate() {
-            let linea = linea.trim();
+            // No usar trim() sobre la línea completa: elimina también los
+            // tabs finales de las filas de nivel 1/2/3 (que terminan en
+            // "\t\t" porque valor_defecto/tipo van vacíos), dejando menos
+            // de 5 columnas tras el split. Cada columna se trimea
+            // individualmente más abajo en su lugar.
+            let linea = linea.strip_suffix('\r').unwrap_or(linea);
 
-            if linea.is_empty() || linea.starts_with('#') {
+            if linea.trim().is_empty() || linea.trim_start().starts_with('#') {
                 continue;
             }
 
@@ -1140,6 +1145,30 @@ pub fn guardar_lote_css(cambios: &[(String, String)]) -> Result<(), Vec<(String,
     }
 
     escribir_mapa_completo(&mapa).map_err(|error| vec![(String::new(), error)])
+}
+
+// ======================================================
+// ♻️ RESTABLECER UN SUBCONJUNTO EXPLÍCITO DE VARIABLES CSS
+// ------------------------------------------------------
+// Variante de restablecer_claves() (que opera sobre el catálogo de
+// config.rs) para Apariencia: quita del mapa de overrides las
+// variables CSS indicadas, anteponiendo PREFIJO_CSS, sin llamar
+// aplicar_valor() (no existe setter de Rust para variables CSS, ver
+// guardar_lote_css más arriba). Usada por "Guardar cambios" cuando el
+// usuario borró un Valor Personalizado que ya estaba persistido (ver
+// vent_configuracion_apariencia.ts), y no por "Restablecer esta
+// pestaña" (que usa el genérico configuracion_restablecer_seccion
+// con prefijo "css.").
+// ======================================================
+
+pub fn restablecer_claves_css(claves: &[String]) -> Result<(), String> {
+    let mut mapa = leer_mapa_completo()?;
+
+    for clave in claves {
+        mapa.remove(&format!("{}{}", PREFIJO_CSS, clave));
+    }
+
+    escribir_mapa_completo(&mapa)
 }
 
 // ======================================================

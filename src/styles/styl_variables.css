@@ -81,6 +81,50 @@
 
 
    /* ==========================
+       Color y opacidad de elementos
+       (catálogo apariencia.tsv, Etapa I)
+       ========================== */
+
+   --barra-superior-color: #222222;
+
+   --barra-superior-opacidad: 60%;
+
+   --barra-lateral-color: #222222;
+
+   --barra-lateral-opacidad: 60%;
+
+   --barra-inferior-color: #222222;
+
+   --barra-inferior-opacidad: 60%;
+
+   --cabecera-tabla-color: #181818;
+
+   --cabecera-tabla-opacidad: 65%;
+
+   --botones-ghost-opacidad-hover: 8%;
+
+   --boton-off-opacidad: 55%;
+
+   --perfil-activo-color: #2E7D32;
+
+   --perfil-activo-opacidad: 100%;
+
+   --perfil-inactivo-color: #8F2525;
+
+   --perfil-inactivo-opacidad: 10%;
+
+   --panel-lateral-item-actual-opacidad: 15%;
+
+   --panel-lateral-eliminar-opacidad: 15%;
+
+   --cambio-perfil-color: #03A9F4;
+
+   --guardar-color: #03A9F4;
+
+   --guardar-opacidad: 100%;
+
+
+   /* ==========================
        Bordes
        ========================== */
 
@@ -231,6 +275,16 @@
    --col-options: 42px;
 
    --col-note: 220px;
+
+   /* Tabla en árbol de Apariencia (ventana Configuración,
+       ver vent_configuracion_apariencia.ts, Etapa E). */
+   --col-config-nombre: 220px;
+
+   --col-config-defecto: 260px;
+
+   --col-config-editar: 40px;
+
+   --col-config-personalizado: 220px;
 
 
    /* ==========================
