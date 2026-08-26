@@ -137,7 +137,7 @@ nivel	id	nombre_ui	valor_defecto	tipo
 2	fondo-tabla	Fondo de tabla		
 0	tabla-fondo-color-impar	Color impar	#202020	color
 0	tabla-fondo-color-par	Color par	#141414	color
-0	tabla-fondo-color-hover	Color hover	#0400ff	color
+0	tabla-fondo-color-hover	Color hover	#03A9F4	color
 0	tabla-fondo-opacidad	Opacidad	50%	porcentaje
 0	tabla-fondo-opacidad-hover	Opacidad hover	24%	porcentaje
 2	botones-ghost	Botones		
