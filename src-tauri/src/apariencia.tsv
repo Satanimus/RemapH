@@ -1,69 +1,167 @@
 # apariencia.tsv — Catálogo de fábrica para la pestaña "Apariencia"
 # de la Ventana de Configuración.
 #
-# Columnas (separadas por TAB): clave | nombre_ui | valor_defecto | tipo
+# Columnas (separadas por TAB): nivel | id | nombre_ui | valor_defecto | tipo
 #
-# - clave: debe coincidir EXACTO con el nombre de la variable CSS en
-#   styl_variables.css, SIN el prefijo "--" (ej. clave "bg" ->
-#   variable "--bg"). No puede contener un punto (reservado para el
-#   prefijo "css." de Configuracion_Usuario.txt).
-# - tipo: "color" (string "#RRGGBB", editable con un selector nativo),
-#   "pixeles" (entero seguido de "px", ej. "16px"), "texto" (texto
-#   libre, ej. una lista de font-family) o "porcentaje" (entero 0-100
-#   seguido de "%", ej. "45%" — para opacidad de un objeto/contenedor,
-#   NO del color: ver reglas_opacidad_apariencia.txt. Combina con su
-#   color base vía color-mix() en el CSS, mismo patrón que
-#   --separador-opacidad-header/-fila/-fila-hover).
-# - valor_defecto: mismo valor EFECTIVO que en styl_variables.css
-#   (si una variable está redefinida más de una vez en el archivo,
-#   el que vale en cascada es el último), en el mismo formato que
-#   "tipo".
+# - nivel: posición en el árbol de la pestaña Apariencia.
+#     1 = Título (agrupador de más alto nivel, ej. "Color de tema").
+#     2 = Subtítulo (un contenedor/elemento propio, ej. "Barra superior").
+#     3 = Elemento (anidado bajo un Subtítulo, ej. "Fondo de sus filas"
+#         dentro de "Separador").
+#     0 = valor individual (color/opacidad/tamaño/etc.), pertenece a la
+#         fila de nivel 1/2/3 inmediatamente anterior. No abre fila
+#         visual propia: se agrupa junto a los demás "0" de esa misma
+#         fila superior, separados por " ; " en la columna Valor.
+#   Un nivel 2 puede tener sus propias filas 0 directamente Y ADEMÁS
+#   tener niveles 3 anidados debajo, cada uno con sus propias filas 0
+#   (ver "Separador" más abajo: tiene su propio 0 de opacidad-header,
+#   y además un nivel 3 "Fondo de sus filas" con sus propios 0).
+# - id: para nivel 0, debe coincidir EXACTO con el nombre de la
+#   variable CSS en styl_variables.css, SIN el prefijo "--" (ej. id
+#   "bg" -> variable "--bg"). No puede contener un punto (reservado
+#   para el prefijo "css." de Configuracion_Usuario.txt). Para nivel
+#   1/2/3, es solo una clave interna de árbol (no mapea a CSS).
+# - nombre_ui: texto a mostrar. En nivel 1/2/3, el nombre del
+#   Título/Subtítulo/Elemento. En nivel 0, una etiqueta corta del
+#   valor (ej. "Color", "Opacidad", "Color 1", "Modo") — no se
+#   muestra literal en la columna "Valor por defecto" (esa columna
+#   solo junta los valores en sí, ver reglas_editor_apariencia_opacidad.txt
+#   regla 33/37), pero sirve para el popup de edición (regla 36).
+# - tipo (solo aplica a nivel 0): "color" (string "#RRGGBB", editable
+#   con selector nativo), "pixeles" (entero + "px"), "texto" (texto
+#   libre, ej. una lista de font-family), "porcentaje" (entero 0-100 +
+#   "%" — opacidad de un objeto/contenedor, NO del color: combina con
+#   su color base vía color-mix() en el CSS) o "modo" (enum de texto
+#   fijo, ej. "plano" / "degradado" — ver nota Etapa B).
+# - valor_defecto: mismo valor EFECTIVO que en styl_variables.css (si
+#   una variable está redefinida más de una vez en el archivo, el que
+#   vale en cascada es el último), en el mismo formato que "tipo".
+#   Vacío en filas de nivel 1/2/3.
 #
 # No es un espejo 1 a 1 de styl_variables.css: solo se listan acá las
-# variables que tiene sentido dejar personalizables (colores propios
-# de fábrica que no son "puramente estructurales" y tamaños simples
-# en px). Variables con formato no soportado (ej. "--row-hover-bg",
-# que es un color con alfa de 8 dígitos, o "--tag-none: transparent",
-# una palabra clave) quedan fuera a propósito. Los colores de
-# etiqueta de fila (--tag-red, --tag-blue, etc. — el "arcoíris" que
-# el usuario asigna a cada fila/separador desde la tabla) también
-# quedan fuera a propósito: no son parte de la identidad visual de
-# la UI, son datos de fila y no deben poder recolorearse en bloque
-# desde Apariencia.
+# variables que tiene sentido dejar personalizables. Variables con
+# formato no soportado o los colores de etiqueta de fila (--tag-red,
+# --tag-blue, etc. — el "arcoíris" que el usuario asigna a cada
+# fila/separador desde la tabla) quedan fuera a propósito: no son
+# parte de la identidad visual de la UI, son datos de fila.
+#
+# Los tamaños de botón/texto de MenuExpress y Portapapeles (antes
+# "CLAVES_TAMANOS_EN_APARIENCIA" en vent_configuracion_main.ts) NO
+# viven en este archivo: son parte del catálogo de configuracion_listar_general
+# (config.rs) y solo se muestran dentro de la pestaña Apariencia por
+# decisión de UI. Un futuro Título "Tamaño de botones" en el árbol de
+# Apariencia debe fusionar esas filas ahí en el frontend, no acá.
 #
 # ⚠️ Sincronización: cualquier variable nueva/eliminada/renombrada en
 # styl_variables.css que deba ser personalizable acá debe reflejarse
 # en este archivo. configuracion_usuario.rs valida las claves al
 # cargar Configuracion_Usuario.txt e ignora silenciosamente las que
-# no matcheen ninguna fila de este archivo.
+# no matcheen ninguna fila id de nivel 0 de este archivo.
 
-clave	nombre_ui	valor_defecto	tipo
-highlight	Color de resaltado (UI)	#03A9F4	color
-highlight-red	Color de resaltado (alerta)	#C62828	color
-bg	Fondo general	#181818	color
-panel	Fondo de panel	#222222	color
-panel2	Fondo de panel secundario	#2B2B2B	color
-border	Color de borde	#404040	color
-overlay-superficie	Fondo de ventanas flotantes	#14141e	color
-overlay-popup	Fondo de popup en ventanas flotantes	#191920	color
-overlay-tooltip	Fondo de tooltip en ventanas flotantes	#0f0f14	color
-overlay-contraste	Contraste (bordes/hover) en ventanas flotantes	#ffffff	color
-portapapeles-boton-fijar-opacidad	Opacidad — botón Fijar (Portapapeles)	70%	porcentaje
-text	Color de texto principal	#F2F2F2	color
-text-disabled	Color de texto deshabilitado	#9e9e9e	color
-text-highlight	Color de texto resaltado	#03A9F4	color
-text-red	Color de texto (alerta)	#C62828	color
-text-highdark	Color de texto oscuro sobre resaltado	#05202a	color
-green	Verde (éxito)	#388E3C	color
-green-dark	Verde (estado activo)	#2E7D32	color
-red-dark	Rojo (estado activo)	#8F2525	color
-cyan-dark	Cian oscurecido (acento UI)	#0B7285	color
-font	Fuente de texto	"Segoe UI", sans-serif	texto
-fs11	Tamaño de texto pequeño	11px	pixeles
-fs13	Tamaño de texto normal	13px	pixeles
-fs16	Tamaño de texto grande	16px	pixeles
-toolbar-height	Alto de la barra de herramientas	48px	pixeles
-row-height	Alto de fila	40px	pixeles
-r6	Radio de bordes	6px	pixeles
-gap8	Espaciado estándar	8px	pixeles
-gap16	Espaciado grande	16px	pixeles
+nivel	id	nombre_ui	valor_defecto	tipo
+1	color-tema	Color de tema		
+2	highlight	Color de resaltado (UI)		
+0	highlight	Color	#03A9F4	color
+2	highlight-red	Color de resaltado (alerta)		
+0	highlight-red	Color	#C62828	color
+2	panel	Fondo de panel		
+0	panel	Color	#222222	color
+2	panel2	Fondo de panel secundario		
+0	panel2	Color	#2B2B2B	color
+2	border	Color de borde		
+0	border	Color	#404040	color
+2	overlay-superficie	Fondo de ventanas flotantes		
+0	overlay-superficie	Color	#14141e	color
+2	overlay-popup	Fondo de popup en ventanas flotantes		
+0	overlay-popup	Color	#191920	color
+2	overlay-tooltip	Fondo de tooltip en ventanas flotantes		
+0	overlay-tooltip	Color	#0f0f14	color
+2	overlay-contraste	Contraste (bordes/hover) en ventanas flotantes		
+0	overlay-contraste	Color	#ffffff	color
+2	text	Color de texto principal		
+0	text	Color	#F2F2F2	color
+2	text-disabled	Color de texto deshabilitado		
+0	text-disabled	Color	#9e9e9e	color
+2	text-highlight	Color de texto resaltado		
+0	text-highlight	Color	#03A9F4	color
+2	text-red	Color de texto (alerta)		
+0	text-red	Color	#C62828	color
+2	text-highdark	Color de texto oscuro sobre resaltado		
+0	text-highdark	Color	#05202a	color
+2	green	Verde (éxito)		
+0	green	Color	#388E3C	color
+2	green-dark	Verde (estado activo)		
+0	green-dark	Color	#2E7D32	color
+2	red-dark	Rojo (estado activo)		
+0	red-dark	Color	#8F2525	color
+2	cyan-dark	Cian oscurecido (acento UI)		
+0	cyan-dark	Color	#0B7285	color
+1	texto	Texto		
+2	font	Fuente de texto		
+0	font	Texto	"Segoe UI", sans-serif	texto
+2	fs11	Tamaño de texto pequeño		
+0	fs11	Tamaño	11px	pixeles
+2	fs13	Tamaño de texto normal		
+0	fs13	Tamaño	13px	pixeles
+2	fs16	Tamaño de texto grande		
+0	fs16	Tamaño	16px	pixeles
+1	dimensiones	Dimensiones		
+2	toolbar-height	Alto de la barra de herramientas		
+0	toolbar-height	Tamaño	48px	pixeles
+2	row-height	Alto de fila		
+0	row-height	Tamaño	40px	pixeles
+2	r6	Radio de bordes		
+0	r6	Tamaño	6px	pixeles
+2	gap8	Espaciado estándar		
+0	gap8	Tamaño	8px	pixeles
+2	gap16	Espaciado grande		
+0	gap16	Tamaño	16px	pixeles
+1	color-opacidad-elementos	Color y opacidad de elementos		
+2	fondo-general	Fondo general		
+0	fondo-general-modo	Modo	plano	modo
+0	bg	Color 1	#181818	color
+0	fondo-general-color2	Color 2	#181818	color
+2	barra-superior	Barra superior		
+0	barra-superior-color	Color	#222222	color
+0	barra-superior-opacidad	Opacidad	60%	porcentaje
+2	barra-lateral	Barra lateral		
+0	barra-lateral-color	Color	#222222	color
+0	barra-lateral-opacidad	Opacidad	60%	porcentaje
+2	barra-inferior	Barra inferior		
+0	barra-inferior-color	Color	#222222	color
+0	barra-inferior-opacidad	Opacidad	60%	porcentaje
+2	cabecera-tabla	Cabecera de tabla		
+0	cabecera-tabla-color	Color	#181818	color
+0	cabecera-tabla-opacidad	Opacidad	65%	porcentaje
+2	fondo-tabla	Fondo de tabla		
+0	tabla-fondo-color-impar	Color impar	#202020	color
+0	tabla-fondo-color-par	Color par	#141414	color
+0	tabla-fondo-color-hover	Color hover	#0400ff	color
+0	tabla-fondo-opacidad	Opacidad	50%	porcentaje
+0	tabla-fondo-opacidad-hover	Opacidad hover	24%	porcentaje
+2	botones-ghost	Botones		
+0	botones-ghost-opacidad-hover	Opacidad hover	8%	porcentaje
+2	separador	Separador		
+0	separador-opacidad-header	Opacidad	18%	porcentaje
+3	separador-filas	Fondo de sus filas		
+0	separador-opacidad-fila	Opacidad	5%	porcentaje
+0	separador-opacidad-fila-hover	Opacidad hover	10%	porcentaje
+2	boton-off	Botón Off (fila y separador)		
+0	boton-off-opacidad	Opacidad	55%	porcentaje
+2	perfil-activo	Botón Perfil Activo		
+0	perfil-activo-color	Color	#2E7D32	color
+0	perfil-activo-opacidad	Opacidad	100%	porcentaje
+2	perfil-inactivo	Botón Perfil Inactivo		
+0	perfil-inactivo-color	Color	#8F2525	color
+0	perfil-inactivo-opacidad	Opacidad	10%	porcentaje
+2	panel-lateral-item-actual	Panel lateral — ítem actual		
+0	panel-lateral-item-actual-opacidad	Opacidad	15%	porcentaje
+2	panel-lateral-eliminar	Panel lateral — botón Eliminar		
+0	panel-lateral-eliminar-opacidad	Opacidad	15%	porcentaje
+2	cambio-perfil	Cambio de perfil		
+0	cambio-perfil-color	Color	#03A9F4	color
+2	boton-guardar	Botón Guardar		
+0	guardar-color	Color	#03A9F4	color
+0	guardar-opacidad	Opacidad	100%	porcentaje
+2	portapapeles-boton-fijar	Botón Fijar (Portapapeles)		
+0	portapapeles-boton-fijar-opacidad	Opacidad	70%	porcentaje
