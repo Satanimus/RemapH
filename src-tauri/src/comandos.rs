@@ -1322,16 +1322,21 @@ pub async fn configuracion_guardar_lote_teclas(
 
 #[derive(Serialize)]
 pub struct ConfiguracionFilaCssUI {
-    pub clave: String,
+    pub id: String,
+
+    pub nivel: u8,
 
     pub nombre_ui: String,
 
-    // "color" | "pixeles"
-    pub tipo: String,
+    // "color" | "pixeles" | "texto" | "porcentaje" | "modo" — None en filas
+    // de nivel 1/2/3 (Título/Subtítulo/Elemento, sin tipo propio).
+    pub tipo: Option<String>,
 
-    pub valor_defecto: String,
+    // None en filas de nivel 1/2/3.
+    pub valor_defecto: Option<String>,
 
-    // None = sin override, se muestra el valor de fábrica.
+    // None = sin override, se muestra el valor de fábrica. Solo aplica a
+    // filas de nivel 0.
     pub valor_personalizado: Option<String>,
 }
 
@@ -1341,6 +1346,7 @@ fn tipo_css_a_texto(tipo: &configuracion_usuario::TipoValorCss) -> String {
         configuracion_usuario::TipoValorCss::Pixeles => "pixeles".to_string(),
         configuracion_usuario::TipoValorCss::Texto => "texto".to_string(),
         configuracion_usuario::TipoValorCss::Porcentaje => "porcentaje".to_string(),
+        configuracion_usuario::TipoValorCss::Modo => "modo".to_string(),
     }
 }
 
@@ -1351,15 +1357,25 @@ pub async fn configuracion_listar_apariencia() -> Result<Vec<ConfiguracionFilaCs
     let filas = configuracion_usuario::cargar_catalogo_css()
         .iter()
         .map(|entrada| ConfiguracionFilaCssUI {
-            clave: entrada.clave.clone(),
+            id: entrada.id.clone(),
+
+            nivel: entrada.nivel,
 
             nombre_ui: entrada.nombre_ui.clone(),
 
-            tipo: tipo_css_a_texto(&entrada.tipo),
+            tipo: if entrada.nivel == 0 {
+                Some(tipo_css_a_texto(&entrada.tipo))
+            } else {
+                None
+            },
 
-            valor_defecto: entrada.valor_defecto.clone(),
+            valor_defecto: if entrada.nivel == 0 {
+                Some(entrada.valor_defecto.clone())
+            } else {
+                None
+            },
 
-            valor_personalizado: overrides.get(&entrada.clave).cloned(),
+            valor_personalizado: overrides.get(&entrada.id).cloned(),
         })
         .collect();
 

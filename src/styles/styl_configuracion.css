@@ -187,6 +187,67 @@
   padding: 2px;
 }
 
+/* ======================================================
+   TABLA EN ÁRBOL (Apariencia)
+   ------------------------------------------------------
+   Esqueleto: mismo alto de fila que .configuracion-tabla,
+   con anchos fijos provisorios para las 4 columnas. El
+   mecanismo real de arrastre de ancho, la sangría/color por
+   nivel y el resto del estilo definitivo llegan en una etapa
+   posterior.
+   ====================================================== */
+
+.configuracion-tabla-arbol {
+  border-collapse: collapse;
+  width: 100%;
+  table-layout: fixed;
+  font-size: var(--fs13);
+}
+
+.configuracion-tabla-arbol thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+
+  background: var(--panel2);
+  color: var(--text-disabled);
+  text-align: left;
+  font-size: var(--fs13);
+  font-weight: 600;
+  padding: var(--gap8);
+  border-bottom: 1px solid var(--border);
+}
+
+.configuracion-tabla-arbol tbody td {
+  padding: var(--gap8);
+  border-bottom: 1px solid var(--border);
+  vertical-align: middle;
+}
+
+.configuracion-tabla-arbol tbody tr:hover {
+  background: var(--row-hover-bg);
+}
+
+.configuracion-tabla-arbol th:nth-child(1),
+.configuracion-tabla-arbol td:nth-child(1) {
+  width: 40%;
+}
+
+.configuracion-tabla-arbol th:nth-child(2),
+.configuracion-tabla-arbol td:nth-child(2) {
+  width: 36%;
+}
+
+.configuracion-tabla-arbol th:nth-child(3),
+.configuracion-tabla-arbol td:nth-child(3) {
+  width: 8%;
+}
+
+.configuracion-tabla-arbol th:nth-child(4),
+.configuracion-tabla-arbol td:nth-child(4) {
+  width: 16%;
+}
+
 /* Grupo de controles de tema (Apariencia) — empujado al borde
    izquierdo del pie, mientras Restablecer/Guardar quedan a la
    derecha (el pie sigue siendo flex-end por defecto). */

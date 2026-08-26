@@ -28,6 +28,7 @@
 import { invoke } from "@tauri-apps/api/core";
 
 import { aplicarOverridesApariencia } from "../core/core_apariencia";
+import { crearPestanaApariencia } from "./vent_configuracion_apariencia";
 
 import "../styles/styl_variables.css";
 import "../styles/styl_general.css";
@@ -66,17 +67,17 @@ interface FilaConfiguracion {
   valorPersonalizado: string | null;
 }
 
-interface CambioConfiguracion {
+export interface CambioConfiguracion {
   clave: string;
   valor: string;
 }
 
-interface ErrorConfiguracion {
+export interface ErrorConfiguracion {
   clave: string;
   mensaje: string;
 }
 
-interface ResultadoGuardado {
+export interface ResultadoGuardado {
   errores: ErrorConfiguracion[];
 }
 
@@ -396,7 +397,7 @@ interface RecoleccionCambios {
   erroresLocales: string[];
 }
 
-interface Pestana {
+export interface Pestana {
   cargar: () => Promise<void>;
 
   // API usada por la barra de acciones global en vez de botones
@@ -1007,45 +1008,6 @@ const pestanaTeclas = crearPestanaEditable({
     "Se pierden los nombres personalizados de esta pestaña.",
 });
 
-// ======================================================
-// 🎨 PESTAÑA APARIENCIA (Etapa 6)
-// ------------------------------------------------------
-// Reutiliza crearPestanaEditable() igual que General/Teclas,
-// agrupando filas en "Colores" y "Tamaños" (apariencia.tsv ya
-// viene ordenado así, ver ese archivo). Es la única pestaña
-// con controles de Guardar/Cargar tema (mostrados en la barra
-// de acciones global, ver "BARRA DE ACCIONES GLOBAL") y con
-// despuesDeAplicar (aplica el cambio en esta misma ventana y
-// le pide al backend que recargue el resto — ver
-// core_apariencia.ts / comandos.rs).
-// ======================================================
-
-// Modelo tal cual lo entrega configuracion_listar_apariencia (snake_case).
-interface FilaCssCruda {
-  clave: string;
-  nombre_ui: string;
-  tipo: string;
-  valor_defecto: string;
-  valor_personalizado: string | null;
-}
-
-function grupoApariencia(clave: string, tipo: string): string {
-  if (
-    clave.startsWith("text-") ||
-    clave === "text" ||
-    clave === "fs11" ||
-    clave === "fs13" ||
-    clave === "fs16" ||
-    clave === "font"
-  ) {
-    return "Texto";
-  }
-  if (tipo === "color") return "Colores";
-  if (tipo === "texto") return "Texto libre";
-  if (tipo === "porcentaje") return "Opacidad";
-  return "Tamaños";
-}
-
 // aplicarOverridesApariencia() actualiza ESTA ventana (la Ventana de
 // Configuración queda afuera del reload que hace el backend — ver
 // configuracion_refrescar_ventanas_apariencia), así que después de
@@ -1136,112 +1098,13 @@ botonCargarTema.addEventListener("click", async () => {
   }
 });
 
-const pestanaApariencia = crearPestanaEditable({
-  panel: panelApariencia,
-
-  encabezados: ["Nombre", "Valor por defecto", "Valor personalizado"],
-
-  cargarFilas: async () => {
-    const [crudasCss, crudasGeneral] = await Promise.all([
-      invoke<FilaCssCruda[]>("configuracion_listar_apariencia"),
-      invoke<FilaGeneralCruda[]>("configuracion_listar_general"),
-    ]);
-
-    const filasCss = crudasCss.map((cruda) => ({
-      clave: cruda.clave,
-      nombreMostrado: cruda.nombre_ui,
-      grupo: grupoApariencia(cruda.clave, cruda.tipo),
-      tipo: cruda.tipo as TipoValorConfiguracion,
-      valorDefecto: cruda.valor_defecto,
-      valorPersonalizado: cruda.valor_personalizado,
-    }));
-
-    // Orden de secciones fijo: el resto de filasCss mantiene el
-    // orden del tsv dentro de cada grupo, pero "Texto" va primero
-    // (agrupa colores + tamaños + fuente de texto, ver
-    // grupoApariencia) para que no quede intercalado entre
-    // "Colores" y "Tamaños". "Opacidad" (tipo porcentaje, ver
-    // reglas_opacidad_apariencia.txt) va justo después de
-    // "Colores": son los objetos/contenedores que aplican
-    // transparencia sobre esos colores, no el color en sí.
-    const ordenGrupos = [
-      "Texto",
-      "Colores",
-      "Opacidad",
-      "Texto libre",
-      "Tamaños",
-    ];
-    filasCss.sort(
-      (a, b) => ordenGrupos.indexOf(a.grupo) - ordenGrupos.indexOf(b.grupo),
-    );
-
-    // Tamaños de botón/texto de MenuExpress y Portapapeles — mismo
-    // catálogo que General (config.rs), solo mostrados acá (ver
-    // CLAVES_TAMANOS_EN_APARIENCIA). Van al final, en su propia
-    // sección.
-    const filasTamanos = crudasGeneral
-      .filter((cruda) => CLAVES_TAMANOS_EN_APARIENCIA.includes(cruda.clave))
-      .map((cruda) => ({
-        clave: cruda.clave,
-        nombreMostrado: cruda.nombre_ui,
-        grupo: "Tamaños de botones",
-        tipo: cruda.tipo as TipoValorConfiguracion,
-        valorDefecto: cruda.valor_defecto,
-        valorPersonalizado: cruda.valor_personalizado,
-      }));
-
-    return [...filasCss, ...filasTamanos];
-  },
-
-  // Cada cambio va a su catálogo de origen: los de
-  // CLAVES_TAMANOS_EN_APARIENCIA son claves de General (config.rs),
-  // el resto son CSS (Apariencia propiamente). Se guardan con los dos
-  // comandos correspondientes y se fusionan los errores, para que la
-  // barra global los trate como un solo guardado.
-  guardarLote: async (cambios) => {
-    const cambiosTamanos = cambios.filter((cambio) =>
-      CLAVES_TAMANOS_EN_APARIENCIA.includes(cambio.clave),
-    );
-    const cambiosCss = cambios.filter(
-      (cambio) => !CLAVES_TAMANOS_EN_APARIENCIA.includes(cambio.clave),
-    );
-
-    const resultados = await Promise.all([
-      cambiosCss.length > 0
-        ? invoke<ResultadoGuardado>("configuracion_guardar_lote_apariencia", {
-            cambios: cambiosCss,
-          })
-        : Promise.resolve<ResultadoGuardado>({ errores: [] }),
-
-      cambiosTamanos.length > 0
-        ? invoke<ResultadoGuardado>("configuracion_guardar_lote", {
-            cambios: cambiosTamanos,
-          })
-        : Promise.resolve<ResultadoGuardado>({ errores: [] }),
-    ]);
-
-    return { errores: resultados.flatMap((resultado) => resultado.errores) };
-  },
-
-  // Restablece ambos catálogos por separado: el CSS por prefijo
-  // ("css.", como antes) y los tamaños por su lista explícita de
-  // claves (ver configuracion_restablecer_claves — no comparten
-  // prefijo con punto con el resto de General).
-  restablecer: async () => {
-    await Promise.all([
-      invoke("configuracion_restablecer_seccion", { prefijo: "css." }),
-      invoke("configuracion_restablecer_claves", {
-        claves: CLAVES_TAMANOS_EN_APARIENCIA,
-      }),
-    ]);
-  },
-
-  despuesDeAplicar: refrescarTrasCambioApariencia,
-
-  textoConfirmacionRestablecer:
-    "¿Restablecer todos los valores de Apariencia a los de fábrica? " +
-    "Se pierden los valores personalizados de esta pestaña.",
-});
+// (nota etapa H pendiente: la fusión de CLAVES_TAMANOS_EN_APARIENCIA
+// al guardar/restablecer, que vivía acá, se reintroduce cuando
+// crearPestanaApariencia tenga persistencia real.)
+const pestanaApariencia = crearPestanaApariencia(
+  panelApariencia,
+  refrescarTrasCambioApariencia,
+);
 
 recargarApariencia = pestanaApariencia.cargar;
 

@@ -51,9 +51,33 @@
 
    --bg: #181818;
 
+   --fondo-general-color2: #181818;
+
+   /* Fallback estático (modo plano): si el JS de overrides
+      (core_apariencia.ts) todavía no corrió, esta variable ya
+      resuelve a un valor válido. Cuando el modo es "degradado",
+      core_apariencia.ts la reemplaza en caliente por un
+      linear-gradient(--bg, --fondo-general-color2). */
+   --fondo-general: var(--bg);
+
    --panel: #222222;
 
    --panel2: #2B2B2B;
+
+
+   /* ==========================
+       Fondo de tabla
+       ========================== */
+
+   --tabla-fondo-color-impar: #202020;
+
+   --tabla-fondo-color-par: #141414;
+
+   --tabla-fondo-color-hover: #0400ff;
+
+   --tabla-fondo-opacidad: 50%;
+
+   --tabla-fondo-opacidad-hover: 24%;
 
 
    /* ==========================

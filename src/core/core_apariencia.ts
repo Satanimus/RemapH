@@ -35,6 +35,15 @@ export async function aplicarOverridesApariencia(): Promise<void> {
     for (const [clave, valor] of Object.entries(overrides)) {
       raiz.style.setProperty(`--${clave}`, valor);
     }
+
+    const modo = overrides["fondo-general-modo"] ?? "plano";
+
+    raiz.style.setProperty(
+      "--fondo-general",
+      modo === "degradado"
+        ? "linear-gradient(135deg, var(--bg), var(--fondo-general-color2))"
+        : "var(--bg)",
+    );
   } catch (error) {
     console.error(
       "⚠️ No se pudieron aplicar los overrides de Apariencia:",

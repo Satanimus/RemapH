@@ -21,7 +21,7 @@ body {
 
     overflow: hidden;
 
-    background: var(--bg);
+    background: var(--fondo-general);
 
     color: var(--text);
 

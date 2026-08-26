@@ -247,19 +247,19 @@
 
     height: var(--row-height);
 
-    background: rgba(32, 32, 32, 0.45);
+    background: color-mix(in srgb, var(--tabla-fondo-color-impar) var(--tabla-fondo-opacidad), transparent);
 
     transition: background var(--speed);
 }
 
 .fila:nth-child(even) {
 
-    background: rgba(20, 20, 20, 0.55);
+    background: color-mix(in srgb, var(--tabla-fondo-color-par) var(--tabla-fondo-opacidad), transparent);
 }
 
 .fila:hover {
 
-    background: var(--row-hover-bg);
+    background: color-mix(in srgb, var(--tabla-fondo-color-hover) var(--tabla-fondo-opacidad-hover), transparent);
 }
 
 /* Etapa E: el tinte de separador se acota a las celdas

@@ -858,11 +858,14 @@ pub enum TipoValorCss {
     Pixeles,
     Texto,
     Porcentaje,
+    Modo,
 }
 
 #[derive(Clone, Debug)]
 pub struct EntradaCatalogoCss {
-    pub clave: String,
+    pub id: String,
+
+    pub nivel: u8,
 
     pub nombre_ui: String,
 
@@ -888,58 +891,93 @@ pub fn cargar_catalogo_css() -> &'static Vec<EntradaCatalogoCss> {
 
             let columnas: Vec<&str> = linea.split('\t').collect();
 
-            if columnas.len() != 4 {
+            if columnas.len() != 5 {
                 panic!(
                     "❌ Error interno en apariencia.tsv. Línea {}",
                     numero_linea + 1
                 );
             }
 
-            // Fila de encabezado ("clave  nombre_ui  valor_defecto  tipo").
-            if columnas[0].trim() == "clave" {
+            // Fila de encabezado ("nivel  id  nombre_ui  valor_defecto  tipo").
+            if columnas[0].trim() == "nivel" {
                 continue;
             }
 
-            let clave = columnas[0].trim();
+            let nivel_texto = columnas[0].trim();
 
-            let nombre_ui = columnas[1].trim();
-
-            let valor_defecto = columnas[2].trim();
-
-            let tipo_texto = columnas[3].trim();
-
-            if clave.is_empty() {
-                panic!(
-                    "❌ Entrada de apariencia sin clave. Línea {}",
-                    numero_linea + 1
-                );
-            }
-
-            if clave.contains('.') {
-                panic!(
-                    "❌ Clave de apariencia.tsv no puede contener un punto (reservado para el prefijo css.): \"{}\"",
-                    clave
-                );
-            }
-
-            let tipo = match tipo_texto {
-                "color" => TipoValorCss::Color,
-                "pixeles" => TipoValorCss::Pixeles,
-                "texto" => TipoValorCss::Texto,
-                "porcentaje" => TipoValorCss::Porcentaje,
+            let nivel: u8 = match nivel_texto.parse::<u8>() {
+                Ok(nivel) if nivel <= 3 => nivel,
                 _ => panic!(
-                    "❌ Tipo desconocido \"{}\" en apariencia.tsv. Línea {}",
-                    tipo_texto,
+                    "❌ Nivel inválido \"{}\" en apariencia.tsv (debe ser 0, 1, 2 o 3). Línea {}",
+                    nivel_texto,
                     numero_linea + 1
                 ),
             };
 
-            if catalogo.iter().any(|entrada: &EntradaCatalogoCss| entrada.clave == clave) {
-                panic!("❌ Clave duplicada en apariencia.tsv: {}", clave);
+            let id = columnas[1].trim();
+
+            let nombre_ui = columnas[2].trim();
+
+            let valor_defecto = columnas[3].trim();
+
+            let tipo_texto = columnas[4].trim();
+
+            if id.is_empty() {
+                panic!(
+                    "❌ Entrada de apariencia sin id. Línea {}",
+                    numero_linea + 1
+                );
+            }
+
+            if id.contains('.') {
+                panic!(
+                    "❌ id de apariencia.tsv no puede contener un punto (reservado para el prefijo css.): \"{}\"",
+                    id
+                );
+            }
+
+            // Nivel 1/2/3 son filas de árbol puras (sin tipo/valor propio) —
+            // no se intenta parsear tipo_texto para ellas. Solo nivel 0 exige
+            // un tipo válido no vacío.
+            let tipo = if nivel == 0 {
+                match tipo_texto {
+                    "color" => TipoValorCss::Color,
+                    "pixeles" => TipoValorCss::Pixeles,
+                    "texto" => TipoValorCss::Texto,
+                    "porcentaje" => TipoValorCss::Porcentaje,
+                    "modo" => TipoValorCss::Modo,
+                    "" => panic!(
+                        "❌ Fila de nivel 0 sin tipo en apariencia.tsv. Línea {}",
+                        numero_linea + 1
+                    ),
+                    _ => panic!(
+                        "❌ Tipo desconocido \"{}\" en apariencia.tsv. Línea {}",
+                        tipo_texto,
+                        numero_linea + 1
+                    ),
+                }
+            } else {
+                // Sin uso: nivel 1/2/3 no expone tipo (ver comandos.rs, None
+                // cuando entrada.nivel != 0).
+                TipoValorCss::Texto
+            };
+
+            // Duplicados: solo se chequean entre filas de nivel 0, que son las
+            // únicas que mapean 1 a 1 a una variable CSS real. Un id de nivel
+            // 0 puede coincidir con el id de su propio nivel 1/2/3 contenedor
+            // (ej. "highlight" como Título y "highlight" como su valor Color).
+            if nivel == 0
+                && catalogo
+                    .iter()
+                    .any(|entrada: &EntradaCatalogoCss| entrada.nivel == 0 && entrada.id == id)
+            {
+                panic!("❌ Id duplicado en apariencia.tsv: {}", id);
             }
 
             catalogo.push(EntradaCatalogoCss {
-                clave: clave.to_string(),
+                id: id.to_string(),
+
+                nivel,
 
                 nombre_ui: nombre_ui.to_string(),
 
@@ -1039,6 +1077,16 @@ fn validar_css_segun_tipo(tipo: &TipoValorCss, valor: &str) -> Result<(), String
                 )),
             }
         }
+
+        TipoValorCss::Modo => {
+            let valor = valor.trim();
+
+            if valor == "plano" || valor == "degradado" {
+                Ok(())
+            } else {
+                Err(format!("Debe ser \"plano\" o \"degradado\": \"{}\"", valor))
+            }
+        }
     }
 }
 
@@ -1060,7 +1108,11 @@ pub fn guardar_lote_css(cambios: &[(String, String)]) -> Result<(), Vec<(String,
     let mut errores: Vec<(String, String)> = Vec::new();
 
     for (clave, valor) in cambios {
-        match catalogo.iter().find(|entrada| &entrada.clave == clave) {
+        match catalogo
+            .iter()
+            .filter(|entrada| entrada.nivel == 0)
+            .find(|entrada| &entrada.id == clave)
+        {
             None => errores.push((
                 clave.clone(),
                 format!("Variable CSS desconocida: \"{}\"", clave),
@@ -1118,12 +1170,10 @@ pub fn exportar_tema(ruta: &std::path::Path) -> Result<(), String> {
          # prefijo \"css.\" que usa Configuracion_Usuario.txt).\n\n",
     );
 
-    for entrada in catalogo {
-        let valor_efectivo = overrides
-            .get(&entrada.clave)
-            .unwrap_or(&entrada.valor_defecto);
+    for entrada in catalogo.iter().filter(|entrada| entrada.nivel == 0) {
+        let valor_efectivo = overrides.get(&entrada.id).unwrap_or(&entrada.valor_defecto);
 
-        contenido.push_str(&format!("{}={}\n", entrada.clave, valor_efectivo));
+        contenido.push_str(&format!("{}={}\n", entrada.id, valor_efectivo));
     }
 
     fs::write(ruta, contenido).map_err(|error| error.to_string())
