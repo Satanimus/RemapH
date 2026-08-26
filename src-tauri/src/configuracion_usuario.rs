@@ -165,6 +165,7 @@
 use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
+use std::sync::Mutex;
 use std::sync::OnceLock;
 
 use crate::config;
@@ -439,6 +440,85 @@ pub fn leer_modo_motor() -> Result<Option<String>, String> {
     let mapa = leer_mapa_completo()?;
 
     Ok(mapa.get(CLAVE_MODO_MOTOR).map(|v| v.trim().to_string()))
+}
+
+// ======================================================
+// 🎨 ESTADO DE TEMA APLICADO (Etapa A)
+// ======================================================
+
+const CLAVE_TEMA_NOMBRE: &str = "tema.nombre";
+const CLAVE_TEMA_ORIGEN: &str = "tema.origen";
+const NOMBRES_TEMAS_PREDEFINIDOS: &[&str] = &["Default"];
+
+fn es_tema_predefinido(nombre: &str) -> bool {
+    NOMBRES_TEMAS_PREDEFINIDOS.contains(&nombre)
+}
+
+static TEMA_APLICADO: Mutex<(String, String)> = Mutex::new((String::new(), String::new()));
+
+fn tema_aplicado_actual() -> (String, String) {
+    let mutex = TEMA_APLICADO.lock().unwrap();
+
+    if mutex.0.is_empty() {
+        ("Default".to_string(), "predefinido".to_string())
+    } else {
+        mutex.clone()
+    }
+}
+
+fn establecer_tema_aplicado_en_memoria(nombre: &str, origen: &str) {
+    let mut mutex = TEMA_APLICADO.lock().unwrap();
+
+    *mutex = (nombre.to_string(), origen.to_string());
+}
+
+pub fn guardar_tema_aplicado(nombre: &str, origen: &str) -> Result<(), String> {
+    let mut mapa = leer_mapa_completo()?;
+
+    mapa.insert(CLAVE_TEMA_NOMBRE.to_string(), nombre.to_string());
+    mapa.insert(CLAVE_TEMA_ORIGEN.to_string(), origen.to_string());
+
+    escribir_mapa_completo(&mapa)?;
+
+    establecer_tema_aplicado_en_memoria(nombre, origen);
+
+    Ok(())
+}
+
+pub fn cargar_tema_aplicado_desde_config() {
+    let mapa = match leer_mapa_completo() {
+        Ok(mapa) => mapa,
+        Err(_) => {
+            establecer_tema_aplicado_en_memoria("Default", "predefinido");
+            return;
+        }
+    };
+
+    let nombre = mapa.get(CLAVE_TEMA_NOMBRE).map(|v| v.trim().to_string());
+    let origen = mapa.get(CLAVE_TEMA_ORIGEN).map(|v| v.trim().to_string());
+
+    let (nombre, origen) = match (nombre, origen) {
+        (Some(nombre), Some(origen)) if !nombre.is_empty() => (nombre, origen),
+        _ => {
+            establecer_tema_aplicado_en_memoria("Default", "predefinido");
+            return;
+        }
+    };
+
+    // Si el archivo .theme referenciado ya no existe en
+    // Usuario/Themes/ (borrado a mano o con "Eliminar Tema"),
+    // se cae al tema por defecto en vez de dejar el estado
+    // apuntando a un archivo inexistente.
+    let existe = match usuario::carpeta_temas() {
+        Ok(carpeta) => carpeta.join(format!("{}.theme", nombre)).exists(),
+        Err(_) => false,
+    };
+
+    if existe || es_tema_predefinido(&nombre) {
+        establecer_tema_aplicado_en_memoria(&nombre, &origen);
+    } else {
+        establecer_tema_aplicado_en_memoria("Default", "predefinido");
+    }
 }
 
 // ======================================================
@@ -739,6 +819,9 @@ pub fn restablecer_claves(claves: &[&str]) -> Result<(), String> {
 // ======================================================
 
 pub fn cargar_al_iniciar() {
+    guardar_tema_por_defecto_si_falta();
+    cargar_tema_aplicado_desde_config();
+
     let overrides = match leer_overrides() {
         Ok(mapa) => mapa,
 
@@ -1181,15 +1264,25 @@ pub fn restablecer_claves_css(claves: &[String]) -> Result<(), String> {
 // del archivo de usuario.
 // ======================================================
 
-pub fn exportar_tema(ruta: &std::path::Path) -> Result<(), String> {
-    let overrides = leer_overrides_css()?;
+// ======================================================
+// 📝 CONTENIDO DE UN ARCHIVO .theme
+// ------------------------------------------------------
+// usar_overrides=true: valor EFECTIVO de cada variable
+// (override si existe, si no el de fábrica) — así "Guardar
+// tema" nunca produce un archivo vacío aunque no se haya
+// tocado nada en esta sesión.
+// usar_overrides=false: siempre el valor de fábrica, sin
+// mirar Configuracion_Usuario.txt — usado para el tema por
+// defecto que vive en Usuario/Themes/.
+// ======================================================
 
-    // Se exporta el valor EFECTIVO de cada variable del catálogo
-    // (override si existe, si no el de fábrica) — no solo las
-    // claves con override guardado. Si no fuera así, guardar un
-    // tema sin haber tocado nada en esta sesión produciría un
-    // archivo .theme vacío, aunque en pantalla se vea una paleta
-    // completa (la de fábrica).
+fn contenido_tema(usar_overrides: bool) -> Result<String, String> {
+    let overrides = if usar_overrides {
+        leer_overrides_css()?
+    } else {
+        HashMap::new()
+    };
+
     let catalogo = cargar_catalogo_css();
 
     let mut contenido = String::from(
@@ -1205,7 +1298,70 @@ pub fn exportar_tema(ruta: &std::path::Path) -> Result<(), String> {
         contenido.push_str(&format!("{}={}\n", entrada.id, valor_efectivo));
     }
 
+    Ok(contenido)
+}
+
+pub fn exportar_tema(ruta: &std::path::Path) -> Result<(), String> {
+    let contenido = contenido_tema(true)?;
+
     fs::write(ruta, contenido).map_err(|error| error.to_string())
+}
+
+// ======================================================
+// 🎨 TEMA POR DEFECTO EN Usuario/Themes/
+// ------------------------------------------------------
+// Se llama una sola vez al iniciar (cargar_al_iniciar). Si
+// Default.theme ya existe no se toca (no pisa un tema que
+// el usuario haya guardado ahí a mano con ese nombre).
+// ======================================================
+
+pub fn guardar_tema_por_defecto_si_falta() {
+    let ruta = match usuario::carpeta_temas() {
+        Ok(carpeta) => carpeta.join("Default.theme"),
+        Err(error) => {
+            eprintln!("⚠️ No se pudo resolver Usuario/Themes/: {}", error);
+            return;
+        }
+    };
+
+    if ruta.exists() {
+        return;
+    }
+
+    let contenido = match contenido_tema(false) {
+        Ok(contenido) => contenido,
+        Err(error) => {
+            eprintln!("⚠️ No se pudo generar el tema por defecto: {}", error);
+            return;
+        }
+    };
+
+    if let Err(error) = fs::write(&ruta, contenido) {
+        eprintln!("⚠️ No se pudo guardar el tema por defecto: {}", error);
+    }
+}
+
+// ======================================================
+// 💾 GUARDAR TEMA (automático, dentro de Usuario/Themes/)
+// ------------------------------------------------------
+// Sin diálogo nativo: mientras no exista el selector de
+// temas integrado, "Guardar tema" siempre escribe adentro
+// de Usuario/Themes/. Devuelve el nombre de archivo final
+// para que la UI lo pueda mostrar.
+// ======================================================
+
+pub fn guardar_tema(nombre_sugerido: &str) -> Result<String, String> {
+    let nombre_archivo = if nombre_sugerido.trim().is_empty() {
+        "tema.theme".to_string()
+    } else {
+        format!("{}.theme", nombre_sugerido.trim())
+    };
+
+    let ruta = usuario::carpeta_temas()?.join(&nombre_archivo);
+
+    exportar_tema(&ruta)?;
+
+    Ok(nombre_archivo)
 }
 
 pub fn importar_tema(ruta: &std::path::Path) -> Result<(), Vec<(String, String)>> {

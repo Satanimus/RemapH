@@ -108,7 +108,21 @@ const tabApariencia = crearBotonTab("Apariencia", false);
 const tabTeclas = crearBotonTab("Teclas", false);
 const tabAvanzado = crearBotonTab("Avanzado", false);
 
-tabs.append(tabGeneral, tabApariencia, tabTeclas, tabAvanzado);
+const botonCarpetaUsuario = document.createElement("button");
+botonCarpetaUsuario.type = "button";
+botonCarpetaUsuario.className = "configuracion-boton-carpeta";
+botonCarpetaUsuario.title = "Abrir carpeta de usuario";
+botonCarpetaUsuario.textContent = "📁";
+
+botonCarpetaUsuario.addEventListener("click", async () => {
+  try {
+    await invoke("abrir_carpeta_usuario");
+  } catch (error) {
+    window.alert(`No se pudo abrir la carpeta de usuario: ${String(error)}`);
+  }
+});
+
+tabs.append(tabGeneral, tabApariencia, tabTeclas, tabAvanzado, botonCarpetaUsuario);
 
 const cuerpo = document.createElement("div");
 cuerpo.className = "configuracion-cuerpo";

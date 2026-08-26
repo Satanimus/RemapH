@@ -5,9 +5,12 @@
 // Dueño de las rutas y archivos del usuario:
 //
 // Usuario/
-//   ├── perfil_Default.json
-//   ├── perfil_Juegos.json
-//   └── ...
+//   ├── Perfiles/
+//   │     ├── perfil_Default.json
+//   │     ├── perfil_Juegos.json
+//   │     └── ...
+//   ├── Portapapeles/
+//   └── Themes/
 //
 // Resuelve la carpeta Usuario, busca perfiles guardados
 // en disco y decide cuál es el perfil actual (siempre el
@@ -57,7 +60,7 @@
 // Transformación que realiza
 // %APPDATA%
 //     ↓
-// Usuario/
+// Usuario/Perfiles/
 //     ↓
 // perfil_actual() → perfil_Juegos.json
 // ======================================================
@@ -84,11 +87,47 @@ pub(crate) fn carpeta() -> Result<PathBuf, String> {
 }
 
 // ======================================================
+// 📁 SUBCARPETAS DE USUARIO
+// ------------------------------------------------------
+// Perfiles, Portapapeles y Themes viven todas dentro de
+// la carpeta Usuario (antes Portapapeles vivía suelta al
+// lado de Usuario, y los perfiles sueltos dentro de
+// Usuario). Este archivo es el único dueño de estas
+// rutas — back_portapapeles.rs y configuracion_usuario.rs
+// las consultan acá en vez de resolver APPDATA por su
+// cuenta.
+// ======================================================
+
+pub(crate) fn carpeta_perfiles() -> Result<PathBuf, String> {
+    let carpeta = carpeta()?.join("Perfiles");
+
+    fs::create_dir_all(&carpeta).map_err(|error| error.to_string())?;
+
+    Ok(carpeta)
+}
+
+pub(crate) fn carpeta_portapapeles() -> Result<PathBuf, String> {
+    let carpeta = carpeta()?.join("Portapapeles");
+
+    fs::create_dir_all(&carpeta).map_err(|error| error.to_string())?;
+
+    Ok(carpeta)
+}
+
+pub(crate) fn carpeta_temas() -> Result<PathBuf, String> {
+    let carpeta = carpeta()?.join("Themes");
+
+    fs::create_dir_all(&carpeta).map_err(|error| error.to_string())?;
+
+    Ok(carpeta)
+}
+
+// ======================================================
 // 📄 BUSCAR PERFILES
 // ======================================================
 
 fn rutas_perfiles() -> Result<Vec<PathBuf>, String> {
-    let carpeta = carpeta()?;
+    let carpeta = carpeta_perfiles()?;
 
     let mut perfiles = Vec::new();
 
@@ -159,7 +198,7 @@ pub fn ruta_perfil(nombre: &str) -> Result<PathBuf, String> {
         return Err("Nombre de perfil inválido".to_string());
     }
 
-    Ok(carpeta()?.join(format!("perfil_{}.json", nombre)))
+    Ok(carpeta_perfiles()?.join(format!("perfil_{}.json", nombre)))
 }
 
 // ======================================================

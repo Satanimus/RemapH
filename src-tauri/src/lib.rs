@@ -181,6 +181,7 @@ pub fn run() {
             comandos::configuracion_restablecer_claves_css,
             comandos::configuracion_guardar_tema,
             comandos::configuracion_cargar_tema,
+            comandos::abrir_carpeta_usuario,
             comandos::obtener_overrides_apariencia,
             comandos::configuracion_refrescar_ventanas_apariencia,
             comandos::motor_obtener_modo,

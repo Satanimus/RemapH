@@ -48,6 +48,32 @@
   font-weight: 600;
 }
 
+/* Botón ghost icono-solo "Abrir carpeta de usuario", mismo criterio
+   que .configuracion-arbol-editar/.configuracion-arbol-expandir:
+   sin fondo ni borde en reposo, borde+color de acento en hover.
+   margin-left: auto lo empuja al extremo derecho de la barra de
+   pestañas, separado de las tabs. */
+.configuracion-boton-carpeta {
+  margin-left: auto;
+  align-self: center;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--r4);
+  color: var(--text-disabled);
+  font-size: var(--fs16);
+  line-height: 1;
+  cursor: pointer;
+  padding: var(--gap4) var(--gap8);
+  transition:
+    border-color .12s ease,
+    color .12s ease;
+}
+
+.configuracion-boton-carpeta:hover {
+  border-color: var(--highlight);
+  color: var(--highlight);
+}
+
 /* ======================================================
    CUERPO / PANELES
    ====================================================== */

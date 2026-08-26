@@ -146,6 +146,7 @@ use crate::perfil_ui::{
     convertir_perfil, ItemFilaUI, ResultadoPerfil, ResultadoPerfilInicial, TriggerCapturaUI,
 };
 use crate::pulsadores;
+use crate::usuario;
 
 use base64::engine::general_purpose::STANDARD as BASE64;
 use base64::Engine as _;
@@ -1307,8 +1308,11 @@ pub async fn configuracion_guardar_lote_teclas(
 // Mismo patrón que General/Teclas: el catálogo (colores y
 // tamaños expuestos, ver apariencia.tsv) y los overrides
 // "css." viven en configuracion_usuario.rs — acá solo se
-// convierte a/desde los modelos serializables de la UI y se
-// resuelven los diálogos nativos de Guardar/Cargar tema.
+// convierte a/desde los modelos serializables de la UI.
+// "Guardar tema" no usa diálogo nativo (guarda automático en
+// Usuario/Themes/, ver configuracion_usuario::guardar_tema);
+// "Cargar tema" sigue resolviendo el diálogo nativo acá hasta
+// que exista el selector de temas integrado.
 //
 // A diferencia de General, no hay setter de Rust que aplicar
 // en caliente: los overrides se inyectan como variables CSS
@@ -1418,38 +1422,44 @@ pub async fn configuracion_restablecer_claves_css(claves: Vec<String>) -> Result
 // ======================================================
 // 🖼️ APARIENCIA — TEMAS (.theme)
 // ------------------------------------------------------
-// Ambos comandos devuelven un resultado "vacío" cuando el
-// usuario cancela el diálogo nativo (rfd): no es un error,
-// simplemente no pasó nada.
-//
 // configuracion_guardar_tema(nombre_sugerido) → bool
-//     false = el usuario canceló el diálogo "Guardar como".
+//     Siempre true salvo error (Err) — guarda automático en
+//     Usuario/Themes/, no hay diálogo que cancelar.
 //
 // configuracion_cargar_tema() → Option<ConfiguracionResultadoGuardadoUI>
-//     None = el usuario canceló el selector de archivo.
+//     None = el usuario canceló el selector de archivo (rfd).
 //     Some(resultado) = se intentó importar; resultado.errores
 //     vacío significa éxito (mismo contrato que guardar_lote).
 // ======================================================
 
 #[tauri::command]
 pub async fn configuracion_guardar_tema(nombre_sugerido: String) -> Result<bool, String> {
-    let nombre_archivo = if nombre_sugerido.trim().is_empty() {
-        "tema.theme".to_string()
-    } else {
-        format!("{}.theme", nombre_sugerido.trim())
-    };
-
-    let Some(ruta) = rfd::FileDialog::new()
-        .set_file_name(&nombre_archivo)
-        .add_filter("Tema RemapH", &["theme"])
-        .save_file()
-    else {
-        return Ok(false);
-    };
-
-    configuracion_usuario::exportar_tema(&ruta)?;
+    // Sin diálogo nativo: mientras no exista el selector de temas
+    // integrado, guarda automático dentro de Usuario/Themes/.
+    configuracion_usuario::guardar_tema(&nombre_sugerido)?;
 
     Ok(true)
+}
+
+// ======================================================
+// 📂 ABRIR CARPETA DE USUARIO
+// ------------------------------------------------------
+// Botón "Abrir carpeta de usuario" en la barra de pestañas
+// de la Ventana de Configuración — abre
+// %APPDATA%/RemapH/Usuario/ (Perfiles/Portapapeles/Themes)
+// en el Explorador de Windows.
+// ======================================================
+
+#[tauri::command]
+pub async fn abrir_carpeta_usuario() -> Result<(), String> {
+    let carpeta = usuario::carpeta()?;
+
+    std::process::Command::new("explorer")
+        .arg(carpeta)
+        .spawn()
+        .map_err(|error| error.to_string())?;
+
+    Ok(())
 }
 
 #[tauri::command]

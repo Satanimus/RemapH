@@ -7,7 +7,7 @@
 //
 // Dueño de la carpeta física del pool compartido de Portapapeles:
 //
-// %APPDATA%/RemapH/Portapapeles/
+// %APPDATA%/RemapH/Usuario/Portapapeles/
 //   ├── abc123-...-def_MiLink.txt        (fijado)
 //   ├── Imagen_13.45.55.png              (rotativo)
 //   └── la ciudad es.txt                 (rotativo)
@@ -215,7 +215,7 @@
 // 6. Funciones del archivo
 //
 // carpeta()
-//     Resuelve (y crea si no existe) %APPDATA%/RemapH/Portapapeles/.
+//     Resuelve (y crea si no existe) %APPDATA%/RemapH/Usuario/Portapapeles/.
 // listar_rotativos()
 //     Todos los rotativos del pool, más reciente primero.
 // listar_fijados()
@@ -295,7 +295,6 @@ use windows_sys::Win32::UI::Input::KeyboardAndMouse::{
 };
 
 use crate::back_portapapeles_captura::{self, ContenidoPortapapeles};
-use crate::config;
 use crate::perfil_cache::{ComportamientoMenu, TamanoBotonPortapapeles, TamanoMenu, UbicacionMenu};
 
 // ======================================================
@@ -328,15 +327,7 @@ pub struct ElementoPortapapeles {
 // ======================================================
 
 fn carpeta() -> Result<PathBuf, String> {
-    let appdata = std::env::var("APPDATA").map_err(|error| error.to_string())?;
-
-    let carpeta = PathBuf::from(appdata)
-        .join(config::NOMBRE_APP)
-        .join("Portapapeles");
-
-    fs::create_dir_all(&carpeta).map_err(|error| error.to_string())?;
-
-    Ok(carpeta)
+    crate::usuario::carpeta_portapapeles()
 }
 
 // ======================================================
