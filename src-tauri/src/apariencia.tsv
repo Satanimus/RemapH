@@ -64,12 +64,15 @@ nivel	id	nombre_ui	valor_defecto	tipo
 0	highlight	Color	#03A9F4	color
 2	highlight-red	Color de resaltado (alerta)		
 0	highlight-red	Color	#C62828	color
+2	bg	Fondo base		
+0	bg	Color	#181818	color
 2	panel	Fondo de panel		
 0	panel	Color	#222222	color
 2	panel2	Fondo de panel secundario		
 0	panel2	Color	#2B2B2B	color
 2	border	Color de borde		
 0	border	Color	#404040	color
+0	border-light	Color claro	#555555	color
 2	overlay-superficie	Fondo de ventanas flotantes		
 0	overlay-superficie	Color	#14141e	color
 2	overlay-popup	Fondo de popup en ventanas flotantes		
@@ -120,8 +123,11 @@ nivel	id	nombre_ui	valor_defecto	tipo
 1	color-opacidad-elementos	Color y opacidad de elementos		
 2	fondo-general	Fondo general		
 0	fondo-general-modo	Modo	plano	modo
-0	bg	Color 1	#181818	color
 0	fondo-general-color2	Color 2	#181818	color
+2	fondo-app	Fondo tras tabla y barras		
+0	fondo-app-modo	Modo	degradado	modo
+0	fondo-app-color1	Color 1	#0d1117	color
+0	fondo-app-color2	Color 2	#05070a	color
 2	barra-superior	Barra superior		
 0	barra-superior-color	Color	#222222	color
 0	barra-superior-opacidad	Opacidad	60%	porcentaje
@@ -150,17 +156,13 @@ nivel	id	nombre_ui	valor_defecto	tipo
 2	boton-off	Botón Off (fila y separador)		
 0	boton-off-opacidad	Opacidad	55%	porcentaje
 2	perfil-activo	Botón Perfil Activo		
-0	perfil-activo-color	Color	#2E7D32	color
 0	perfil-activo-opacidad	Opacidad	100%	porcentaje
 2	perfil-inactivo	Botón Perfil Inactivo		
-0	perfil-inactivo-color	Color	#8F2525	color
 0	perfil-inactivo-opacidad	Opacidad	10%	porcentaje
 2	panel-lateral-item-actual	Panel lateral — ítem actual		
 0	panel-lateral-item-actual-opacidad	Opacidad	15%	porcentaje
 2	panel-lateral-eliminar	Panel lateral — botón Eliminar		
 0	panel-lateral-eliminar-opacidad	Opacidad	15%	porcentaje
-2	cambio-perfil	Cambio de perfil		
-0	cambio-perfil-color	Color	#03A9F4	color
 2	boton-guardar	Botón Guardar		
 0	guardar-color	Color	#03A9F4	color
 0	guardar-opacidad	Opacidad	100%	porcentaje

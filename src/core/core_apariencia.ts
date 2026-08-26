@@ -66,6 +66,15 @@ export async function aplicarOverridesApariencia(): Promise<void> {
         ? "linear-gradient(135deg, var(--bg), var(--fondo-general-color2))"
         : "var(--bg)",
     );
+
+    const modoApp = overrides["fondo-app-modo"] ?? "degradado";
+
+    raiz.style.setProperty(
+      "--fondo-app",
+      modoApp === "degradado"
+        ? "linear-gradient(180deg, var(--fondo-app-color1), var(--fondo-app-color2))"
+        : "var(--fondo-app-color1)",
+    );
   } catch (error) {
     console.error(
       "⚠️ No se pudieron aplicar los overrides de Apariencia:",
