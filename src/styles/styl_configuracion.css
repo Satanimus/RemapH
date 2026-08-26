@@ -493,6 +493,9 @@
 .configuracion-boton-primario {
   background: var(--highlight);
   border-color: var(--highlight);
+  color: var(--text-highdark);
+  font-family: var(--font);
+  font-weight: 600;
 }
 
 .configuracion-toast {

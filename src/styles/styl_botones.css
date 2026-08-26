@@ -145,6 +145,38 @@
 }
 
 /* ======================================================
+   🔘 EFECTO PRESS / CLICK EN BARRA SUPERIOR
+   ====================================================== */
+
+/* 1. Botones ghost (Menú, + Fila, + Separador, Revertir) */
+.btn-menu-lateral:active,
+.btn-agregar-fila:active,
+.btn-agregar-separador:active,
+.btn-revertir-cambios:active {
+    transform: translateY(1px);
+}
+
+/* 2. Botón Guardar Cambios */
+.btn-guardar-cambios:active {
+    transform: translateY(1px);
+    filter: brightness(0.95);
+}
+
+/* 3. Selector de Perfil y Estados (Activo / Inactivo) */
+
+.ui-btn.estado:active {
+    transform: translateY(1px) !important;
+}
+
+/* Selector/Desplegable del Perfil (Contenedor principal + texto) */
+.perfil-selector:active,
+.perfil-selector-nombre:active,
+.ui-btn:has(.perfil-selector-nombre):active {
+    transform: translateY(1px) !important;
+}
+
+
+/* ======================================================
    ⚙️ BOTÓN ICONO
    ====================================================== */
 
@@ -354,29 +386,25 @@
 }
 
 /* ======================================================
-    🧾 POPUPS — LISTAS DE OPCIONES
-    ------------------------------------------------------
-    Visual tipo menú de Visual Studio.
-    ====================================================== */
+   🧾 POPUPS — LISTAS DE OPCIONES
+   ------------------------------------------------------
+   Visual tipo menú de Visual Studio.
+   ====================================================== */
 
-.popup-capa .ui-btn {
-
+/* Estado de reposo de los ítems del popup */
+.popup-capa .ui-btn,
+.popup-lista .ui-btn {
     background: transparent;
-
     border: 1px solid transparent;
-
     border-radius: var(--r4);
-
 }
 
-.popup-capa .ui-btn:hover {
-
-    background: transparent;
-
+/* Estado hover/en foco de los ítems del popup (Sobrescribe background: transparent) */
+.popup-capa .ui-btn:hover,
+.popup-lista .ui-btn:hover {
+    background: color-mix(in srgb, var(--highlight) var(--botones-ghost-opacidad-hover), transparent) !important;
     border-color: var(--highlight);
-
     border-radius: var(--r4);
-
 }
 
 /* ======================================================
@@ -717,7 +745,7 @@
 
     color: var(--text-highdark);
 
-    background: color-mix(in srgb, var(--guardar-color) var(--guardar-opacidad), transparent);
+    background: color-mix(in srgb, var(--highlight) var(--guardar-opacidad), transparent);
 
     font-weight: 600;
 }

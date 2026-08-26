@@ -164,7 +164,6 @@ nivel	id	nombre_ui	valor_defecto	tipo
 2	panel-lateral-eliminar	Panel lateral — botón Eliminar		
 0	panel-lateral-eliminar-opacidad	Opacidad	15%	porcentaje
 2	boton-guardar	Botón Guardar		
-0	guardar-color	Color	#03A9F4	color
 0	guardar-opacidad	Opacidad	100%	porcentaje
 2	portapapeles-boton-fijar	Botón Fijar (Portapapeles)		
 0	portapapeles-boton-fijar-opacidad	Opacidad	70%	porcentaje
