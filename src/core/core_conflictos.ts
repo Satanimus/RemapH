@@ -3,7 +3,7 @@
 // ------------------------------------------------------
 // Detecta conflictos entre filas.
 //
-// Dos categorías de conflicto, cada una con su propio
+// Tres categorías de conflicto, cada una con su propio
 // criterio de detección — ver cada función:
 //
 // 001 — Trigger idéntico + App incompatible (dos filas que
@@ -16,20 +16,33 @@
 //        "Mantenido" son condiciones DISTINTAS) — ver
 //        ruedaRepeticionAnulaMantenido() más abajo.
 //
-// La acción no participa en ninguna de las dos.
+// 003 — Trigger o Acción de UNA fila coincide con el atajo
+//        global reservado (tecla_toggle_perfil o
+//        tecla_guardar_coordenada, ver config.rs). A
+//        diferencia de 001/002, no es entre dos filas — es
+//        una sola fila+columna contra un valor de
+//        Configuración, resuelto en el backend (Reglas
+//        9/10/11/12) — ver obtenerConflictosAtajoReservado()
+//        más abajo.
+//
+// La acción no participa en 001 ni en 002.
 // ======================================================
 
+import { invoke } from "@tauri-apps/api/core";
+
 import type { FilaPerfil } from "./core_perfil";
+import type { Entrada } from "./core_entrada";
 import { esGatilloRueda } from "./core_trigger";
 
 // ======================================================
 // 📦 CONFLICTO
 // ======================================================
 
-export type CodigoConflicto = "001" | "002";
+export type CodigoConflicto = "001" | "002" | "003";
 
-export interface Conflicto {
-  codigo: CodigoConflicto;
+// 001/002: conflicto entre dos filas.
+export interface ConflictoDosFilas {
+  codigo: "001" | "002";
 
   numeroA: number;
 
@@ -40,12 +53,27 @@ export interface Conflicto {
   filaB: FilaPerfil;
 }
 
+// 003: conflicto de una sola fila+columna contra un atajo
+// reservado de Configuración — no hay "fila B" con la que
+// compare (ver header).
+export interface ConflictoAtajoReservado {
+  codigo: "003";
+
+  numeroFila: number;
+
+  columna: "Trigger" | "Accion";
+
+  fila: FilaPerfil;
+}
+
+export type Conflicto = ConflictoDosFilas | ConflictoAtajoReservado;
+
 // ======================================================
 // 🔍 OBTENER CONFLICTOS
 // ======================================================
 
-export function obtenerConflictos(filas: FilaPerfil[]): Conflicto[] {
-  const conflictos: Conflicto[] = [];
+export function obtenerConflictos(filas: FilaPerfil[]): ConflictoDosFilas[] {
+  const conflictos: ConflictoDosFilas[] = [];
 
   for (let indiceA = 0; indiceA < filas.length; indiceA++) {
     for (let indiceB = indiceA + 1; indiceB < filas.length; indiceB++) {
@@ -98,6 +126,82 @@ export function filaTieneConflicto(
   return obtenerConflictos(filas).some(
     (conflicto) => conflicto.filaA.id === id || conflicto.filaB.id === id,
   );
+}
+
+// ======================================================
+// 🔒 ATAJO RESERVADO (conflicto 003)
+// ------------------------------------------------------
+// A diferencia de 001/002 (calculados 100% en el frontend), acá la
+// comparación vive en el backend (perfil_ui::coincide_con_atajo_reservado,
+// ver comandos.rs) — es quien conoce el valor vigente de
+// tecla_toggle_perfil/tecla_guardar_coordenada (config.rs). Por eso
+// esta función es async, a diferencia de obtenerConflictos(). Cubre
+// Trigger y Accion de cada fila (Regla 11) — una fila puede generar
+// hasta dos conflictos "003", uno por columna.
+// ======================================================
+
+function entradaAEntradaUI(entrada: Entrada): { tipo: string; codigo: string } {
+  return { tipo: entrada.tipo, codigo: entrada.codigo };
+}
+
+export async function obtenerConflictosAtajoReservado(
+  filas: FilaPerfil[],
+): Promise<ConflictoAtajoReservado[]> {
+  const conflictos: ConflictoAtajoReservado[] = [];
+
+  for (let indice = 0; indice < filas.length; indice++) {
+    const fila = filas[indice];
+
+    const columnas: Array<{ columna: "Trigger" | "Accion"; trigger: FilaPerfil["trigger"] | null }> =
+      [
+        { columna: "Trigger", trigger: fila.trigger },
+        { columna: "Accion", trigger: fila.accion },
+      ];
+
+    for (const { columna, trigger } of columnas) {
+      if (!trigger || !trigger.gatillo) {
+        continue;
+      }
+
+      const coincide = await invoke<boolean>("coincide_con_atajo_reservado", {
+        modificadores: trigger.modificadores.map(entradaAEntradaUI),
+
+        gatillo: entradaAEntradaUI(trigger.gatillo),
+      });
+
+      if (coincide) {
+        conflictos.push({
+          codigo: "003",
+
+          numeroFila: indice + 1,
+
+          columna,
+
+          fila,
+        });
+      }
+    }
+  }
+
+  return conflictos;
+}
+
+// ❓ FILA EN CONFLICTO CON ATAJO RESERVADO
+// ------------------------------------------------------
+// Función hermana de filaTieneConflicto(), separada (no
+// unificada) porque los dos llamadores actuales de
+// filaTieneConflicto() (comp_controles.ts::crearEstado,
+// comp_separador_estado.ts) son síncronos hoy — unificar ambas
+// categorías en una sola función habría forzado a hacerlas async
+// también. Queda sin invocar todavía: la conecta la Etapa F.
+export async function filaTieneConflictoAtajoReservado(
+  id: string,
+
+  filas: FilaPerfil[],
+): Promise<boolean> {
+  const conflictos = await obtenerConflictosAtajoReservado(filas);
+
+  return conflictos.some((conflicto) => conflicto.fila.id === id);
 }
 
 // ======================================================

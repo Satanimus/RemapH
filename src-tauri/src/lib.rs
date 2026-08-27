@@ -96,6 +96,7 @@ pub fn run() {
             comandos::desactivar_perfil,
             comandos::iniciar_captura,
             comandos::obtener_captura,
+            comandos::coincide_con_atajo_reservado,
             comandos::obtener_perfil_actual,
             comandos::obtener_perfiles,
             comandos::traducir_pulsador,

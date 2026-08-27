@@ -142,9 +142,10 @@ use crate::macro_usuario;
 use crate::macros;
 use crate::motor;
 use crate::perfil;
+use crate::eventos::InputId;
 use crate::perfil_ui::{
-    convertir_atajo_captura, convertir_perfil, AtajoCapturaUI, ItemFilaUI, ResultadoPerfil,
-    ResultadoPerfilInicial, TriggerCapturaUI,
+    convertir_atajo_captura, convertir_perfil, AtajoCapturaUI, EntradaUI, ItemFilaUI,
+    ResultadoPerfil, ResultadoPerfilInicial, TriggerCapturaUI,
 };
 use crate::pulsadores;
 use crate::usuario;
@@ -435,6 +436,39 @@ pub fn iniciar_captura(fila_id: String, columna: String) {
 #[tauri::command]
 pub fn obtener_captura() -> Option<(String, String, Option<TriggerCapturaUI>)> {
     crate::perfil_ui::obtener_captura()
+}
+
+// ======================================================
+// 🔒 COINCIDENCIA CON ATAJO RESERVADO (config.rs)
+// ------------------------------------------------------
+// Expone perfil_ui::coincide_con_atajo_reservado al frontend, para
+// que core_conflictos.ts pueda marcar en alerta una fila cuyo
+// Trigger o Acción coincide con tecla_toggle_perfil/
+// tecla_guardar_coordenada (Reglas 9/10/11/12).
+// ======================================================
+
+fn entrada_ui_a_input_id(entrada: &EntradaUI) -> InputId {
+    let fuente = match entrada.tipo.as_str() {
+        "Teclado" => "keyboard",
+
+        "Mouse" => "mouse",
+
+        "Multimedia" => "multimedia",
+
+        "Joystick" => "joystick",
+
+        _ => "unknown",
+    };
+
+    InputId::new(fuente, &entrada.codigo)
+}
+
+#[tauri::command]
+pub fn coincide_con_atajo_reservado(modificadores: Vec<EntradaUI>, gatillo: EntradaUI) -> bool {
+    let modificadores: Vec<InputId> = modificadores.iter().map(entrada_ui_a_input_id).collect();
+    let gatillo = entrada_ui_a_input_id(&gatillo);
+
+    crate::perfil_ui::coincide_con_atajo_reservado(&modificadores, &gatillo)
 }
 
 // ======================================================

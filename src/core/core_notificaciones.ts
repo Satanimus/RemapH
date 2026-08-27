@@ -5,7 +5,7 @@
 //
 // La lógica solo llama:
 //
-// Notificacion 001 / 002
+// Notificacion 001 / 002 / 003
 //
 // Los textos viven aquí.
 // ======================================================
@@ -26,6 +26,17 @@ export interface DatosNotificacion {
   appB: AppPerfil;
 }
 
+// Datos de la notificación 003 (conflicto de atajo reservado): una
+// sola fila+columna, sin "fila B" ni apps — no reusa
+// DatosNotificacion (ver core_conflictos.ts::ConflictoAtajoReservado,
+// mismo criterio de no forzar campos opcionales entre las dos
+// formas).
+export interface DatosNotificacionAtajoReservado {
+  fila: number;
+
+  columna: "Trigger" | "Accion";
+}
+
 // ======================================================
 // 📝 TEXTOS
 // ======================================================
@@ -44,12 +55,16 @@ const TEXTOS = {
     `Disparador de rueda con Extra Repetición anula ` +
     `identificación del mismo disparador con modo [Mantenido].`,
 
-  // A diferencia de 001/002 (conflictos entre DOS filas,
-  // recalculados en vivo), esta es una advertencia de UNA sola fila
-  // que viaja desde Rust tal cual tras compilar (ver
-  // core_advertencias_compilacion.ts) — el mensaje ya viene armado
-  // del lado backend, acá solo se antepone el número de fila con el
-  // mismo formato que el resto.
+  notificacion003: (datos: DatosNotificacionAtajoReservado) =>
+    `⚠ (Fila ${datos.fila}) ` +
+    `El disparador de la columna ${datos.columna} coincide con ` +
+    `un atajo global reservado (Configuración).`,
+
+  // A diferencia de 001/002/003 (conflictos recalculados en vivo),
+  // esta es una advertencia de UNA sola fila que viaja desde Rust
+  // tal cual tras compilar (ver core_advertencias_compilacion.ts) —
+  // el mensaje ya viene armado del lado backend, acá solo se
+  // antepone el número de fila con el mismo formato que el resto.
   advertenciaCompilacion: (fila: number, mensaje: string) =>
     `(Fila ${fila}) ${mensaje}`,
 };
@@ -86,6 +101,21 @@ export function obtenerTextoNotificacion(
     case "002":
       return TEXTOS.notificacion002(datos);
   }
+}
+
+// ======================================================
+// 📝 OBTENER TEXTO DE NOTIFICACIÓN — ATAJO RESERVADO (003)
+// ------------------------------------------------------
+// Función separada de obtenerTextoNotificacion() (no un tercer
+// case ahí) porque 003 usa DatosNotificacionAtajoReservado, no
+// DatosNotificacion — mismo criterio de core_conflictos.ts de no
+// forzar un solo shape de datos para las tres categorías.
+// ======================================================
+
+export function obtenerTextoNotificacionAtajoReservado(
+  datos: DatosNotificacionAtajoReservado,
+): string {
+  return TEXTOS.notificacion003(datos);
 }
 
 // ======================================================
