@@ -32,6 +32,8 @@
 }
 
 .panel-ayuda.abierto {
+    width: var(--ancho-ayuda, 280px);
+
     overflow: visible;
 }
 

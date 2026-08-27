@@ -30,7 +30,10 @@ function aplicarAncho(ancho: number): void {
     return;
   }
 
-  panelElemento.style.width = `${Math.max(ANCHO_AYUDA_MINIMO, ancho)}px`;
+  panelElemento.style.setProperty(
+    "--ancho-ayuda",
+    `${Math.max(ANCHO_AYUDA_MINIMO, ancho)}px`,
+  );
 }
 
 // ======================================================
@@ -91,11 +94,14 @@ function iniciarArrastreAncho(inicioX: number): void {
 
     const anchoFinal = panelElemento.getBoundingClientRect().width;
 
-    invoke("establecer_ancho_panel_ayuda", { ancho: Math.round(anchoFinal) }).catch(
-      (error) => {
-        console.error("❌ No se pudo guardar el ancho del panel de ayuda:", error);
-      },
-    );
+    invoke("establecer_ancho_panel_ayuda", {
+      ancho: Math.round(anchoFinal),
+    }).catch((error) => {
+      console.error(
+        "❌ No se pudo guardar el ancho del panel de ayuda:",
+        error,
+      );
+    });
   };
 
   window.addEventListener("mousemove", mover);
@@ -111,9 +117,14 @@ async function inicializarPanelAyuda(): Promise<void> {
   let ancho = ANCHO_AYUDA_DEFAULT;
 
   try {
-    ancho = (await invoke<number | null>("obtener_ancho_panel_ayuda")) ?? ANCHO_AYUDA_DEFAULT;
+    ancho =
+      (await invoke<number | null>("obtener_ancho_panel_ayuda")) ??
+      ANCHO_AYUDA_DEFAULT;
   } catch (error) {
-    console.error("❌ No se pudo consultar el ancho del panel de ayuda:", error);
+    console.error(
+      "❌ No se pudo consultar el ancho del panel de ayuda:",
+      error,
+    );
   }
 
   aplicarAncho(ancho);
@@ -137,7 +148,10 @@ async function inicializarPanelAyuda(): Promise<void> {
           mostrarContenidoAyuda(contenido);
         }
       } catch (error) {
-        console.error("❌ No se pudo obtener el contenido de bienvenida:", error);
+        console.error(
+          "❌ No se pudo obtener el contenido de bienvenida:",
+          error,
+        );
       }
     }
 
@@ -149,9 +163,13 @@ async function inicializarPanelAyuda(): Promise<void> {
   let visible = false;
 
   try {
-    visible = (await invoke<boolean | null>("obtener_visible_panel_ayuda")) ?? false;
+    visible =
+      (await invoke<boolean | null>("obtener_visible_panel_ayuda")) ?? false;
   } catch (error) {
-    console.error("❌ No se pudo consultar la visibilidad del panel de ayuda:", error);
+    console.error(
+      "❌ No se pudo consultar la visibilidad del panel de ayuda:",
+      error,
+    );
   }
 
   if (visible) {
@@ -169,16 +187,24 @@ export function abrirPanelAyuda(): void {
   panelElemento?.classList.add("abierto");
 
   invoke("establecer_visible_panel_ayuda", { visible: true }).catch((error) => {
-    console.error("❌ No se pudo guardar la visibilidad del panel de ayuda:", error);
+    console.error(
+      "❌ No se pudo guardar la visibilidad del panel de ayuda:",
+      error,
+    );
   });
 }
 
 export function cerrarPanelAyuda(): void {
   panelElemento?.classList.remove("abierto");
 
-  invoke("establecer_visible_panel_ayuda", { visible: false }).catch((error) => {
-    console.error("❌ No se pudo guardar la visibilidad del panel de ayuda:", error);
-  });
+  invoke("establecer_visible_panel_ayuda", { visible: false }).catch(
+    (error) => {
+      console.error(
+        "❌ No se pudo guardar la visibilidad del panel de ayuda:",
+        error,
+      );
+    },
+  );
 }
 
 export function alternarPanelAyuda(): void {

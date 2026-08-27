@@ -1,5 +1,6 @@
 ## boton_panel_ayuda
 **Ayuda**
+
 Bienvenida
 
 ¡Bienvenido a RemapH! Este panel te acompaña mientras usás el programa: pasá el mouse sobre cualquier botón o control y, tras un par de segundos, va a aparecer acá una explicación de qué hace.
@@ -10,18 +11,21 @@ Si en algún momento el panel te queda molestando, lo cerrás y no se vuelve a a
 
 ## btn-agregar-fila
 **Barra superior**
+
 + Fila
 
 Agrega una fila nueva y vacía al perfil actual, al final de la tabla (o del último separador, si hay uno). Desde ahí se define su [red:Trigger] y su [cyan:Acción].
 
 ## btn-agregar-separador
 **Barra superior**
+
 + Separador
 
 Agrega un separador a la tabla: sirve para agrupar filas relacionadas bajo un título propio, y se puede contraer o expandir con un click.
 
 ## perfil-estado
 **Barra superior**
+
 Perfil Activo / Perfil inactivo
 
 Activa o desactiva el perfil actual. Con el perfil *activo*, sus remapeos funcionan de verdad sobre el teclado y el mouse; con el perfil *inactivo*, no se aplica ninguno (Windows recibe todo tal cual).
@@ -30,12 +34,14 @@ También se puede alternar con el atajo global configurable en Configuración > 
 
 ## btn-guardar-cambios, btn-revertir-cambios
 **Barra superior**
+
 Cambios en perfil
 
 Cuando editás la tabla aparece este aviso. `Guardar` escribe los cambios a disco y recompila el perfil (si estaba activo, los nuevos remapeos entran en vigencia al instante). `Revertir` descarta lo editado y vuelve a mostrar el perfil tal como está guardado en disco.
 
 ## btn-menu-lateral, panel-lateral-lista, panel-lateral-item, botonNuevo, botonClonar, botonRenombrar, panel-lateral-eliminar
 **Panel lateral**
+
 Perfiles
 
 Este panel (botón `☰`) lista todos los perfiles guardados. Click en uno para pasar a usarlo. Desde acá también se crean perfiles nuevos (`Nuevo`), se duplica el actual (`Clonar`), se le cambia el nombre (`Renombrar`) o se lo borra (`Eliminar perfil` — pide confirmación antes de aplicarse).
@@ -44,18 +50,21 @@ Si el perfil actual tiene cambios sin guardar, cualquiera de estas acciones te p
 
 ## panel-lateral-configuracion
 **Panel lateral**
+
 Configuración
 
 Abre la ventana de Configuración: ahí se ajustan las opciones generales del programa (atajos globales, apariencia, dispositivos, modo del motor de entrada, etc.), separadas del contenido de los perfiles.
 
 ## trigger, accion, opciones, extra
 **Tabla de remapeos**
+
 Columnas
 
 `Trigger` define qué combinación de teclas o clicks dispara la fila. `Acción` define qué hace RemapH cuando eso ocurre. `Opciones` agrupa configuraciones puntuales de esa fila (temporización, condiciones, etc.). `Extra` (`∴`) muestra información adicional de la fila al pasar el mouse.
 
 ## tipo-fila, selector-tipo
 **Tabla de remapeos**
+
 Tipos de fila
 
 Cada fila tiene un tipo, que define qué clase de acción ejecuta: `Macro` (secuencia de pasos), `Extra` (Normal/Turbo/Mantener/Click sostenido), `Portapapeles` (pega un texto guardado), `Click en coordenada` (clickea una posición fija de la pantalla), entre otros. El tipo se elige desde el selector de la columna `Acción` de esa fila.

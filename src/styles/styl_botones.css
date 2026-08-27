@@ -606,7 +606,7 @@
 }
 
 /* ======================================================
-   ➕ AGREGAR FILA / ☰ MENÚ LATERAL
+   ➕ AGREGAR FILA / ☰ MENÚ LATERAL / ❔ AYUDA
    ------------------------------------------------------
    Botones ghost agrupados en toolbar-left. "+ Fila" antes
    era un círculo con "+" anclado debajo de la última fila
@@ -615,7 +615,8 @@
 
 .btn-menu-lateral,
 .btn-agregar-fila,
-.btn-agregar-separador {
+.btn-agregar-separador,
+.btn-ayuda {
 
     display: flex;
 
@@ -635,7 +636,7 @@
 
     background: transparent;
 
-    color: var(--text-disabled);
+    color: var(--text);
 
     border: 1px solid transparent;
 
@@ -654,7 +655,10 @@
 
 .btn-menu-lateral:hover,
 .btn-agregar-fila:hover,
-.btn-agregar-separador:hover {
+.btn-agregar-separador:hover,
+.btn-ayuda:hover,
+.layout:has(.panel-lateral.abierto) .btn-menu-lateral,
+.layout:has(.panel-ayuda.abierto) .btn-ayuda {
 
     background: color-mix(in srgb, var(--highlight) var(--botones-ghost-opacidad-hover), transparent);
 
