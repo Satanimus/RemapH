@@ -61,6 +61,20 @@ const cacheDotsPorToolbar = new WeakMap<HTMLElement, HTMLElement>();
 
 const nombresPorToolbar = new WeakMap<HTMLElement, HTMLElement>();
 
+// ======================================================
+// 🎚️ POLLING ESTADO PERFIL (atajo global toggle)
+// ------------------------------------------------------
+// obtener_estado_cache no empuja eventos (mismo motivo que
+// motor_obtener_modo, ver ui_statusbar.ts) — el atajo global
+// Activar/Desactivar (ver entrada.rs) puede cambiar el estado del
+// perfil sin pasar por el botón de esta toolbar, así que se
+// consulta por polling para que el botón no quede desincronizado.
+// Se salta la lectura mientras hay un click propio en curso
+// (botonEstado.disabled) para no pisar ese flujo.
+// ======================================================
+
+const INTERVALO_POLLING_PERFIL_MS = 1000;
+
 export async function refrescarEstadoDesdeBackend(
   toolbar: HTMLElement,
 ): Promise<void> {
@@ -244,6 +258,14 @@ export function crearToolbar(alGuardar: () => Promise<void>): HTMLElement {
       botonEstado.disabled = false;
     }
   });
+
+  setInterval(() => {
+    if (botonEstado?.disabled) {
+      return;
+    }
+
+    void refrescarEstadoDesdeBackend(toolbar);
+  }, INTERVALO_POLLING_PERFIL_MS);
 
   // ==================================================
   // 💾 GUARDAR / ↩️ REVERTIR CAMBIOS PENDIENTES

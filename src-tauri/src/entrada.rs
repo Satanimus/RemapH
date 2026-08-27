@@ -276,11 +276,13 @@ thread_local! {
 // 🎚️ ATAJO GLOBAL TOGGLE PERFIL
 // ------------------------------------------------------
 // Detección independiente de RETENIDO/DEVOLVIENDO/Cache: debe
-// funcionar con el perfil desactivado (cache vacía) y aunque haya
-// una captura en curso no la afecta — se resuelve antes que
-// cualquiera de esas ramas (ver procesar_evento). Lleva su propio
-// registro de teclas físicamente abajo (no reutiliza el de Cache,
-// que no existe cuando el perfil está desactivado).
+// funcionar con el perfil desactivado (cache vacía). [FIX] SÍ lo
+// afecta el Modo Captura (cache::captura_activa()): mientras se está
+// grabando un combo nuevo, tocar el combo del atajo debe quedar
+// registrado por la captura, no disparar el toggle — ver el chequeo
+// en procesar_evento(). Lleva su propio registro de teclas
+// físicamente abajo (no reutiliza el de Cache, que no existe cuando
+// el perfil está desactivado).
 // ======================================================
 
 static TECLAS_ABAJO_TOGGLE: Mutex<Vec<InputId>> = Mutex::new(Vec::new());
@@ -351,12 +353,20 @@ fn ejecutar_toggle_perfil() {
 }
 
 pub fn procesar_evento(evento: InputEvent) {
-    // Atajo global Activar/Desactivar perfil: va antes que cualquier
-    // otra cosa (incluida la excepción de Modo Captura de abajo),
-    // para que funcione sin importar si el perfil está activado o
-    // desactivado. Si el combo coincide, se consume el evento acá
-    // mismo (no se reenvía a Windows) y no sigue el resto del flujo.
-    if detectar_toggle(&evento) {
+    // Atajo global Activar/Desactivar perfil: va antes que el resto
+    // del flujo, para que funcione sin importar si el perfil está
+    // activado o desactivado. Igual se llama a detectar_toggle()
+    // incondicionalmente (necesita ver cada Down/Up para mantener
+    // TECLAS_ABAJO_TOGGLE al día), pero [FIX] la acción NO se
+    // dispara si hay Modo Captura en curso (cache::captura_activa()):
+    // mientras se está grabando un combo nuevo desde el Botón
+    // Capturador (incluida la captura del propio atajo o de
+    // tecla_guardar_coordenada — Regla 7), tocar ese combo debe
+    // quedar registrado por la captura, no disparar el toggle. En
+    // ese caso el evento NO se consume acá; sigue el flujo normal y
+    // cae en la excepción de Modo Captura de abajo, que sí lo
+    // consume.
+    if detectar_toggle(&evento) && !cache::captura_activa() {
         ejecutar_toggle_perfil();
         return;
     }

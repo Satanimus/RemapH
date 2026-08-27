@@ -353,22 +353,19 @@ unsafe extern "system" fn hook_teclado(codigo: i32, wparam: WPARAM, lparam: LPAR
         return CallNextHookEx(std::ptr::null_mut(), codigo, wparam, lparam);
     }
 
-    // Sin perfil activo NI captura en curso, no hay nada que
-    // remapear ni que grabar: se pasa TODO directo, sin traducir, sin
-    // bloquear el físico, sin llamar a debe_tragar_no_traducible() ni
-    // a evaluar(). Mismo criterio y mismo orden de precedencia que ya
-    // usa entrada.rs::procesar_evento (captura_activa() primero,
-    // esta_vacia() después) — con Modo Captura activo SIEMPRE hay que
-    // seguir interceptando, aunque no haya perfil, porque ese modo
-    // necesita ver/grabar cada evento físico (ver captura_coordenada.rs).
-    // Aplicado ANTES de interceptar nada, para evitar que este hook
-    // de baja latencia (WH_KEYBOARD_LL) haga trabajo alguno por cada
-    // tecla cuando RemapH no tiene nada que hacer — causa del lag
-    // general reportado (afecta más al mouse, ver hook_mouse()).
-    if !crate::cache::captura_activa() && crate::cache::esta_vacia() {
-        return CallNextHookEx(std::ptr::null_mut(), codigo, wparam, lparam);
-    }
-
+    // [FIX] Ya NO hay shortcut por cache::esta_vacia() acá: con perfil
+    // desactivado, el atajo global Activar/Desactivar (Regla 2 del
+    // plan) tiene que seguir viendo cada evento físico para poder
+    // reactivar el perfil — y esa detección vive únicamente en
+    // entrada::procesar_evento (entrada.rs es el único funnel, Regla
+    // 3), no acá, para no duplicarla en cada backend. El shortcut
+    // viejo cortaba ANTES de llegar a ese funnel, dejando el atajo
+    // muerto apenas se desactivaba el perfil (y, con él, cualquier
+    // forma de reactivarlo sin reiniciar). back_interception.rs nunca
+    // tuvo este shortcut y nunca tuvo este bug. El costo real de
+    // encolar siempre queda en el hilo worker (ver COLA más arriba),
+    // no en este hook de baja latencia — y WM_MOUSEMOVE (el caso que
+    // sí importa en volumen) sigue filtrado aparte en hook_mouse().
     let datos = &*(lparam as *const KBDLLHOOKSTRUCT);
 
     // Filtrar eventos inyectados por este mismo proceso
@@ -444,17 +441,12 @@ unsafe extern "system" fn hook_mouse(codigo: i32, wparam: WPARAM, lparam: LPARAM
         return CallNextHookEx(std::ptr::null_mut(), codigo, wparam, lparam);
     }
 
-    // Sin perfil activo NI captura en curso, no hay nada que
-    // remapear ni que grabar: se pasa TODO directo (ver comentario
-    // equivalente en hook_teclado(), mismo orden de precedencia que
-    // entrada.rs::procesar_evento). Este es el caso que más importa:
-    // WM_MOUSEMOVE por sí solo ya se filtra más abajo, pero botones y
-    // rueda sin perfil ni captura también pasaban por
-    // evaluar()/debe_tragar_no_traducible() innecesariamente.
-    if !crate::cache::captura_activa() && crate::cache::esta_vacia() {
-        return CallNextHookEx(std::ptr::null_mut(), codigo, wparam, lparam);
-    }
-
+    // [FIX] Ver nota equivalente en hook_teclado(): ya no hay
+    // shortcut por cache::esta_vacia() acá, para que el atajo global
+    // toggle siga funcionando con el perfil desactivado. WM_MOUSEMOVE
+    // (el volumen que de verdad importa) sigue filtrado aparte más
+    // abajo, antes de traducir_mouse/encolar — así que este cambio no
+    // reintroduce el lag original.
     let datos = &*(lparam as *const MSLLHOOKSTRUCT);
 
     // Filtrar eventos inyectados por este mismo proceso
