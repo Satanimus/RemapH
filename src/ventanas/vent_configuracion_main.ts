@@ -3,25 +3,26 @@
 // ------------------------------------------------------
 // Punto de entrada de la Ventana de Configuración
 // (configuracion.html — página independiente, ver
-// vite.config.ts). Etapa 6 del plan: las 3 pestañas tienen
-// contenido real.
+// vite.config.ts).
 //
-// Las 3 pestañas comparten la misma mecánica (tabla de 3
+// General/Teclas comparten la misma mecánica (tabla de 3
 // columnas, editar marca en verde, "Aplicar cambios" valida
 // y manda un lote, "Restablecer esta pestaña" borra los
-// overrides) armada una sola vez en crearPestanaEditable() y
-// reutilizada con distinta fuente de datos:
+// overrides) armada una sola vez en crearPestanaEditable().
+// Apariencia y Tema usan en cambio crearPestanaApariencia()
+// (árbol Título/Subtítulo/Elemento, ver vent_configuracion_apariencia.ts)
+// sobre el mismo catálogo de apariencia.tsv, cada una mostrando
+// un subconjunto de Títulos distinto:
 //
-// • General    → configuracion_listar_general() / _guardar_lote
+// • General     → configuracion_listar_general() / _guardar_lote
 //   (catálogo de config.rs, ver configuracion_usuario.rs).
-// • Teclas     → configuracion_listar_teclas() / _guardar_lote_teclas
+// • Teclas      → configuracion_listar_teclas() / _guardar_lote_teclas
 //   (catálogo de pulsadores.tsv, agrupado en subtítulos acá
 //   mismo — ver categorizarTecla()).
-// • Apariencia → configuracion_listar_apariencia() / _guardar_lote_apariencia
-//   (catálogo de styl_variables.css, ver apariencia.tsv). Es
-//   la única con tipos de campo nuevos ("color" y "pixeles")
-//   — ver crearInputColor()/crearInputPixeles() y el bloque
-//   "PESTAÑA APARIENCIA" al final del archivo.
+// • Apariencia  → Texto + Dimensiones, con selector de Escala general.
+// • Tema        → Color de tema + Color de Texto + Color y opacidad
+//   de elementos, con el selector Cargar/Guardar/Renombrar/Eliminar
+//   tema.
 // ======================================================
 
 import { invoke } from "@tauri-apps/api/core";
@@ -104,6 +105,7 @@ tabs.className = "configuracion-tabs";
 
 const tabGeneral = crearBotonTab("General", true);
 const tabApariencia = crearBotonTab("Apariencia", false);
+const tabTema = crearBotonTab("Tema", false);
 const tabTeclas = crearBotonTab("Teclas", false);
 const tabAvanzado = crearBotonTab("Avanzado", false);
 
@@ -124,6 +126,7 @@ botonCarpetaUsuario.addEventListener("click", async () => {
 tabs.append(
   tabGeneral,
   tabApariencia,
+  tabTema,
   tabTeclas,
   tabAvanzado,
   botonCarpetaUsuario,
@@ -138,13 +141,22 @@ panelGeneral.className = "configuracion-panel";
 const panelApariencia = document.createElement("div");
 panelApariencia.className = "configuracion-panel oculto";
 
+const panelTema = document.createElement("div");
+panelTema.className = "configuracion-panel oculto";
+
 const panelTeclas = document.createElement("div");
 panelTeclas.className = "configuracion-panel oculto";
 
 const panelAvanzado = document.createElement("div");
 panelAvanzado.className = "configuracion-panel oculto";
 
-cuerpo.append(panelGeneral, panelApariencia, panelTeclas, panelAvanzado);
+cuerpo.append(
+  panelGeneral,
+  panelApariencia,
+  panelTema,
+  panelTeclas,
+  panelAvanzado,
+);
 
 card.append(tabs, cuerpo);
 raiz.append(card);
@@ -177,13 +189,15 @@ function crearBotonTab(texto: string, activa: boolean): HTMLButtonElement {
 const paresTab: ReadonlyArray<readonly [HTMLButtonElement, HTMLDivElement]> = [
   [tabGeneral, panelGeneral],
   [tabApariencia, panelApariencia],
+  [tabTema, panelTema],
   [tabTeclas, panelTeclas],
   [tabAvanzado, panelAvanzado],
 ];
 
-// Selector de temas de Apariencia (Pestana.elementoBarra) — se
-// asigna más abajo, junto a la barra de acciones global, pero se
-// referencia acá porque activarTab controla su visibilidad.
+// Selector de temas (Pestana.elementoBarra, solo lo expone la
+// pestaña "Tema") — se asigna más abajo, junto a la barra de
+// acciones global, pero se referencia acá porque activarTab
+// controla su visibilidad.
 let elementoSelectorTema: HTMLElement | null = null;
 
 function activarTab(botonElegido: HTMLButtonElement): void {
@@ -195,14 +209,22 @@ function activarTab(botonElegido: HTMLButtonElement): void {
     panel.classList.toggle("oculto", !activa);
   }
 
-  elementoSelectorTema?.classList.toggle(
-    "oculto",
-    botonElegido !== tabApariencia,
-  );
+  elementoSelectorTema?.classList.toggle("oculto", botonElegido !== tabTema);
+
+  // Apariencia y Tema comparten la misma sesión de apariencia en el
+  // backend (ver refrescarDesdeOtraPestana en
+  // vent_configuracion_apariencia.ts): al entrar a una, se refleja
+  // lo que se haya cargado/tocado en la otra.
+  if (botonElegido === tabApariencia) {
+    void pestanaApariencia.refrescarDesdeOtraPestana();
+  } else if (botonElegido === tabTema) {
+    void pestanaTema.refrescarDesdeOtraPestana();
+  }
 }
 
 tabGeneral.addEventListener("click", () => activarTab(tabGeneral));
 tabApariencia.addEventListener("click", () => activarTab(tabApariencia));
+tabTema.addEventListener("click", () => activarTab(tabTema));
 tabTeclas.addEventListener("click", () => activarTab(tabTeclas));
 tabAvanzado.addEventListener("click", () => activarTab(tabAvanzado));
 
@@ -1062,9 +1084,36 @@ async function refrescarTrasCambioApariencia(): Promise<void> {
 // (nota etapa H pendiente: la fusión de CLAVES_TAMANOS_EN_APARIENCIA
 // al guardar/restablecer, que vivía acá, se reintroduce cuando
 // crearPestanaApariencia tenga persistencia real.)
+//
+// Apariencia = Texto + Dimensiones (con selector de Escala general).
+// Tema = Color de tema + Color de Texto + Color y opacidad de
+// elementos (con el selector Cargar/Guardar/Renombrar/Eliminar
+// tema). Ambas comparten el mismo catálogo/sesión de apariencia en
+// el backend — ver apariencia.tsv y refrescarDesdeOtraPestana.
 const pestanaApariencia = crearPestanaApariencia(
   panelApariencia,
   refrescarTrasCambioApariencia,
+  {
+    grupos: ["texto", "dimensiones"],
+    incluirSelectorTema: false,
+    incluirEscala: true,
+    textoConfirmacionRestablecer:
+      "¿Restablecer Texto y Dimensiones a los valores de fábrica? " +
+      "Se pierden los valores personalizados de esta pestaña.",
+  },
+);
+
+const pestanaTema = crearPestanaApariencia(
+  panelTema,
+  refrescarTrasCambioApariencia,
+  {
+    grupos: ["color-tema", "color-texto", "color-opacidad-elementos"],
+    incluirSelectorTema: true,
+    incluirEscala: false,
+    textoConfirmacionRestablecer:
+      "¿Restablecer todos los valores de Tema a los de fábrica? " +
+      "Se pierden los valores personalizados de esta pestaña.",
+  },
 );
 
 // ======================================================
@@ -1154,6 +1203,7 @@ const TODAS_LAS_PESTANAS: ReadonlyArray<readonly [HTMLButtonElement, Pestana]> =
   [
     [tabGeneral, pestanaGeneral],
     [tabApariencia, pestanaApariencia],
+    [tabTema, pestanaTema],
     [tabTeclas, pestanaTeclas],
     [tabAvanzado, pestanaAvanzado],
   ];
@@ -1177,8 +1227,8 @@ botonGuardarGlobal.textContent = "Aplicar cambios";
 
 barraGlobal.append(botonRestablecerGlobal, botonGuardarGlobal);
 
-if (pestanaApariencia.elementoBarra) {
-  elementoSelectorTema = pestanaApariencia.elementoBarra;
+if (pestanaTema.elementoBarra) {
+  elementoSelectorTema = pestanaTema.elementoBarra;
   barraGlobal.prepend(elementoSelectorTema);
 }
 
@@ -1273,9 +1323,12 @@ botonGuardarGlobal.addEventListener("click", async () => {
   // tabla. Si CUALQUIERA falla, se bloquea el guardado completo (no
   // se guarda nada, ni siquiera lo válido de otras pestañas) — ver
   // respuesta a la consulta sobre errores en pestaña no activa.
-  const recolecciones = [pestanaGeneral, pestanaApariencia, pestanaTeclas].map(
-    (pestana) => ({ pestana, resultado: pestana.validarYRecolectar() }),
-  );
+  const recolecciones = [
+    pestanaGeneral,
+    pestanaApariencia,
+    pestanaTema,
+    pestanaTeclas,
+  ].map((pestana) => ({ pestana, resultado: pestana.validarYRecolectar() }));
 
   const huboErrores = recolecciones.some(
     ({ resultado }) => resultado.erroresLocales.length > 0,
@@ -1357,5 +1410,6 @@ actualizarVisibilidadGuardarGlobal();
 
 pestanaGeneral.cargar();
 pestanaApariencia.cargar();
+pestanaTema.cargar();
 pestanaTeclas.cargar();
 pestanaAvanzado.cargar();

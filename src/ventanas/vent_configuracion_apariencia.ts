@@ -79,6 +79,7 @@ const SENTINEL_BORRAR = "__borrar__";
 interface FilaMontada {
   nodo: NodoArbol;
   tr: HTMLTableRowElement;
+  actualizarColumnas: () => void;
 }
 
 // ----------------------------------------------------
@@ -179,6 +180,77 @@ function construirArbol(filas: FilaCssCruda[]): NodoArbol[] {
 
   return nodos;
 }
+
+// ----------------------------------------------------
+// Filtro de árbol por Título de nivel 1 (Apariencia vs Tema: cada
+// pestaña muestra solo un subconjunto de los Títulos del catálogo,
+// ver crearPestanaApariencia). Conserva el tramo completo (nivel
+// 2/3 + sus hijos nivel 0) de cada Título permitido.
+// ----------------------------------------------------
+
+function filtrarArbolPorGrupos(
+  arbol: NodoArbol[],
+  gruposPermitidos: Set<string>,
+): NodoArbol[] {
+  const resultado: NodoArbol[] = [];
+
+  let manteniendo = false;
+
+  for (const nodo of arbol) {
+    if (nodo.entrada.nivel === 1) {
+      manteniendo = gruposPermitidos.has(nodo.entrada.id);
+    }
+
+    if (manteniendo) {
+      resultado.push(nodo);
+    }
+  }
+
+  return resultado;
+}
+
+// ----------------------------------------------------
+// Preset de Escala general (Pequeño/Normal/Grande) — pestaña
+// Apariencia. Fija de una sola vez el tamaño de texto (fs11/fs13/
+// fs16) y las dimensiones (toolbar-height/row-height/r6/gap8/gap16);
+// deja el resultado como edición pendiente igual que un campo tocado
+// a mano (no persiste solo).
+// ----------------------------------------------------
+
+type ClaveEscala = "pequeno" | "normal" | "grande";
+
+const PRESETS_ESCALA: Record<ClaveEscala, Record<string, string>> = {
+  pequeno: {
+    fs11: "10px",
+    fs13: "12px",
+    fs16: "14px",
+    "toolbar-height": "42px",
+    "row-height": "34px",
+    r6: "4px",
+    gap8: "6px",
+    gap16: "12px",
+  },
+  normal: {
+    fs11: "11px",
+    fs13: "13px",
+    fs16: "16px",
+    "toolbar-height": "48px",
+    "row-height": "40px",
+    r6: "6px",
+    gap8: "8px",
+    gap16: "16px",
+  },
+  grande: {
+    fs11: "13px",
+    fs13: "15px",
+    fs16: "19px",
+    "toolbar-height": "54px",
+    "row-height": "46px",
+    r6: "8px",
+    gap8: "10px",
+    gap16: "20px",
+  },
+};
 
 // ----------------------------------------------------
 // Expandir/Contraer (Etapa E8)
@@ -382,7 +454,7 @@ function crearFilaArbol(
   coloresTema: Map<string, string>,
   filasConCambio: Set<NodoArbol>,
   valoresOriginales: Map<string, string | null>,
-): HTMLTableRowElement {
+): { tr: HTMLTableRowElement; actualizarColumnas: () => void } {
   const tr = document.createElement("tr");
 
   const nivel = nodo.entrada.nivel;
@@ -493,7 +565,7 @@ function crearFilaArbol(
 
   tr.append(tdNombre, tdDefecto, tdPersonalizado);
 
-  return tr;
+  return { tr, actualizarColumnas };
 }
 
 // ----------------------------------------------------
@@ -545,10 +617,30 @@ function crearTablaApariencia(panel: HTMLDivElement): HTMLTableSectionElement {
 // Pestaña completa
 // ----------------------------------------------------
 
+export interface OpcionesPestanaApariencia {
+  // Ids de Título (nivel 1) del catálogo que muestra esta pestaña
+  // (ver apariencia.tsv) — el resto del catálogo no se renderiza acá.
+  grupos: string[];
+
+  // Solo la pestaña "Tema" muestra el selector Cargar/Guardar/
+  // Renombrar/Eliminar tema (botonSelectorTema, montado en la barra
+  // global por vent_configuracion_main.ts vía elementoBarra).
+  incluirSelectorTema: boolean;
+
+  // Solo la pestaña "Apariencia" (Texto+Dimensiones) muestra el
+  // selector de Escala general (Pequeño/Normal/Grande).
+  incluirEscala: boolean;
+
+  textoConfirmacionRestablecer: string;
+}
+
 export function crearPestanaApariencia(
   panel: HTMLDivElement,
   despuesDeAplicar: () => Promise<void>,
-): Pestana {
+  opciones: OpcionesPestanaApariencia,
+): Pestana & { refrescarDesdeOtraPestana: () => Promise<void> } {
+  const gruposPermitidos = new Set(opciones.grupos);
+
   const tbody = crearTablaApariencia(panel);
 
   // E3: estado de sesión del selector de temas — nombre/origen del
@@ -797,6 +889,95 @@ export function crearPestanaApariencia(
   // borrar" cuando el usuario hace doble click en Valor por Defecto.
   const valoresOriginales = new Map<string, string | null>();
 
+  // Filas montadas de la última recarga — el preset de Escala
+  // necesita ubicar los nodos por id (fs11/fs13/.../gap16) y
+  // refrescar sus columnas tras aplicar un preset.
+  let filasMontadasActual: FilaMontada[] = [];
+
+  // Contenedor del grupo de botones Pequeño/Normal/Grande — se
+  // completa en crearFilaEscala() (solo si opciones.incluirEscala),
+  // se refresca en cada recarga vía actualizarSeleccionEscala().
+  let contenedorEscala: HTMLElement | null = null;
+
+  function valorEfectivo(id: string): string | null {
+    for (const fm of filasMontadasActual) {
+      const hijo = fm.nodo.hijos.find((h) => h.id === id);
+
+      if (hijo) {
+        return hijo.valor_personalizado ?? hijo.valor_defecto;
+      }
+    }
+
+    return null;
+  }
+
+  function escalaActual(): ClaveEscala | "" {
+    for (const clave of ["pequeno", "normal", "grande"] as const) {
+      const coincide = Object.entries(PRESETS_ESCALA[clave]).every(
+        ([id, valor]) => valorEfectivo(id) === valor,
+      );
+
+      if (coincide) {
+        return clave;
+      }
+    }
+
+    return "";
+  }
+
+  function actualizarSeleccionEscala(): void {
+    if (!contenedorEscala) {
+      return;
+    }
+
+    contenedorEscala.replaceChildren(
+      crearGrupoOpciones<ClaveEscala>(
+        [
+          { texto: "Pequeño", valor: "pequeno" },
+          { texto: "Normal", valor: "normal" },
+          { texto: "Grande", valor: "grande" },
+        ],
+        escalaActual() as ClaveEscala,
+        (valor) => aplicarEscala(valor),
+      ),
+    );
+  }
+
+  function aplicarEscala(clave: ClaveEscala): void {
+    for (const [id, valor] of Object.entries(PRESETS_ESCALA[clave])) {
+      for (const fm of filasMontadasActual) {
+        const hijo = fm.nodo.hijos.find((h) => h.id === id);
+
+        if (hijo) {
+          hijo.valor_personalizado = valor;
+          filasConCambio.add(fm.nodo);
+          fm.tr.classList.add("configuracion-arbol-editando");
+        }
+      }
+    }
+
+    for (const fm of filasMontadasActual) {
+      fm.actualizarColumnas();
+    }
+
+    actualizarSeleccionEscala();
+  }
+
+  function crearFilaEscala(): HTMLElement {
+    const fila = document.createElement("div");
+    fila.className = "configuracion-escala-fila";
+
+    const etiqueta = document.createElement("span");
+    etiqueta.className = "configuracion-escala-etiqueta";
+    etiqueta.textContent = "Escala general";
+
+    contenedorEscala = document.createElement("div");
+
+    fila.append(etiqueta, contenedorEscala);
+
+    return fila;
+  }
+
   // F1: separada de cargar() para poder refrescar la tabla tras
   // "Cargar" tema (Etapa F) sin reiniciar la sesión de apariencia —
   // reiniciarla ahí perdería el preview recién cargado.
@@ -805,9 +986,11 @@ export function crearPestanaApariencia(
       "configuracion_listar_apariencia",
     );
 
-    const arbol = construirArbol(filas);
+    const arbolCompleto = construirArbol(filas);
 
-    const coloresTema = construirMapaColoresTema(arbol);
+    const coloresTema = construirMapaColoresTema(arbolCompleto);
+
+    const arbol = filtrarArbolPorGrupos(arbolCompleto, gruposPermitidos);
 
     tbody.innerHTML = "";
 
@@ -824,7 +1007,7 @@ export function crearPestanaApariencia(
     const filasMontadas: FilaMontada[] = [];
 
     for (const nodo of arbol) {
-      const tr = crearFilaArbol(
+      const { tr, actualizarColumnas } = crearFilaArbol(
         nodo,
         filasMontadas,
         coloresTema,
@@ -832,13 +1015,16 @@ export function crearPestanaApariencia(
         valoresOriginales,
       );
 
-      filasMontadas.push({ nodo, tr });
+      filasMontadas.push({ nodo, tr, actualizarColumnas });
       trPorNodo.set(nodo, tr);
 
       tbody.append(tr);
     }
 
+    filasMontadasActual = filasMontadas;
+
     actualizarBotonSelectorTema(filas);
+    actualizarSeleccionEscala();
   }
 
   async function cargar(): Promise<void> {
@@ -968,19 +1154,41 @@ export function crearPestanaApariencia(
     await despuesDeAplicar();
   }
 
-  // Restablecer esta pestaña (corregido): antes solo releía desde el
-  // backend (cargar()) sin borrar nada — si el usuario ya había
-  // guardado overrides en sesiones previas, seguían persistidos y
-  // volvían a aparecer. Debe borrar TODOS los overrides "css." del
-  // archivo de usuario primero (mismo comando genérico que usa
-  // Teclas con el prefijo "pulsador.", ver más abajo en este
-  // archivo), y solo después releer para reflejar los valores de
-  // fábrica ya sin overrides.
+  // Restablecer esta pestaña. La pestaña "Tema" (incluirSelectorTema)
+  // reinicia la sesión completa (cargar()) y vuelve a mostrar el tema
+  // realmente aplicado — no borra los overrides "css." persistidos,
+  // esos SON los valores del tema aplicado. La pestaña "Apariencia"
+  // (Texto+Dimensiones) no es dueña de esa sesión compartida: solo
+  // descarta sus propias ediciones sin guardar releyendo el estado
+  // actual (recargarTablaApariencia), sin tocar la sesión de tema que
+  // pueda estar en preview desde la otra pestaña.
   async function restablecerPestana(): Promise<void> {
-    await invoke("configuracion_restablecer_seccion", { prefijo: "css." });
+    if (opciones.incluirSelectorTema) {
+      await cargar();
+    } else {
+      await recargarTablaApariencia();
+    }
 
-    await cargar();
     await despuesDeAplicar();
+  }
+
+  // Refresco liviano al entrar a esta pestaña (ver activarTab en
+  // vent_configuracion_main.ts): las pestañas "Apariencia" y "Tema"
+  // comparten la misma sesión de apariencia en el backend, así que
+  // cargar/guardar un tema en una debe reflejarse en la otra. No
+  // reinicia la sesión (a diferencia de cargar()) para no perder un
+  // preview de tema sin guardar. Se salta si hay ediciones propias
+  // pendientes, para no pisarlas.
+  async function refrescarDesdeOtraPestana(): Promise<void> {
+    if (hayEdicionesPendientes()) {
+      return;
+    }
+
+    await recargarTablaApariencia();
+  }
+
+  if (opciones.incluirEscala) {
+    panel.prepend(crearFilaEscala());
   }
 
   return {
@@ -991,14 +1199,13 @@ export function crearPestanaApariencia(
     marcarErroresGuardado,
     limpiarEstadoTrasGuardado,
     restablecerPestana,
+    refrescarDesdeOtraPestana,
 
     // Selector de temas: se monta en la barra de acciones global
     // (ver vent_configuracion_main.ts), no dentro de este panel —
-    // solo visible cuando la pestaña Apariencia está activa.
-    elementoBarra: botonSelectorTema,
+    // solo lo expone la pestaña "Tema".
+    elementoBarra: opciones.incluirSelectorTema ? botonSelectorTema : undefined,
 
-    textoConfirmacionRestablecer:
-      "¿Restablecer todos los valores de Apariencia a los de fábrica? " +
-      "Se pierden los valores personalizados de esta pestaña.",
+    textoConfirmacionRestablecer: opciones.textoConfirmacionRestablecer,
   };
 }

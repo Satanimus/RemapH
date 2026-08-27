@@ -144,6 +144,22 @@
 }
 
 /* ======================================================
+   ESCALA GENERAL (pestaña Apariencia)
+   ====================================================== */
+
+.configuracion-escala-fila {
+  display: flex;
+  align-items: center;
+  gap: var(--gap12);
+  flex-shrink: 0;
+}
+
+.configuracion-escala-etiqueta {
+  font-size: var(--fs13);
+  color: var(--text);
+}
+
+/* ======================================================
    TABLA
    ====================================================== */
 
