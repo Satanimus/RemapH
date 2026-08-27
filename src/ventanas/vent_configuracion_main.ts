@@ -29,6 +29,14 @@ import { invoke } from "@tauri-apps/api/core";
 
 import { crearContenedorPopup } from "../componentes/comp_popup_contenedor";
 
+import {
+  crearCapturadorAtajo,
+  type AtajoCaptura,
+} from "../componentes/comp_capturador";
+
+import type { Entrada } from "../core/core_entrada";
+import { triggerAHTML } from "../core/core_trigger";
+
 import { aplicarOverridesApariencia } from "../core/core_apariencia";
 import { crearPestanaApariencia } from "./vent_configuracion_apariencia";
 
@@ -53,7 +61,8 @@ type TipoValorConfiguracion =
   | "texto"
   | "color"
   | "pixeles"
-  | "porcentaje";
+  | "porcentaje"
+  | "trigger";
 
 interface FilaConfiguracion {
   clave: string;
@@ -89,6 +98,14 @@ interface FilaMontada {
   fila: FilaConfiguracion;
   tr: HTMLTableRowElement;
   inputs: HTMLInputElement[];
+
+  // Solo para fila.tipo === "trigger" (sin <input>, ver montarFila):
+  // último atajo capturado (texto "mod,mod|gatillo", mismo formato
+  // que AtajoSimple::a_texto()) y el botón capturador, para poder
+  // refrescar su texto/HTML desde aplicarValorEnInputs (doble click
+  // en "Valor por defecto").
+  valorTrigger: string | null;
+  botonTrigger: HTMLButtonElement | null;
 }
 
 // ======================================================
@@ -269,9 +286,16 @@ function formatearValor(tipo: TipoValorConfiguracion, valor: string): string {
 }
 
 function construirValorDesdeInputs(
-  fila: FilaConfiguracion,
-  inputs: HTMLInputElement[],
+  montada: Pick<FilaMontada, "fila" | "inputs" | "valorTrigger">,
 ): string {
+  const { fila, inputs, valorTrigger } = montada;
+
+  if (fila.tipo === "trigger") {
+    // Sin <input> (ver montarFila) — el valor lo dejó el capturador
+    // en valorTrigger, ya en formato "mod,mod|gatillo".
+    return valorTrigger ?? fila.valorDefecto;
+  }
+
   if (fila.tipo === "numero_par") {
     return `${inputs[0].value.trim()},${inputs[1].value.trim()}`;
   }
@@ -350,6 +374,20 @@ function validarValor(fila: FilaConfiguracion, valor: string): string | null {
 
       return null;
     }
+
+    case "trigger": {
+      // Espejo de AtajoSimple::desde_texto(): "mod,mod|gatillo",
+      // separador '|' presente y gatillo no vacío. El capturador
+      // (comp_capturador.ts) ya arma el texto en este formato, así
+      // que esto solo protege contra un valorTrigger corrupto.
+      const partes = valor.split("|");
+
+      if (partes.length !== 2 || partes[1].trim().length === 0) {
+        return "Atajo inválido";
+      }
+
+      return null;
+    }
   }
 }
 
@@ -385,15 +423,94 @@ function crearInputPorcentaje(valorInicial: string): HTMLInputElement {
   return input;
 }
 
+// ======================================================
+// 🎚️ ATAJO ↔ TEXTO (espejo de AtajoSimple::a_texto() /
+// desde_texto() en config.rs) — solo para fila.tipo === "trigger".
+// ======================================================
+
+function entradaDesdeTexto(texto: string): Entrada | null {
+  const [fuente, codigo] = texto.split(":");
+
+  if (!fuente || !codigo) {
+    return null;
+  }
+
+  const tipo: Record<string, "Teclado" | "Mouse" | "Multimedia" | "Joystick"> = {
+    keyboard: "Teclado",
+    mouse: "Mouse",
+    multimedia: "Multimedia",
+    joystick: "Joystick",
+  };
+
+  return { tipo: tipo[fuente] ?? "Teclado", codigo, nombre: codigo };
+}
+
+function parsearAtajoDesdeTexto(texto: string): AtajoCaptura {
+  const [modsTexto, gatilloTexto] = texto.split("|");
+
+  const modificadores = (modsTexto ?? "")
+    .split(",")
+    .filter((entrada) => entrada.length > 0)
+    .map(entradaDesdeTexto)
+    .filter((entrada): entrada is Entrada => entrada !== null);
+
+  const gatillo = gatilloTexto ? entradaDesdeTexto(gatilloTexto) : null;
+
+  return { modificadores, gatillo };
+}
+
+function atajoATexto(atajo: AtajoCaptura): string {
+  const fuente: Record<string, string> = {
+    Teclado: "keyboard",
+    Mouse: "mouse",
+    Multimedia: "multimedia",
+    Joystick: "joystick",
+  };
+
+  const mods = atajo.modificadores
+    .map((entrada) => `${fuente[entrada.tipo]}:${entrada.codigo}`)
+    .join(",");
+
+  const gatillo = atajo.gatillo
+    ? `${fuente[atajo.gatillo.tipo]}:${atajo.gatillo.codigo}`
+    : "";
+
+  return `${mods}|${gatillo}`;
+}
+
 // Inversa de construirValorDesdeInputs(): escribe valorDefecto en
 // el/los inputs de la fila según su tipo, disparando "input" en
 // cada uno para reusar el flujo normal de marcarEditando/validación
-// (ver dblclick en tdDefecto, dentro de montarFila).
+// (ver dblclick en tdDefecto, dentro de montarFila). Para
+// fila.tipo === "trigger" no hay inputs que disparen ese evento: se
+// actualiza valorTrigger, se refresca el botón capturador y se llama
+// a marcarEditando directamente (recibida por parámetro — esta
+// función vive fuera de crearPestanaEditable, marcarEditando es
+// interna a esa fábrica).
 function aplicarValorEnInputs(
-  fila: FilaConfiguracion,
-  inputs: HTMLInputElement[],
+  montada: FilaMontada,
   valor: string,
+  marcarEditando: (clave: string, tr: HTMLTableRowElement) => void,
 ): void {
+  const { fila, inputs } = montada;
+
+  if (fila.tipo === "trigger") {
+    montada.valorTrigger = valor;
+
+    if (montada.botonTrigger) {
+      const atajo = parsearAtajoDesdeTexto(valor);
+
+      montada.botonTrigger.innerHTML =
+        atajo.gatillo !== null
+          ? `<div class="trigger-contenido">${triggerAHTML({ ...atajo, condicion: "simple" })}</div>`
+          : "🚩 Capturar";
+    }
+
+    marcarEditando(fila.clave, montada.tr);
+
+    return;
+  }
+
   if (fila.tipo === "numero_par") {
     const [ancho, alto] = valor.split(",");
 
@@ -609,7 +726,35 @@ function crearPestanaEditable(opciones: OpcionesPestana): Pestana {
 
     const inputs: HTMLInputElement[] = [];
 
-    if (fila.tipo === "numero_par") {
+    // Fila montada real, referenciada por el capturador (rama
+    // "trigger") y por el dblclick de tdDefecto — se completa antes
+    // de armar el contenido de tdPersonalizado porque ambos la
+    // necesitan por referencia (no una copia).
+    const montada: FilaMontada = {
+      fila,
+      tr,
+      inputs,
+      valorTrigger: fila.tipo === "trigger" ? valorActual : null,
+      botonTrigger: null,
+    };
+
+    if (fila.tipo === "trigger") {
+      // Sin <input>: reusa el Botón Capturador (Regla 7) en vez del
+      // input de texto plano — este tipo nunca cae en el `else`
+      // genérico de abajo.
+      const boton = crearCapturadorAtajo(
+        fila.clave as "tecla_guardar_coordenada" | "tecla_toggle_perfil",
+        parsearAtajoDesdeTexto(valorActual),
+        (atajo) => {
+          montada.valorTrigger = atajoATexto(atajo);
+          marcarEditando(fila.clave, tr);
+        },
+      );
+
+      montada.botonTrigger = boton;
+
+      tdPersonalizado.append(boton);
+    } else if (fila.tipo === "numero_par") {
       const [ancho, alto] = valorActual.split(",");
 
       const inputAncho = crearInputNumero((ancho ?? "").trim());
@@ -674,13 +819,13 @@ function crearPestanaEditable(opciones: OpcionesPestana): Pestana {
     // afecta a todas).
     tdDefecto.title = "Doble click para usar este valor";
     tdDefecto.addEventListener("dblclick", () => {
-      aplicarValorEnInputs(fila, inputs, fila.valorDefecto);
+      aplicarValorEnInputs(montada, fila.valorDefecto, marcarEditando);
     });
 
     tr.append(tdNombre, tdDefecto, tdPersonalizado);
     tbody.append(tr);
 
-    filasMontadas.set(fila.clave, { fila, tr, inputs });
+    filasMontadas.set(fila.clave, montada);
   }
 
   // ----------------------------------------------------
@@ -743,7 +888,7 @@ function crearPestanaEditable(opciones: OpcionesPestana): Pestana {
         continue;
       }
 
-      const valor = construirValorDesdeInputs(montada.fila, montada.inputs);
+      const valor = construirValorDesdeInputs(montada);
       const error = validarValor(montada.fila, valor);
 
       if (error) {

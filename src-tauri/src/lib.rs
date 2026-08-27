@@ -137,6 +137,8 @@ pub fn run() {
             comandos::obtener_resultado_coordenada,
             comandos::obtener_tecla_guardar_coordenada,
             comandos::establecer_tecla_guardar_coordenada,
+            comandos::obtener_tecla_toggle_perfil,
+            comandos::establecer_tecla_toggle_perfil,
             comandos::obtener_intervalo_captura_coordenada,
             comandos::obtener_datos_menu_express,
             comandos::cerrar_menu_express,

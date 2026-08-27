@@ -648,6 +648,10 @@ pub fn abrir_selector_emoji() {
 // obtener_tecla_guardar_coordenada() / establecer_...()
 //     Config de la tecla de guardado (F1 por defecto).
 //
+// obtener_tecla_toggle_perfil() / establecer_...()
+//     Config del atajo global Activar/Desactivar perfil
+//     (Ctrl+F1 por defecto).
+//
 // obtener_intervalo_captura_coordenada()
 //     Cada cuántos ms debe sondear captura.html (config.rs).
 // ======================================================
@@ -796,11 +800,25 @@ pub fn obtener_tecla_guardar_coordenada() -> AtajoCapturaUI {
 
 #[tauri::command]
 pub fn establecer_tecla_guardar_coordenada(valor: String) -> Result<(), String> {
-    // Sin uso desde el frontend hoy — se deja compilando.
     let atajo = config::AtajoSimple::desde_texto(&valor)
         .ok_or_else(|| format!("Formato de atajo inválido: \"{}\"", valor))?;
 
     config::establecer_tecla_guardar_coordenada(atajo);
+
+    Ok(())
+}
+
+#[tauri::command]
+pub fn obtener_tecla_toggle_perfil() -> AtajoCapturaUI {
+    convertir_atajo_captura(&config::tecla_toggle_perfil())
+}
+
+#[tauri::command]
+pub fn establecer_tecla_toggle_perfil(valor: String) -> Result<(), String> {
+    let atajo = config::AtajoSimple::desde_texto(&valor)
+        .ok_or_else(|| format!("Formato de atajo inválido: \"{}\"", valor))?;
+
+    config::establecer_tecla_toggle_perfil(atajo);
 
     Ok(())
 }

@@ -194,6 +194,7 @@ use crate::captura_coordenada;
 use crate::config;
 use crate::eventos::{InputEvent, InputId, InputState};
 use crate::motor;
+use crate::perfil;
 use std::cell::RefCell;
 use std::sync::Mutex;
 use std::time::Duration;
@@ -271,7 +272,83 @@ thread_local! {
     static EVENTO_EN_CURSO: RefCell<Option<InputEvent>> = RefCell::new(None);
 }
 
+// ======================================================
+// 🎚️ ATAJO GLOBAL TOGGLE PERFIL
+// ------------------------------------------------------
+// Detección independiente de RETENIDO/DEVOLVIENDO/Cache: debe
+// funcionar con el perfil desactivado (cache vacía) y aunque haya
+// una captura en curso no la afecta — se resuelve antes que
+// cualquiera de esas ramas (ver procesar_evento). Lleva su propio
+// registro de teclas físicamente abajo (no reutiliza el de Cache,
+// que no existe cuando el perfil está desactivado).
+// ======================================================
+
+static TECLAS_ABAJO_TOGGLE: Mutex<Vec<InputId>> = Mutex::new(Vec::new());
+
+/// Compara un set de teclas físicamente abajo contra un AtajoSimple
+/// (modificadores + gatillo), sin importar el orden de los
+/// modificadores. Mismo criterio que
+/// perfil_ui::coincide_con_atajo_reservado, pero contra un solo
+/// atajo (acá no aplica tecla_guardar_coordenada).
+fn coincide_con_combo(atajo: &config::AtajoSimple, gatillo: &InputId, abajo: &[InputId]) -> bool {
+    &atajo.gatillo == gatillo
+        && atajo.modificadores.len() == abajo.len().saturating_sub(1)
+        && atajo
+            .modificadores
+            .iter()
+            .all(|modificador| abajo.contains(modificador))
+}
+
+/// Actualiza TECLAS_ABAJO_TOGGLE con el evento físico y, en el Down
+/// del gatillo, evalúa si el combo resultante coincide con
+/// config::tecla_toggle_perfil(). Devuelve true solo en ese caso
+/// (nunca en Up/Pulse, ni en un Down que solo sea un modificador).
+fn detectar_toggle(evento: &InputEvent) -> bool {
+    let mut abajo = TECLAS_ABAJO_TOGGLE.lock().unwrap();
+
+    match evento.state {
+        InputState::Down => {
+            if !abajo.contains(&evento.input) {
+                abajo.push(evento.input.clone());
+            }
+
+            let atajo = config::tecla_toggle_perfil();
+            coincide_con_combo(&atajo, &evento.input, &abajo)
+        }
+        InputState::Up => {
+            abajo.retain(|i| i != &evento.input);
+            false
+        }
+        InputState::Pulse => false,
+    }
+}
+
+/// Consulta cache::esta_vacia() (activado/desactivado) y llama a
+/// perfil::activar_perfil() / perfil::desactivar_perfil() según
+/// corresponda. Errores de activar_perfil() (ej. perfil corrupto)
+/// solo se loguean por consola: entrada.rs no tiene forma de
+/// mostrarlos en la UI.
+fn ejecutar_toggle_perfil() {
+    if cache::esta_vacia() {
+        if let Err(error) = perfil::activar_perfil() {
+            eprintln!("⚠️ Atajo toggle: no se pudo activar el perfil: {error}");
+        }
+    } else {
+        perfil::desactivar_perfil();
+    }
+}
+
 pub fn procesar_evento(evento: InputEvent) {
+    // Atajo global Activar/Desactivar perfil: va antes que cualquier
+    // otra cosa (incluida la excepción de Modo Captura de abajo),
+    // para que funcione sin importar si el perfil está activado o
+    // desactivado. Si el combo coincide, se consume el evento acá
+    // mismo (no se reenvía a Windows) y no sigue el resto del flujo.
+    if detectar_toggle(&evento) {
+        ejecutar_toggle_perfil();
+        return;
+    }
+
     // Tap pasivo para la ventana de captura de "Click en coordenada"
     // (ver captura_coordenada.rs): nunca decide nada sobre el evento,
     // solo observa. Va primero y no retorna nada — todo lo de abajo

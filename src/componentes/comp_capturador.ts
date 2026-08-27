@@ -21,11 +21,25 @@ import {
   extrasPermitidosTeclaMouse,
 } from "../core/core_trigger";
 
+import type { Entrada } from "../core/core_entrada";
+
 import { abrirPopupModificador } from "./comp_popup_abrir";
 
 import { crearTrigger } from "../core/core_trigger";
 
 type DestinoCaptura = "Trigger" | "Accion";
+
+// ======================================================
+// 🎚️ ATAJO SIMPLE (config.rs: tecla_toggle_perfil /
+// tecla_guardar_coordenada) — mismos modificadores+gatillo que
+// Trigger, sin condicion (Regla 5: ambos limitados a Simple).
+// ======================================================
+
+export interface AtajoCaptura {
+  modificadores: Entrada[];
+
+  gatillo: Entrada | null;
+}
 
 // ======================================================
 // CREAR CAPTURADOR
@@ -154,6 +168,125 @@ export function crearCapturador(
           }
 
           reconstruirFila(contexto.id);
+
+          return;
+        }
+
+        await new Promise((resolver) => setTimeout(resolver, 50));
+      }
+    };
+
+    await esperar();
+  });
+
+  return boton;
+}
+
+// ======================================================
+// 🎚️ CREAR CAPTURADOR DE ATAJO (config.rs)
+// ------------------------------------------------------
+// Variante reducida de crearCapturador: sin ContextoFila/
+// FilaPerfil, sin botón "+" de condición (Regla 5: estos atajos
+// no admiten Doble/Triple/Mantenido) y sin conocer las claves de
+// configuracion_guardar_lote — arma el texto y avisa vía
+// alGuardar, quien llama decide qué hacer con él.
+// ======================================================
+
+export function crearCapturadorAtajo(
+  claveConfig: "tecla_guardar_coordenada" | "tecla_toggle_perfil",
+  atajoInicial: AtajoCaptura,
+  alGuardar: (atajo: AtajoCaptura) => void,
+): HTMLButtonElement {
+  // triggerATexto/triggerAHTML piden un Trigger completo — se
+  // envuelve acá solo para reusarlas, condicion:"simple" nunca se
+  // guarda ni se transporta a ningún lado.
+  const aTrigger = (atajo: AtajoCaptura) => ({
+    ...atajo,
+    condicion: "simple" as const,
+  });
+
+  const tieneAtajo = atajoInicial.gatillo !== null;
+
+  const boton = crearBoton({
+    texto: tieneAtajo
+      ? triggerATexto(aTrigger(atajoInicial))
+      : "🚩 Capturar",
+
+    html: tieneAtajo
+      ? `
+            <div class="trigger-contenido">
+                ${triggerAHTML(aTrigger(atajoInicial))}
+            </div>
+          `
+      : "🚩 Capturar",
+
+    clase: "capturador",
+  });
+
+  let capturando = false;
+
+  boton.addEventListener("click", async () => {
+    if (capturando) {
+      return;
+    }
+
+    capturando = true;
+
+    boton.dataset.abierto = "true";
+
+    boton.textContent = "Esperando...";
+
+    await invoke("iniciar_captura", {
+      filaId: "config",
+      columna: claveConfig,
+    });
+
+    const esperar = async () => {
+      while (capturando) {
+        const capturado = await invoke<[string, string, unknown | null] | null>(
+          "obtener_captura",
+        );
+
+        if (capturado) {
+          const [filaId, columna, resultado] = capturado;
+
+          // Mismo criterio que crearCapturador: puede haber quedado
+          // un resultado de una captura anterior (otra clave) si
+          // esta se abrió muy rápido después de otra.
+          if (filaId !== "config" || columna !== claveConfig) {
+            await new Promise((resolver) => setTimeout(resolver, 50));
+
+            continue;
+          }
+
+          capturando = false;
+
+          boton.dataset.abierto = "false";
+
+          if (resultado === null) {
+            // Captura descartada (ej: Click izquierdo solo) — el
+            // botón vuelve a su estado previo, sin avisar a
+            // alGuardar.
+            return;
+          }
+
+          // condicion del resultado se descarta a propósito (Regla
+          // 5): este atajo nunca guarda ni transporta condición.
+          const { modificadores, gatillo } = resultado as {
+            modificadores: Entrada[];
+            gatillo: Entrada | null;
+            condicion: string;
+          };
+
+          const atajo: AtajoCaptura = { modificadores, gatillo };
+
+          boton.innerHTML = `
+            <div class="trigger-contenido">
+                ${triggerAHTML(aTrigger(atajo))}
+            </div>
+          `;
+
+          alGuardar(atajo);
 
           return;
         }

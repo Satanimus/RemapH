@@ -87,6 +87,13 @@ static GUARDADO_SOLICITADO: std::sync::Mutex<bool> = std::sync::Mutex::new(false
 static RESULTADO: std::sync::Mutex<Option<(f64, f64)>> = std::sync::Mutex::new(None);
 static CONFIG_ACTIVA: std::sync::Mutex<Option<ConfigCaptura>> = std::sync::Mutex::new(None);
 
+// Teclas físicamente abajo relevantes al atajo de guardar coordenada
+// (ahora AtajoSimple: modificadores + gatillo, no una tecla suelta).
+// Registro propio, independiente del de entrada.rs — observar_evento()
+// es un tap pasivo y no tiene acceso al estado interno de otros
+// archivos.
+static TECLAS_ABAJO: std::sync::Mutex<Vec<InputId>> = std::sync::Mutex::new(Vec::new());
+
 /// Llamada al abrir la ventana de captura, con la config de la fila
 /// que la abrió.
 pub fn activar(ubicacion: String, modo_ventana: String, punto_referencia: String) {
@@ -123,14 +130,31 @@ pub fn observar_evento(evento: &InputEvent) {
         return;
     }
 
-    if evento.state != InputState::Down {
-        return;
-    }
+    let mut abajo = TECLAS_ABAJO.lock().unwrap();
 
-    let tecla = InputId::new("keyboard", &config::tecla_guardar_coordenada());
+    match evento.state {
+        InputState::Up => {
+            abajo.retain(|i| i != &evento.input);
+        }
+        InputState::Down => {
+            if !abajo.contains(&evento.input) {
+                abajo.push(evento.input.clone());
+            }
 
-    if evento.input == tecla {
-        *GUARDADO_SOLICITADO.lock().unwrap() = true;
+            let atajo = config::tecla_guardar_coordenada();
+
+            let coincide = atajo.gatillo == evento.input
+                && atajo.modificadores.len() == abajo.len().saturating_sub(1)
+                && atajo
+                    .modificadores
+                    .iter()
+                    .all(|modificador| abajo.contains(modificador));
+
+            if coincide {
+                *GUARDADO_SOLICITADO.lock().unwrap() = true;
+            }
+        }
+        InputState::Pulse => {}
     }
 }
 
