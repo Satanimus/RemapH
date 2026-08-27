@@ -6,13 +6,17 @@ import { invoke } from "@tauri-apps/api/core";
 
 import type { FilaPerfil } from "../core/core_perfil";
 
-import { obtenerConflictos } from "../core/core_conflictos";
+import {
+  obtenerConflictos,
+  obtenerSnapshotAtajoReservado,
+} from "../core/core_conflictos";
 
 import { obtenerAdvertenciasCompilacion } from "../core/core_advertencias_compilacion";
 
 import {
   obtenerTextoEstadoNormal,
   obtenerTextoNotificacion,
+  obtenerTextoNotificacionAtajoReservado,
   obtenerTextoAdvertenciaCompilacion,
 } from "../core/core_notificaciones";
 
@@ -116,7 +120,13 @@ export function actualizarStatusbar(filas: FilaPerfil[]): void {
 
   const advertencias = obtenerAdvertenciasCompilacion();
 
-  if (conflictos.length === 0 && advertencias.length === 0) {
+  const conflictosAtajo = obtenerSnapshotAtajoReservado();
+
+  if (
+    conflictos.length === 0 &&
+    advertencias.length === 0 &&
+    conflictosAtajo.length === 0
+  ) {
     textoActual.textContent = obtenerTextoEstadoNormal();
 
     return;
@@ -134,11 +144,21 @@ export function actualizarStatusbar(filas: FilaPerfil[]): void {
     }),
   );
 
+  const textosAtajo = conflictosAtajo.map((conflicto) =>
+    obtenerTextoNotificacionAtajoReservado({
+      fila: conflicto.numeroFila,
+
+      columna: conflicto.columna,
+    }),
+  );
+
   const textosAdvertencias = advertencias.map((advertencia) =>
     obtenerTextoAdvertenciaCompilacion(advertencia.fila, advertencia.mensaje),
   );
 
-  textoActual.textContent = [...textosConflictos, ...textosAdvertencias].join(
-    "   •   ",
-  );
+  textoActual.textContent = [
+    ...textosConflictos,
+    ...textosAtajo,
+    ...textosAdvertencias,
+  ].join("   •   ");
 }

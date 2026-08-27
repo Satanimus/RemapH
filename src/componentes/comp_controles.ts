@@ -63,7 +63,10 @@ import { crearCoordenada } from "../core/core_coordenada";
 
 import { obtenerPerfilUi } from "../core/core_perfil_ui";
 
-import { filaTieneConflicto } from "../core/core_conflictos";
+import {
+  filaTieneConflicto,
+  filaEnSnapshotAtajoReservado,
+} from "../core/core_conflictos";
 
 import { filaTieneAdvertencia } from "../core/core_advertencias_compilacion";
 
@@ -103,7 +106,13 @@ export function crearEstado(
 
   const advertencia = filaTieneAdvertencia(filaPerfil.id, filasNormales);
 
-  const apagadaPorAviso = conflicto || advertencia;
+  const atajoReservado = filaEnSnapshotAtajoReservado(
+    filaPerfil.id,
+
+    filasNormales,
+  );
+
+  const apagadaPorAviso = conflicto || advertencia || atajoReservado;
 
   boton.dataset.estado = apagadaPorAviso
     ? "off"

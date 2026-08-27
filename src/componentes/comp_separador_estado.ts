@@ -16,7 +16,10 @@ import {
 } from "../core/core_separadores";
 import { obtenerPerfilUi } from "../core/core_perfil_ui";
 import { reconstruirTabla } from "../ui/ui_tabla_control";
-import { filaTieneConflicto } from "../core/core_conflictos";
+import {
+  filaTieneConflicto,
+  filaEnSnapshotAtajoReservado,
+} from "../core/core_conflictos";
 import { filaTieneAdvertencia } from "../core/core_advertencias_compilacion";
 
 // Tercer estado (además de on/off/mixto): si alguna fila del tramo
@@ -42,7 +45,8 @@ function tramoTieneAlerta(separador: SeparadorPerfil): boolean {
   return tramo.some(
     (fila) =>
       filaTieneConflicto(fila.id, filasNormales) ||
-      filaTieneAdvertencia(fila.id, filasNormales),
+      filaTieneAdvertencia(fila.id, filasNormales) ||
+      filaEnSnapshotAtajoReservado(fila.id, filasNormales),
   );
 }
 

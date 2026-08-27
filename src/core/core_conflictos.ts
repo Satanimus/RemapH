@@ -186,22 +186,50 @@ export async function obtenerConflictosAtajoReservado(
   return conflictos;
 }
 
-// ❓ FILA EN CONFLICTO CON ATAJO RESERVADO
+// ======================================================
+// 📸 SNAPSHOT DE CONFLICTOS 003 (para consultar sync)
 // ------------------------------------------------------
-// Función hermana de filaTieneConflicto(), separada (no
-// unificada) porque los dos llamadores actuales de
-// filaTieneConflicto() (comp_controles.ts::crearEstado,
-// comp_separador_estado.ts) son síncronos hoy — unificar ambas
-// categorías en una sola función habría forzado a hacerlas async
-// también. Queda sin invocar todavía: la conecta la Etapa F.
-export async function filaTieneConflictoAtajoReservado(
+// obtenerConflictosAtajoReservado() es async (invoke). Los dos
+// consumidores del estado de alerta de fila (comp_controles.ts::
+// crearEstado, comp_separador_estado.ts::tramoTieneAlerta) son
+// síncronos, así que acá se guarda el último resultado conocido
+// — mismo patrón que advertenciasActuales en
+// core_advertencias_compilacion.ts — y se expone un getter y un
+// helper por-id sync para leerlo. El refresco del snapshot lo
+// dispara ui_tabla_control.ts en cada reconstruirTabla()/
+// reconstruirFila().
+// ======================================================
+
+let conflictosAtajoReservadoActuales: ConflictoAtajoReservado[] = [];
+
+export async function actualizarSnapshotAtajoReservado(
+  filas: FilaPerfil[],
+): Promise<void> {
+  conflictosAtajoReservadoActuales = await obtenerConflictosAtajoReservado(
+    filas,
+  );
+}
+
+export function obtenerSnapshotAtajoReservado(): ConflictoAtajoReservado[] {
+  return conflictosAtajoReservadoActuales;
+}
+
+export function filaEnSnapshotAtajoReservado(
   id: string,
 
   filas: FilaPerfil[],
-): Promise<boolean> {
-  const conflictos = await obtenerConflictosAtajoReservado(filas);
+): boolean {
+  const indice = filas.findIndex((fila) => fila.id === id);
 
-  return conflictos.some((conflicto) => conflicto.fila.id === id);
+  if (indice < 0) {
+    return false;
+  }
+
+  const numeroFila = indice + 1;
+
+  return conflictosAtajoReservadoActuales.some(
+    (conflicto) => conflicto.numeroFila === numeroFila,
+  );
 }
 
 // ======================================================

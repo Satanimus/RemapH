@@ -18,7 +18,13 @@ let actualizarSeparadoresDeFilasCallback:
 
 let conflictosAnteriores = new Map<string, Set<string>>();
 
-import { obtenerConflictos } from "../core/core_conflictos";
+let conflictosAtajoReservadoAnteriores = new Set<string>();
+
+import {
+  obtenerConflictos,
+  actualizarSnapshotAtajoReservado,
+  obtenerSnapshotAtajoReservado,
+} from "../core/core_conflictos";
 
 import { obtenerPerfilUi } from "../core/core_perfil_ui";
 
@@ -62,6 +68,12 @@ export function reconstruirTabla(): void {
   actualizarMapaConflictos();
 
   actualizarConflictosCallback?.();
+
+  const filasNormales = obtenerPerfilUi().filas.filter(
+    (item): item is FilaPerfil => !esSeparador(item),
+  );
+
+  void refrescarConflictosAtajoReservado(filasNormales);
 }
 
 // ======================================================
@@ -96,6 +108,55 @@ export function reconstruirFila(id: string): void {
   actualizarSeparadoresDeFilasCallback?.([...afectados]);
 
   conflictosAnteriores = conflictosActuales;
+
+  actualizarConflictosCallback?.();
+
+  const filasNormales = obtenerPerfilUi().filas.filter(
+    (item): item is FilaPerfil => !esSeparador(item),
+  );
+
+  void refrescarConflictosAtajoReservado(filasNormales);
+}
+
+// ======================================================
+// 🔒 REFRESCAR CONFLICTOS ATAJO RESERVADO (003)
+// ------------------------------------------------------
+// obtenerConflictosAtajoReservado (invocada dentro de
+// actualizarSnapshotAtajoReservado) es async — a diferencia de
+// obtenerConflictos() (001/002), acá no se puede resolver el
+// afectado en el mismo tick. Se dispara desde reconstruirTabla()/
+// reconstruirFila() y, al resolver, reconstruye solo las filas
+// afectadas (unión con el estado anterior, mismo criterio que
+// reconstruirFila() usa para 001/002).
+// ======================================================
+
+async function refrescarConflictosAtajoReservado(
+  filasNormales: FilaPerfil[],
+): Promise<void> {
+  await actualizarSnapshotAtajoReservado(filasNormales);
+
+  const snapshot = obtenerSnapshotAtajoReservado();
+
+  const actuales = new Set<string>();
+
+  snapshot.forEach((conflicto) => {
+    const fila = filasNormales[conflicto.numeroFila - 1];
+
+    if (fila) {
+      actuales.add(fila.id);
+    }
+  });
+
+  const afectados = new Set<string>([
+    ...conflictosAtajoReservadoAnteriores,
+    ...actuales,
+  ]);
+
+  afectados.forEach((filaId) => {
+    reconstruirFilaCallback?.(filaId);
+  });
+
+  conflictosAtajoReservadoAnteriores = actuales;
 
   actualizarConflictosCallback?.();
 }

@@ -25,6 +25,8 @@ import { iniciarAjusteTextoBotones } from "./util/util_texto_boton";
 
 import { actualizarStatusbar } from "./ui/ui_statusbar";
 
+import { actualizarSnapshotAtajoReservado } from "./core/core_conflictos";
+
 import { esSeparador } from "./core/core_separadores";
 
 import type { FilaPerfil } from "./core/core_perfil";
@@ -80,6 +82,10 @@ async function iniciarApp(): Promise<void> {
   const perfil = await convertirperfil_json(resultado.perfil);
 
   establecerPerfilUi(perfil);
+
+  await actualizarSnapshotAtajoReservado(
+    perfil.filas.filter((item): item is FilaPerfil => !esSeparador(item)),
+  );
 
   document.body.replaceChildren(crearApp(guardarPerfil));
 

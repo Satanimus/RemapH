@@ -303,14 +303,26 @@ fn coincide_con_combo(atajo: &config::AtajoSimple, gatillo: &InputId, abajo: &[I
 /// del gatillo, evalúa si el combo resultante coincide con
 /// config::tecla_toggle_perfil(). Devuelve true solo en ese caso
 /// (nunca en Up/Pulse, ni en un Down que solo sea un modificador).
+///
+/// [FIX] Windows repite WM_KEYDOWN mientras una tecla sigue
+/// físicamente abajo (auto-repeat) — sin este chequeo, mantener
+/// apretado el gatillo disparaba ejecutar_toggle_perfil() una vez
+/// por cada repeat, activando/desactivando el perfil en ráfaga
+/// mientras se sostiene la tecla (mismo patrón que ya rompía
+/// Interception al recrear su contexto en sucesión rápida — ver
+/// back_interception.rs). Se dispara solo en la transición real
+/// (la tecla no estaba abajo todavía); un Down repetido de una
+/// tecla ya registrada nunca reevalúa el combo.
 fn detectar_toggle(evento: &InputEvent) -> bool {
     let mut abajo = TECLAS_ABAJO_TOGGLE.lock().unwrap();
 
     match evento.state {
         InputState::Down => {
-            if !abajo.contains(&evento.input) {
-                abajo.push(evento.input.clone());
+            if abajo.contains(&evento.input) {
+                return false;
             }
+
+            abajo.push(evento.input.clone());
 
             let atajo = config::tecla_toggle_perfil();
             coincide_con_combo(&atajo, &evento.input, &abajo)
