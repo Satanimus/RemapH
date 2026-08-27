@@ -20,7 +20,10 @@ import type { Columna } from "../ui/ui_columnas";
 
 import { activarRedimensionColumnas } from "../ui/ui_redimension_columnas";
 
-import { mostrarPopup, ocultarPopup } from "../componentes/comp_popup_contenedor";
+import {
+  mostrarPopup,
+  ocultarPopup,
+} from "../componentes/comp_popup_contenedor";
 
 import { abrirFormularioNombre } from "../componentes/comp_popup_formulario_nombre";
 
@@ -98,13 +101,6 @@ const COLUMNAS_ARBOL: Columna[] = [
   },
 
   {
-    id: "editar",
-    titulo: "Editar",
-    grupo: "general",
-    ancho: "var(--col-config-editar)",
-  },
-
-  {
     id: "personalizado",
     titulo: "Valor Personalizado",
     grupo: "general",
@@ -115,8 +111,7 @@ const COLUMNAS_ARBOL: Columna[] = [
 const ANCHOS_DEFAULT_ARBOL: Record<string, number> = {
   nombre: 220,
   defecto: 260,
-  editar: 40,
-  personalizado: 220,
+  personalizado: 260,
 };
 
 // Sangría por nivel del árbol (Etapa E6): mayor jerarquía = menos
@@ -420,17 +415,36 @@ function crearFilaArbol(
   const tdDefecto = document.createElement("td");
   tdDefecto.className = "configuracion-arbol-defecto";
 
-  const tdEditar = document.createElement("td");
-
+  // Columna Editar/Valor Personalizado fusionada (Etapa H11): un
+  // solo botón por fila, sin padding propio en la celda (el botón
+  // ocupa todo el ancho, ver .configuracion-arbol-personalizado-celda).
   const tdPersonalizado = document.createElement("td");
+  tdPersonalizado.className = "configuracion-arbol-personalizado-celda";
 
-  // G5: refresca Valor por Defecto/Personalizado tras un cambio en
-  // el popup Editar o un borrado por doble click.
+  const botonPersonalizado = document.createElement("button");
+  botonPersonalizado.type = "button";
+  botonPersonalizado.className = "configuracion-arbol-personalizado";
+
+  tdPersonalizado.append(botonPersonalizado);
+
+  // G5/H11: refresca Valor por Defecto y el botón fusionado tras un
+  // cambio en el popup Editar o un borrado por doble click — el
+  // botón muestra "✎" vacío cuando no hay Valor Personalizado, o el
+  // valor ya guardado (swatch+nombre para color) en su lugar.
   const actualizarColumnas = (): void => {
     tdDefecto.replaceChildren(renderizarValorDefecto(nodo.hijos, coloresTema));
-    tdPersonalizado.replaceChildren(
-      renderizarValorPersonalizado(nodo.hijos, coloresTema),
+
+    const hayValorPersonalizado = nodo.hijos.some(
+      (hijo) => hijo.valor_personalizado && hijo.valor_personalizado.length > 0,
     );
+
+    if (hayValorPersonalizado) {
+      botonPersonalizado.replaceChildren(
+        renderizarValorPersonalizado(nodo.hijos, coloresTema),
+      );
+    } else {
+      botonPersonalizado.textContent = "✎";
+    }
   };
 
   // F5/H1: doble click sobre Valor por Defecto borra el Valor
@@ -460,14 +474,11 @@ function crearFilaArbol(
     actualizarColumnas();
   });
 
-  // G6/H1: botón Editar abre el mini popup sobre la fila; cualquier
-  // cambio dentro del popup marca la fila como pendiente de guardar.
-  const botonEditar = document.createElement("button");
-  botonEditar.type = "button";
-  botonEditar.className = "configuracion-arbol-editar";
-  botonEditar.textContent = "✎";
-
-  botonEditar.addEventListener("click", (evento) => {
+  // G6/H1/H11: botón fusionado (vacío=lápiz o con el Valor
+  // Personalizado ya guardado) abre el mini popup sobre la fila;
+  // cualquier cambio dentro del popup marca la fila como pendiente
+  // de guardar. Se reabre igual estando vacío o con valor.
+  botonPersonalizado.addEventListener("click", (evento) => {
     const popup = crearPopupEditar(nodo, () => {
       filasConCambio.add(nodo);
       tr.classList.add("configuracion-arbol-editando");
@@ -478,11 +489,9 @@ function crearFilaArbol(
     mostrarPopup(popup, evento.clientX, evento.clientY);
   });
 
-  tdEditar.append(botonEditar);
-
   actualizarColumnas();
 
-  tr.append(tdNombre, tdDefecto, tdEditar, tdPersonalizado);
+  tr.append(tdNombre, tdDefecto, tdPersonalizado);
 
   return tr;
 }
@@ -724,16 +733,20 @@ export function crearPestanaApariencia(
         botonRenombrar.textContent = "Renombrar";
 
         botonRenombrar.addEventListener("click", () => {
-          abrirFormularioNombre(nombreTemaSesion, evento, async (nombreNuevo) => {
-            await invoke("configuracion_tema_renombrar", {
-              nombreActual: nombreTemaSesion,
-              nombreNuevo,
-            });
+          abrirFormularioNombre(
+            nombreTemaSesion,
+            evento,
+            async (nombreNuevo) => {
+              await invoke("configuracion_tema_renombrar", {
+                nombreActual: nombreTemaSesion,
+                nombreNuevo,
+              });
 
-            nombreTemaSesion = nombreNuevo;
+              nombreTemaSesion = nombreNuevo;
 
-            await recargarTablaApariencia();
-          });
+              await recargarTablaApariencia();
+            },
+          );
         });
 
         lista.append(botonRenombrar);

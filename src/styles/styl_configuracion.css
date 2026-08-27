@@ -49,7 +49,7 @@
 }
 
 /* Botón ghost icono-solo "Abrir carpeta de usuario", mismo criterio
-   que .configuracion-arbol-editar/.configuracion-arbol-expandir:
+   que .configuracion-arbol-personalizado/.configuracion-arbol-expandir:
    sin fondo ni borde en reposo, borde+color de acento en hover.
    margin-left: auto lo empuja al extremo derecho de la barra de
    pestañas, separado de las tabs. */
@@ -176,12 +176,20 @@
 
 .configuracion-tabla tbody td {
   padding: var(--gap8);
-  border-bottom: 1px solid var(--border);
   vertical-align: middle;
 }
 
+.configuracion-tabla tbody tr {
+  background: color-mix(in srgb, var(--tabla-fondo-color-impar) var(--tabla-fondo-opacidad), transparent);
+  transition: background var(--speed);
+}
+
+.configuracion-tabla tbody tr:nth-child(even) {
+  background: color-mix(in srgb, var(--tabla-fondo-color-par) var(--tabla-fondo-opacidad), transparent);
+}
+
 .configuracion-tabla tbody tr:hover {
-  background: var(--row-hover-bg);
+  background: color-mix(in srgb, var(--tabla-fondo-color-hover) var(--tabla-fondo-opacidad-hover), transparent);
 }
 
 .configuracion-valor-defecto {
@@ -285,12 +293,20 @@
 
 .configuracion-tabla-arbol tbody td {
   padding: var(--gap8);
-  border-bottom: 1px solid var(--border);
   vertical-align: middle;
 }
 
+.configuracion-tabla-arbol tbody tr {
+  background: color-mix(in srgb, var(--tabla-fondo-color-impar) var(--tabla-fondo-opacidad), transparent);
+  transition: background var(--speed);
+}
+
+.configuracion-tabla-arbol tbody tr:nth-child(even) {
+  background: color-mix(in srgb, var(--tabla-fondo-color-par) var(--tabla-fondo-opacidad), transparent);
+}
+
 .configuracion-tabla-arbol tbody tr:hover {
-  background: var(--row-hover-bg);
+  background: color-mix(in srgb, var(--tabla-fondo-color-hover) var(--tabla-fondo-opacidad-hover), transparent);
 }
 
 /* F6: cuadradito de color en la columna Valor por Defecto. */
@@ -311,7 +327,7 @@
 }
 
 .configuracion-arbol-defecto:hover {
-  background: var(--row-hover-bg);
+  background: color-mix(in srgb, var(--overlay-contraste) 8%, transparent);
 }
 
 /* E7: sangría/color por nivel (Regla 28: única diferencia visual
@@ -355,23 +371,40 @@
   color: var(--highlight);
 }
 
-/* G7: botón Editar (ícono lápiz), mismo criterio ghost que
-   .configuracion-arbol-expandir. */
-.configuracion-arbol-editar {
+/* H11: columna Editar/Valor Personalizado fusionada — la celda
+   pierde el padding genérico de .configuracion-tabla-arbol tbody td
+   (el botón de adentro pone el suyo, así ocupa toda la celda y es
+   clickeable de punta a punta). */
+.configuracion-arbol-personalizado-celda {
+  padding: 0;
+}
+
+/* Botón único: "✎" cuando no hay Valor Personalizado, o el valor ya
+   guardado (swatch+nombre para color, texto para el resto) en su
+   lugar — mismo criterio ghost que .configuracion-arbol-expandir,
+   pero ocupando todo el ancho/alto de la celda y alineado a la
+   izquierda. */
+.configuracion-arbol-personalizado {
+  display: flex;
+  align-items: center;
+  gap: var(--gap4);
+  width: 100%;
+  height: 100%;
   background: transparent;
   border: 1px solid transparent;
   border-radius: var(--r4);
   color: var(--text-disabled);
   font-family: var(--font);
   font-size: var(--fs13);
+  text-align: left;
   cursor: pointer;
-  padding: 0;
+  padding: var(--gap8);
   transition:
     border-color .12s ease,
     color .12s ease;
 }
 
-.configuracion-arbol-editar:hover {
+.configuracion-arbol-personalizado:hover {
   border-color: var(--highlight);
   color: var(--highlight);
 }
