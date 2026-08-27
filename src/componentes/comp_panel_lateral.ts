@@ -20,6 +20,8 @@ import { confirmarPopup } from "./comp_popup_confirmar";
 
 import { abrirFormularioNombre } from "./comp_popup_formulario_nombre";
 
+import { ATRIBUTO_AYUDA_ID } from "../ui/ui_ayuda_hover";
+
 import type { perfil_json } from "../core/core_perfil_json";
 
 import type { AdvertenciaCompilacion } from "../core/core_advertencias_compilacion";
@@ -189,6 +191,8 @@ function crearListaPerfiles(
 
   lista.className = "panel-lateral-lista";
 
+  lista.setAttribute(ATRIBUTO_AYUDA_ID, "panel-lateral-lista");
+
   perfiles.forEach((nombre) => {
     const esActual = nombre === nombreActual;
 
@@ -197,6 +201,8 @@ function crearListaPerfiles(
 
       clase: "panel-lateral-item",
     });
+
+    boton.setAttribute(ATRIBUTO_AYUDA_ID, "panel-lateral-item");
 
     if (esActual) {
       boton.classList.add("panel-lateral-item--actual");
@@ -317,6 +323,8 @@ function crearAcciones(
     texto: "Nuevo",
   });
 
+  botonNuevo.setAttribute(ATRIBUTO_AYUDA_ID, "botonNuevo");
+
   botonNuevo.addEventListener("click", async (evento) => {
     if (estaEditado) {
       const guardar = await confirmarPopup(
@@ -348,6 +356,8 @@ function crearAcciones(
     texto: "Clonar",
   });
 
+  botonClonar.setAttribute(ATRIBUTO_AYUDA_ID, "botonClonar");
+
   botonClonar.addEventListener("click", async () => {
     try {
       const resultado = await invoke<ResultadoPerfil>("clonar_perfil");
@@ -367,6 +377,8 @@ function crearAcciones(
   const botonRenombrar = crearBoton({
     texto: "Renombrar",
   });
+
+  botonRenombrar.setAttribute(ATRIBUTO_AYUDA_ID, "botonRenombrar");
 
   botonRenombrar.addEventListener("click", async (evento) => {
     if (estaEditado) {
@@ -392,6 +404,8 @@ function crearAcciones(
 
     clase: "panel-lateral-eliminar",
   });
+
+  botonEliminar.setAttribute(ATRIBUTO_AYUDA_ID, "panel-lateral-eliminar");
 
   let confirmando = false;
 
@@ -435,6 +449,8 @@ function crearItemConfiguracion(): HTMLElement {
 
     clase: "panel-lateral-configuracion",
   });
+
+  boton.setAttribute(ATRIBUTO_AYUDA_ID, "panel-lateral-configuracion");
 
   boton.addEventListener("click", () => {
     invoke("abrir_ventana_configuracion").catch((error) => {

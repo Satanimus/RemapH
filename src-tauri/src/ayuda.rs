@@ -39,7 +39,17 @@ pub fn cargar_catalogo() -> &'static HashMap<String, String> {
             bloques.push((ids_actuales, contenido_actual));
         }
 
+        for (ids, contenido) in bloques {
+            for id in ids {
+                catalogo.insert(id, contenido.clone());
+            }
+        }
+
         catalogo
     })
+}
+
+pub fn obtener_ayuda(id_objeto: &str) -> Option<String> {
+    cargar_catalogo().get(id_objeto).cloned()
 }
 

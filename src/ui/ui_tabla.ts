@@ -39,6 +39,8 @@ import {
 
 import { crearControladorArrastre } from "../util/util_arrastrable";
 
+import { ATRIBUTO_AYUDA_ID } from "./ui_ayuda_hover";
+
 // ======================================================
 // CREAR TABLA
 // ======================================================
@@ -56,6 +58,14 @@ export function crearTabla(alModificar: () => void): HTMLElement {
 
   cabecera.className = "cabecera";
 
+  const IDS_AYUDA_COLUMNA: Record<string, string> = {
+    trigger: "trigger",
+    accion: "accion",
+    opciones: "opciones",
+    extra: "extra",
+    tipo: "tipo-fila",
+  };
+
   COLUMNAS.forEach((col) => {
     const celda = document.createElement("div");
 
@@ -68,6 +78,12 @@ export function crearTabla(alModificar: () => void): HTMLElement {
     celda.style.flexBasis = col.ancho;
 
     celda.textContent = col.titulo;
+
+    const idAyuda = IDS_AYUDA_COLUMNA[col.id];
+
+    if (idAyuda) {
+      celda.setAttribute(ATRIBUTO_AYUDA_ID, idAyuda);
+    }
 
     cabecera.append(celda);
   });

@@ -1,0 +1,102 @@
+/* ======================================================
+   ❔ PANEL DE AYUDA
+   ------------------------------------------------------
+   Panel deslizante fijo, lado derecho (toggle ❔, ver
+   ui_toolbar.ts + comp_panel_ayuda.ts). Mismo patrón que
+   .panel-lateral (styl_panel_lateral.css), en el lado
+   opuesto del layout.
+   ====================================================== */
+
+.panel-ayuda {
+    position: relative;
+
+    flex-shrink: 0;
+
+    width: 0;
+
+    min-width: 0;
+
+    height: 100%;
+
+    background: color-mix(in srgb, var(--barra-lateral-color) var(--barra-lateral-opacidad), transparent);
+
+    backdrop-filter: blur(14px);
+
+    -webkit-backdrop-filter: blur(14px);
+
+    border-left: 1px solid var(--border);
+
+    transition: width var(--speed);
+
+    overflow: hidden;
+}
+
+.panel-ayuda.abierto {
+    overflow: visible;
+}
+
+.panel-ayuda-cuerpo {
+    padding: var(--gap8);
+
+    width: 100%;
+
+    height: 100%;
+
+    overflow-y: auto;
+}
+
+.panel-ayuda-resize {
+    position: absolute;
+
+    left: -8px;
+
+    top: 0;
+
+    width: 16px;
+
+    height: 100%;
+
+    cursor: col-resize;
+}
+
+.panel-ayuda-resize::before {
+    content: "";
+
+    position: absolute;
+
+    left: 7px;
+
+    top: 0;
+
+    width: 1px;
+
+    height: 100%;
+
+    background: var(--border);
+}
+
+/* ======================================================
+   MARCAS DE FORMATO (Regla 9)
+   ====================================================== */
+
+.ayuda-linea {
+    min-height: 1em;
+}
+
+.ayuda-cyan {
+    color: var(--tag-cyan);
+}
+
+.ayuda-red {
+    color: var(--text-red);
+}
+
+.panel-ayuda-cuerpo code {
+    font-family: monospace;
+
+    background: color-mix(in srgb, var(--text) 12%, transparent);
+
+    border-radius: var(--r4);
+
+    padding: 0 4px;
+}

@@ -10,6 +10,8 @@ import { reconstruirFila, reconstruirTabla } from "../ui/ui_tabla_control";
 import { invoke } from "@tauri-apps/api/core";
 import { recomputarCascadaAscendente } from "../core/core_separadores";
 
+import { ATRIBUTO_AYUDA_ID } from "../ui/ui_ayuda_hover";
+
 import {
   abrirPopupTipo,
   abrirPopupColor,
@@ -171,6 +173,8 @@ export function crearTipo(
     titulo: tipoATexto(filaPerfil.tipo),
     clase: "tipo-control",
   });
+
+  boton.setAttribute(ATRIBUTO_AYUDA_ID, "selector-tipo");
 
   boton.addEventListener("click", (evento) => {
     abrirPopupTipo(

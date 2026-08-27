@@ -130,6 +130,7 @@
 //
 // ======================================================
 
+use crate::ayuda;
 use crate::back_app;
 use crate::back_coordenada;
 use crate::captura_coordenada;
@@ -1671,4 +1672,42 @@ pub fn motor_solicitar_cambio_modo(modo: String) {
     };
 
     motor::solicitar_cambio_modo(modo);
+}
+
+// ======================================================
+// ❔ AYUDA
+// ======================================================
+
+#[tauri::command]
+pub fn obtener_ayuda(id_objeto: String) -> Option<String> {
+    ayuda::obtener_ayuda(&id_objeto)
+}
+
+// ======================================================
+// ❔ PANEL DE AYUDA — PERSISTENCIA
+// ======================================================
+
+#[tauri::command]
+pub fn obtener_ancho_panel_ayuda() -> Option<u32> {
+    configuracion_usuario::leer_ancho_panel_ayuda().unwrap_or(None)
+}
+
+#[tauri::command]
+pub fn establecer_ancho_panel_ayuda(ancho: u32) -> Result<(), String> {
+    configuracion_usuario::guardar_ancho_panel_ayuda(ancho)
+}
+
+#[tauri::command]
+pub fn obtener_visible_panel_ayuda() -> Option<bool> {
+    configuracion_usuario::leer_visible_panel_ayuda().unwrap_or(None)
+}
+
+#[tauri::command]
+pub fn establecer_visible_panel_ayuda(visible: bool) -> Result<(), String> {
+    configuracion_usuario::guardar_visible_panel_ayuda(visible)
+}
+
+#[tauri::command]
+pub fn obtener_primer_inicio_ayuda() -> bool {
+    configuracion_usuario::primer_inicio()
 }

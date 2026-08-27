@@ -6,6 +6,7 @@
 // Inicializa el motor principal.
 // ======================================================
 
+mod ayuda;
 mod back_app;
 mod back_coordenada;
 mod back_interception;
@@ -196,6 +197,12 @@ pub fn run() {
             comandos::configuracion_refrescar_ventanas_apariencia,
             comandos::motor_obtener_modo,
             comandos::motor_solicitar_cambio_modo,
+            comandos::obtener_ayuda,
+            comandos::obtener_ancho_panel_ayuda,
+            comandos::establecer_ancho_panel_ayuda,
+            comandos::obtener_visible_panel_ayuda,
+            comandos::establecer_visible_panel_ayuda,
+            comandos::obtener_primer_inicio_ayuda,
         ])
         .build(tauri::generate_context!())
         .expect("error al construir Tauri")

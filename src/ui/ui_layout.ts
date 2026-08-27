@@ -18,6 +18,10 @@ import { crearContenedorPopup } from "../componentes/comp_popup_contenedor";
 
 import { crearPanelLateral } from "../componentes/comp_panel_lateral";
 
+import { crearPanelAyuda } from "../componentes/comp_panel_ayuda";
+
+import { activarHoverAyuda } from "./ui_ayuda_hover";
+
 import { obtenerPerfilUi } from "../core/core_perfil_ui";
 
 import { registrarActualizacionConflictos } from "./ui_tabla_control";
@@ -55,11 +59,15 @@ export function crearLayout(alGuardar: () => Promise<void>): HTMLElement {
     (resultado) => aplicarResultadoPerfilEnToolbar(toolbar, resultado),
   );
 
+  const panelAyuda = crearPanelAyuda();
+
+  activarHoverAyuda();
+
   const layoutCuerpo = document.createElement("div");
 
   layoutCuerpo.className = "layout-cuerpo";
 
-  layoutCuerpo.append(panelLateral, tabla);
+  layoutCuerpo.append(panelLateral, tabla, panelAyuda);
 
   const fragment = document.createDocumentFragment();
 

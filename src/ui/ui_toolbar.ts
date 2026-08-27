@@ -20,6 +20,8 @@ import { invoke } from "@tauri-apps/api/core";
 
 import { alternarPanelLateral } from "../componentes/comp_panel_lateral";
 
+import { alternarPanelAyuda } from "../componentes/comp_panel_ayuda";
+
 import type {
   EstadoPerfilActual,
   ResultadoPerfil,
@@ -110,6 +112,7 @@ export function crearToolbar(alGuardar: () => Promise<void>): HTMLElement {
                 class="btn-menu-lateral"
                 type="button"
                 title="Menú"
+                data-ayuda-id="btn-menu-lateral"
             >
                 <span>☰</span>
             </button>
@@ -118,6 +121,7 @@ export function crearToolbar(alGuardar: () => Promise<void>): HTMLElement {
                 class="btn-agregar-fila"
                 type="button"
                 title="Agregar fila"
+                data-ayuda-id="btn-agregar-fila"
             >
                 <span>+ Fila</span>
             </button>
@@ -126,6 +130,7 @@ export function crearToolbar(alGuardar: () => Promise<void>): HTMLElement {
                 class="btn-agregar-separador"
                 type="button"
                 title="Agregar separador"
+                data-ayuda-id="btn-agregar-separador"
             >
                 <span>+ Separador</span>
             </button>
@@ -139,6 +144,7 @@ export function crearToolbar(alGuardar: () => Promise<void>): HTMLElement {
                 <button
                     class="perfil-estado"
                     type="button"
+                    data-ayuda-id="perfil-estado"
                 ></button>
 
             </div>
@@ -154,6 +160,7 @@ export function crearToolbar(alGuardar: () => Promise<void>): HTMLElement {
                 <button
                     class="btn-revertir-cambios"
                     type="button"
+                    data-ayuda-id="btn-revertir-cambios"
                 >
                     Revertir
                 </button>
@@ -161,11 +168,21 @@ export function crearToolbar(alGuardar: () => Promise<void>): HTMLElement {
                 <button
                     class="btn-guardar-cambios"
                     type="button"
+                    data-ayuda-id="btn-guardar-cambios"
                 >
                     Guardar
                 </button>
 
             </div>
+
+            <button
+                class="btn-ayuda"
+                type="button"
+                title="Ayuda"
+                data-ayuda-id="boton_panel_ayuda"
+            >
+                <span>❔</span>
+            </button>
 
         </div>
 
@@ -331,6 +348,18 @@ export function crearToolbar(alGuardar: () => Promise<void>): HTMLElement {
 
   botonMenuLateral?.addEventListener("click", () => {
     alternarPanelLateral();
+  });
+
+  // ==================================================
+  // ❔ AYUDA
+  // ==================================================
+
+  const botonAyuda = toolbar.querySelector(
+    ".btn-ayuda",
+  ) as HTMLButtonElement | null;
+
+  botonAyuda?.addEventListener("click", () => {
+    alternarPanelAyuda();
   });
 
   // ==================================================

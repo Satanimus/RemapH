@@ -445,6 +445,55 @@ pub fn leer_modo_motor() -> Result<Option<String>, String> {
 }
 
 // ======================================================
+// ❔ PANEL DE AYUDA
+// ======================================================
+
+const CLAVE_AYUDA_ANCHO: &str = "ayuda.ancho";
+const CLAVE_AYUDA_VISIBLE: &str = "ayuda.visible";
+
+pub fn guardar_ancho_panel_ayuda(ancho: u32) -> Result<(), String> {
+    let mut mapa = leer_mapa_completo()?;
+
+    mapa.insert(CLAVE_AYUDA_ANCHO.to_string(), ancho.to_string());
+
+    escribir_mapa_completo(&mapa)
+}
+
+pub fn leer_ancho_panel_ayuda() -> Result<Option<u32>, String> {
+    let mapa = leer_mapa_completo()?;
+
+    Ok(mapa
+        .get(CLAVE_AYUDA_ANCHO)
+        .and_then(|valor| valor.trim().parse::<u32>().ok()))
+}
+
+pub fn guardar_visible_panel_ayuda(visible: bool) -> Result<(), String> {
+    let mut mapa = leer_mapa_completo()?;
+
+    mapa.insert(
+        CLAVE_AYUDA_VISIBLE.to_string(),
+        visible.to_string(),
+    );
+
+    escribir_mapa_completo(&mapa)
+}
+
+pub fn leer_visible_panel_ayuda() -> Result<Option<bool>, String> {
+    let mapa = leer_mapa_completo()?;
+
+    Ok(mapa
+        .get(CLAVE_AYUDA_VISIBLE)
+        .and_then(|valor| valor.trim().parse::<bool>().ok()))
+}
+
+pub fn primer_inicio() -> bool {
+    match ruta_archivo() {
+        Ok(ruta) => !ruta.exists(),
+        Err(_) => true,
+    }
+}
+
+// ======================================================
 // 🎨 ESTADO DE TEMA APLICADO (Etapa A)
 // ======================================================
 
