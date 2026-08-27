@@ -98,8 +98,15 @@
 //
 // tecla_guardar_coordenada()
 // establecer_tecla_guardar_coordenada()
-//     Tecla que la ventana de captura de "Click en coordenada"
-//     escucha para guardar la posición actual ("F1" por defecto).
+//     Atajo (AtajoSimple: modificadores + gatillo) que la ventana de
+//     captura de "Click en coordenada" escucha para guardar la
+//     posición actual (F1 sin modificadores, por defecto).
+//
+// tecla_toggle_perfil()
+// establecer_tecla_toggle_perfil()
+//     Atajo (AtajoSimple: modificadores + gatillo) global para
+//     Activar/Desactivar el perfil (Ctrl+F1 por defecto). Funciona
+//     con el perfil desactivado, cubre Interception y Modo Portable.
 //
 // intervalo_captura_coordenada()
 // establecer_intervalo_captura_coordenada()
@@ -196,6 +203,8 @@
 // ======================================================
 
 use std::sync::atomic::{AtomicU64, Ordering};
+
+use crate::eventos::InputId;
 
 // ======================================================
 // 📦 APP
@@ -387,29 +396,117 @@ pub fn establecer_tiempo_inactividad_captura(valor: u64) {
 }
 
 // ======================================================
-// 📌 TECLA GUARDAR COORDENADA (ventana de captura)
+// 🎹 ATAJO SIMPLE (modificadores + gatillo, sin condición)
 // ------------------------------------------------------
-// Código interno de tecla (mismo vocabulario que
-// pulsadores.tsv, ej. "F1") que la ventana de captura de
-// "Click en coordenada" escucha para guardar la posición
-// actual. Configurable, no fija — ver captura_coordenada.rs
-// (quien la usa) y comandos.rs (quien la expone a la UI).
+// Formato compartido por tecla_guardar_coordenada y
+// tecla_toggle_perfil: ambos deben funcionar con el perfil
+// desactivado, fuera del pipeline de AnalizadorTrigger/Cache
+// — quedan limitados a Simple (sin Doble/Triple/Mantenido),
+// así que no necesitan condicion, solo modificadores+gatillo.
+//
+// Texto plano: "mod1,mod2|gatillo" (cada entrada en formato
+// InputId "fuente:control", ej. "keyboard:F1"). Sin
+// modificadores: "|keyboard:F1".
 // ======================================================
 
-static TECLA_GUARDAR_COORDENADA: std::sync::Mutex<String> = std::sync::Mutex::new(String::new());
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct AtajoSimple {
+    pub modificadores: Vec<InputId>,
 
-pub fn tecla_guardar_coordenada() -> String {
-    let valor = TECLA_GUARDAR_COORDENADA.lock().unwrap();
+    pub gatillo: InputId,
+}
 
-    if valor.is_empty() {
-        "F1".to_string()
-    } else {
-        valor.clone()
+impl AtajoSimple {
+    pub fn a_texto(&self) -> String {
+        let mods = self
+            .modificadores
+            .iter()
+            .map(|input| input.to_string())
+            .collect::<Vec<_>>()
+            .join(",");
+
+        format!("{}|{}", mods, self.gatillo)
+    }
+
+    /// None si el texto no respeta el formato "mod,mod|gatillo"
+    /// (separador '|' ausente, o alguna entrada sin "fuente:control").
+    pub fn desde_texto(texto: &str) -> Option<Self> {
+        let (mods_texto, gatillo_texto) = texto.split_once('|')?;
+
+        let modificadores = mods_texto
+            .split(',')
+            .filter(|entrada| !entrada.is_empty())
+            .map(input_id_desde_texto)
+            .collect::<Option<Vec<_>>>()?;
+
+        let gatillo = input_id_desde_texto(gatillo_texto)?;
+
+        Some(Self {
+            modificadores,
+            gatillo,
+        })
     }
 }
 
-pub fn establecer_tecla_guardar_coordenada(valor: String) {
-    *TECLA_GUARDAR_COORDENADA.lock().unwrap() = valor;
+fn input_id_desde_texto(texto: &str) -> Option<InputId> {
+    let (fuente, control) = texto.split_once(':')?;
+
+    Some(InputId::new(fuente, control))
+}
+
+// ======================================================
+// 📌 TECLA GUARDAR COORDENADA (ventana de captura)
+// ------------------------------------------------------
+// Atajo (modificadores + gatillo, ver AtajoSimple) que la
+// ventana de captura de "Click en coordenada" escucha para
+// guardar la posición actual. Configurable, no fijo — ver
+// captura_coordenada.rs (quien la usa) y comandos.rs (quien
+// la expone a la UI).
+// ======================================================
+
+static TECLA_GUARDAR_COORDENADA: std::sync::Mutex<Option<AtajoSimple>> =
+    std::sync::Mutex::new(None);
+
+pub fn tecla_guardar_coordenada() -> AtajoSimple {
+    TECLA_GUARDAR_COORDENADA
+        .lock()
+        .unwrap()
+        .clone()
+        .unwrap_or_else(|| AtajoSimple {
+            modificadores: Vec::new(),
+            gatillo: InputId::new("keyboard", "F1"),
+        })
+}
+
+pub fn establecer_tecla_guardar_coordenada(valor: AtajoSimple) {
+    *TECLA_GUARDAR_COORDENADA.lock().unwrap() = Some(valor);
+}
+
+// ======================================================
+// 🎚️ TECLA TOGGLE PERFIL (Activar/Desactivar, atajo global)
+// ------------------------------------------------------
+// Atajo (modificadores + gatillo, ver AtajoSimple) que activa
+// o desactiva el perfil actual. Global: funciona con el
+// perfil desactivado y cubre Interception y Modo Portable —
+// ver entrada.rs (quien lo detecta) y comandos.rs (quien lo
+// expone a la UI).
+// ======================================================
+
+static TECLA_TOGGLE_PERFIL: std::sync::Mutex<Option<AtajoSimple>> = std::sync::Mutex::new(None);
+
+pub fn tecla_toggle_perfil() -> AtajoSimple {
+    TECLA_TOGGLE_PERFIL
+        .lock()
+        .unwrap()
+        .clone()
+        .unwrap_or_else(|| AtajoSimple {
+            modificadores: vec![InputId::new("keyboard", "LeftControl")],
+            gatillo: InputId::new("keyboard", "F1"),
+        })
+}
+
+pub fn establecer_tecla_toggle_perfil(valor: AtajoSimple) {
+    *TECLA_TOGGLE_PERFIL.lock().unwrap() = Some(valor);
 }
 
 // ======================================================

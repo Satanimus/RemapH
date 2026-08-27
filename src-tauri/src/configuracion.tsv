@@ -7,7 +7,9 @@
 #   config.rs sin el prefijo "establecer_" (ej. clave "tiempo_doble"
 #   -> config::tiempo_doble() / config::establecer_tiempo_doble()).
 # - tipo: "numero" (un solo entero), "numero_par" (dos enteros
-#   separados por coma, ej. "60,30" -> ancho,alto) o "texto" (string).
+#   separados por coma, ej. "60,30" -> ancho,alto), "texto" (string)
+#   o "trigger" (modificadores + gatillo, formato AtajoSimple de
+#   config.rs: "mod1,mod2|gatillo", ej. "keyboard:LeftControl|keyboard:F1").
 # - valor_defecto: mismo valor que el default en config.rs, en el
 #   mismo formato que "tipo" (par -> "ancho,alto").
 #
@@ -25,7 +27,8 @@ tiempo_repeticion	Intervalo de repetición Turbo (ms)	30	numero
 tiempo_espera_normal	Espera antes de repetir en Normal (ms)	500	numero
 tiempo_maximo_retenido	Tiempo máximo retenido, red de seguridad (ms)	5000	numero
 tiempo_inactividad_captura	Tiempo máximo de Captura, red de seguridad (ms)	10000	numero
-tecla_guardar_coordenada	Tecla para guardar coordenada capturada	F1	texto
+tecla_guardar_coordenada	Tecla para guardar coordenada capturada	|keyboard:F1	trigger
+tecla_toggle_perfil	Atajo para Activar/Desactivar el perfil	keyboard:LeftControl|keyboard:F1	trigger
 intervalo_captura_coordenada	Intervalo de refresco, ventana de captura (ms)	100	numero
 delay_entre_salida_doble	Pausa entre combos, Acción Doble (ms)	30	numero
 delay_rueda_repeticion	Pausa entre repeticiones de rueda (ms)	30	numero

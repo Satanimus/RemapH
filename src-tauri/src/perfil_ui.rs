@@ -577,6 +577,33 @@ pub fn convertir_trigger_captura(
 }
 
 // ======================================================
+// 🔄 ATAJOSIMPLE → UI
+// ------------------------------------------------------
+// Igual que TriggerCapturaUI, pero sin condicion — para los
+// atajos de config.rs (tecla_guardar_coordenada,
+// tecla_toggle_perfil), limitados a Simple.
+// ======================================================
+
+#[derive(Serialize)]
+pub struct AtajoCapturaUI {
+    pub modificadores: Vec<EntradaCapturaUI>,
+
+    pub gatillo: EntradaCapturaUI,
+}
+
+pub fn convertir_atajo_captura(atajo: &crate::config::AtajoSimple) -> AtajoCapturaUI {
+    AtajoCapturaUI {
+        modificadores: atajo
+            .modificadores
+            .iter()
+            .map(convertir_input_captura)
+            .collect(),
+
+        gatillo: convertir_input_captura(&atajo.gatillo),
+    }
+}
+
+// ======================================================
 // 🎯 CONDICIÓN → TEXTO (para la UI)
 // ------------------------------------------------------
 // Conversión explícita, en minúscula (coherente con el
@@ -594,6 +621,32 @@ fn condicion_a_texto(condicion: &crate::perfil_cache::CondicionTrigger) -> Strin
 
         crate::perfil_cache::CondicionTrigger::Mantenido => "mantenido".to_string(),
     }
+}
+
+// ======================================================
+// 🔒 COINCIDENCIA CON ATAJO RESERVADO
+// ------------------------------------------------------
+// Compara una captura (modificadores + gatillo) contra los
+// atajos reservados de config.rs (tecla_toggle_perfil,
+// tecla_guardar_coordenada). Sin importar el orden de los
+// modificadores.
+// ======================================================
+
+pub fn coincide_con_atajo_reservado(
+    modificadores: &[crate::eventos::InputId],
+    gatillo: &crate::eventos::InputId,
+) -> bool {
+    let coincide_con = |atajo: &crate::config::AtajoSimple| {
+        atajo.gatillo == *gatillo
+            && atajo.modificadores.len() == modificadores.len()
+            && atajo
+                .modificadores
+                .iter()
+                .all(|modificador| modificadores.contains(modificador))
+    };
+
+    coincide_con(&crate::config::tecla_toggle_perfil())
+        || coincide_con(&crate::config::tecla_guardar_coordenada())
 }
 
 // ======================================================

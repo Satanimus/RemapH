@@ -180,6 +180,7 @@ pub enum TipoValor {
     Numero,
     NumeroPar,
     Texto,
+    Trigger,
 }
 
 #[derive(Clone, Debug)]
@@ -256,6 +257,7 @@ pub fn cargar_catalogo() -> &'static Vec<EntradaCatalogo> {
                 "numero" => TipoValor::Numero,
                 "numero_par" => TipoValor::NumeroPar,
                 "texto" => TipoValor::Texto,
+                "trigger" => TipoValor::Trigger,
                 _ => panic!(
                     "❌ Tipo desconocido \"{}\" en configuracion.tsv. Línea {}",
                     tipo_texto,
@@ -555,6 +557,11 @@ fn parsear_numero_par(valor: &str) -> Result<(u64, u64), String> {
     Ok((ancho, alto))
 }
 
+pub fn parsear_trigger(valor: &str) -> Result<config::AtajoSimple, String> {
+    config::AtajoSimple::desde_texto(valor)
+        .ok_or_else(|| format!("Formato de atajo inválido: \"{}\"", valor))
+}
+
 // ======================================================
 // ⚙️ APLICAR VALOR (clave → setter de config.rs)
 // ------------------------------------------------------
@@ -587,13 +594,11 @@ pub fn aplicar_valor(clave: &str, valor: &str) -> Result<(), String> {
         }
 
         "tecla_guardar_coordenada" => {
-            let valor_limpio = valor.trim();
+            config::establecer_tecla_guardar_coordenada(parsear_trigger(valor)?);
+        }
 
-            if valor_limpio.is_empty() {
-                return Err("La tecla no puede estar vacía".to_string());
-            }
-
-            config::establecer_tecla_guardar_coordenada(valor_limpio.to_string());
+        "tecla_toggle_perfil" => {
+            config::establecer_tecla_toggle_perfil(parsear_trigger(valor)?);
         }
 
         "intervalo_captura_coordenada" => {
@@ -693,6 +698,8 @@ fn validar_segun_tipo(tipo: &TipoValor, valor: &str) -> Result<(), String> {
                 Ok(())
             }
         }
+
+        TipoValor::Trigger => parsear_trigger(valor).map(|_| ()),
     }
 }
 

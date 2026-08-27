@@ -143,7 +143,8 @@ use crate::macros;
 use crate::motor;
 use crate::perfil;
 use crate::perfil_ui::{
-    convertir_perfil, ItemFilaUI, ResultadoPerfil, ResultadoPerfilInicial, TriggerCapturaUI,
+    convertir_atajo_captura, convertir_perfil, AtajoCapturaUI, ItemFilaUI, ResultadoPerfil,
+    ResultadoPerfilInicial, TriggerCapturaUI,
 };
 use crate::pulsadores;
 use crate::usuario;
@@ -789,13 +790,19 @@ pub fn obtener_resultado_coordenada() -> Option<(f64, f64)> {
 }
 
 #[tauri::command]
-pub fn obtener_tecla_guardar_coordenada() -> String {
-    config::tecla_guardar_coordenada()
+pub fn obtener_tecla_guardar_coordenada() -> AtajoCapturaUI {
+    convertir_atajo_captura(&config::tecla_guardar_coordenada())
 }
 
 #[tauri::command]
-pub fn establecer_tecla_guardar_coordenada(valor: String) {
-    config::establecer_tecla_guardar_coordenada(valor)
+pub fn establecer_tecla_guardar_coordenada(valor: String) -> Result<(), String> {
+    // Sin uso desde el frontend hoy — se deja compilando.
+    let atajo = config::AtajoSimple::desde_texto(&valor)
+        .ok_or_else(|| format!("Formato de atajo inválido: \"{}\"", valor))?;
+
+    config::establecer_tecla_guardar_coordenada(atajo);
+
+    Ok(())
 }
 
 #[tauri::command]
@@ -1173,6 +1180,7 @@ fn tipo_configuracion_a_texto(tipo: &configuracion_usuario::TipoValor) -> String
         configuracion_usuario::TipoValor::Numero => "numero".to_string(),
         configuracion_usuario::TipoValor::NumeroPar => "numero_par".to_string(),
         configuracion_usuario::TipoValor::Texto => "texto".to_string(),
+        configuracion_usuario::TipoValor::Trigger => "trigger".to_string(),
     }
 }
 
