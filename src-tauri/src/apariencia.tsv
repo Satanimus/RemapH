@@ -62,8 +62,6 @@ nivel	id	nombre_ui	valor_defecto	tipo
 1	color-tema	Color de tema		
 2	highlight	Color de resaltado (UI)		
 0	highlight	Color	#03A9F4	color
-2	highlight-red	Color de resaltado (alerta)		
-0	highlight-red	Color	#C62828	color
 2	bg	Fondo base		
 0	bg	Color	#181818	color
 2	panel	Fondo de panel		
@@ -81,8 +79,6 @@ nivel	id	nombre_ui	valor_defecto	tipo
 0	overlay-tooltip	Color	#0f0f14	color
 2	overlay-contraste	Contraste (bordes/hover) en ventanas flotantes		
 0	overlay-contraste	Color	#ffffff	color
-2	green	Verde (éxito)		
-0	green	Color	#388E3C	color
 2	green-dark	Verde (estado activo)		
 0	green-dark	Color	#2E7D32	color
 2	red-dark	Rojo (estado activo)		

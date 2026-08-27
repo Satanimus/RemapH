@@ -104,6 +104,10 @@
   color: var(--text-highlight);
 }
 
+.configuracion-selector-tema:active {
+  transform: translateY(1px);
+}
+
 /* ======================================================
    CUERPO / PANELES
    ====================================================== */
@@ -518,9 +522,17 @@
   border-color: var(--highlight);
 }
 
+.configuracion-boton:active {
+  transform: translateY(1px);
+}
+
 .configuracion-boton:disabled {
   opacity: 0.5;
   cursor: default;
+}
+
+.configuracion-boton.oculto {
+  display: none;
 }
 
 .configuracion-boton-primario {
@@ -529,6 +541,10 @@
   color: var(--text-highdark);
   font-family: var(--font);
   font-weight: 600;
+}
+
+.configuracion-boton-primario:hover {
+  filter: brightness(1.1);
 }
 
 .configuracion-toast {

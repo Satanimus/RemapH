@@ -121,7 +121,13 @@ botonCarpetaUsuario.addEventListener("click", async () => {
   }
 });
 
-tabs.append(tabGeneral, tabApariencia, tabTeclas, tabAvanzado, botonCarpetaUsuario);
+tabs.append(
+  tabGeneral,
+  tabApariencia,
+  tabTeclas,
+  tabAvanzado,
+  botonCarpetaUsuario,
+);
 
 const cuerpo = document.createElement("div");
 cuerpo.className = "configuracion-cuerpo";
@@ -1320,8 +1326,30 @@ botonGuardarGlobal.addEventListener("click", async () => {
     window.alert(`No se pudo guardar: ${String(error)}`);
   } finally {
     botonGuardarGlobal.disabled = false;
+    actualizarVisibilidadGuardarGlobal();
   }
 });
+
+// ======================================================
+// 👁️ VISIBILIDAD DE "Aplicar cambios"
+// ------------------------------------------------------
+// Solo debe verse si hay algo pendiente en CUALQUIERA de las 4
+// pestañas (todas exponen hayEdicionesPendientes() como API pull,
+// no hay un evento de cambio centralizado) — se resuelve con un
+// polling liviano, mismo criterio que el intervalo de
+// vent_captura_main.ts.
+// ======================================================
+
+function actualizarVisibilidadGuardarGlobal(): void {
+  const hayCambios = TODAS_LAS_PESTANAS.some(([, pestana]) =>
+    pestana.hayEdicionesPendientes(),
+  );
+
+  botonGuardarGlobal.classList.toggle("oculto", !hayCambios);
+}
+
+setInterval(actualizarVisibilidadGuardarGlobal, 250);
+actualizarVisibilidadGuardarGlobal();
 
 // ======================================================
 // 🏁 INICIAR

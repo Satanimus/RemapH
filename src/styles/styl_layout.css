@@ -1042,17 +1042,34 @@
   text-align: left;
 }
 
+/* H12: hitbox invisible (8px, mismo footprint que antes: 4px +
+   2px de margen a cada lado) con una línea fina de 1px centrada
+   por ::before — mismo criterio que .divisor-columna en
+   styl_tabla.css. Antes el propio elemento de 4px de ancho +
+   border-radius se pintaba entero con --border-light, lo que se
+   veía como una barra gruesa (fácil de confundir con una barra de
+   scroll) en vez de una línea. */
 .popup-macro-col-resizer {
+  position: relative;
   flex: 0 0 auto;
-  width: 4px;
-  margin: 0 2px;
+  width: 8px;
   align-self: stretch;
   cursor: col-resize;
+}
+
+.popup-macro-col-resizer::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 0;
+  transform: translateX(-50%);
+  width: 1px;
+  height: 100%;
   border-radius: var(--r4);
   background: var(--border-light);
 }
 
-.popup-macro-col-resizer:hover {
+.popup-macro-col-resizer:hover::before {
   background: var(--highlight);
 }
 
@@ -1068,17 +1085,31 @@
   gap: var(--gap4);
   overflow-y: auto;
   padding: var(--gap4);
-  background: var(--bg);
+  background: transparent;
   border: 1px solid var(--border-light);
   border-radius: var(--r4);
 }
 
+/* Mismo fondo cebreado + hover que la tabla de la ventana principal
+   (Apariencia > Fondo de tabla) — antes fondo negro sólido heredado
+   de .popup-macro-editor-lista (var(--bg)). Cada .popup-macro-editor-paso
+   es una "fila", en orden secuencial dentro de la lista. */
 .popup-macro-editor-paso {
   display: flex;
   flex-direction: column;
   gap: var(--gap4);
   padding: var(--gap4);
   border-radius: var(--r4);
+  background: color-mix(in srgb, var(--tabla-fondo-color-impar) var(--tabla-fondo-opacidad), transparent);
+  transition: background var(--speed);
+}
+
+.popup-macro-editor-paso:nth-child(even) {
+  background: color-mix(in srgb, var(--tabla-fondo-color-par) var(--tabla-fondo-opacidad), transparent);
+}
+
+.popup-macro-editor-paso:hover {
+  background: color-mix(in srgb, var(--tabla-fondo-color-hover) var(--tabla-fondo-opacidad-hover), transparent);
 }
 
 .popup-macro-editor-paso-fila {
