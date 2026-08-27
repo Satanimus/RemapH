@@ -104,6 +104,8 @@ export function abrirPopupExtraPortapapeles(
 
   popup.className = "popup-extra";
 
+  popup.dataset.ayudaId = "popup-extra-portapapeles";
+
   const redibujar = () =>
     abrirPopupExtraPortapapeles(evento, contexto, filaPerfil, alModificar);
 

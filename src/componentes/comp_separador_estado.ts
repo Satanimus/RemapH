@@ -58,6 +58,8 @@ export function crearEstadoSeparador(
 
   boton.className = "ui-btn estado-toggle";
 
+  boton.dataset.ayudaId = "estado-toggle";
+
   const hayAlerta = tramoTieneAlerta(separador);
   const esMixto = !hayAlerta && separador.estadoVisual === "mixto";
 

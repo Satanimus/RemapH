@@ -59,11 +59,13 @@ export function crearTabla(alModificar: () => void): HTMLElement {
   cabecera.className = "cabecera";
 
   const IDS_AYUDA_COLUMNA: Record<string, string> = {
-    trigger: "trigger",
-    accion: "accion",
     opciones: "opciones",
-    extra: "extra",
+    app: "app-columna",
+    trigger: "trigger",
     tipo: "tipo-fila",
+    accion: "accion",
+    extra: "extra",
+    nota: "nota-columna",
   };
 
   COLUMNAS.forEach((col) => {
@@ -78,6 +80,8 @@ export function crearTabla(alModificar: () => void): HTMLElement {
     celda.style.flexBasis = col.ancho;
 
     celda.textContent = col.titulo;
+
+    celda.title = col.titulo;
 
     const idAyuda = IDS_AYUDA_COLUMNA[col.id];
 

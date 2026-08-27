@@ -103,6 +103,8 @@ export function abrirPopupAccionMultimedia(
 
   popup.className = "popup-extra";
 
+  popup.dataset.ayudaId = "popup-accion-multimedia";
+
   // Cast: accionReferencia puede ser null (todavía no se eligió
   // nada) pero crearGrupoOpciones pide T sin null — con null ningún
   // botón queda marcado como activo, que es el comportamiento

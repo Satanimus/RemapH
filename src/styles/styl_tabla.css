@@ -20,7 +20,13 @@
 
     height: 100%;
 
-    padding-right: 20px;
+    /* Reserva justa para el scrollbar real (10px, ver
+       ::-webkit-scrollbar en styl_general.css) — antes eran 20px
+       fijos, el doble de lo necesario, que además quedaban sin
+       ningún fondo de fila pintado encima (se veían como un
+       hueco vacío al hacer scroll horizontal en ventanas
+       angostas). */
+    padding-right: 10px;
 
     box-sizing: border-box;
 
@@ -219,7 +225,16 @@
 
     align-items: center;
 
-    width: 100%;
+    /* calc, no 100%: el margin-right de respiro (ver abajo) debe
+       restarse del ancho, no sumarse afuera — con solo 100% el
+       elemento terminaba igual de ancho + el margin, empujando
+       el borde de color otra vez hasta el límite real (el mismo
+       bug, solo que ahora por overflow en vez de por padding). */
+    width: calc(100% - var(--gap8));
+
+    margin-right: var(--gap8);
+
+    box-sizing: border-box;
 }
 
 .cabecera {
@@ -361,7 +376,9 @@
 
     align-items: center;
 
-    width: 100%;
+    width: calc(100% - var(--gap8));
+
+    margin-right: var(--gap8);
 
     height: var(--row-height);
 
@@ -441,28 +458,6 @@
 }
 
 .celda.nota-separador .nota {
-
-    font-size: var(--fs13);
-}
-
-/* Etapa E: Nota de una fila dentro de un separador no lleva el
-   tinte de separador (recortado a Opciones→Extra) — se separa
-   visualmente del cuerpo teñido, leyéndose como nota al margen,
-   igual criterio que .celda.nota-separador del header. */
-/* [FIX] tenía un border-left fijo en var(--border-light) que se
-   veía como línea gris entre Extra y Nota en TODAS las filas de
-   un separador (con o sin color) — no dependía de en-separador-fin
-   ni de en-separador-borde-fin, por eso ningún fix anterior lo
-   tocaba. Se saca el borde: la nota queda sin borde propio, solo
-   se distingue del cuerpo teñido por no llevar el tinte de
-   separador (ver comentario arriba de .celda.nota-separador).
-   Antes llevaba cursiva como marca visual adicional, pero se
-   sacó: deformaba los emoji que el usuario escribe en la nota.
-   La clase .celda.nota-en-fila-separador se sigue asignando desde
-   TS como marcador (usada por el selector de abajo), aunque ya no
-   tenga estilos propios acá. */
-
-.celda.nota-en-fila-separador .nota {
 
     font-size: var(--fs13);
 }

@@ -560,6 +560,8 @@ function montarEditor(
 
     barra.className = "popup-macro-barra";
 
+    barra.dataset.ayudaId = "macro-editor-barra-titulo";
+
     if (renombrando) {
       const input = document.createElement("input");
 
@@ -679,6 +681,8 @@ function montarEditor(
     const pie = document.createElement("div");
 
     pie.className = "popup-macro-editor-pie";
+
+    pie.dataset.ayudaId = "macro-editor-pie-botones";
 
     const botonCancelar = crearBoton({ texto: "Cancelar" });
 
@@ -959,6 +963,8 @@ function montarEditor(
     const columnaDerecha = document.createElement("div");
 
     columnaDerecha.className = "popup-macro-editor-columna-derecha";
+
+    columnaDerecha.dataset.ayudaId = "macro-editor-lista-pasos";
 
     // Anchos iniciales de columna como variables CSS en el contenedor
     // del editor (spec F3) — los resizers del encabezado (F2) y las
@@ -1965,6 +1971,8 @@ function crearPanelFunciones(
   const panel = document.createElement("div");
 
   panel.className = "popup-macro-funciones";
+
+  panel.dataset.ayudaId = "macro-editor-panel-funciones";
 
   const subtitulo = document.createElement("span");
 

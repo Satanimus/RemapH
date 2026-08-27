@@ -64,6 +64,54 @@ const cacheDotsPorToolbar = new WeakMap<HTMLElement, HTMLElement>();
 const nombresPorToolbar = new WeakMap<HTMLElement, HTMLElement>();
 
 // ======================================================
+// 🎚️ TOOLTIP ATAJO GLOBAL (perfil-estado)
+// ------------------------------------------------------
+// "Atajo global: Ctrl+F1" — se arma con el atajo guardado
+// (obtener_tecla_toggle_perfil), nunca un texto fijo, para que
+// si el usuario lo cambia en Configuración el tooltip lo
+// refleje. Se consulta al crear la toolbar y de nuevo cada vez
+// que la ventana recupera foco (por si se editó desde la
+// ventana de Configuración mientras tanto).
+// ======================================================
+
+interface EntradaAtajoUI {
+  nombre: string;
+}
+
+interface AtajoTogglePerfilUI {
+  modificadores: EntradaAtajoUI[];
+
+  gatillo: EntradaAtajoUI;
+}
+
+async function actualizarTooltipAtajoToggle(
+  toolbar: HTMLElement,
+): Promise<void> {
+  const botonEstado = toolbar.querySelector(
+    ".perfil-estado",
+  ) as HTMLButtonElement | null;
+
+  if (!botonEstado) {
+    return;
+  }
+
+  try {
+    const atajo = await invoke<AtajoTogglePerfilUI>(
+      "obtener_tecla_toggle_perfil",
+    );
+
+    const nombres = [
+      ...atajo.modificadores.map((entrada) => entrada.nombre),
+      atajo.gatillo.nombre,
+    ];
+
+    botonEstado.title = `Atajo global: ${nombres.join("+")}`;
+  } catch (error) {
+    console.error("❌ No se pudo obtener el atajo global del perfil:", error);
+  }
+}
+
+// ======================================================
 // 🎚️ POLLING ESTADO PERFIL (atajo global toggle)
 // ------------------------------------------------------
 // obtener_estado_cache no empuja eventos (mismo motivo que
@@ -211,6 +259,12 @@ export function crearToolbar(alGuardar: () => Promise<void>): HTMLElement {
   ) as HTMLButtonElement | null;
 
   botonEstadoInicial?.append(nombrePerfil, textoEstado);
+
+  actualizarTooltipAtajoToggle(toolbar);
+
+  window.addEventListener("focus", () => {
+    actualizarTooltipAtajoToggle(toolbar);
+  });
 
   // ==================================================
   // 📄 PERFIL ACTUAL

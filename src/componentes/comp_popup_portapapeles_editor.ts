@@ -37,6 +37,8 @@ export function abrirEditorPortapapeles(
 
   popup.className = "popup-extra popup-portapapeles-editor";
 
+  popup.dataset.ayudaId = "portapapeles-editor";
+
   const inputNombre = document.createElement("input");
 
   inputNombre.type = "text";

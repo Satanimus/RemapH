@@ -57,11 +57,10 @@ export function crearFila(
 
     celda.style.flexBasis = col.ancho;
 
-    // Etapa E: el tinte de separador (fondo + bordes) ya no cubre
-    // la fila completa — se acota a las celdas Opciones→Extra
-    // (Nota queda fuera, con estilo de nota al margen). Se aplica
-    // por celda en vez de en el contenedor .fila.
-    if (infoSeparador && col.id !== "nota") {
+    // El tinte de separador (fondo + bordes) cubre toda la fila,
+    // incluida Nota, para que el marco quede parejo de punta a
+    // punta en vez de sentirse cargado a la izquierda.
+    if (infoSeparador) {
       celda.style.setProperty(
         "--separador-color",
         infoSeparador.color
@@ -78,8 +77,9 @@ export function crearFila(
       // "en-separador-fin" da la esquina redondeada del lado
       // derecho y el borde de acento (color real, o border-light
       // como fallback si no tiene color — igual que en-separador-
-      // inicio del otro lado).
-      if (col.id === "extra") {
+      // inicio del otro lado). Ahora cae en Nota, la última
+      // columna de la fila.
+      if (col.id === "nota") {
         celda.classList.add("en-separador-fin");
       }
 
@@ -90,10 +90,6 @@ export function crearFila(
       if (infoSeparador.ultima) {
         celda.classList.add("ultima-del-separador");
       }
-    }
-
-    if (infoSeparador && col.id === "nota") {
-      celda.classList.add("nota-en-fila-separador");
     }
 
     switch (col.id) {

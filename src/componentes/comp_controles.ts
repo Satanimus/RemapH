@@ -92,6 +92,8 @@ export function crearEstado(
 
   boton.title = "On/Off";
 
+  boton.dataset.ayudaId = "estado-toggle";
+
   // Mismo aviso "OFF ⚠️" para dos motivos distintos: conflicto entre
   // filas (recalculado en vivo, ver core_conflictos.ts) o advertencia
   // de la última compilación (ej. ruta de "abrir" que ya no existe,

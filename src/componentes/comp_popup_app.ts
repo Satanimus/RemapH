@@ -365,6 +365,8 @@ export async function abrirPopupApp(
 
   popup.className = "app-popup";
 
+  popup.dataset.ayudaId = "popup-app";
+
   const redibujar = (filtro: FiltroListado) =>
     abrirPopupApp(evento, contexto, filaPerfil, alModificar, filtro);
 

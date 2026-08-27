@@ -2,12 +2,15 @@
 // ❔📝 util_Texto_Ayuda
 // ------------------------------------------------------
 // Parser de las marcas de formato del contenido de ayuda.txt
-// (Regla 9): **negrita**, *cursiva*, `código`, [cyan:texto],
-// [red:texto] — sin HTML, todo armado vía DOM.
+// (Regla 9): **negrita**, *cursiva*, `código`, [color:texto]
+// (cyan, red, orange, yellow, green, blue, purple, pink, gray)
+// — sin HTML, todo armado vía DOM. Las marcas [color:...] son
+// recursivas: **negrita**/*cursiva*/`código` dentro de un color
+// se combinan (ej. [green:*Activo*] queda verde + cursiva).
 // ======================================================
 
-const REGEX_MARCAS =
-  /\*\*(.+?)\*\*|\*(.+?)\*|`(.+?)`|\[cyan:(.+?)\]|\[red:(.+?)\]/g;
+const PATRON_MARCAS =
+  /\*\*(.+?)\*\*|\*(.+?)\*|`(.+?)`|\[cyan:(.+?)\]|\[red:(.+?)\]|\[(orange|yellow|green|blue|purple|pink|gray):(.+?)\]/g;
 
 export function parsearLineaAyuda(linea: string): Node[] {
   const nodos: Node[] = [];
@@ -16,16 +19,22 @@ export function parsearLineaAyuda(linea: string): Node[] {
 
   let coincidencia: RegExpExecArray | null;
 
-  REGEX_MARCAS.lastIndex = 0;
+  // Instancia propia por llamada: al ser recursiva (marcas de
+  // color anidan negrita/cursiva/código), un regex /g compartido
+  // a nivel de módulo se pisa entre la llamada externa y la
+  // interna (comparten lastIndex), lo que podía dejar el `while`
+  // externo sin avanzar nunca — congelando la interfaz.
+  const regex = new RegExp(PATRON_MARCAS.source, "g");
 
-  while ((coincidencia = REGEX_MARCAS.exec(linea)) !== null) {
+  while ((coincidencia = regex.exec(linea)) !== null) {
     if (coincidencia.index > ultimoIndice) {
       nodos.push(
         document.createTextNode(linea.slice(ultimoIndice, coincidencia.index)),
       );
     }
 
-    const [, negrita, cursiva, codigo, cyan, red] = coincidencia;
+    const [, negrita, cursiva, codigo, cyan, red, colorNombre, colorTexto] =
+      coincidencia;
 
     if (negrita !== undefined) {
       const elemento = document.createElement("strong");
@@ -50,7 +59,7 @@ export function parsearLineaAyuda(linea: string): Node[] {
 
       elemento.className = "ayuda-cyan";
 
-      elemento.textContent = cyan;
+      elemento.append(...parsearLineaAyuda(cyan));
 
       nodos.push(elemento);
     } else if (red !== undefined) {
@@ -58,12 +67,20 @@ export function parsearLineaAyuda(linea: string): Node[] {
 
       elemento.className = "ayuda-red";
 
-      elemento.textContent = red;
+      elemento.append(...parsearLineaAyuda(red));
+
+      nodos.push(elemento);
+    } else if (colorNombre !== undefined) {
+      const elemento = document.createElement("span");
+
+      elemento.className = `ayuda-${colorNombre}`;
+
+      elemento.append(...parsearLineaAyuda(colorTexto));
 
       nodos.push(elemento);
     }
 
-    ultimoIndice = REGEX_MARCAS.lastIndex;
+    ultimoIndice = regex.lastIndex;
   }
 
   if (ultimoIndice < linea.length) {

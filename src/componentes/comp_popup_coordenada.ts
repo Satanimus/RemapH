@@ -349,6 +349,8 @@ export function abrirPopupExtraTeclaMouse(
 
   popup.className = "popup-extra";
 
+  popup.dataset.ayudaId = "popup-extra-tecla-mouse";
+
   const redibujar = () =>
     abrirPopupExtraTeclaMouse(evento, contexto, filaPerfil, alModificar);
 

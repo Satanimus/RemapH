@@ -1,70 +1,319 @@
 ## boton_panel_ayuda
+
+**¡Bienvenido a RemapH!**
+
+Ahora podrás transformar cualquier tecla o click en lo que necesites: cosas simples como en otro atajo o comando multimedia, un muy útil menu radial universal y hasta macros complejas de automatización. 
+
+Todo se organiza por perfiles y filtros para personalizar tus programas favoritos.
+
+Sólo tienes que configurar tus filas en la tabla central.
+
+---
+
 **Ayuda**
 
-Bienvenida
+Pasa el mouse sobre cualquier botón o control y va a aparecer acá una explicación de qué hace.
 
-¡Bienvenido a RemapH! Este panel te acompaña mientras usás el programa: pasá el mouse sobre cualquier botón o control y, tras un par de segundos, va a aparecer acá una explicación de qué hace.
+Podés abrir o cerrar el panel con `❔`.
 
-Podés abrir o cerrar este panel en cualquier momento con el botón `❔`, y ajustar su ancho arrastrando el borde izquierdo.
+## btn-agregar-fila, btn-agregar-separador
+**+ Fila**
 
-Si en algún momento el panel te queda molestando, lo cerrás y no se vuelve a abrir solo — salvo que reinstales el programa.
+Agrega una fila nueva y vacía al perfil actual.
 
-## btn-agregar-fila
-**Barra superior**
+Se ubica al final de la tabla (o del último separador, si hay uno).
 
-+ Fila
+Cada fila es una instrucción completa que configuras. Bien simplificado es:
+"Cuando ejecute este [cyan:Disparador] quiero ocurra esta [red:Acción]". 
 
-Agrega una fila nueva y vacía al perfil actual, al final de la tabla (o del último separador, si hay uno). Desde ahí se define su [red:Trigger] y su [cyan:Acción].
+---
 
-## btn-agregar-separador
-**Barra superior**
+**+ Separador**
 
-+ Separador
+Agrega un separador a la tabla.
 
-Agrega un separador a la tabla: sirve para agrupar filas relacionadas bajo un título propio, y se puede contraer o expandir con un click.
+Es como un separador de hojas de un libro. Sirve para agrupar filas relacionadas bajo un título propio.
+
+Se puede contraer o expandir con un click.
 
 ## perfil-estado
-**Barra superior**
+**Perfil Activo / Inactivo**
 
-Perfil Activo / Perfil inactivo
+Activa o desactiva el perfil actual.
 
-Activa o desactiva el perfil actual. Con el perfil *activo*, sus remapeos funcionan de verdad sobre el teclado y el mouse; con el perfil *inactivo*, no se aplica ninguno (Windows recibe todo tal cual).
+[green:**Activo**] — sus remapeos funcionan de verdad sobre el teclado y el mouse.
+
+[red:**Inactivo**] — no se aplica ninguno, Windows recibe todo tal cual.
 
 También se puede alternar con el atajo global configurable en Configuración > General (por defecto `Ctrl+F1`), sin importar qué ventana esté en foco.
 
 ## btn-guardar-cambios, btn-revertir-cambios
-**Barra superior**
+**Cambios en perfil**
 
-Cambios en perfil
+Aparece cuando editás la tabla.
 
-Cuando editás la tabla aparece este aviso. `Guardar` escribe los cambios a disco y recompila el perfil (si estaba activo, los nuevos remapeos entran en vigencia al instante). `Revertir` descarta lo editado y vuelve a mostrar el perfil tal como está guardado en disco.
+`Guardar`
+Escribe los cambios a disco y recompila el perfil. Si estaba activo, los nuevos remapeos entran en vigencia al instante.
+
+`Revertir`
+Descarta lo editado y vuelve a mostrar el perfil tal como está guardado en disco.
 
 ## btn-menu-lateral, panel-lateral-lista, panel-lateral-item, botonNuevo, botonClonar, botonRenombrar, panel-lateral-eliminar
-**Panel lateral**
+**Perfiles**
 
-Perfiles
+Este panel (botón `☰`) lista todos los perfiles guardados.
 
-Este panel (botón `☰`) lista todos los perfiles guardados. Click en uno para pasar a usarlo. Desde acá también se crean perfiles nuevos (`Nuevo`), se duplica el actual (`Clonar`), se le cambia el nombre (`Renombrar`) o se lo borra (`Eliminar perfil` — pide confirmación antes de aplicarse).
+Click en uno para pasar a usarlo.
+
+`Nuevo`
+Crea un perfil vacío.
+
+`Clonar`
+Duplica el perfil actual.
+
+`Renombrar`
+Le cambia el nombre.
+
+`Eliminar perfil`
+Lo borra — pide confirmación antes de aplicarse.
 
 Si el perfil actual tiene cambios sin guardar, cualquiera de estas acciones te pregunta antes si querés guardarlos.
 
 ## panel-lateral-configuracion
-**Panel lateral**
+**Configuración**
 
-Configuración
+Abre la ventana de Configuración.
 
-Abre la ventana de Configuración: ahí se ajustan las opciones generales del programa (atajos globales, apariencia, dispositivos, modo del motor de entrada, etc.), separadas del contenido de los perfiles.
+Ahí se ajustan las opciones generales del programa: atajos globales, apariencia, dispositivos, modo del motor de entrada, etc. — separadas del contenido de los perfiles.
 
 ## trigger, accion, opciones, extra
-**Tabla de remapeos**
+**Columnas de la tabla**
 
-Columnas
+`Trigger`
+Qué combinación de teclas o clicks dispara la fila.
 
-`Trigger` define qué combinación de teclas o clicks dispara la fila. `Acción` define qué hace RemapH cuando eso ocurre. `Opciones` agrupa configuraciones puntuales de esa fila (temporización, condiciones, etc.). `Extra` (`∴`) muestra información adicional de la fila al pasar el mouse.
+`Acción`
+Qué hace RemapH cuando eso ocurre.
+
+`Opciones`
+Configuraciones puntuales de esa fila (temporización, condiciones, etc.).
+
+`Extra` (`∴`)
+Información adicional de la fila al pasar el mouse.
+
+## app-columna
+**Columna App**
+
+Restringe la fila a una sola aplicación.
+
+Mientras esa app no esté en primer plano, el Trigger de esa fila no hace nada.
+
+Vacía, la fila funciona en cualquier ventana.
+
+## nota-columna
+**Columna Nota**
+
+Campo de texto libre.
+
+Sin efecto en el funcionamiento de la fila — solo para dejarte un recordatorio o comentario propio.
 
 ## tipo-fila, selector-tipo
-**Tabla de remapeos**
+**Tipos de fila**
 
-Tipos de fila
+Cada fila tiene un tipo, que define qué clase de acción ejecuta.
 
-Cada fila tiene un tipo, que define qué clase de acción ejecuta: `Macro` (secuencia de pasos), `Extra` (Normal/Turbo/Mantener/Click sostenido), `Portapapeles` (pega un texto guardado), `Click en coordenada` (clickea una posición fija de la pantalla), entre otros. El tipo se elige desde el selector de la columna `Acción` de esa fila.
+🔠 `Teclado - Mouse`
+Repite, mantiene o combina un trigger de tecla/mouse — con opción de click en coordenada.
+
+🎵 `Multimedia`
+Dispara un comando multimedia (volumen, reproducción, etc.).
+
+⚡ `MenuExpress`
+Abre un menú propio con botones de otras filas.
+
+🧩 `Macro`
+Ejecuta una secuencia de pasos.
+
+📋 `Portapapeles`
+Pega un texto guardado.
+
+📂 `Abrir Archivo/App`
+Abre un archivo, carpeta o programa.
+
+El tipo se elige desde el selector de la columna `Acción` de esa fila.
+
+## estado-toggle
+**On / Off**
+
+Prende o apaga esta fila (o, si es un separador, todo su tramo de filas) sin borrarla.
+
+Con [red:⨉] la fila queda inactiva: no dispara nada aunque el perfil esté activo.
+
+Si ves [red:⚠️] en vez del ícono, la fila está apagada automáticamente por un conflicto con otra fila o por un aviso de la última compilación — el motivo puntual se explica en la barra de estado, abajo de la ventana.
+
+## popup-extra-abrir
+📂 **Extra — Abrir Archivo/App**
+
+`Iniciar`
+Cómo arranca la ventana: normal, minimizada o maximizada.
+
+`Instancias`
+`Múltiple` permite abrir varias copias a la vez. `Única` hace que un click adicional solo enfoque la ya abierta.
+
+`Abrir con`
+Programa alternativo para abrir el archivo, en vez del asociado por Windows — solo aparece cuando la ruta no es un `.exe`.
+
+`Argumento`
+Línea de comandos, en vez de `Abrir con`, cuando la ruta sí es un ejecutable.
+
+## popup-extra-macro
+🧩 **Extra — Macro**
+
+`Comportamiento` define cómo se dispara la secuencia al presionar el Trigger:
+
+`Una ejecución`
+Corre la macro entera una vez por cada pulsación.
+
+`Toggle`
+La inicia con una pulsación y la corta con la siguiente.
+
+`Tecla mantenida`
+La repite en bucle mientras el Trigger sigue presionado.
+
+## popup-extra-multimedia
+🎵 **Extra — Multimedia**
+
+Ajustes propios de la acción multimedia elegida (volumen, reproducción, etc.), según el tipo de control multimedia que tenga esta fila.
+
+## popup-extra-menu-express
+⚡ **Extra — Menú Express**
+
+Configura cómo se ve y se comporta el Menú Express que abre esta fila: forma del menú y demás ajustes visuales/funcionales propios de ese menú.
+
+## popup-extra-portapapeles
+📋 **Extra — Portapapeles**
+
+Ajustes de cómo se pega el contenido guardado en el portapapeles de esta fila: modo de pegado, formato, etc.
+
+## macro-editor-barra-titulo
+🧩 **Editor de Macro — Barra de título**
+
+Muestra el nombre de la macro.
+
+`[...]`
+Renombra sin salir del editor.
+
+Arrastrando esta barra se mueve toda la ventana del editor por la pantalla.
+
+## macro-editor-panel-funciones
+🧩 **Editor de Macro — Funciones**
+
+Lista los tipos de paso disponibles:
+
+`Tecla/Mouse` · `Espera` · `Bucle` · `Coordenada` · `Pegar` · `Abrir` · `Multimedia`
+
+Click en alguno agrega un paso nuevo de ese tipo al final de la secuencia.
+
+## macro-editor-lista-pasos
+🧩 **Editor de Macro — Pasos**
+
+Cada fila es un paso de la secuencia, en el orden en que se van a ejecutar.
+
+Se pueden reordenar arrastrando.
+Se pueden expandir para editar su detalle.
+El ancho de sus columnas se ajusta arrastrando el encabezado.
+
+## macro-editor-pie-botones
+🧩 **Editor de Macro — Cancelar / Guardar**
+
+`Cancelar`
+Cierra el editor sin aplicar los cambios hechos en esta sesión.
+
+`Guardar` (o `Guardar como`)
+Confirma la secuencia de pasos y la deja lista para usarse en esta fila.
+
+## popup-extra-tecla-mouse
+🔠 **Extra — Tecla/Mouse**
+
+`Repetición`
+
+`Normal`
+El Trigger dispara una sola vez.
+
+`Turbo`
+Se repite mientras se mantiene presionado.
+
+`Repetición`
+Modo especial de rueda.
+
+`Coordenada`
+Agrega un click en una posición fija de la pantalla. Activado, se puede elegir en relación a qué (posición absoluta, cursor o ventana), en qué unidad se mide, y si el click ocurre al iniciar o al finalizar el gatillo.
+
+`📌 Capturar Coordenada`
+Abre una ventana para marcar el punto en pantalla.
+
+## popup-opciones-fila
+**Opciones (⁝)**
+
+`Color`
+Tinte identificatorio para la fila o el separador — y las filas que contiene, si es un separador.
+
+`Clonar`
+Duplica la fila/separador tal cual.
+
+`Mover`
+Activa el modo de reubicación con el teclado.
+
+`Eliminar`
+Borra la fila o el separador. En un separador, además pregunta si eliminar también las filas que contiene o solo desarmar el agrupamiento.
+
+## popup-app
+**Restringir a una aplicación**
+
+Limita esta fila para que solo actúe cuando la aplicación en primer plano sea la elegida acá — en cualquier otra ventana, el Trigger no hace nada.
+
+El interruptor de arriba prende o apaga ese filtro.
+
+La lista muestra los programas abiertos (`Principales`) o todos los detectados (`Otros`).
+
+## popup-macro-accion
+🧩 **Acción — Macro**
+
+`Nueva`
+Crea una macro vacía y abre directo su editor.
+
+`Editar`
+Abre el editor de la macro ya asignada a esta fila.
+
+`Abrir`
+Despliega el listado de macros guardadas para asignar una existente.
+
+`Eliminar`
+Borra la macro asignada a esta fila — no afecta a otras filas que la usen.
+
+## menu-express-editor
+⚡ **Acción — Menú Express**
+
+El nombre de arriba es el título del menú.
+
+`Botones Seleccionado`
+Filas ya agregadas a este menú, cada una con un nombre personalizado editable — quitalas con su botón de eliminar.
+
+`Botones Disponibles`
+Resto de las filas del perfil, listas para agregarse con un click.
+
+## portapapeles-editor
+📋 **Acción — Portapapeles**
+
+`Nombre de la ventana`
+Título que va a mostrar la ventana de Portapapeles cuando se abra desde esta fila.
+
+Se guarda solo, sin botón de confirmar.
+
+## popup-accion-multimedia
+🎵 **Acción — Multimedia**
+
+`Comando multimedia`
+Elegí qué control dispara esta fila: volumen, reproducción u otro de los comandos listados.
+
+Cada categoría agrupa las acciones relacionadas.

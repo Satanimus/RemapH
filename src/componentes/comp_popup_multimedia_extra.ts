@@ -66,6 +66,8 @@ export function abrirPopupExtraMultimedia(
 
   popup.className = "popup-extra";
 
+  popup.dataset.ayudaId = "popup-extra-multimedia";
+
   const redibujar = () =>
     abrirPopupExtraMultimedia(evento, contexto, filaPerfil, alModificar);
 

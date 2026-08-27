@@ -188,6 +188,8 @@ export function abrirEditorMenuExpress(
 
   popup.className = "popup-extra popup-menu-editor";
 
+  popup.dataset.ayudaId = "menu-express-editor";
+
   // ----------------------------------
   // ✏️ NOMBRE DEL MENÚ
   // ----------------------------------

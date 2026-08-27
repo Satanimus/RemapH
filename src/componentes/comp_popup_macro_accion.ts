@@ -66,6 +66,8 @@ export function abrirPopupMacroAccion(
 
     contenedor.className = "popup-perfil";
 
+    contenedor.dataset.ayudaId = "popup-macro-accion";
+
     contenedor.append(
       crearMenuPrincipal(
         filaPerfil,

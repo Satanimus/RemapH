@@ -78,6 +78,8 @@ export async function abrirPopupExtraAbrir(
 
     popup.className = "popup-extra";
 
+    popup.dataset.ayudaId = "popup-extra-abrir";
+
     // ----------------------------------
     // INICIAR
     // ----------------------------------

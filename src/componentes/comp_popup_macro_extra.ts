@@ -44,6 +44,8 @@ export function abrirPopupExtraMacro(
 
     popup.className = "popup-extra";
 
+    popup.dataset.ayudaId = "popup-extra-macro";
+
     const opciones: { texto: string; valor: ComportamientoMacro }[] = [
       { texto: "Una ejecución", valor: "una_ejecucion" },
       { texto: "Toggle", valor: "toggle" },

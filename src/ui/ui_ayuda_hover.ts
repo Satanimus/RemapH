@@ -13,7 +13,7 @@ import { mostrarContenidoAyuda } from "../componentes/comp_panel_ayuda";
 
 export const ATRIBUTO_AYUDA_ID = "data-ayuda-id";
 
-const DEBOUNCE_AYUDA_MS = 2000;
+const DEBOUNCE_AYUDA_MS = 500;
 
 let idActual: string | null = null;
 let temporizador: ReturnType<typeof setTimeout> | null = null;
@@ -44,6 +44,8 @@ export function activarHoverAyuda(): void {
 
     temporizador = setTimeout(() => {
       temporizador = null;
+
+      console.log("🛈 ayuda id_objeto:", idObjeto);
 
       invoke<string | null>("obtener_ayuda", { idObjeto })
         .then((contenido) => {

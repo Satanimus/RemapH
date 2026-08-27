@@ -447,6 +447,8 @@ export function abrirPopupOpciones(
 
     lista.className = "popup-lista";
 
+    lista.dataset.ayudaId = "popup-opciones-fila";
+
     // ----------------------------------
     // 🎨 COLOR (se expande en una caja interna)
     // ----------------------------------

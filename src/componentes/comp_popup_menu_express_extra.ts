@@ -233,6 +233,8 @@ export function abrirPopupExtraMenuExpress(
 
   popup.className = "popup-extra";
 
+  popup.dataset.ayudaId = "popup-extra-menu-express";
+
   const redibujar = () =>
     abrirPopupExtraMenuExpress(evento, contexto, filaPerfil, alModificar);
 

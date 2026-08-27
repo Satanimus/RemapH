@@ -85,12 +85,76 @@
     min-height: 1em;
 }
 
-.ayuda-cyan {
+.panel-ayuda-cuerpo strong {
+    color: var(--tag-cyan);
+
+    font-size: 1.05em;
+
+    letter-spacing: 0.02em;
+}
+
+.panel-ayuda-cuerpo em {
+    color: color-mix(in srgb, var(--text) 65%, transparent);
+
+    font-style: italic;
+}
+
+/* Las marcas [color:texto] son recursivas (ver
+   util_texto_ayuda.ts): pueden contener **negrita** 
+*cursiva* adentro. Estas reglas ganan por especificidad sobre .panel-ayuda-cuerpo strong/em de arriba,
+para que el color explícito del autor no quede tapado por el cyan/gris default de negrita/cursiva. */ 
+.panel-ayuda-cuerpo .ayuda-cyan,
+.panel-ayuda-cuerpo .ayuda-cyan strong,
+.panel-ayuda-cuerpo .ayuda-cyan em {
     color: var(--tag-cyan);
 }
 
-.ayuda-red {
+.panel-ayuda-cuerpo .ayuda-red,
+.panel-ayuda-cuerpo .ayuda-red strong,
+.panel-ayuda-cuerpo .ayuda-red em {
     color: var(--text-red);
+}
+
+.panel-ayuda-cuerpo .ayuda-orange,
+.panel-ayuda-cuerpo .ayuda-orange strong,
+.panel-ayuda-cuerpo .ayuda-orange em {
+    color: var(--tag-orange);
+}
+
+.panel-ayuda-cuerpo .ayuda-yellow,
+.panel-ayuda-cuerpo .ayuda-yellow strong,
+.panel-ayuda-cuerpo .ayuda-yellow em {
+    color: var(--tag-yellow);
+}
+
+.panel-ayuda-cuerpo .ayuda-green,
+.panel-ayuda-cuerpo .ayuda-green strong,
+.panel-ayuda-cuerpo .ayuda-green em {
+    color: var(--tag-green);
+}
+
+.panel-ayuda-cuerpo .ayuda-blue,
+.panel-ayuda-cuerpo .ayuda-blue strong,
+.panel-ayuda-cuerpo .ayuda-blue em {
+    color: var(--tag-blue);
+}
+
+.panel-ayuda-cuerpo .ayuda-purple,
+.panel-ayuda-cuerpo .ayuda-purple strong,
+.panel-ayuda-cuerpo .ayuda-purple em {
+    color: var(--tag-purple);
+}
+
+.panel-ayuda-cuerpo .ayuda-pink,
+.panel-ayuda-cuerpo .ayuda-pink strong,
+.panel-ayuda-cuerpo .ayuda-pink em {
+    color: var(--tag-pink);
+}
+
+.panel-ayuda-cuerpo .ayuda-gray,
+.panel-ayuda-cuerpo .ayuda-gray strong,
+.panel-ayuda-cuerpo .ayuda-gray em {
+    color: var(--tag-gray);
 }
 
 .panel-ayuda-cuerpo code {
