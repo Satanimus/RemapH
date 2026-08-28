@@ -1,5 +1,4 @@
 ## boton_panel_ayuda
-
 **¡Bienvenido a RemapH!**
 
 Ahora podrás transformar cualquier tecla o click en lo que necesites: cosas simples como en otro atajo o comando multimedia, un muy útil menu radial universal y hasta macros complejas de automatización. 
@@ -7,14 +6,15 @@ Ahora podrás transformar cualquier tecla o click en lo que necesites: cosas sim
 Todo se organiza por perfiles y filtros para personalizar tus programas favoritos.
 
 Sólo tienes que configurar tus filas en la tabla central.
-
 ---
 
-**Ayuda**
+`❔` **Ayuda**
+
+Abre y cierra este panel lateral.
 
 Pasa el mouse sobre cualquier botón o control y va a aparecer acá una explicación de qué hace.
 
-Podés abrir o cerrar el panel con `❔`.
+
 
 ## btn-agregar-fila, btn-agregar-separador
 **+ Fila**
@@ -23,9 +23,8 @@ Agrega una fila nueva y vacía al perfil actual.
 
 Se ubica al final de la tabla (o del último separador, si hay uno).
 
-Cada fila es una instrucción completa que configuras. Bien simplificado es:
+Cada fila es una instrucción de tipo:
 "Cuando ejecute este [cyan:Disparador] quiero ocurra esta [red:Acción]". 
-
 ---
 
 **+ Separador**
@@ -52,63 +51,74 @@ También se puede alternar con el atajo global configurable en Configuración > 
 
 Aparece cuando editás la tabla.
 
-`Guardar`
+[green:`Guardar`]
 Escribe los cambios a disco y recompila el perfil. Si estaba activo, los nuevos remapeos entran en vigencia al instante.
+---
 
 `Revertir`
 Descarta lo editado y vuelve a mostrar el perfil tal como está guardado en disco.
 
-## btn-menu-lateral, panel-lateral-lista, panel-lateral-item, botonNuevo, botonClonar, botonRenombrar, panel-lateral-eliminar
-**Perfiles**
+## btn-menu-lateral, panel-lateral-lista, panel-lateral-item, botonNuevo, botonClonar, botonRenombrar, panel-lateral-eliminar, panel-lateral-configuracion
+`☰` **Menú** 
 
-Este panel (botón `☰`) lista todos los perfiles guardados.
+[cyan:**Perfiles**]
 
-Click en uno para pasar a usarlo.
+Lista todos los perfiles guardados.
 
-`Nuevo`
-Crea un perfil vacío.
+Solo puede haber un perfil activo a la vez.
 
-`Clonar`
-Duplica el perfil actual.
+Si se abre otro perfil, el anterior se desactiva.  
 
-`Renombrar`
-Le cambia el nombre.
+Las opciones de perfil afectan al perfil actual.
+---
 
-`Eliminar perfil`
-Lo borra — pide confirmación antes de aplicarse.
-
-Si el perfil actual tiene cambios sin guardar, cualquiera de estas acciones te pregunta antes si querés guardarlos.
-
-## panel-lateral-configuracion
-**Configuración**
+`⚙️` **Configuración**
 
 Abre la ventana de Configuración.
 
-Ahí se ajustan las opciones generales del programa: atajos globales, apariencia, dispositivos, modo del motor de entrada, etc. — separadas del contenido de los perfiles.
+Ahí se ajustan las opciones generales del programa: atajos globales, apariencia, etc.
 
-## trigger, accion, opciones, extra
-**Columnas de la tabla**
+Aca se puede elegir modo del motor: Portable o Driver (Interception).
 
-`Trigger`
-Qué combinación de teclas o clicks dispara la fila.
+## opciones, popup-opciones-fila
+`⁝` **Opciones de Fila y Separador**
 
-`Acción`
-Qué hace RemapH cuando eso ocurre.
+Configuraciones puntuales de esa Fila o Separador.
 
-`Opciones`
-Configuraciones puntuales de esa fila (temporización, condiciones, etc.).
+Si mantienes presionado el botón `⁝` de una fila entras a modo *Mover*.
+Permite selección multiple (*Ctrl+click*), arrastrar y mover con teclado.
+---
 
-`Extra` (`∴`)
-Información adicional de la fila al pasar el mouse.
+**Color**
 
-## app-columna
-**Columna App**
+Sirve de identificador visual en tabla.
 
-Restringe la fila a una sola aplicación.
+En el caso de las filas: permite dar color a su botón si es usada en un Menu Express. 
 
-Mientras esa app no esté en primer plano, el Trigger de esa fila no hace nada.
+## app-columna, popup-app
+**App**
 
-Vacía, la fila funciona en cualquier ventana.
+Condiciona la activación de la fila al estado de una aplicación.
+
+Para que un programa se muestre en la lista debe estar abierto.
+
+Hay 3 modos:
+
+-`🌐` *Global*: Por default, sin filtro.
+
+-`App de usuario`: La Fila solo funciona mientras esa app esté en primer plano. En cualquier otra ventana el *Disparador* no hace nada.
+
+-`Segundo plano`: La Fila funciona mientras el programa elegido este abierto (en primer o en segundo plano).
+
+## trigger
+**Disparador**
+
+Captura la combinación de teclas o clicks que ejecutará la fila.
+
+Permite capturar teclas, combinaciones, clicks y rueda de mouse.
+
+La última tecla o click de la combinación puede ser: Simple, Mantenida [cyan:`[]`], Doble [cyan:`x2`] o triple [cyan:`x3`].
+La rueda del mouse puede ser: Corta o Larga [cyan:"[]"].
 
 ## nota-columna
 **Columna Nota**
@@ -251,30 +261,6 @@ Agrega un click en una posición fija de la pantalla. Activado, se puede elegir 
 
 `📌 Capturar Coordenada`
 Abre una ventana para marcar el punto en pantalla.
-
-## popup-opciones-fila
-**Opciones (⁝)**
-
-`Color`
-Tinte identificatorio para la fila o el separador — y las filas que contiene, si es un separador.
-
-`Clonar`
-Duplica la fila/separador tal cual.
-
-`Mover`
-Activa el modo de reubicación con el teclado.
-
-`Eliminar`
-Borra la fila o el separador. En un separador, además pregunta si eliminar también las filas que contiene o solo desarmar el agrupamiento.
-
-## popup-app
-**Restringir a una aplicación**
-
-Limita esta fila para que solo actúe cuando la aplicación en primer plano sea la elegida acá — en cualquier otra ventana, el Trigger no hace nada.
-
-El interruptor de arriba prende o apaga ese filtro.
-
-La lista muestra los programas abiertos (`Principales`) o todos los detectados (`Otros`).
 
 ## popup-macro-accion
 🧩 **Acción — Macro**

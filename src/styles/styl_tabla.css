@@ -237,6 +237,31 @@
     box-sizing: border-box;
 }
 
+/* [FIX] bug: al angostar la ventana, Nota (única celda flexible)
+   llega a su ancho mínimo y dentro de la fila ya no sobra espacio
+   para el respiro de 8px de arriba — como el fondo de la fila (o
+   de las celdas .en-separador) sigue terminando 8px antes del
+   borde real, ese margen le come 8px al propio box de Nota /
+   separador en vez de quedar afuera de él (el "borrado" reportado
+   por el usuario), y además ese hueco sin pintar queda pegado al
+   borde de la VENTANA, no acotado a la columna Nota.
+   .viewport.recortado (ver ui_tabla.ts, actualizarRecorte)
+   se agrega solo cuando el contenido de la fila ya no entra
+   (scrollWidth > clientWidth del viewport, o sea el box ya está
+   siendo cortado) — en ese estado se anula el respiro fijo para
+   que el fondo/color siempre llegue hasta donde llega el propio
+   contenido, sin dejar margen sin pintar dentro del box. Mientras
+   el box todavía tiene lugar para achicarse (no hay overflow), el
+   respiro de arriba se mantiene sin cambios. */
+.viewport.recortado .cabecera,
+.viewport.recortado .fila,
+.viewport.recortado .fila-separador {
+
+    width: 100%;
+
+    margin-right: 0;
+}
+
 .cabecera {
 
     height: var(--header-height);

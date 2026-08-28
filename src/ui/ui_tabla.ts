@@ -54,6 +54,34 @@ export function crearTabla(alModificar: () => void): HTMLElement {
 
   viewport.className = "viewport";
 
+  // ==================================================
+  // 🩹 DETECCIÓN DE RECORTE HORIZONTAL
+  // ------------------------------------------------------
+  // Bug: al angostar la ventana, el respiro fijo de --gap8 en
+  // .cabecera/.fila/.fila-separador (ver styl_tabla.css) le
+  // come 8px al propio box de Nota/separador en vez de quedar
+  // afuera de él, apenas ese box deja de tener lugar para
+  // achicarse y empieza a quedar cortado por la ventana.
+  // scrollWidth > clientWidth es exactamente esa condición: el
+  // contenido de la fila (Opciones..Nota) ya no entra en el
+  // viewport. Solo ahí se agrega "recortado", que anula el
+  // respiro (ver .viewport.recortado en styl_tabla.css) para
+  // que el fondo/color siempre llegue hasta donde llega el
+  // contenido real. Se reevalúa en cada resize del viewport
+  // (el caso reportado: achicar la ventana) y después de cada
+  // reconstrucción de la tabla (cambiar de perfil, agregar o
+  // quitar filas/separadores).
+  // ==================================================
+
+  const actualizarRecorte = (): void => {
+    viewport.classList.toggle(
+      "recortado",
+      viewport.scrollWidth > viewport.clientWidth,
+    );
+  };
+
+  new ResizeObserver(actualizarRecorte).observe(viewport);
+
   const cabecera = document.createElement("div");
 
   cabecera.className = "cabecera";
@@ -362,6 +390,8 @@ export function crearTabla(alModificar: () => void): HTMLElement {
         }
       }
     });
+
+    actualizarRecorte();
   };
 
   reconstruirTabla();
