@@ -261,9 +261,13 @@ export function coordenadaBancoAPerfil(
   coordenada: CoordenadaBanco,
 ): Pick<
   CoordenadaPerfil,
-  "ubicacion" | "modoVentana" | "puntoReferencia" | "x" | "y"
+  "nota" | "aplicacion" | "ubicacion" | "modoVentana" | "puntoReferencia" | "x" | "y"
 > {
   return {
+    nota: coordenada.nota,
+
+    aplicacion: coordenada.aplicacion,
+
     ubicacion: TIPO_A_UBICACION[coordenada.tipo] ?? "absoluta",
 
     modoVentana: MODO_A_MODO_VENTANA[coordenada.modo] ?? "pixeles",

@@ -736,6 +736,77 @@
   font-weight: 600;
 }
 
+/* ======================================================
+   ✕ ELIMINAR COORDENADA (ghost, solo ícono)
+   ------------------------------------------------------
+   Pegado al borde derecho de la fila de acciones (margin-
+   left:auto empuja todo lo que venga después de Seleccionar/
+   Cambiar+Probar, que sí son flex:1). Mismo patrón que los
+   demás botones "eliminar" ghost del proyecto (ver
+   .panel-lateral-eliminar en styl_panel_lateral.css): en
+   reposo, sin borde propio (hereda el ghost transparente de
+   .ui-btn); en hover, SIN el brillo cyan que trae .ui-btn:hover
+   normal — fondo transparente, borde y texto en rojo
+   (--text-red/--highlight-red). Solo limpia los campos
+   guardados de ESTA fila, no toca el banco.
+   ====================================================== */
+
+.popup-extra-fila-acciones .popup-extra-eliminar {
+  flex: none;
+  width: auto;
+  margin-left: auto;
+  padding: 0 var(--gap8);
+  color: var(--text-disabled);
+  border-color: transparent;
+}
+
+.popup-extra-fila-acciones .popup-extra-eliminar.ui-btn:hover {
+  background: transparent !important;
+  border-color: var(--highlight-red) !important;
+  color: var(--text-red);
+}
+
+/* ======================================================
+   📋 BOX INFORMATIVO — RESUMEN DE COORDENADA (solo lectura)
+   ------------------------------------------------------
+   Bajo el botón Seleccionar/Cambiar del popup Extra — mismo
+   look que cualquier otro nivel subordinado del popup
+   (popup-caja-interna), pero de solo lectura: etiqueta en
+   color texto deshabilitado, valor en color texto principal,
+   igual criterio que el tooltip del botón Extra de la tabla.
+   ====================================================== */
+
+.popup-coordenada-resumen {
+  font-size: var(--fs11);
+}
+
+.popup-coordenada-resumen-nota {
+  color: var(--text);
+  font-size: var(--fs13);
+}
+
+.popup-coordenada-resumen-linea {
+  display: flex;
+  gap: var(--gap4);
+}
+
+.popup-coordenada-resumen-xy {
+  display: flex;
+  gap: var(--gap4);
+}
+
+.popup-coordenada-resumen-xy+.popup-coordenada-resumen-xy {
+  margin-left: var(--gap8);
+}
+
+.popup-coordenada-resumen-titulo {
+  color: var(--text-disabled);
+}
+
+.popup-coordenada-resumen-valor {
+  color: var(--text);
+}
+
 .app-icono {
   width: 18px;
   height: 18px;

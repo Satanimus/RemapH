@@ -1,0 +1,11 @@
+{
+    "$schema": "../gen/schemas/desktop-schema.json",
+    "identifier": "coordenadas",
+    "description": "Capability for the coordinate-bank catalog window (Etapa C/G: filterable list + group preview)",
+    "windows": ["coordenadas"],
+    "permissions": [
+      "core:default",
+      "core:window:allow-close",
+      "core:window:allow-destroy"
+    ]
+  }

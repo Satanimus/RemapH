@@ -19,6 +19,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow, PhysicalPosition } from "@tauri-apps/api/window";
 
+import type { Entrada } from "../core/core_entrada";
 import { aplicarOverridesApariencia } from "../core/core_apariencia";
 
 import "../styles/styl_variables.css";
@@ -229,6 +230,24 @@ let origenRelativaCursor: { x: number; y: number } | null = null;
 // consulta una sola vez al cargar, igual que el resto de la config
 // activa — se usa en los textos de instrucción en vez del genérico
 // "la tecla configurada".
+//
+// obtener_tecla_guardar_coordenada devuelve AtajoCapturaUI (objeto
+// {modificadores, gatillo}, no un string plano — de ahí salía
+// "[object Object]" cuando se interpolaba el objeto directo en el
+// texto). Acá se lo formatea a texto tipo "Ctrl+F1" antes de
+// guardarlo en teclaGuardar.
+interface AtajoCapturaUI {
+  modificadores: Entrada[];
+  gatillo: Entrada;
+}
+
+function atajoCapturaATexto(atajo: AtajoCapturaUI): string {
+  return [
+    ...atajo.modificadores.map((entrada) => entrada.nombre),
+    atajo.gatillo.nombre,
+  ].join("+");
+}
+
 let teclaGuardar = "F1";
 
 // ======================================================
@@ -430,11 +449,12 @@ async function iniciar(): Promise<void> {
   }
 
   try {
-    teclaGuardar = await conTimeout(
-      invoke<string>("obtener_tecla_guardar_coordenada"),
+    const atajo = await conTimeout(
+      invoke<AtajoCapturaUI>("obtener_tecla_guardar_coordenada"),
       3000,
       "obtener_tecla_guardar_coordenada",
     );
+    teclaGuardar = atajoCapturaATexto(atajo);
   } catch (error) {
     mostrarDiagnostico(
       `FALLÓ obtener_tecla_guardar_coordenada (uso F1): ${String(error)}`,

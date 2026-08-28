@@ -34,6 +34,16 @@ export interface CoordenadaPerfil {
   // popup se expande mostrando el resto de estos campos.
   activa: boolean;
 
+  // Nota/App copiadas de la CoordenadaBanco al momento de
+  // seleccionar (Etapa D) — solo para mostrar en el box
+  // informativo del popup (Opción 1: copia congelada, no vive
+  // en vivo contra el gestor). Si luego se edita la Nota/App de
+  // esa coordenada desde el gestor, esta fila NO se entera sola
+  // — hay que volver a seleccionarla acá para traer el cambio.
+  nota: string;
+
+  aplicacion: string;
+
   ubicacion: UbicacionCoordenada;
 
   modoVentana: ModoVentanaCoordenada;
@@ -58,6 +68,10 @@ export interface CoordenadaPerfil {
 export function crearCoordenada(): CoordenadaPerfil {
   return {
     activa: false,
+
+    nota: "",
+
+    aplicacion: "",
 
     ubicacion: "absoluta",
 

@@ -138,13 +138,13 @@ use crate::captura_coordenada;
 use crate::compilador::ResultadoCompilacion;
 use crate::config;
 use crate::configuracion_usuario;
-use crate::eventos::InputId;
 use crate::macro_cache;
 use crate::macro_json::MacroArchivoJson;
 use crate::macro_usuario;
 use crate::macros;
 use crate::motor;
 use crate::perfil;
+use crate::eventos::InputId;
 use crate::perfil_ui::{
     convertir_atajo_captura, convertir_perfil, AtajoCapturaUI, EntradaUI, ItemFilaUI,
     ResultadoPerfil, ResultadoPerfilInicial, TriggerCapturaUI,
@@ -331,10 +331,7 @@ pub fn compilar_perfil(filas: Vec<ItemFilaUI>) -> Result<ResultadoCompilacion, S
 }
 
 #[tauri::command]
-pub fn guardar_perfil_como(
-    nombre: String,
-    filas: Vec<ItemFilaUI>,
-) -> Result<ResultadoPerfil, String> {
+pub fn guardar_perfil_como(nombre: String, filas: Vec<ItemFilaUI>) -> Result<ResultadoPerfil, String> {
     let perfil = convertir_perfil(filas);
 
     perfil::guardar_perfil_como(nombre, perfil)
@@ -841,13 +838,7 @@ pub async fn abrir_ventana_preview_coordenada(
         }
     }
 
-    captura_coordenada::activar_preview(
-        ubicacion.clone(),
-        modo_ventana.clone(),
-        punto_referencia.clone(),
-        x,
-        y,
-    );
+    captura_coordenada::activar_preview(ubicacion.clone(), modo_ventana.clone(), punto_referencia.clone(), x, y);
 
     // Mismo criterio que abrir_ventana_preview_grupo: se posiciona la
     // ventana YA en el builder (en vez de dejarla nacer en la esquina
@@ -944,13 +935,8 @@ pub fn probar_coordenada(
     x: f64,
     y: f64,
 ) {
-    let (destino_x, destino_y) = back_coordenada::calcular_destino_valores(
-        &ubicacion,
-        &modo_ventana,
-        &punto_referencia,
-        x,
-        y,
-    );
+    let (destino_x, destino_y) =
+        back_coordenada::calcular_destino_valores(&ubicacion, &modo_ventana, &punto_referencia, x, y);
 
     back_coordenada::mover_cursor(destino_x, destino_y);
 }

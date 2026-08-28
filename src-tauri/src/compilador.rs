@@ -351,11 +351,18 @@ fn compilar_remapeo(
     };
 
     // Coordenada ya no depende de un tipo aparte: es un extra
-    // independiente de tecla_mouse. Si está activa pero todavía no se
-    // capturó (x/y en None), la fila se descarta en silencio (mismo
-    // criterio que una Acción sin capturar).
+    // independiente de tecla_mouse. El switch (coordenada.activa) es
+    // puramente visual de UI — no alcanza para que la fila lleve
+    // coordenada real. Si está activo pero todavía no se guardó
+    // ninguna (x/y en None), se trata exactamente como si el switch
+    // estuviera apagado: coordenada queda None y el resto de la fila
+    // (Acción/Trigger/Extra) se compila normal. Antes el `?` acá
+    // descartaba la fila ENTERA en silencio (sin mensaje de error
+    // visible), impidiendo guardar cualquier remap con el switch
+    // prendido y sin coordenada capturada — bug real, no era el
+    // comportamiento buscado.
     let coordenada = if remapeo.coordenada.activa {
-        Some(convertir_coordenada(&remapeo.coordenada)?)
+        convertir_coordenada(&remapeo.coordenada)
     } else {
         None
     };
@@ -885,4 +892,3 @@ fn convertir_coordenada(coordenada: &CoordenadaJson) -> Option<CoordenadaCache> 
         post_accion,
     })
 }
-

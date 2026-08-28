@@ -8,32 +8,44 @@
 // capa), en vez de cerrarlo. Todo vive en UN solo popup que
 // se extiende hacia abajo — no hay sub-popups laterales.
 //
-// NIVEL 1 — Repetición: Ninguno / Normal / Turbo (sobre
-//          filaPerfil.extra, mismo vocabulario "" | "normal" |
-//          "turbo" que usa compilador.rs vía convertir_extra()
-//          — "Ninguno" ya no es sinónimo fijo de "sin Extra":
-//          con condición Mantenido se resuelve del lado de
-//          Rust a ExtraCache::Mantener, para depender del Up
-//          físico real en vez de un tiempo fijo)
+// NIVEL 1     — Repetición: Ninguno / Normal / Turbo (sobre
+//               filaPerfil.extra, mismo vocabulario "" |
+//               "normal" | "turbo" que usa compilador.rs vía
+//               convertir_extra() — "Ninguno" ya no es
+//               sinónimo fijo de "sin Extra": con condición
+//               Mantenido se resuelve del lado de Rust a
+//               ExtraCache::Mantener, para depender del Up
+//               físico real en vez de un tiempo fijo)
 // INTERRUPTOR — Coordenada (sobre filaPerfil.coordenada.activa).
-//          No excluyente con el nivel de arriba: se puede
-//          combinar cualquier repetición con Coordenada. Al
-//          activarse, expande debajo:
-//   NIVEL 2 — "En relación a:" (Absoluta/Relativa a cursor/
-//            Relativa a ventana). Si es Relativa a ventana, se
-//            agrega una caja interna (otro nivel visual, mismo
-//            popup) con "Medido en:" (Porcentaje/Píxeles) y,
-//            solo en Píxeles, "Medido desde:".
-//   BOTÓN   — 📌 Capturar Coordenada (abre la ventana de
-//            captura — ver comandos.rs; conecta el polling
-//            del resultado). Botón principal, cyan oscuro. Ya
-//            no agrega "(desde Sup-Izq)" al valor — queda solo
-//            el valor (ver textoCoordenada en core_coordenada.ts).
-//   NIVEL 3 — "Finalizar en:" (Posición inicial/Posición final)
+//               No excluyente con el nivel de arriba: se puede
+//               combinar cualquier repetición con Coordenada.
+//               Al activarse, expande debajo:
+//   COORDENADA — Botón 📌 Seleccionar/Cambiar (abre el gestor
+//               de coordenadas — vent_coordenadas_main.ts —
+//               con su catálogo filtrable + "Nueva coordenada",
+//               que internamente reusa el flujo de captura
+//               existente) + ▶ Probar al lado, SOLO si la
+//               coordenada elegida es tipo Absoluta (Cursor/
+//               Ventana no tienen nada útil que probar acá:
+//               ver comentario junto al botón). Una vez
+//               elegida, aparece debajo un box informativo
+//               (popup-caja-interna) de solo lectura con el
+//               resumen — Nota/App/Tipo/Medido en/Medido
+//               desde/X/Y, copiados de la CoordenadaBanco al
+//               momento de seleccionar (no en vivo: si se edita
+//               esa coordenada desde el gestor después, hay que
+//               volver a seleccionarla acá para traer el
+//               cambio — ver CoordenadaPerfil en
+//               core_coordenada.ts). "En relación a"/"Medido
+//               en"/"Medido desde" YA NO se editan acá — son
+//               responsabilidad exclusiva del gestor.
+//   FINALIZAR EN — "Posición inicial"/"Posición final" (sobre
+//               coordenada.postAccion) — igual que antes, solo
+//               reubicado bajo Coordenada.
 //
-// El pin 📌 solo queda como emoji del texto del botón de
-// captura y del texto del botón Extra de la tabla (ver
-// textoExtraTeclaMouse) — el toggle de Coordenada usa el
+// El pin 📌 solo queda como emoji del texto del botón
+// Seleccionar/Cambiar y del texto del botón Extra de la tabla
+// (ver textoExtraTeclaMouse) — el toggle de Coordenada usa el
 // interruptor deslizante genérico (crearInterruptor).
 // ======================================================
 
@@ -47,12 +59,7 @@ import type { ContextoFila } from "../core/core_contexto_fila";
 
 import type { FilaPerfil } from "../core/core_perfil";
 
-import type {
-  UbicacionCoordenada,
-  ModoVentanaCoordenada,
-  PuntoReferenciaCoordenada,
-  PostAccionCoordenada,
-} from "../core/core_coordenada";
+import type { PostAccionCoordenada } from "../core/core_coordenada";
 
 import { textoCoordenada } from "../core/core_coordenada";
 
@@ -222,88 +229,110 @@ function crearSeparador(): HTMLElement {
 }
 
 // ======================================================
-// 🧱 CAJA INTERNA: RELATIVA A VENTANA
+// 📋 BOX INFORMATIVO — RESUMEN DE LA COORDENADA
 // ------------------------------------------------------
-// Ya no es un sub-popup lateral aparte: es un bloque más,
-// dentro del mismo popup, visualmente marcado como "otro
-// nivel" (borde + fondo más oscuro que el panel — clase
-// popup-caja-interna). Contiene Método de medición y, solo
-// en Píxeles, Punto de referencia.
+// Box anidado (popup-caja-interna, mismo look que cualquier
+// otro nivel subordinado del popup) que aparece bajo el botón
+// Seleccionar/Cambiar una vez que hay una coordenada elegida.
+// Solo informativo, no editable acá — para editar Nota/App/
+// valores hay que ir al gestor de coordenadas.
+//
+// Orden fijo: Nota (sin título de línea) → App → Tipo →
+// Medido en → Medido desde → X/Y. Cualquier línea que no
+// aplique o esté vacía se omite entera (no queda un renglón
+// en blanco) — Medido en/Medido desde solo tienen sentido
+// para ubicación Ventana, y dentro de esa, Medido desde solo
+// en modo Píxeles (mismas condiciones que ya usaba
+// textoExtraTeclaMouse para el tooltip).
 // ======================================================
 
-function crearCajaVentana(
-  contexto: ContextoFila,
-  filaPerfil: FilaPerfil,
-  alModificar: () => void,
-  redibujar: () => void,
+function crearLineaResumen(titulo: string, valor: string): HTMLElement {
+  const linea = document.createElement("div");
+
+  linea.className = "popup-coordenada-resumen-linea";
+
+  const spanTitulo = document.createElement("span");
+  spanTitulo.className = "popup-coordenada-resumen-titulo";
+  spanTitulo.textContent = `${titulo}:`;
+
+  const spanValor = document.createElement("span");
+  spanValor.className = "popup-coordenada-resumen-valor";
+  spanValor.textContent = valor;
+
+  linea.append(spanTitulo, spanValor);
+
+  return linea;
+}
+
+function crearBoxResumenCoordenada(
+  coordenada: FilaPerfil["coordenada"],
 ): HTMLElement {
-  const coordenada = filaPerfil.coordenada;
+  const box = document.createElement("div");
 
-  const caja = document.createElement("div");
+  box.className = "popup-caja-interna popup-coordenada-resumen";
 
-  caja.className = "popup-caja-interna";
-
-  const modoOpciones: { texto: string; valor: ModoVentanaCoordenada }[] = [
-    { texto: "Píxeles", valor: "pixeles" },
-    { texto: "Porcentaje", valor: "porcentaje" },
-  ];
-
-  caja.append(
-    crearFilaPopup(
-      "Medido en:",
-      crearGrupoOpciones(modoOpciones, coordenada.modoVentana, (valor) => {
-        coordenada.modoVentana = valor;
-
-        // El punto de referencia y la coordenada guardada dejan de
-        // tener sentido al cambiar de modo — hay que volver a
-        // capturar (ver misma lógica al cambiar de Ubicación abajo).
-        coordenada.puntoReferencia = "sup_izq";
-        coordenada.x = null;
-        coordenada.y = null;
-
-        cerrarVentanaCapturaCoordenada();
-        reconstruirFila(contexto.id);
-        alModificar();
-        redibujar();
-      }),
-    ),
-  );
-
-  // Para Porcentaje el punto de referencia siempre es Sup-Izq — no
-  // se muestran las opciones (ver spec).
-  if (coordenada.modoVentana === "pixeles") {
-    const puntoOpciones: { texto: string; valor: PuntoReferenciaCoordenada }[] =
-      [
-        { texto: "Sup-Izq", valor: "sup_izq" },
-        { texto: "Sup-Der", valor: "sup_der" },
-        { texto: "Centro", valor: "centro" },
-        { texto: "Inf-Izq", valor: "inf_izq" },
-        { texto: "Inf-Der", valor: "inf_der" },
-      ];
-
-    caja.append(
-      crearFilaPopup(
-        "Medido desde:",
-        crearGrupoOpciones(
-          puntoOpciones,
-          coordenada.puntoReferencia,
-          (valor) => {
-            coordenada.puntoReferencia = valor;
-            coordenada.x = null;
-            coordenada.y = null;
-
-            cerrarVentanaCapturaCoordenada();
-            reconstruirFila(contexto.id);
-            alModificar();
-            redibujar();
-          },
-          "popup-grupo-grid3",
-        ),
-      ),
-    );
+  if (coordenada.nota) {
+    const nota = document.createElement("div");
+    nota.className = "popup-coordenada-resumen-nota";
+    nota.textContent = coordenada.nota;
+    box.append(nota);
   }
 
-  return caja;
+  if (coordenada.aplicacion) {
+    box.append(crearLineaResumen("App", coordenada.aplicacion));
+  }
+
+  box.append(
+    crearLineaResumen("Tipo", textoUbicacionCoordenada(coordenada.ubicacion)),
+  );
+
+  if (coordenada.ubicacion === "relativa_ventana") {
+    box.append(
+      crearLineaResumen(
+        "Medido en",
+        textoModoVentanaCoordenada(coordenada.modoVentana),
+      ),
+    );
+
+    if (coordenada.modoVentana === "pixeles") {
+      box.append(
+        crearLineaResumen(
+          "Medido desde",
+          textoPuntoReferencia(coordenada.puntoReferencia),
+        ),
+      );
+    }
+  }
+
+  const filaXY = document.createElement("div");
+  filaXY.className = "popup-coordenada-resumen-linea";
+  filaXY.append(
+    crearLineaResumenXY("X", coordenada.x),
+    crearLineaResumenXY("Y", coordenada.y),
+  );
+  box.append(filaXY);
+
+  return box;
+}
+
+function crearLineaResumenXY(
+  eje: "X" | "Y",
+  valor: number | null,
+): HTMLElement {
+  const grupo = document.createElement("span");
+  grupo.className = "popup-coordenada-resumen-xy";
+
+  const spanTitulo = document.createElement("span");
+  spanTitulo.className = "popup-coordenada-resumen-titulo";
+  spanTitulo.textContent = `${eje}:`;
+
+  const spanValor = document.createElement("span");
+  spanValor.className = "popup-coordenada-resumen-valor";
+  spanValor.textContent = valor === null ? "—" : String(valor);
+
+  grupo.append(spanTitulo, spanValor);
+
+  return grupo;
 }
 
 // ======================================================
@@ -453,44 +482,92 @@ export function abrirPopupExtraTeclaMouse(
   popup.append(crearSeparador());
 
   // ----------------------------------
-  // NIVEL 2 — Ubicación (solo si Coordenada está activa)
+  // COORDENADA — subtítulo + botón Seleccionar/Cambiar (+ Probar
+  // si Absoluta) + box informativo (si ya hay una elegida)
+  // ------------------------------------------------------
+  // "En relación a"/"Medido en"/"Medido desde" ya no viven acá —
+  // son responsabilidad exclusiva del gestor de coordenadas (ver
+  // vent_coordenadas_main.ts). Este popup solo elige CUÁL
+  // coordenada del banco usar y muestra su resumen; para cambiar
+  // esos valores hay que editarla desde el gestor.
   // ----------------------------------
 
-  const ubicacionOpciones: { texto: string; valor: UbicacionCoordenada }[] = [
-    { texto: "Absoluta", valor: "absoluta" },
-    { texto: "Cursor", valor: "relativa_cursor" },
-    { texto: "Ventana", valor: "relativa_ventana" },
-  ];
+  const tieneCoordenada = coordenada.x !== null && coordenada.y !== null;
 
-  popup.append(
-    crearFilaPopup(
-      "En relación a:",
-      crearGrupoOpciones(ubicacionOpciones, coordenada.ubicacion, (valor) => {
-        coordenada.ubicacion = valor;
+  const labelCoordenada = document.createElement("span");
+  labelCoordenada.className = "popup-fila-label";
+  labelCoordenada.textContent = "Coordenada:";
+  popup.append(labelCoordenada);
 
-        // Los ejes x/y significan otra cosa en cada ubicación — hay
-        // que volver a capturar.
-        coordenada.x = null;
-        coordenada.y = null;
+  const filaSeleccionar = document.createElement("div");
+  filaSeleccionar.className = "popup-extra-fila-acciones";
 
-        cerrarVentanaCapturaCoordenada();
-        reconstruirFila(contexto.id);
-        alModificar();
-        redibujar();
-      }),
-    ),
-  );
+  const botonSeleccionar = document.createElement("button");
+  botonSeleccionar.className = "ui-btn popup-extra-capturar";
+  botonSeleccionar.textContent = tieneCoordenada
+    ? "📌 Cambiar"
+    : "📌 Seleccionar";
+  botonSeleccionar.addEventListener("click", () => {
+    iniciarSeleccion(contexto, filaPerfil, evento, alModificar);
+  });
 
-  // Caja interna (mismo popup, otro nivel visual) — solo si la
-  // ubicación es Relativa a Ventana.
-  if (coordenada.ubicacion === "relativa_ventana") {
-    popup.append(
-      crearCajaVentana(contexto, filaPerfil, alModificar, redibujar),
-    );
+  filaSeleccionar.append(botonSeleccionar);
+
+  // Probar solo tiene sentido para Absoluta: Cursor y Ventana
+  // siempre resuelven contra ESTA máquina/ventana en este momento
+  // (el cursor está donde está, la ventana activa somos nosotros
+  // mismos editando el perfil), así que "probar" ahí no ejercita
+  // nada útil — a diferencia del botón ▶ del gestor, que si aplica
+  // a cualquier tipo porque ahí se prueba la coordenada aislada,
+  // no en el contexto de un remap real.
+  if (tieneCoordenada && coordenada.ubicacion === "absoluta") {
+    const botonProbar = document.createElement("button");
+    botonProbar.className = "ui-btn popup-extra-probar";
+    botonProbar.textContent = "▶ Probar";
+    botonProbar.title = "Mover mouse a coordenada";
+    botonProbar.addEventListener("click", () => {
+      probarCoordenada(coordenada);
+    });
+
+    filaSeleccionar.append(botonProbar);
   }
 
+  // Eliminar (✕ ghost, pegado al borde derecho vía margin-left:auto
+  // en CSS) — solo limpia x/y de ESTA fila, no toca la coordenada
+  // en el gestor (Usuario/Coordenadas.tsv sigue intacto). Con
+  // coordenada.activa true pero x/y en null queda exactamente en el
+  // mismo estado que "switch apagado" (ver convertir_coordenada en
+  // compilador.rs) — no hace falta apagar el switch acá.
+  if (tieneCoordenada) {
+    const botonEliminar = document.createElement("button");
+    botonEliminar.className = "ui-btn popup-extra-eliminar";
+    botonEliminar.textContent = "✕";
+    botonEliminar.title = "Eliminar coordenada";
+    botonEliminar.addEventListener("click", () => {
+      coordenada.x = null;
+      coordenada.y = null;
+      coordenada.nota = "";
+      coordenada.aplicacion = "";
+
+      cerrarVentanaCapturaCoordenada();
+      reconstruirFila(contexto.id);
+      alModificar();
+      redibujar();
+    });
+
+    filaSeleccionar.append(botonEliminar);
+  }
+
+  popup.append(filaSeleccionar);
+
+  if (tieneCoordenada) {
+    popup.append(crearBoxResumenCoordenada(coordenada));
+  }
+
+  popup.append(crearSeparador());
+
   // ----------------------------------
-  // NIVEL 3 — Post-acción
+  // FINALIZAR EN — Posición Inicial / Posición Final
   // ----------------------------------
 
   const postAccionOpciones: { texto: string; valor: PostAccionCoordenada }[] = [
@@ -510,41 +587,6 @@ export function abrirPopupExtraTeclaMouse(
       }),
     ),
   );
-
-  popup.append(crearSeparador());
-
-  // ----------------------------------
-  // BOTÓN — Capturar Coordenada / Probar
-  // ----------------------------------
-
-  const filaAcciones = document.createElement("div");
-  filaAcciones.className = "popup-extra-fila-acciones";
-
-  const botonCapturar = document.createElement("button");
-
-  botonCapturar.className = "ui-btn popup-extra-capturar";
-
-  botonCapturar.textContent = `📌 ${textoCoordenada(coordenada)}`;
-
-  botonCapturar.addEventListener("click", () => {
-    iniciarSeleccion(contexto, filaPerfil, evento, alModificar);
-  });
-
-  const botonProbar = document.createElement("button");
-
-  botonProbar.className = "ui-btn popup-extra-probar";
-
-  botonProbar.textContent = "▶ Probar";
-
-  botonProbar.disabled = coordenada.x === null || coordenada.y === null;
-
-  botonProbar.addEventListener("click", () => {
-    probarCoordenada(coordenada);
-  });
-
-  filaAcciones.append(botonCapturar, botonProbar);
-
-  popup.append(filaAcciones);
 
   mostrarPopup(popup, evento.clientX, evento.clientY);
 }
