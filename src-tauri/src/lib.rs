@@ -105,7 +105,7 @@ pub fn run() {
             comandos::obtener_nombre_perfil_actual,
             comandos::obtener_estado_cache,
             comandos::restaurar_perfil_actual,
-            comandos::clonar_perfil,
+            comandos::guardar_perfil_como,
             comandos::renombrar_perfil,
             comandos::eliminar_perfil_actual,
             comandos::crear_perfil_nuevo,

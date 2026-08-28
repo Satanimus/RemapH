@@ -11,9 +11,15 @@ import { mostrarPopup, ocultarPopup } from "./comp_popup_contenedor";
 
 import { crearBoton } from "./comp_boton";
 
+export interface OpcionesConfirmarPopup {
+  textoNo?: string;
+  textoSi?: string;
+}
+
 export function confirmarPopup(
   mensaje: string,
   evento: MouseEvent,
+  opciones?: OpcionesConfirmarPopup,
 ): Promise<boolean> {
   return new Promise((resolver) => {
     let resuelto = false;
@@ -41,8 +47,8 @@ export function confirmarPopup(
 
     botones.className = "popup-confirmar-botones";
 
-    const botonNo = crearBoton({ texto: "No" });
-    const botonSi = crearBoton({ texto: "Sí" });
+    const botonNo = crearBoton({ texto: opciones?.textoNo ?? "No" });
+    const botonSi = crearBoton({ texto: opciones?.textoSi ?? "Sí" });
 
     botonNo.addEventListener("click", () => {
       resolverUnaVez(false);

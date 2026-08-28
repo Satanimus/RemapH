@@ -72,8 +72,10 @@
 // restaurar_perfil_actual()
 //     Recupera perfil guardado.
 //
-// clonar_perfil()
-//     Crea copia de perfil.
+// guardar_perfil_como()
+//     Guarda la versión de perfil que muestra la UI (con o sin
+//     cambios sin guardar) como un perfil nuevo, con el nombre
+//     pedido al usuario, sin tocar el archivo del perfil actual.
 //     Recibe perfil ya convertido desde perfil_ui.
 //
 // renombrar_perfil()
@@ -253,17 +255,23 @@ pub fn restaurar_perfil_actual() -> Result<ResultadoPerfil, String> {
 }
 
 // ======================================================
-// 📋 CLONAR PERFIL
+// 💾📋 GUARDAR PERFIL COMO
+// ------------------------------------------------------
+// A diferencia de guardar_perfil(), no escribe sobre el archivo del
+// perfil actual: guarda el perfil recibido (la versión que muestra
+// la UI, editada o no) bajo el nombre pedido al usuario. El archivo
+// del perfil actual queda intacto. siguiente_nombre() resuelve
+// colisiones igual que en renombrar_perfil().
 // ======================================================
 
-pub fn clonar_perfil() -> Result<ResultadoPerfil, String> {
-    let nombre_actual = usuario::nombre_actual()?;
+pub fn guardar_perfil_como(nombre: String, perfil: perfil_json) -> Result<ResultadoPerfil, String> {
+    let nombre = nombre.trim();
 
-    let nombre = siguiente_nombre(&nombre_actual)?;
+    if nombre.is_empty() {
+        return Err("El nombre del perfil está vacío".into());
+    }
 
-    let ruta_actual = usuario::perfil_actual()?;
-
-    let perfil = cargar_desde_disco(&ruta_actual)?;
+    let nombre = siguiente_nombre(nombre)?;
 
     // Etapa 8C: ver excepción documentada en el header del archivo.
     runtime::detener_todo();

@@ -20,6 +20,8 @@ import { confirmarPopup } from "./comp_popup_confirmar";
 
 import { abrirFormularioNombre } from "./comp_popup_formulario_nombre";
 
+import { obtenerPerfilUi } from "../core/core_perfil_ui";
+
 import { ATRIBUTO_AYUDA_ID } from "../ui/ui_ayuda_hover";
 
 import type { perfil_json } from "../core/core_perfil_json";
@@ -164,7 +166,6 @@ async function recargarContenidoPanel(): Promise<void> {
     crearAcciones(
       nombreActual,
       estaEditado,
-      alGuardarActual,
       alCambiarPerfilActual,
     ),
 
@@ -308,7 +309,6 @@ function crearEspacioFlexible(): HTMLElement {
 function crearAcciones(
   nombreActual: string,
   estaEditado: boolean,
-  alGuardar: () => Promise<void>,
   alCambiarPerfil: (resultado: ResultadoPerfil) => void | Promise<void>,
 ): HTMLElement {
   const acciones = document.createElement("div");
@@ -327,13 +327,14 @@ function crearAcciones(
 
   botonNuevo.addEventListener("click", async (evento) => {
     if (estaEditado) {
-      const guardar = await confirmarPopup(
-        "¿Guardar cambios del perfil actual?",
+      const continuar = await confirmarPopup(
+        "Perderá los cambios no guardados",
         evento,
+        { textoNo: "Cancelar", textoSi: "OK" },
       );
 
-      if (guardar) {
-        await alGuardar();
+      if (!continuar) {
+        return;
       }
     }
 
@@ -349,25 +350,21 @@ function crearAcciones(
   });
 
   // ==================================================
-  // CLONAR PERFIL
+  // GUARDAR COMO
+  // ------------------------------------------------------
+  // Guarda la versión de perfil que muestra la UI (con cambios sin
+  // guardar o no) como un perfil nuevo, sin reemplazar el perfil
+  // actual guardado.
   // ==================================================
 
-  const botonClonar = crearBoton({
-    texto: "Clonar",
+  const botonGuardarComo = crearBoton({
+    texto: "Guardar como",
   });
 
-  botonClonar.setAttribute(ATRIBUTO_AYUDA_ID, "botonClonar");
+  botonGuardarComo.setAttribute(ATRIBUTO_AYUDA_ID, "botonGuardarComo");
 
-  botonClonar.addEventListener("click", async () => {
-    try {
-      const resultado = await invoke<ResultadoPerfil>("clonar_perfil");
-
-      await alCambiarPerfil(resultado);
-
-      await recargarContenidoPanel();
-    } catch (error) {
-      console.error("❌ No se pudo clonar el perfil:", error);
-    }
+  botonGuardarComo.addEventListener("click", (evento) => {
+    abrirFormularioGuardarComo(nombreActual, evento, alCambiarPerfil);
   });
 
   // ==================================================
@@ -382,13 +379,14 @@ function crearAcciones(
 
   botonRenombrar.addEventListener("click", async (evento) => {
     if (estaEditado) {
-      const guardar = await confirmarPopup(
-        "¿Guardar cambios del perfil actual?",
+      const continuar = await confirmarPopup(
+        "Perderá los cambios no guardados",
         evento,
+        { textoNo: "Cancelar", textoSi: "OK" },
       );
 
-      if (guardar) {
-        await alGuardar();
+      if (!continuar) {
+        return;
       }
     }
 
@@ -429,7 +427,7 @@ function crearAcciones(
     }
   });
 
-  acciones.append(botonNuevo, botonClonar, botonRenombrar, botonEliminar);
+  acciones.append(botonNuevo, botonGuardarComo, botonRenombrar, botonEliminar);
 
   return acciones;
 }
@@ -473,6 +471,35 @@ function abrirFormularioRenombrar(
   abrirFormularioNombre(nombreActual, evento, async (nuevoNombre) => {
     const resultado = await invoke<ResultadoPerfil>("renombrar_perfil", {
       nuevoNombre,
+    });
+
+    await alCambiarPerfil(resultado);
+
+    await recargarContenidoPanel();
+  });
+}
+
+// ======================================================
+// GUARDAR COMO
+// ------------------------------------------------------
+// Mismo popup que Renombrar, pero el valor inicial sugerido es
+// distinto al nombre actual (para no chocar con el "sin cambios,
+// no hacer nada" del formulario genérico) y el resultado va a
+// guardar_perfil_como con el perfil que muestra la UI en este
+// momento (editado o no).
+// ======================================================
+
+function abrirFormularioGuardarComo(
+  nombreActual: string,
+  evento: MouseEvent,
+  alCambiarPerfil: (resultado: ResultadoPerfil) => void | Promise<void>,
+): void {
+  abrirFormularioNombre(`${nombreActual} (copia)`, evento, async (nombre) => {
+    const perfil = obtenerPerfilUi();
+
+    const resultado = await invoke<ResultadoPerfil>("guardar_perfil_como", {
+      nombre,
+      filas: perfil.filas,
     });
 
     await alCambiarPerfil(resultado);

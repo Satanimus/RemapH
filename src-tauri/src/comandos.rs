@@ -330,8 +330,10 @@ pub fn compilar_perfil(filas: Vec<ItemFilaUI>) -> Result<ResultadoCompilacion, S
 }
 
 #[tauri::command]
-pub fn clonar_perfil() -> Result<ResultadoPerfil, String> {
-    perfil::clonar_perfil()
+pub fn guardar_perfil_como(nombre: String, filas: Vec<ItemFilaUI>) -> Result<ResultadoPerfil, String> {
+    let perfil = convertir_perfil(filas);
+
+    perfil::guardar_perfil_como(nombre, perfil)
 }
 
 #[tauri::command]
