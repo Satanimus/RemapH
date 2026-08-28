@@ -123,6 +123,18 @@ pub(crate) fn carpeta_temas() -> Result<PathBuf, String> {
 }
 
 // ======================================================
+// 📄 RUTA CATÁLOGO DE COORDENADAS
+// ------------------------------------------------------
+// Archivo único directo en Usuario/ (no tiene subcarpeta
+// propia, a diferencia de Perfiles/Portapapeles/Themes) —
+// ver banco_coordenadas.rs.
+// ======================================================
+
+pub(crate) fn ruta_coordenadas() -> Result<PathBuf, String> {
+    Ok(carpeta()?.join("Coordenadas.tsv"))
+}
+
+// ======================================================
 // 📄 BUSCAR PERFILES
 // ======================================================
 

@@ -23,6 +23,9 @@ interception = "0.1.2"
 
 base64 = "0.22"
 
+# Ids internos del banco de coordenadas guardadas (banco_coordenadas.rs).
+uuid = { version = "1", features = ["v4"] }
+
 # Control de volumen por sesión de audio (alcance "En App" de la
 # Acción Multimedia) — ver back_multimedia.rs.
 winmix = "0.1"

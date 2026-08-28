@@ -133,6 +133,7 @@
 use crate::ayuda;
 use crate::back_app;
 use crate::back_coordenada;
+use crate::banco_coordenadas;
 use crate::captura_coordenada;
 use crate::compilador::ResultadoCompilacion;
 use crate::config;
@@ -788,6 +789,222 @@ pub fn cerrar_ventana_captura_coordenada(app: tauri::AppHandle) {
     }
 
     captura_coordenada::desactivar();
+    captura_coordenada::desactivar_preview();
+}
+
+// ======================================================
+// 👁️ PREVISUALIZACIÓN DE COORDENADA — Etapa E
+// ------------------------------------------------------
+// Mismo label/builder que abrir_ventana_captura_coordenada
+// (VENTANA_CAPTURA_COORDENADA) — el modo previsualización usa la
+// misma ventana overlay, nunca las dos a la vez (ver
+// captura_coordenada::activar_preview/activar).
+// ======================================================
+
+#[derive(Clone, Serialize, serde::Deserialize)]
+pub struct ConfigPreviewJson {
+    pub ubicacion: String,
+
+    pub modo_ventana: String,
+
+    pub punto_referencia: String,
+
+    pub x: f64,
+
+    pub y: f64,
+}
+
+#[tauri::command]
+pub async fn abrir_ventana_preview_coordenada(
+    app: tauri::AppHandle,
+    ubicacion: String,
+    modo_ventana: String,
+    punto_referencia: String,
+    x: f64,
+    y: f64,
+) -> Result<(), String> {
+    // Ver comentario largo en abrir_ventana_captura_coordenada: misma
+    // necesidad de `async fn` (deadlock de WebviewWindowBuilder::build()
+    // en Windows si se llama desde comando síncrono) y de esperar a que
+    // una ventana previa con el mismo label termine de cerrarse.
+    if let Some(existente) = app.get_webview_window(VENTANA_CAPTURA_COORDENADA) {
+        let _ = existente.close();
+
+        for _ in 0..50 {
+            if app.get_webview_window(VENTANA_CAPTURA_COORDENADA).is_none() {
+                break;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(20));
+        }
+    }
+
+    captura_coordenada::activar_preview(ubicacion, modo_ventana, punto_referencia, x, y);
+
+    WebviewWindowBuilder::new(
+        &app,
+        VENTANA_CAPTURA_COORDENADA,
+        WebviewUrl::App("captura.html".into()),
+    )
+    .title("RemapH — Captura")
+    .inner_size(320.0, 120.0)
+    .resizable(false)
+    .decorations(false)
+    .transparent(true)
+    .shadow(false)
+    .always_on_top(true)
+    .skip_taskbar(true)
+    .focused(true)
+    .devtools(true)
+    .build()
+    .map_err(|error| error.to_string())?;
+
+    Ok(())
+}
+
+#[tauri::command]
+pub fn obtener_config_preview_coordenada() -> Option<ConfigPreviewJson> {
+    captura_coordenada::obtener_config_preview().map(|config| ConfigPreviewJson {
+        ubicacion: config.ubicacion,
+        modo_ventana: config.modo_ventana,
+        punto_referencia: config.punto_referencia,
+        x: config.x,
+        y: config.y,
+    })
+}
+
+#[tauri::command]
+pub fn obtener_destino_preview_coordenada() -> Option<(i32, i32)> {
+    let config = captura_coordenada::obtener_config_preview()?;
+
+    Some(back_coordenada::calcular_destino_valores(
+        &config.ubicacion,
+        &config.modo_ventana,
+        &config.punto_referencia,
+        config.x,
+        config.y,
+    ))
+}
+
+// ======================================================
+// ▶️ PROBAR COORDENADA — Etapa F
+// ------------------------------------------------------
+// Mueve el cursor real al punto calculado, mismo camino que
+// Runtime (back_coordenada::calcular_destino_valores() +
+// mover_cursor()).
+// ======================================================
+
+#[tauri::command]
+pub fn probar_coordenada(
+    ubicacion: String,
+    modo_ventana: String,
+    punto_referencia: String,
+    x: f64,
+    y: f64,
+) {
+    let (destino_x, destino_y) =
+        back_coordenada::calcular_destino_valores(&ubicacion, &modo_ventana, &punto_referencia, x, y);
+
+    back_coordenada::mover_cursor(destino_x, destino_y);
+}
+
+// ======================================================
+// 👁️▶️ PREVISUALIZACIÓN Y PRUEBA DE GRUPO — Etapa G
+// ------------------------------------------------------
+// Extiende Etapa E/F para operar sobre todas las coordenadas
+// del filtro activo de la ventana "Coordenadas guardadas" a la
+// vez: una ventana overlay por coordenada (label
+// "captura_coordenada_grupo_{indice}"), y un solo comando que
+// mueve el cursor real por cada punto en orden.
+// ======================================================
+
+const PREFIJO_VENTANA_PREVIEW_GRUPO: &str = "captura_coordenada_grupo_";
+
+#[tauri::command]
+pub async fn abrir_ventana_preview_grupo(
+    app: tauri::AppHandle,
+    coordenadas: Vec<ConfigPreviewJson>,
+) -> Result<(), String> {
+    // Cierra cualquier ventana de grupo (u overlay individual/captura)
+    // que hubiera quedado abierta antes de levantar las nuevas.
+    cerrar_ventanas_preview_grupo(app.clone());
+
+    captura_coordenada::activar_preview_grupo(
+        coordenadas
+            .iter()
+            .map(|config| captura_coordenada::ConfigPreview {
+                ubicacion: config.ubicacion.clone(),
+                modo_ventana: config.modo_ventana.clone(),
+                punto_referencia: config.punto_referencia.clone(),
+                x: config.x,
+                y: config.y,
+            })
+            .collect(),
+    );
+
+    for indice in 0..coordenadas.len() {
+        let label = format!("{PREFIJO_VENTANA_PREVIEW_GRUPO}{indice}");
+
+        WebviewWindowBuilder::new(
+            &app,
+            label,
+            WebviewUrl::App(format!("captura.html?grupo={indice}").into()),
+        )
+        .title("RemapH — Captura")
+        .inner_size(320.0, 120.0)
+        .resizable(false)
+        .decorations(false)
+        .transparent(true)
+        .shadow(false)
+        .always_on_top(true)
+        .skip_taskbar(true)
+        .focused(false)
+        .devtools(true)
+        .build()
+        .map_err(|error| error.to_string())?;
+    }
+
+    Ok(())
+}
+
+#[tauri::command]
+pub fn cerrar_ventanas_preview_grupo(app: tauri::AppHandle) {
+    for (label, ventana) in app.webview_windows() {
+        if label.starts_with(PREFIJO_VENTANA_PREVIEW_GRUPO) {
+            let _ = ventana.close();
+        }
+    }
+
+    captura_coordenada::desactivar_preview_grupo();
+}
+
+#[tauri::command]
+pub fn obtener_destino_preview_grupo(indice: usize) -> Option<(i32, i32)> {
+    let config = captura_coordenada::obtener_config_preview_grupo(indice)?;
+
+    Some(back_coordenada::calcular_destino_valores(
+        &config.ubicacion,
+        &config.modo_ventana,
+        &config.punto_referencia,
+        config.x,
+        config.y,
+    ))
+}
+
+#[tauri::command]
+pub fn probar_grupo_coordenadas(coordenadas: Vec<ConfigPreviewJson>) {
+    for config in coordenadas {
+        let (destino_x, destino_y) = back_coordenada::calcular_destino_valores(
+            &config.ubicacion,
+            &config.modo_ventana,
+            &config.punto_referencia,
+            config.x,
+            config.y,
+        );
+
+        back_coordenada::mover_cursor(destino_x, destino_y);
+
+        std::thread::sleep(std::time::Duration::from_millis(150));
+    }
 }
 
 #[tauri::command]
@@ -860,9 +1077,93 @@ pub fn establecer_tecla_toggle_perfil(valor: String) -> Result<(), String> {
     Ok(())
 }
 
+// ======================================================
+// 📍 VENTANA "SELECCIONAR COORDENADA" — Etapa C
+// ------------------------------------------------------
+// abrir_ventana_coordenadas()
+//     Crea la ventana bajo demanda. Ventana NORMAL: con
+//     decoraciones, resizable, fondo sólido — el usuario la
+//     cierra con la X nativa, no hace falta un comando
+//     cerrar_.... Mismo criterio que abrir_ventana_
+//     configuracion(). Si ya estaba abierta, se la enfoca en
+//     vez de crear una segunda instancia.
+// ======================================================
+
+const VENTANA_COORDENADAS: &str = "coordenadas";
+
+#[tauri::command]
+pub async fn abrir_ventana_coordenadas(app: tauri::AppHandle) -> Result<(), String> {
+    if let Some(existente) = app.get_webview_window(VENTANA_COORDENADAS) {
+        let _ = existente.set_focus();
+        return Ok(());
+    }
+
+    WebviewWindowBuilder::new(
+        &app,
+        VENTANA_COORDENADAS,
+        WebviewUrl::App("coordenadas.html".into()),
+    )
+    .title("RemapH — Coordenadas")
+    .inner_size(720.0, 480.0)
+    .min_inner_size(520.0, 360.0)
+    .resizable(true)
+    .focused(true)
+    .devtools(true)
+    .build()
+    .map_err(|error| error.to_string())?;
+
+    Ok(())
+}
+
 #[tauri::command]
 pub fn obtener_intervalo_captura_coordenada() -> u64 {
     config::intervalo_captura_coordenada()
+}
+
+// ======================================================
+// 📍 COMANDOS BANCO DE COORDENADAS — Etapa A
+// ------------------------------------------------------
+// CRUD directo sobre banco_coordenadas.rs — sin traducción
+// intermedia (CoordenadaBanco ya es serializable).
+// ======================================================
+
+#[tauri::command]
+pub fn coordenadas_listar(
+    aplicacion: Option<String>,
+    tipo: Option<u8>,
+    modo: Option<u8>,
+) -> Result<Vec<banco_coordenadas::CoordenadaBanco>, String> {
+    banco_coordenadas::listar_filtrado(aplicacion.as_deref(), tipo, modo)
+}
+
+#[tauri::command]
+pub fn coordenadas_agregar(
+    coordenada: banco_coordenadas::CoordenadaBanco,
+) -> Result<banco_coordenadas::CoordenadaBanco, String> {
+    banco_coordenadas::agregar(coordenada)
+}
+
+#[tauri::command]
+pub fn seleccionar_coordenada_banco(coordenada: banco_coordenadas::CoordenadaBanco) {
+    captura_coordenada::guardar_seleccion_banco(coordenada);
+}
+
+#[tauri::command]
+pub fn obtener_seleccion_coordenada_banco() -> Option<banco_coordenadas::CoordenadaBanco> {
+    captura_coordenada::obtener_seleccion_banco()
+}
+
+#[tauri::command]
+pub fn coordenadas_editar(
+    id: String,
+    coordenada: banco_coordenadas::CoordenadaBanco,
+) -> Result<(), String> {
+    banco_coordenadas::editar(&id, coordenada)
+}
+
+#[tauri::command]
+pub fn coordenadas_eliminar(id: String) -> Result<(), String> {
+    banco_coordenadas::eliminar(&id)
 }
 
 // ======================================================

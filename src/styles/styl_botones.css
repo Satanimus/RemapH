@@ -433,6 +433,29 @@
 }
 
 /* ======================================================
+    ▶️ BOTÓN SECUNDARIO — Probar Coordenada
+    ------------------------------------------------------
+    Fantasma (mismo fondo transparente que .ui-btn) mientras
+    haya coordenada capturada; deshabilitado si todavía no.
+    ====================================================== */
+
+.popup-capa .popup-extra-probar:disabled {
+
+    opacity: 0.4;
+
+    cursor: not-allowed;
+
+}
+
+.popup-capa .popup-extra-probar:disabled:hover {
+
+    background: transparent !important;
+
+    border-color: transparent;
+
+}
+
+/* ======================================================
    📋 LISTAS POPUP
    ====================================================== */
 

@@ -1,1567 +1,564 @@
 // ======================================================
-// ⚙️ vent_configuracion_Main
+// 📌 vent_captura_Main
 // ------------------------------------------------------
-// Punto de entrada de la Ventana de Configuración
-// (configuracion.html — página independiente, ver
-// vite.config.ts).
+// Punto de entrada de la ventana overlay de "Click en
+// coordenada" (captura.html — página independiente, ver
+// vite.config.ts). Todo el cálculo de %H/%V y offsets vive
+// ACÁ, en TS — Rust solo entrega datos crudos (cursor,
+// rect+título de ventana activa) vía back_coordenada.rs.
 //
-// General/Teclas comparten la misma mecánica (tabla de 3
-// columnas, editar marca en verde, "Aplicar cambios" valida
-// y manda un lote, "Restablecer esta pestaña" borra los
-// overrides) armada una sola vez en crearPestanaEditable().
-// Apariencia y Tema usan en cambio crearPestanaApariencia()
-// (árbol Título/Subtítulo/Elemento, ver vent_configuracion_apariencia.ts)
-// sobre el mismo catálogo de apariencia.tsv, cada una mostrando
-// un subconjunto de Títulos distinto:
-//
-// • General     → configuracion_listar_general() / _guardar_lote
-//   (catálogo de config.rs, ver configuracion_usuario.rs).
-// • Teclas      → configuracion_listar_teclas() / _guardar_lote_teclas
-//   (catálogo de pulsadores.tsv, agrupado en subtítulos acá
-//   mismo — ver categorizarTecla()).
-// • Apariencia  → Texto + Dimensiones, con selector de Escala general.
-// • Tema        → Color de tema + Color de Texto + Color y opacidad
-//   de elementos, con el selector Cargar/Guardar/Renombrar/Eliminar
-//   tema.
+// Config activa (ubicación/modo/punto de referencia) se lee
+// UNA sola vez al cargar desde obtener_config_captura_activa
+// (fijada por comandos.rs justo antes de crear esta ventana
+// — sin carrera posible). Si el usuario cambia esa config en
+// el popup principal mientras esta ventana sigue abierta, el
+// popup la cierra automáticamente (ver comp_popup_coordenada.ts)
+// — acá nunca hace falta releer la config a mitad de camino.
 // ======================================================
 
 import { invoke } from "@tauri-apps/api/core";
-
-import { crearContenedorPopup } from "../componentes/comp_popup_contenedor";
-
-import {
-  crearCapturadorAtajo,
-  type AtajoCaptura,
-} from "../componentes/comp_capturador";
-
-import type { Entrada } from "../core/core_entrada";
-import { triggerAHTML, triggerATexto } from "../core/core_trigger";
+import { getCurrentWindow, PhysicalPosition } from "@tauri-apps/api/window";
 
 import { aplicarOverridesApariencia } from "../core/core_apariencia";
-import { crearPestanaApariencia } from "./vent_configuracion_apariencia";
 
 import "../styles/styl_variables.css";
-import "../styles/styl_general.css";
-import "../styles/styl_botones.css";
-import "../styles/styl_layout.css";
-import "../styles/styl_configuracion.css";
+import "../styles/styl_captura.css";
 
-// La propia Ventana de Configuración también debe reflejar el
-// tema personalizado mientras se lo edita (no solo el resto de
-// ventanas de la app).
 void aplicarOverridesApariencia();
 
 // ======================================================
-// 🧭 TIPOS COMPARTIDOS
+// 🧭 TIPOS
 // ======================================================
 
-type TipoValorConfiguracion =
-  | "numero"
-  | "numero_par"
-  | "texto"
-  | "color"
-  | "pixeles"
-  | "porcentaje"
-  | "trigger";
+interface ConfigCaptura {
+  ubicacion: "absoluta" | "relativa_cursor" | "relativa_ventana";
 
-interface FilaConfiguracion {
-  clave: string;
+  modoVentana: "porcentaje" | "pixeles";
 
-  nombreMostrado: string;
-
-  // Subtítulo bajo el que agrupar esta fila (Teclas). null
-  // = sin agrupar (General): no se insertan separadores.
-  grupo: string | null;
-
-  tipo: TipoValorConfiguracion;
-
-  valorDefecto: string;
-
-  valorPersonalizado: string | null;
+  puntoReferencia: "sup_izq" | "sup_der" | "centro" | "inf_izq" | "inf_der";
 }
 
-export interface CambioConfiguracion {
-  clave: string;
-  valor: string;
-}
+interface VentanaActiva {
+  titulo: string;
 
-export interface ErrorConfiguracion {
-  clave: string;
-  mensaje: string;
-}
+  x: number;
 
-export interface ResultadoGuardado {
-  errores: ErrorConfiguracion[];
-}
+  y: number;
 
-interface FilaMontada {
-  fila: FilaConfiguracion;
-  tr: HTMLTableRowElement;
-  inputs: HTMLInputElement[];
+  ancho: number;
 
-  // Solo para fila.tipo === "trigger" (sin <input>, ver montarFila):
-  // último atajo capturado (texto "mod,mod|gatillo", mismo formato
-  // que AtajoSimple::a_texto()) y el botón capturador, para poder
-  // refrescar su texto/HTML desde aplicarValorEnInputs (doble click
-  // en "Valor por defecto").
-  valorTrigger: string | null;
-  botonTrigger: HTMLButtonElement | null;
+  alto: number;
 }
 
 // ======================================================
-// 🏗️ ARMAR DOM BASE (pestañas + paneles)
+// 🏗️ ARMAR DOM
 // ======================================================
 
-const raiz = document.getElementById("configuracion")!;
+const raiz = document.getElementById("captura")!;
 
 const card = document.createElement("div");
-card.className = "configuracion-card";
+card.className = "captura-card";
 
-const tabs = document.createElement("div");
-tabs.className = "configuracion-tabs";
+const header = document.createElement("div");
+header.className = "captura-header";
+header.setAttribute("data-tauri-drag-region", "");
 
-const tabGeneral = crearBotonTab("General", true);
-const tabApariencia = crearBotonTab("Apariencia", false);
-const tabTema = crearBotonTab("Tema", false);
-const tabTeclas = crearBotonTab("Teclas", false);
-const tabAvanzado = crearBotonTab("Avanzado", false);
+const icono = document.createElement("span");
+icono.className = "captura-header-icono";
+icono.textContent = "⠿";
+icono.setAttribute("data-tauri-drag-region", "");
 
-const botonCarpetaUsuario = document.createElement("button");
-botonCarpetaUsuario.type = "button";
-botonCarpetaUsuario.className = "configuracion-boton-carpeta";
-botonCarpetaUsuario.title = "Abrir carpeta de usuario";
-botonCarpetaUsuario.textContent = "📁";
+const titulo = document.createElement("span");
+titulo.className = "captura-header-titulo";
+titulo.textContent = "MODO CAPTURA";
+titulo.setAttribute("data-tauri-drag-region", "");
 
-botonCarpetaUsuario.addEventListener("click", async () => {
-  try {
-    await invoke("abrir_carpeta_usuario");
-  } catch (error) {
-    window.alert(`No se pudo abrir la carpeta de usuario: ${String(error)}`);
-  }
-});
+const botonCancelar = document.createElement("button");
+botonCancelar.className = "captura-cancelar";
+botonCancelar.textContent = "Cancelar";
 
-tabs.append(
-  tabGeneral,
-  tabApariencia,
-  tabTema,
-  tabTeclas,
-  tabAvanzado,
-  botonCarpetaUsuario,
-);
+header.append(icono, titulo, botonCancelar);
 
 const cuerpo = document.createElement("div");
-cuerpo.className = "configuracion-cuerpo";
+cuerpo.className = "captura-cuerpo";
 
-const panelGeneral = document.createElement("div");
-panelGeneral.className = "configuracion-panel";
-
-const panelApariencia = document.createElement("div");
-panelApariencia.className = "configuracion-panel oculto";
-
-const panelTema = document.createElement("div");
-panelTema.className = "configuracion-panel oculto";
-
-const panelTeclas = document.createElement("div");
-panelTeclas.className = "configuracion-panel oculto";
-
-const panelAvanzado = document.createElement("div");
-panelAvanzado.className = "configuracion-panel oculto";
-
-cuerpo.append(
-  panelGeneral,
-  panelApariencia,
-  panelTema,
-  panelTeclas,
-  panelAvanzado,
-);
-
-card.append(tabs, cuerpo);
+card.append(header, cuerpo);
 raiz.append(card);
 
-// Capa de popups (crearContenedorPopup) — la ventana principal la monta
-// en ui_layout.ts; esta ventana tiene su propio documento/módulo y
-// necesita la suya propia, o mostrarPopup() (usado por el botón Editar
-// de la pestaña Apariencia) no encuentra dónde montar el contenido y no
-// hace nada.
-raiz.append(crearContenedorPopup());
-
-function crearBotonTab(texto: string, activa: boolean): HTMLButtonElement {
-  const boton = document.createElement("button");
-
-  boton.type = "button";
-
-  boton.className = activa
-    ? "configuracion-tab configuracion-tab-activa"
-    : "configuracion-tab";
-
-  boton.textContent = texto;
-
-  return boton;
-}
-
 // ======================================================
-// 🔀 CAMBIO DE PESTAÑA
-// ======================================================
-
-const paresTab: ReadonlyArray<readonly [HTMLButtonElement, HTMLDivElement]> = [
-  [tabGeneral, panelGeneral],
-  [tabApariencia, panelApariencia],
-  [tabTema, panelTema],
-  [tabTeclas, panelTeclas],
-  [tabAvanzado, panelAvanzado],
-];
-
-// Selector de temas (Pestana.elementoBarra, solo lo expone la
-// pestaña "Tema") — se asigna más abajo, junto a la barra de
-// acciones global, pero se referencia acá porque activarTab
-// controla su visibilidad.
-let elementoSelectorTema: HTMLElement | null = null;
-
-function activarTab(botonElegido: HTMLButtonElement): void {
-  for (const [boton, panel] of paresTab) {
-    const activa = boton === botonElegido;
-
-    boton.classList.toggle("configuracion-tab-activa", activa);
-
-    panel.classList.toggle("oculto", !activa);
-  }
-
-  elementoSelectorTema?.classList.toggle("oculto", botonElegido !== tabTema);
-
-  // Apariencia y Tema comparten la misma sesión de apariencia en el
-  // backend (ver refrescarDesdeOtraPestana en
-  // vent_configuracion_apariencia.ts): al entrar a una, se refleja
-  // lo que se haya cargado/tocado en la otra.
-  if (botonElegido === tabApariencia) {
-    void pestanaApariencia.refrescarDesdeOtraPestana();
-  } else if (botonElegido === tabTema) {
-    void pestanaTema.refrescarDesdeOtraPestana();
-  }
-}
-
-tabGeneral.addEventListener("click", () => activarTab(tabGeneral));
-tabApariencia.addEventListener("click", () => activarTab(tabApariencia));
-tabTema.addEventListener("click", () => activarTab(tabTema));
-tabTeclas.addEventListener("click", () => activarTab(tabTeclas));
-tabAvanzado.addEventListener("click", () => activarTab(tabAvanzado));
-
-// ======================================================
-// 🍞 TOAST (compartido por todas las pestañas)
-// ======================================================
-
-let toastTimer: ReturnType<typeof setTimeout> | null = null;
-
-function mostrarToast(texto: string): void {
-  let toast = card.querySelector<HTMLDivElement>(".configuracion-toast");
-
-  if (!toast) {
-    toast = document.createElement("div");
-    toast.className = "configuracion-toast";
-    card.append(toast);
-  }
-
-  toast.textContent = texto;
-  toast.classList.add("configuracion-toast-visible");
-
-  if (toastTimer !== null) {
-    clearTimeout(toastTimer);
-  }
-
-  toastTimer = setTimeout(() => {
-    toast?.classList.remove("configuracion-toast-visible");
-  }, 1500);
-}
-
-// ======================================================
-// 🔤 FORMATEO / VALIDACIÓN (comparte General y Teclas)
-// ======================================================
-
-function formatearValor(tipo: TipoValorConfiguracion, valor: string): string {
-  if (tipo === "numero_par") {
-    const [ancho, alto] = valor.split(",");
-    return `${(ancho ?? "").trim()} × ${(alto ?? "").trim()}`;
-  }
-
-  if (tipo === "trigger") {
-    const atajo = parsearAtajoDesdeTexto(valor);
-
-    return triggerATexto({ ...atajo, condicion: "simple" });
-  }
-
-  return valor;
-}
-
-function construirValorDesdeInputs(
-  montada: Pick<FilaMontada, "fila" | "inputs" | "valorTrigger">,
-): string {
-  const { fila, inputs, valorTrigger } = montada;
-
-  if (fila.tipo === "trigger") {
-    // Sin <input> (ver montarFila) — el valor lo dejó el capturador
-    // en valorTrigger, ya en formato "mod,mod|gatillo".
-    return valorTrigger ?? fila.valorDefecto;
-  }
-
-  if (fila.tipo === "numero_par") {
-    return `${inputs[0].value.trim()},${inputs[1].value.trim()}`;
-  }
-
-  if (fila.tipo === "pixeles") {
-    return `${inputs[0].value.trim()}px`;
-  }
-
-  if (fila.tipo === "porcentaje") {
-    return `${inputs[0].value.trim()}%`;
-  }
-
-  return inputs[0].value.trim();
-}
-
-// Espejo simple de validar_segun_tipo() / guardar_lote_pulsadores()
-// en configuracion_usuario.rs — el backend siempre revalida por su
-// cuenta; esto es solo para dar feedback inmediato sin ida y vuelta.
-function validarValor(fila: FilaConfiguracion, valor: string): string | null {
-  switch (fila.tipo) {
-    case "numero": {
-      if (!/^\d+$/.test(valor)) {
-        return "Debe ser un número entero";
-      }
-
-      return null;
-    }
-
-    case "numero_par": {
-      const partes = valor.split(",");
-
-      if (
-        partes.length !== 2 ||
-        !partes.every((parte) => /^\d+$/.test(parte.trim()))
-      ) {
-        return "Deben ser dos números enteros separados por coma";
-      }
-
-      return null;
-    }
-
-    case "texto": {
-      if (valor.trim().length === 0) {
-        return "No puede estar vacío";
-      }
-
-      return null;
-    }
-
-    case "pixeles": {
-      if (!/^\d+px$/.test(valor)) {
-        return "Debe ser un tamaño en píxeles (ej. 16px)";
-      }
-
-      return null;
-    }
-
-    case "color": {
-      if (!/^#[0-9a-fA-F]{6}$/.test(valor)) {
-        return "Color inválido (formato #RRGGBB)";
-      }
-
-      return null;
-    }
-
-    case "porcentaje": {
-      if (!/^\d{1,3}%$/.test(valor)) {
-        return "Debe ser un porcentaje (ej. 45%)";
-      }
-
-      const numero = Number(valor.slice(0, -1));
-
-      if (numero < 0 || numero > 100) {
-        return "Debe ser un porcentaje entre 0% y 100%";
-      }
-
-      return null;
-    }
-
-    case "trigger": {
-      // Espejo de AtajoSimple::desde_texto(): "mod,mod|gatillo",
-      // separador '|' presente y gatillo no vacío. El capturador
-      // (comp_capturador.ts) ya arma el texto en este formato, así
-      // que esto solo protege contra un valorTrigger corrupto.
-      const partes = valor.split("|");
-
-      if (partes.length !== 2 || partes[1].trim().length === 0) {
-        return "Atajo inválido";
-      }
-
-      return null;
-    }
-  }
-}
-
-function crearInputNumero(valorInicial: string): HTMLInputElement {
-  const input = document.createElement("input");
-
-  input.type = "number";
-  input.min = "0";
-  input.step = "1";
-  input.value = valorInicial;
-
-  return input;
-}
-
-function crearInputColor(valorInicial: string): HTMLInputElement {
-  const input = document.createElement("input");
-
-  input.type = "color";
-  input.value = valorInicial;
-
-  return input;
-}
-
-function crearInputPorcentaje(valorInicial: string): HTMLInputElement {
-  const input = document.createElement("input");
-
-  input.type = "number";
-  input.min = "0";
-  input.max = "100";
-  input.step = "1";
-  input.value = valorInicial;
-
-  return input;
-}
-
-// ======================================================
-// 🎚️ ATAJO ↔ TEXTO (espejo de AtajoSimple::a_texto() /
-// desde_texto() en config.rs) — solo para fila.tipo === "trigger".
-// ======================================================
-
-function entradaDesdeTexto(texto: string): Entrada | null {
-  const [fuente, codigo] = texto.split(":");
-
-  if (!fuente || !codigo) {
-    return null;
-  }
-
-  const tipo: Record<string, "Teclado" | "Mouse" | "Multimedia" | "Joystick"> =
-    {
-      keyboard: "Teclado",
-      mouse: "Mouse",
-      multimedia: "Multimedia",
-      joystick: "Joystick",
-    };
-
-  return { tipo: tipo[fuente] ?? "Teclado", codigo, nombre: codigo };
-}
-
-function parsearAtajoDesdeTexto(texto: string): AtajoCaptura {
-  const [modsTexto, gatilloTexto] = texto.split("|");
-
-  const modificadores = (modsTexto ?? "")
-    .split(",")
-    .filter((entrada) => entrada.length > 0)
-    .map(entradaDesdeTexto)
-    .filter((entrada): entrada is Entrada => entrada !== null);
-
-  const gatillo = gatilloTexto ? entradaDesdeTexto(gatilloTexto) : null;
-
-  return { modificadores, gatillo };
-}
-
-function atajoATexto(atajo: AtajoCaptura): string {
-  const fuente: Record<string, string> = {
-    Teclado: "keyboard",
-    Mouse: "mouse",
-    Multimedia: "multimedia",
-    Joystick: "joystick",
-  };
-
-  const mods = atajo.modificadores
-    .map((entrada) => `${fuente[entrada.tipo]}:${entrada.codigo}`)
-    .join(",");
-
-  const gatillo = atajo.gatillo
-    ? `${fuente[atajo.gatillo.tipo]}:${atajo.gatillo.codigo}`
-    : "";
-
-  return `${mods}|${gatillo}`;
-}
-
-// Inversa de construirValorDesdeInputs(): escribe valorDefecto en
-// el/los inputs de la fila según su tipo, disparando "input" en
-// cada uno para reusar el flujo normal de marcarEditando/validación
-// (ver dblclick en tdDefecto, dentro de montarFila). Para
-// fila.tipo === "trigger" no hay inputs que disparen ese evento: se
-// actualiza valorTrigger, se refresca el botón capturador y se llama
-// a marcarEditando directamente (recibida por parámetro — esta
-// función vive fuera de crearPestanaEditable, marcarEditando es
-// interna a esa fábrica).
-function aplicarValorEnInputs(
-  montada: FilaMontada,
-  valor: string,
-  marcarEditando: (clave: string, tr: HTMLTableRowElement) => void,
-): void {
-  const { fila, inputs } = montada;
-
-  if (fila.tipo === "trigger") {
-    montada.valorTrigger = valor;
-
-    if (montada.botonTrigger) {
-      const atajo = parsearAtajoDesdeTexto(valor);
-
-      montada.botonTrigger.innerHTML =
-        atajo.gatillo !== null
-          ? `<div class="trigger-contenido">${triggerAHTML({ ...atajo, condicion: "simple" })}</div>`
-          : "🚩 Capturar";
-    }
-
-    marcarEditando(fila.clave, montada.tr);
-
-    return;
-  }
-
-  if (fila.tipo === "numero_par") {
-    const [ancho, alto] = valor.split(",");
-
-    inputs[0].value = (ancho ?? "").trim();
-    inputs[1].value = (alto ?? "").trim();
-  } else if (fila.tipo === "pixeles") {
-    inputs[0].value = valor.replace(/px$/, "");
-  } else if (fila.tipo === "porcentaje") {
-    inputs[0].value = valor.replace(/%$/, "");
-  } else {
-    inputs[0].value = valor;
-  }
-
-  for (const input of inputs) {
-    input.dispatchEvent(new Event("input", { bubbles: false }));
-  }
-}
-
-// ======================================================
-// 🏭 FÁBRICA DE PESTAÑA EDITABLE (tabla + acciones)
+// 🩺 DIAGNÓSTICO EN PANTALLA
 // ------------------------------------------------------
-// Arma una tabla de 3 columnas con su estado (filas
-// montadas/editadas), mensaje de error y botones "Guardar
-// cambios" / "Restablecer esta pestaña" dentro de `panel`.
-// Quien llama solo provee de dónde salen las filas y a qué
-// comandos Tauri mandar guardado/restablecido — el resto
-// (marcar verde al editar, marcar rojo al fallar validación,
-// toast de confirmación) es idéntico para cualquier pestaña
-// que lo use.
+// F12/devtools no siempre engancha en una ventana sin
+// decoraciones — en vez de depender de la consola, cualquier
+// error o timeout se escribe directo en el cuerpo de la
+// ventana para poder verlo sin herramientas externas.
+// TODO: sacar este bloque una vez confirmado que la ventana
+// funciona de punta a punta.
 // ======================================================
 
-interface OpcionesPestana {
-  panel: HTMLDivElement;
-
-  encabezados: readonly [string, string, string];
-
-  cargarFilas: () => Promise<FilaConfiguracion[]>;
-
-  guardarLote: (cambios: CambioConfiguracion[]) => Promise<ResultadoGuardado>;
-
-  restablecer: () => Promise<void>;
-
-  textoConfirmacionRestablecer: string;
-
-  // Se llama después de un guardado o restablecido exitoso, además
-  // del toast de confirmación (solo lo usa Apariencia, para pedirle
-  // al backend que recargue el resto de ventanas y así se vea el
-  // cambio — ver configuracion_refrescar_ventanas_apariencia).
-  despuesDeAplicar?: () => Promise<void>;
+function mostrarDiagnostico(texto: string): void {
+  const linea = document.createElement("div");
+  linea.className = "captura-linea";
+  linea.style.color = "#FF6B6B";
+  linea.style.wordBreak = "break-word";
+  linea.textContent = texto;
+  cuerpo.append(linea);
 }
 
-// Resultado de intentar juntar los cambios pendientes de una pestaña,
-// sin aplicarlos todavía — usado por el botón Guardar global (ver
-// bloque "BARRA DE ACCIONES GLOBAL") para validar TODAS las pestañas
-// antes de guardar ninguna.
-interface RecoleccionCambios {
-  cambios: CambioConfiguracion[];
-  erroresLocales: string[];
-}
-
-export interface Pestana {
-  cargar: () => Promise<void>;
-
-  // API usada por la barra de acciones global en vez de botones
-  // propios de esta pestaña (ver "BARRA DE ACCIONES GLOBAL").
-  hayEdicionesPendientes: () => boolean;
-  validarYRecolectar: () => RecoleccionCambios;
-  aplicarGuardado: (
-    cambios: CambioConfiguracion[],
-  ) => Promise<ResultadoGuardado>;
-  marcarErroresGuardado: (errores: ErrorConfiguracion[]) => void;
-  limpiarEstadoTrasGuardado: () => Promise<void>;
-  restablecerPestana: () => Promise<void>;
-  textoConfirmacionRestablecer: string;
-
-  // Elemento propio de la pestaña que se monta en la barra de
-  // acciones global (ver "BARRA DE ACCIONES GLOBAL"), visible solo
-  // mientras esta pestaña está activa. Hoy solo lo usa Apariencia
-  // (botón selector de temas).
-  elementoBarra?: HTMLElement;
-}
-
-function crearPestanaEditable(opciones: OpcionesPestana): Pestana {
-  const {
-    panel,
-    encabezados,
-    cargarFilas,
-    guardarLote,
-    restablecer,
-    textoConfirmacionRestablecer,
-    despuesDeAplicar,
-  } = opciones;
-
-  // ----------------------------------------------------
-  // DOM propio de esta pestaña
-  // ----------------------------------------------------
-
-  const tabla = document.createElement("table");
-  tabla.className = "configuracion-tabla";
-
-  const thead = document.createElement("thead");
-  const trEncabezado = document.createElement("tr");
-
-  for (const texto of encabezados) {
-    const th = document.createElement("th");
-    th.textContent = texto;
-    trEncabezado.append(th);
-  }
-
-  thead.append(trEncabezado);
-
-  const tbody = document.createElement("tbody");
-
-  tabla.append(thead, tbody);
-
-  // La tabla en sí no scrollea (ver configuracion.css) — este
-  // contenedor es el que tiene overflow-y y ocupa el espacio
-  // disponible del panel, dejando que la tabla crezca a su altura
-  // natural adentro.
-  const scrollTabla = document.createElement("div");
-  scrollTabla.className = "configuracion-tabla-scroll";
-  scrollTabla.append(tabla);
-
-  const mensajeError = document.createElement("div");
-  mensajeError.className = "configuracion-error oculto";
-
-  panel.append(scrollTabla, mensajeError);
-
-  // ----------------------------------------------------
-  // Estado propio de esta pestaña
-  // ----------------------------------------------------
-
-  const filasMontadas = new Map<string, FilaMontada>();
-  const filasEditadas = new Set<string>();
-
-  function ocultarError(): void {
-    mensajeError.classList.add("oculto");
-    mensajeError.textContent = "";
-  }
-
-  function mostrarError(texto: string): void {
-    mensajeError.textContent = texto;
-    mensajeError.classList.remove("oculto");
-  }
-
-  function marcarEditando(clave: string, tr: HTMLTableRowElement): void {
-    filasEditadas.add(clave);
-
-    tr.classList.remove("configuracion-fila-error");
-    tr.classList.add("configuracion-fila-editando");
-
-    ocultarError();
-  }
-
-  function limpiarEstadoFilas(): void {
-    for (const { tr } of filasMontadas.values()) {
-      tr.classList.remove(
-        "configuracion-fila-editando",
-        "configuracion-fila-error",
+function conTimeout<T>(
+  promesa: Promise<T>,
+  ms: number,
+  etiqueta: string,
+): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      reject(
+        new Error(
+          `Timeout (${ms}ms) esperando "${etiqueta}" — el invoke nunca resolvió ni rechazó.`,
+        ),
       );
-    }
+    }, ms);
 
-    filasEditadas.clear();
-  }
-
-  // ----------------------------------------------------
-  // Montar filas (+ separador de subtítulo si `grupo` cambia)
-  // ----------------------------------------------------
-
-  function montarFilaSubtitulo(texto: string): void {
-    const tr = document.createElement("tr");
-    tr.className = "configuracion-subtitulo";
-
-    const td = document.createElement("td");
-    td.colSpan = encabezados.length;
-    td.textContent = texto;
-
-    tr.append(td);
-    tbody.append(tr);
-  }
-
-  function montarFila(fila: FilaConfiguracion): void {
-    const tr = document.createElement("tr");
-
-    const tdNombre = document.createElement("td");
-    tdNombre.textContent = fila.nombreMostrado;
-
-    const tdDefecto = document.createElement("td");
-    tdDefecto.className = "configuracion-valor-defecto";
-
-    if (fila.tipo === "color") {
-      const envoltorioSwatch = document.createElement("span");
-      envoltorioSwatch.className = "configuracion-swatch-wrap";
-
-      const swatch = document.createElement("span");
-      swatch.className = "configuracion-swatch";
-      swatch.style.backgroundColor = fila.valorDefecto;
-
-      envoltorioSwatch.append(
-        swatch,
-        document.createTextNode(formatearValor(fila.tipo, fila.valorDefecto)),
-      );
-
-      tdDefecto.append(envoltorioSwatch);
-    } else {
-      tdDefecto.textContent = formatearValor(fila.tipo, fila.valorDefecto);
-    }
-
-    const tdPersonalizado = document.createElement("td");
-    tdPersonalizado.className = "configuracion-valor-personalizado";
-
-    const valorActual = fila.valorPersonalizado ?? fila.valorDefecto;
-
-    const inputs: HTMLInputElement[] = [];
-
-    // Fila montada real, referenciada por el capturador (rama
-    // "trigger") y por el dblclick de tdDefecto — se completa antes
-    // de armar el contenido de tdPersonalizado porque ambos la
-    // necesitan por referencia (no una copia).
-    const montada: FilaMontada = {
-      fila,
-      tr,
-      inputs,
-      valorTrigger: fila.tipo === "trigger" ? valorActual : null,
-      botonTrigger: null,
-    };
-
-    if (fila.tipo === "trigger") {
-      // Sin <input>: reusa el Botón Capturador (Regla 7) en vez del
-      // input de texto plano — este tipo nunca cae en el `else`
-      // genérico de abajo.
-      const boton = crearCapturadorAtajo(
-        fila.clave as "tecla_guardar_coordenada" | "tecla_toggle_perfil",
-        parsearAtajoDesdeTexto(valorActual),
-        (atajo) => {
-          montada.valorTrigger = atajoATexto(atajo);
-          marcarEditando(fila.clave, tr);
-        },
-      );
-
-      montada.botonTrigger = boton;
-
-      tdPersonalizado.append(boton);
-    } else if (fila.tipo === "numero_par") {
-      const [ancho, alto] = valorActual.split(",");
-
-      const inputAncho = crearInputNumero((ancho ?? "").trim());
-      const inputAlto = crearInputNumero((alto ?? "").trim());
-
-      inputs.push(inputAncho, inputAlto);
-
-      const envoltorio = document.createElement("div");
-      envoltorio.className = "configuracion-par";
-      envoltorio.append(inputAncho, document.createTextNode("×"), inputAlto);
-
-      tdPersonalizado.append(envoltorio);
-    } else if (fila.tipo === "numero") {
-      const input = crearInputNumero(valorActual);
-
-      inputs.push(input);
-
-      tdPersonalizado.append(input);
-    } else if (fila.tipo === "pixeles") {
-      // valorActual siempre trae el sufijo "px" (ver
-      // configuracion_listar_apariencia) — el input numérico solo
-      // edita el número, el "px" se reapendea al construir el valor
-      // (ver construirValorDesdeInputs).
-      const input = crearInputNumero(valorActual.replace(/px$/, ""));
-
-      inputs.push(input);
-
-      tdPersonalizado.append(input);
-    } else if (fila.tipo === "color") {
-      const input = crearInputColor(valorActual);
-
-      inputs.push(input);
-
-      tdPersonalizado.append(input);
-    } else if (fila.tipo === "porcentaje") {
-      // Mismo criterio que "pixeles": valorActual siempre trae el
-      // sufijo "%" (ver configuracion_listar_apariencia) — el input
-      // numérico solo edita el número, el "%" se reapendea al
-      // construir el valor (ver construirValorDesdeInputs).
-      const input = crearInputPorcentaje(valorActual.replace(/%$/, ""));
-
-      inputs.push(input);
-
-      tdPersonalizado.append(input);
-    } else {
-      const input = document.createElement("input");
-      input.type = "text";
-      input.value = valorActual;
-
-      inputs.push(input);
-
-      tdPersonalizado.append(input);
-    }
-
-    for (const input of inputs) {
-      input.addEventListener("input", () => marcarEditando(fila.clave, tr));
-    }
-
-    // Doble click en "Valor por defecto" → lo copia a "Valor
-    // personalizado" (spec: acceso rápido para restablecer una
-    // sola fila sin pasar por "Restablecer esta pestaña", que
-    // afecta a todas).
-    tdDefecto.title = "Doble click para usar este valor";
-    tdDefecto.addEventListener("dblclick", () => {
-      aplicarValorEnInputs(montada, fila.valorDefecto, marcarEditando);
-    });
-
-    tr.append(tdNombre, tdDefecto, tdPersonalizado);
-    tbody.append(tr);
-
-    filasMontadas.set(fila.clave, montada);
-  }
-
-  // ----------------------------------------------------
-  // Cargar (fábrica + overrides)
-  // ----------------------------------------------------
-
-  async function cargar(): Promise<void> {
-    tbody.innerHTML = "";
-    filasMontadas.clear();
-    filasEditadas.clear();
-    ocultarError();
-
-    let filas: FilaConfiguracion[];
-
-    try {
-      filas = await cargarFilas();
-    } catch (error) {
-      mostrarError(`No se pudo cargar: ${String(error)}`);
-      return;
-    }
-
-    let ultimoGrupo: string | null = null;
-
-    for (const fila of filas) {
-      if (fila.grupo !== null && fila.grupo !== ultimoGrupo) {
-        montarFilaSubtitulo(fila.grupo);
-        ultimoGrupo = fila.grupo;
-      }
-
-      montarFila(fila);
-    }
-  }
-
-  // ----------------------------------------------------
-  // Aplicar cambios
-  // ----------------------------------------------------
-
-  // ----------------------------------------------------
-  // Aplicar cambios (API para la barra global — ver
-  // "BARRA DE ACCIONES GLOBAL")
-  // ----------------------------------------------------
-
-  function hayEdicionesPendientes(): boolean {
-    return filasEditadas.size > 0;
-  }
-
-  // Valida y arma la lista de cambios de ESTA pestaña, sin aplicar
-  // nada todavía — la barra global junta esto de las 4 pestañas antes
-  // de guardar cualquiera (ver Aplicar cambios / errorConsulta P2).
-  function validarYRecolectar(): RecoleccionCambios {
-    ocultarError();
-
-    const cambios: CambioConfiguracion[] = [];
-    const erroresLocales: string[] = [];
-
-    for (const clave of filasEditadas) {
-      const montada = filasMontadas.get(clave);
-
-      if (!montada) {
-        continue;
-      }
-
-      const valor = construirValorDesdeInputs(montada);
-      const error = validarValor(montada.fila, valor);
-
-      if (error) {
-        montada.tr.classList.remove("configuracion-fila-editando");
-        montada.tr.classList.add("configuracion-fila-error");
-
-        erroresLocales.push(`${montada.fila.nombreMostrado}: ${error}`);
-
-        continue;
-      }
-
-      cambios.push({ clave, valor });
-    }
-
-    if (erroresLocales.length > 0) {
-      mostrarError(erroresLocales.join(" · "));
-    }
-
-    return { cambios, erroresLocales };
-  }
-
-  function marcarErroresGuardado(errores: ErrorConfiguracion[]): void {
-    for (const error of errores) {
-      const montada = filasMontadas.get(error.clave);
-
-      if (montada) {
-        montada.tr.classList.remove("configuracion-fila-editando");
-        montada.tr.classList.add("configuracion-fila-error");
-      }
-    }
-
-    mostrarError(
-      errores
-        .map((error) => {
-          const nombre =
-            filasMontadas.get(error.clave)?.fila.nombreMostrado ?? error.clave;
-
-          return `${nombre}: ${error.mensaje}`;
-        })
-        .join(" · "),
+    promesa.then(
+      (valor) => {
+        clearTimeout(timer);
+        resolve(valor);
+      },
+      (error) => {
+        clearTimeout(timer);
+        reject(error);
+      },
     );
-  }
-
-  async function limpiarEstadoTrasGuardado(): Promise<void> {
-    limpiarEstadoFilas();
-
-    if (despuesDeAplicar) {
-      await despuesDeAplicar();
-    }
-  }
-
-  // ----------------------------------------------------
-  // Restablecer esta pestaña (API para la barra global)
-  // ----------------------------------------------------
-
-  async function restablecerPestana(): Promise<void> {
-    await restablecer();
-    await cargar();
-
-    if (despuesDeAplicar) {
-      await despuesDeAplicar();
-    }
-  }
-
-  return {
-    cargar,
-    hayEdicionesPendientes,
-    validarYRecolectar,
-    aplicarGuardado: guardarLote,
-    marcarErroresGuardado,
-    limpiarEstadoTrasGuardado,
-    restablecerPestana,
-    textoConfirmacionRestablecer,
-  };
-}
-
-// ======================================================
-// ⚙️ PESTAÑA GENERAL
-// ======================================================
-
-// Modelo tal cual lo entrega configuracion_listar_general (snake_case).
-interface FilaGeneralCruda {
-  clave: string;
-  nombre_ui: string;
-  tipo: string;
-  valor_defecto: string;
-  valor_personalizado: string | null;
-}
-
-// Claves de configuracion.tsv que se muestran en la pestaña
-// Apariencia (tamaños de botón/texto de MenuExpress y Portapapeles)
-// en vez de en General — mismo catálogo backend (config.rs /
-// configuracion_listar_general), solo cambia dónde se ven y con qué
-// subconjunto se restablece cada "Restablecer esta pestaña" (ver
-// configuracion_restablecer_claves). Declarada acá porque General la
-// usa para excluirlas de su tabla; Apariencia la importa más abajo.
-const CLAVES_TAMANOS_EN_APARIENCIA: readonly string[] = [
-  "menu_boton_pequeno",
-  "menu_boton_mediano",
-  "menu_boton_grande",
-  "menu_texto_pequeno",
-  "menu_texto_mediano",
-  "menu_texto_grande",
-  "portapapeles_boton_pequeno",
-  "portapapeles_boton_mediano",
-  "portapapeles_boton_grande",
-];
-
-// Agrupa el resto de General en dos categorías: "Varios" arriba
-// (tecla de atajo, sensibilidad, paso de volumen — todo lo que no es
-// un tiempo) y "Tiempo (ms)" abajo (todas las claves de temporización
-// del catálogo). Cualquier clave nueva que no sea de tiempo cae en
-// "Varios" por defecto (catch-all), así que sigue viéndose aunque no
-// esté prevista acá.
-function grupoGeneral(clave: string, nombreUi: string): string {
-  if (clave.startsWith("tiempo_") || clave.startsWith("delay_")) {
-    return "Tiempo (ms)";
-  }
-
-  return nombreUi.includes("(ms)") ? "Tiempo (ms)" : "Varios";
-}
-
-const pestanaGeneral = crearPestanaEditable({
-  panel: panelGeneral,
-
-  encabezados: ["Nombre", "Valor por defecto", "Valor personalizado"],
-
-  cargarFilas: async () => {
-    const crudas = await invoke<FilaGeneralCruda[]>(
-      "configuracion_listar_general",
-    );
-
-    const propiasDeGeneral = crudas.filter(
-      (cruda) => !CLAVES_TAMANOS_EN_APARIENCIA.includes(cruda.clave),
-    );
-
-    // "Varios" antes que "Tiempo (ms)" (ver montarFilaSubtitulo /
-    // ultimoGrupo en crearPestanaEditable: el orden de salida define
-    // el orden de las secciones, no hay sort propio acá).
-    const orden = ["Varios", "Tiempo (ms)"];
-
-    const filas = propiasDeGeneral.map((cruda) => ({
-      clave: cruda.clave,
-      nombreMostrado: cruda.nombre_ui,
-      grupo: grupoGeneral(cruda.clave, cruda.nombre_ui),
-      tipo: cruda.tipo as TipoValorConfiguracion,
-      valorDefecto: cruda.valor_defecto,
-      valorPersonalizado: cruda.valor_personalizado,
-    }));
-
-    filas.sort((a, b) => orden.indexOf(a.grupo) - orden.indexOf(b.grupo));
-
-    return filas;
-  },
-
-  guardarLote: (cambios) =>
-    invoke<ResultadoGuardado>("configuracion_guardar_lote", { cambios }),
-
-  restablecer: async () => {
-    const crudas = await invoke<FilaGeneralCruda[]>(
-      "configuracion_listar_general",
-    );
-
-    const clavesPropias = crudas
-      .map((cruda) => cruda.clave)
-      .filter((clave) => !CLAVES_TAMANOS_EN_APARIENCIA.includes(clave));
-
-    await invoke("configuracion_restablecer_claves", {
-      claves: clavesPropias,
-    });
-  },
-
-  textoConfirmacionRestablecer:
-    "¿Restablecer todos los valores de General a los de fábrica? " +
-    "Se pierden los valores personalizados de esta pestaña.",
-});
-
-// ======================================================
-// ⌨️ PESTAÑA TECLAS (Etapa 5)
-// ------------------------------------------------------
-// El backend (configuracion_listar_teclas) no agrupa por
-// subtítulo, solo manda "fuente" (keyboard/mouse) como
-// pista — la categoría de cada tecla se decide acá mismo,
-// con reglas sobre el nombre interno. Una tecla nueva que no
-// matchee ninguna regla cae en "Símbolos" (catch-all), así
-// que sigue viéndose en la tabla aunque no esté prevista.
-// ======================================================
-
-type CategoriaTecla =
-  | "Letras"
-  | "Números"
-  | "Teclado numérico"
-  | "Funciones"
-  | "Especiales"
-  | "Símbolos"
-  | "Mouse";
-
-const INTERNOS_ESPECIALES = new Set([
-  "Enter",
-  "Escape",
-  "Backspace",
-  "Tab",
-  "Space",
-  "Left",
-  "Up",
-  "Right",
-  "Down",
-  "Home",
-  "End",
-  "PageUp",
-  "PageDown",
-  "Insert",
-  "Delete",
-  "CapsLock",
-  "NumLock",
-  "ScrollLock",
-  "PrintScreen",
-  "LeftShift",
-  "RightShift",
-  "LeftControl",
-  "RightControl",
-  "LeftAlt",
-  "RightAlt",
-]);
-
-const INTERNOS_TECLADO_NUMERICO_EXTRA = new Set([
-  "Multiply",
-  "Add",
-  "Subtract",
-  "Decimal",
-  "Divide",
-]);
-
-function categorizarTecla(interno: string, fuente: string): CategoriaTecla {
-  if (fuente === "mouse") {
-    return "Mouse";
-  }
-
-  if (/^[A-Z]$/.test(interno)) {
-    return "Letras";
-  }
-
-  if (/^Num\d$/.test(interno)) {
-    return "Números";
-  }
-
-  if (
-    /^NumPad\d$/.test(interno) ||
-    INTERNOS_TECLADO_NUMERICO_EXTRA.has(interno)
-  ) {
-    return "Teclado numérico";
-  }
-
-  if (/^F\d{1,2}$/.test(interno)) {
-    return "Funciones";
-  }
-
-  if (INTERNOS_ESPECIALES.has(interno)) {
-    return "Especiales";
-  }
-
-  return "Símbolos";
-}
-
-const ORDEN_CATEGORIAS: readonly CategoriaTecla[] = [
-  "Letras",
-  "Números",
-  "Teclado numérico",
-  "Funciones",
-  "Especiales",
-  "Símbolos",
-  "Mouse",
-];
-
-// Modelo tal cual lo entrega configuracion_listar_teclas (snake_case).
-interface FilaTeclaCruda {
-  interno: string;
-  fuente: string;
-  nombre_fabrica: string;
-  nombre_personalizado: string | null;
-}
-
-const pestanaTeclas = crearPestanaEditable({
-  panel: panelTeclas,
-
-  encabezados: ["Tecla", "Nombre de fábrica", "Nombre personalizado"],
-
-  cargarFilas: async () => {
-    const crudas = await invoke<FilaTeclaCruda[]>(
-      "configuracion_listar_teclas",
-    );
-
-    const filas = crudas.map((cruda) => ({
-      clave: cruda.interno,
-      nombreMostrado: cruda.interno,
-      grupo: categorizarTecla(cruda.interno, cruda.fuente) as string,
-      tipo: "texto" as TipoValorConfiguracion,
-      valorDefecto: cruda.nombre_fabrica,
-      valorPersonalizado: cruda.nombre_personalizado,
-    }));
-
-    // pulsadores.tsv ya viene ordenado por categoría, pero se
-    // reordena acá explícitamente según ORDEN_CATEGORIAS para no
-    // depender de ese orden implícito si el .tsv cambia.
-    return filas.sort(
-      (a, b) =>
-        ORDEN_CATEGORIAS.indexOf(a.grupo as CategoriaTecla) -
-        ORDEN_CATEGORIAS.indexOf(b.grupo as CategoriaTecla),
-    );
-  },
-
-  guardarLote: (cambios) =>
-    invoke<ResultadoGuardado>("configuracion_guardar_lote_teclas", {
-      cambios,
-    }),
-
-  restablecer: async () => {
-    await invoke("configuracion_restablecer_seccion", {
-      prefijo: "pulsador.",
-    });
-  },
-
-  textoConfirmacionRestablecer:
-    "¿Restablecer todos los nombres de Teclas a los de fábrica? " +
-    "Se pierden los nombres personalizados de esta pestaña.",
-});
-
-// aplicarOverridesApariencia() actualiza ESTA ventana (la Ventana de
-// Configuración queda afuera del reload que hace el backend — ver
-// configuracion_refrescar_ventanas_apariencia), así que después de
-// cualquier cambio hay que llamarla acá a mano, además de pedirle al
-// backend que recargue el resto.
-async function refrescarTrasCambioApariencia(): Promise<void> {
-  await aplicarOverridesApariencia();
-  await invoke("configuracion_refrescar_ventanas_apariencia");
-}
-
-// (nota etapa H pendiente: la fusión de CLAVES_TAMANOS_EN_APARIENCIA
-// al guardar/restablecer, que vivía acá, se reintroduce cuando
-// crearPestanaApariencia tenga persistencia real.)
-//
-// Apariencia = Texto + Dimensiones (con selector de Escala general).
-// Tema = Color de tema + Color de Texto + Color y opacidad de
-// elementos (con el selector Cargar/Guardar/Renombrar/Eliminar
-// tema). Ambas comparten el mismo catálogo/sesión de apariencia en
-// el backend — ver apariencia.tsv y refrescarDesdeOtraPestana.
-const pestanaApariencia = crearPestanaApariencia(
-  panelApariencia,
-  refrescarTrasCambioApariencia,
-  {
-    grupos: ["texto", "dimensiones"],
-    incluirSelectorTema: false,
-    incluirEscala: true,
-    textoConfirmacionRestablecer:
-      "¿Restablecer Texto y Dimensiones a los valores de fábrica? " +
-      "Se pierden los valores personalizados de esta pestaña.",
-  },
-);
-
-const pestanaTema = crearPestanaApariencia(
-  panelTema,
-  refrescarTrasCambioApariencia,
-  {
-    grupos: ["color-tema", "color-texto", "color-opacidad-elementos"],
-    incluirSelectorTema: true,
-    incluirEscala: false,
-    textoConfirmacionRestablecer:
-      "¿Restablecer todos los valores de Tema a los de fábrica? " +
-      "Se pierden los valores personalizados de esta pestaña.",
-  },
-);
-
-// ======================================================
-// 🛠️ PESTAÑA AVANZADO
-// ------------------------------------------------------
-// Selector de modo de motor (Interception / Portable). No usa
-// crearPestanaEditable (no es una tabla), pero expone la misma
-// interfaz Pestana para integrarse con la barra de acciones global
-// (ver "BARRA DE ACCIONES GLOBAL"): tocar el selector solo marca un
-// cambio pendiente, sin aplicar nada hasta "Aplicar cambios".
-// ======================================================
-
-const tituloModoMotor = document.createElement("h3");
-tituloModoMotor.className = "configuracion-avanzado-titulo";
-tituloModoMotor.textContent = "Motor de entrada/salida";
-
-const selectorModoMotor = document.createElement("select");
-selectorModoMotor.className = "configuracion-avanzado-select";
-
-const opcionInterception = document.createElement("option");
-opcionInterception.value = "Interception";
-opcionInterception.textContent = "Driver (Interception)";
-
-const opcionPortable = document.createElement("option");
-opcionPortable.value = "Portable";
-opcionPortable.textContent = "Portable";
-
-selectorModoMotor.append(opcionInterception, opcionPortable);
-
-panelAvanzado.append(tituloModoMotor, selectorModoMotor);
-
-// Último modo confirmado por el backend (no el elegido en el
-// <select>, que puede tener un cambio pendiente sin guardar todavía).
-let modoMotorActivo = "Interception";
-
-async function cargarModoMotor(): Promise<void> {
-  modoMotorActivo = await invoke<string>("motor_obtener_modo");
-  selectorModoMotor.value = modoMotorActivo;
-}
-
-function hayEdicionPendienteModoMotor(): boolean {
-  return selectorModoMotor.value !== modoMotorActivo;
-}
-
-async function guardarModoMotor(): Promise<void> {
-  await invoke("motor_solicitar_cambio_modo", {
-    modo: selectorModoMotor.value,
   });
-
-  modoMotorActivo = selectorModoMotor.value;
 }
-
-async function restablecerModoMotor(): Promise<void> {
-  selectorModoMotor.value = modoMotorActivo;
-}
-
-const pestanaAvanzado: Pestana = {
-  cargar: cargarModoMotor,
-  hayEdicionesPendientes: hayEdicionPendienteModoMotor,
-
-  // Sin validación posible (es un <select> de dos opciones fijas):
-  // si hay cambio pendiente, se recolecta como un único "cambio" sin
-  // clave real — Aplicar cambios global lo aplica llamando a
-  // guardarModoMotor() en vez de pasar por guardarLote genérico (ver
-  // manejo especial en el bloque "BARRA DE ACCIONES GLOBAL").
-  validarYRecolectar: () => ({ cambios: [], erroresLocales: [] }),
-  aplicarGuardado: async () => ({ errores: [] }),
-  marcarErroresGuardado: () => {},
-
-  limpiarEstadoTrasGuardado: async () => {},
-  restablecerPestana: restablecerModoMotor,
-
-  textoConfirmacionRestablecer:
-    "¿Restablecer el motor seleccionado al modo activo actual?",
-};
 
 // ======================================================
-// 🧭 BARRA DE ACCIONES GLOBAL
-// ------------------------------------------------------
-// Única y fija para las 4 pestañas: "Aplicar cambios" junta y guarda
-// los cambios pendientes de TODAS las pestañas (no solo la activa).
-// "Restablecer esta pestaña" actúa solo sobre la pestaña activa
-// (título/mensaje cambia según cuál sea).
+// 🚪 CERRAR (sin guardar)
 // ======================================================
 
-const TODAS_LAS_PESTANAS: ReadonlyArray<readonly [HTMLButtonElement, Pestana]> =
-  [
-    [tabGeneral, pestanaGeneral],
-    [tabApariencia, pestanaApariencia],
-    [tabTema, pestanaTema],
-    [tabTeclas, pestanaTeclas],
-    [tabAvanzado, pestanaAvanzado],
-  ];
-
-const filaAcciones = document.createElement("div");
-filaAcciones.className = "configuracion-fila-slot";
-
-const barraGlobal = document.createElement("div");
-barraGlobal.className = "configuracion-acciones";
-
-const botonRestablecerGlobal = document.createElement("button");
-botonRestablecerGlobal.type = "button";
-botonRestablecerGlobal.className = "configuracion-boton";
-botonRestablecerGlobal.textContent = "Restablecer esta pestaña";
-
-const botonGuardarGlobal = document.createElement("button");
-botonGuardarGlobal.type = "button";
-botonGuardarGlobal.className =
-  "configuracion-boton configuracion-boton-primario";
-botonGuardarGlobal.textContent = "Aplicar cambios";
-
-barraGlobal.append(botonRestablecerGlobal, botonGuardarGlobal);
-
-if (pestanaTema.elementoBarra) {
-  elementoSelectorTema = pestanaTema.elementoBarra;
-  barraGlobal.prepend(elementoSelectorTema);
-}
-
-filaAcciones.append(barraGlobal);
-
-// --------------------------------------------------------
-// Fila de confirmación (reemplaza el window.confirm() nativo
-// de "Restablecer esta pestaña") — misma barra inferior, se
-// alarga hacia arriba mostrando el mensaje + Cancelar/
-// Confirmar en vez de abrir un popup del sistema aparte.
-// --------------------------------------------------------
-
-const filaConfirmacionSlot = document.createElement("div");
-filaConfirmacionSlot.className = "configuracion-fila-slot oculto";
-
-const filaConfirmacion = document.createElement("div");
-filaConfirmacion.className = "configuracion-confirmacion";
-
-const textoConfirmacion = document.createElement("span");
-textoConfirmacion.className = "configuracion-confirmacion-texto";
-
-const botonCancelarConfirmacion = document.createElement("button");
-botonCancelarConfirmacion.type = "button";
-botonCancelarConfirmacion.className = "configuracion-boton";
-botonCancelarConfirmacion.textContent = "Cancelar";
-
-const botonConfirmarConfirmacion = document.createElement("button");
-botonConfirmarConfirmacion.type = "button";
-botonConfirmarConfirmacion.className =
-  "configuracion-boton configuracion-boton-primario";
-botonConfirmarConfirmacion.textContent = "Restablecer";
-
-filaConfirmacion.append(
-  textoConfirmacion,
-  botonCancelarConfirmacion,
-  botonConfirmarConfirmacion,
-);
-filaConfirmacionSlot.append(filaConfirmacion);
-
-const barraAcciones = document.createElement("div");
-barraAcciones.className = "configuracion-barra";
-barraAcciones.append(filaConfirmacionSlot, filaAcciones);
-
-card.append(barraAcciones);
-
-function pestanaActiva(): Pestana {
-  const par = TODAS_LAS_PESTANAS.find(([boton]) =>
-    boton.classList.contains("configuracion-tab-activa"),
-  );
-
-  return par ? par[1] : pestanaGeneral;
-}
-
-botonRestablecerGlobal.addEventListener("click", () => {
-  const activa = pestanaActiva();
-
-  textoConfirmacion.textContent = activa.textoConfirmacionRestablecer;
-
-  filaAcciones.classList.add("oculto");
-  filaConfirmacionSlot.classList.remove("oculto");
+botonCancelar.addEventListener("click", () => {
+  mostrarDiagnostico("Cancelar clickeado, invocando cierre...");
+  cerrar();
 });
 
-botonCancelarConfirmacion.addEventListener("click", () => {
-  filaConfirmacionSlot.classList.add("oculto");
-  filaAcciones.classList.remove("oculto");
+// Regla 7: Esc cancela esta ventana (equivalente a Cancelar).
+document.addEventListener("keydown", (evento) => {
+  if (evento.key === "Escape") cerrar();
 });
 
-botonConfirmarConfirmacion.addEventListener("click", async () => {
-  const activa = pestanaActiva();
+function cerrar(): void {
+  detenerPolling();
 
-  botonConfirmarConfirmacion.disabled = true;
-  botonCancelarConfirmacion.disabled = true;
-
-  try {
-    await activa.restablecerPestana();
-    mostrarToast("✅ Restablecido");
-  } catch (error) {
-    window.alert(`No se pudo restablecer: ${String(error)}`);
-  } finally {
-    botonConfirmarConfirmacion.disabled = false;
-    botonCancelarConfirmacion.disabled = false;
-
-    filaConfirmacionSlot.classList.add("oculto");
-    filaAcciones.classList.remove("oculto");
-  }
-});
-
-botonGuardarGlobal.addEventListener("click", async () => {
-  const huboCambioModo = pestanaAvanzado.hayEdicionesPendientes();
-
-  // Junta y valida los cambios pendientes de las 3 pestañas de
-  // tabla. Si CUALQUIERA falla, se bloquea el guardado completo (no
-  // se guarda nada, ni siquiera lo válido de otras pestañas) — ver
-  // respuesta a la consulta sobre errores en pestaña no activa.
-  const recolecciones = [
-    pestanaGeneral,
-    pestanaApariencia,
-    pestanaTema,
-    pestanaTeclas,
-  ].map((pestana) => ({ pestana, resultado: pestana.validarYRecolectar() }));
-
-  const huboErrores = recolecciones.some(
-    ({ resultado }) => resultado.erroresLocales.length > 0,
-  );
-
-  if (huboErrores) {
-    return;
-  }
-
-  if (
-    !huboCambioModo &&
-    recolecciones.every(
-      ({ pestana, resultado }) =>
-        resultado.cambios.length === 0 && !pestana.hayEdicionesPendientes(),
+  invoke("cerrar_ventana_captura_coordenada")
+    .then(() =>
+      mostrarDiagnostico("cerrar_ventana_captura_coordenada resolvió OK."),
     )
-  ) {
+    .catch((error) => mostrarDiagnostico(`Error al cerrar: ${String(error)}`));
+}
+
+// ======================================================
+// 📐 PUNTO DE REFERENCIA → COORDENADA ABSOLUTA
+// ------------------------------------------------------
+// Espejo de punto_referencia_absoluto() en back_coordenada.rs.
+// ======================================================
+
+function puntoReferenciaAbsoluto(
+  referencia: ConfigCaptura["puntoReferencia"],
+  ventana: VentanaActiva,
+): { x: number; y: number } {
+  switch (referencia) {
+    case "sup_izq":
+      return { x: ventana.x, y: ventana.y };
+
+    case "sup_der":
+      return { x: ventana.x + ventana.ancho, y: ventana.y };
+
+    case "centro":
+      return {
+        x: ventana.x + ventana.ancho / 2,
+        y: ventana.y + ventana.alto / 2,
+      };
+
+    case "inf_izq":
+      return { x: ventana.x, y: ventana.y + ventana.alto };
+
+    case "inf_der":
+      return { x: ventana.x + ventana.ancho, y: ventana.y + ventana.alto };
+  }
+}
+
+// ======================================================
+// 🏷️ TEXTO PUNTO DE REFERENCIA
+// ======================================================
+
+function textoPuntoReferencia(
+  referencia: ConfigCaptura["puntoReferencia"],
+): string {
+  switch (referencia) {
+    case "sup_izq":
+      return "Sup-Izq";
+    case "sup_der":
+      return "Sup-Der";
+    case "centro":
+      return "Centro";
+    case "inf_izq":
+      return "Inf-Izq";
+    case "inf_der":
+      return "Inf-Der";
+  }
+}
+
+// ======================================================
+// ⏱️ ESTADO DE POLLING
+// ======================================================
+
+let intervaloId: ReturnType<typeof setInterval> | null = null;
+
+function detenerPolling(): void {
+  if (intervaloId !== null) {
+    clearInterval(intervaloId);
+    intervaloId = null;
+  }
+}
+
+// Estado del paso 1/2 exclusivo de "Relativa a cursor".
+let pasoRelativaCursor: 1 | 2 = 1;
+let origenRelativaCursor: { x: number; y: number } | null = null;
+
+// Tecla de guardado configurada (config.rs — "F1" por defecto). Se
+// consulta una sola vez al cargar, igual que el resto de la config
+// activa — se usa en los textos de instrucción en vez del genérico
+// "la tecla configurada".
+let teclaGuardar = "F1";
+
+// ======================================================
+// 💾 GUARDAR RESULTADO Y CERRAR
+// ======================================================
+
+function guardarYcerrar(x: number, y: number): void {
+  detenerPolling();
+
+  invoke("guardar_resultado_coordenada", { x, y }).catch(() => {});
+
+  cuerpo.innerHTML = "";
+  const feedback = document.createElement("div");
+  feedback.className = "captura-guardado";
+  feedback.textContent = "✅ Guardado";
+  cuerpo.append(feedback);
+
+  setTimeout(() => {
+    invoke("cerrar_ventana_captura_coordenada").catch(() => {});
+  }, 500);
+}
+
+// ======================================================
+// 👁️ MODO PREVISUALIZACIÓN (Etapa E)
+// ------------------------------------------------------
+// Marcador "X" en vivo, sin header/Cancelar/texto de
+// diagnóstico. El destino ya viene calculado desde Rust
+// (obtener_destino_preview_coordenada) — acá solo se
+// reposiciona la ventana para centrar el marcador sobre el
+// punto. Mitades fijas: la ventana overlay siempre se crea
+// con inner_size(320, 120) (ver abrir_ventana_preview_coordenada
+// en comandos.rs), no es resizable.
+//
+// x/y llegan en coordenadas FÍSICAS (mismo sistema que
+// GetCursorPos/GetWindowRect en back_coordenada.rs — ver el
+// comentario largo sobre esto en back_menu_express.rs::
+// monitor_para_punto). Mezclar eso con LogicalPosition rompe el
+// posicionamiento en cualquier monitor con escalado != 100%: por
+// eso acá se posiciona con PhysicalPosition, convirtiendo la
+// mitad de ventana (lógica, 160x60) a físico vía scaleFactor().
+// ======================================================
+
+const MITAD_ANCHO_PREVIEW_LOGICO = 160;
+const MITAD_ALTO_PREVIEW_LOGICO = 60;
+
+async function iniciarPreview(indiceGrupo: number | null): Promise<void> {
+  raiz.innerHTML = "";
+
+  const marcador = document.createElement("div");
+  marcador.className = "captura-marcador-x";
+  marcador.textContent = "X";
+  raiz.append(marcador);
+
+  let intervaloMs = 100;
+
+  try {
+    intervaloMs = await conTimeout(
+      invoke<number>("obtener_intervalo_captura_coordenada"),
+      3000,
+      "obtener_intervalo_captura_coordenada",
+    );
+  } catch {
+    // Sin diagnóstico visible en este modo — se sigue con 100ms.
+  }
+
+  const ventana = getCurrentWindow();
+  const escala = await ventana.scaleFactor();
+
+  intervaloId = setInterval(
+    () => void actualizarPreview(ventana, escala, indiceGrupo),
+    intervaloMs,
+  );
+  void actualizarPreview(ventana, escala, indiceGrupo);
+}
+
+async function actualizarPreview(
+  ventana: ReturnType<typeof getCurrentWindow>,
+  escala: number,
+  indiceGrupo: number | null,
+): Promise<void> {
+  let destino: [number, number] | null;
+
+  try {
+    destino =
+      indiceGrupo === null
+        ? await conTimeout(
+            invoke<[number, number] | null>(
+              "obtener_destino_preview_coordenada",
+            ),
+            3000,
+            "obtener_destino_preview_coordenada",
+          )
+        : await conTimeout(
+            invoke<[number, number] | null>("obtener_destino_preview_grupo", {
+              indice: indiceGrupo,
+            }),
+            3000,
+            "obtener_destino_preview_grupo",
+          );
+  } catch {
+    detenerPolling();
     return;
   }
 
-  botonGuardarGlobal.disabled = true;
-
-  try {
-    for (const { pestana, resultado } of recolecciones) {
-      if (resultado.cambios.length === 0 && !pestana.hayEdicionesPendientes()) {
-        continue;
-      }
-
-      const guardado = await pestana.aplicarGuardado(resultado.cambios);
-
-      if (guardado.errores.length > 0) {
-        pestana.marcarErroresGuardado(guardado.errores);
-        botonGuardarGlobal.disabled = false;
-        return;
-      }
-
-      await pestana.limpiarEstadoTrasGuardado();
-    }
-
-    // El cambio de motor se guarda al final: si algún cambio de las
-    // otras pestañas falló, el motor no llega a tocarse (Regla 12
-    // solo debe dispararse cuando el guardado completo es exitoso).
-    if (huboCambioModo) {
-      await guardarModoMotor();
-    }
-
-    mostrarToast("✅ Guardado");
-  } catch (error) {
-    window.alert(`No se pudo guardar: ${String(error)}`);
-  } finally {
-    botonGuardarGlobal.disabled = false;
-    actualizarVisibilidadGuardarGlobal();
+  if (!destino) {
+    return;
   }
-});
 
-// ======================================================
-// 👁️ VISIBILIDAD DE "Aplicar cambios"
-// ------------------------------------------------------
-// Solo debe verse si hay algo pendiente en CUALQUIERA de las 4
-// pestañas (todas exponen hayEdicionesPendientes() como API pull,
-// no hay un evento de cambio centralizado) — se resuelve con un
-// polling liviano, mismo criterio que el intervalo de
-// vent_captura_main.ts.
-// ======================================================
+  const [x, y] = destino;
 
-function actualizarVisibilidadGuardarGlobal(): void {
-  const hayCambios = TODAS_LAS_PESTANAS.some(([, pestana]) =>
-    pestana.hayEdicionesPendientes(),
+  await ventana.setPosition(
+    new PhysicalPosition(
+      x - MITAD_ANCHO_PREVIEW_LOGICO * escala,
+      y - MITAD_ALTO_PREVIEW_LOGICO * escala,
+    ),
   );
-
-  botonGuardarGlobal.classList.toggle("oculto", !hayCambios);
 }
-
-setInterval(actualizarVisibilidadGuardarGlobal, 250);
-actualizarVisibilidadGuardarGlobal();
 
 // ======================================================
 // 🏁 INICIAR
 // ======================================================
 
-pestanaGeneral.cargar();
-pestanaApariencia.cargar();
-pestanaTema.cargar();
-pestanaTeclas.cargar();
-pestanaAvanzado.cargar();
+async function iniciar(): Promise<void> {
+  const parametroGrupo = new URLSearchParams(location.search).get("grupo");
+
+  if (parametroGrupo !== null) {
+    await iniciarPreview(Number(parametroGrupo));
+    return;
+  }
+
+  let previewActiva: unknown;
+
+  try {
+    previewActiva = await invoke("obtener_config_preview_coordenada");
+  } catch {
+    previewActiva = null;
+  }
+
+  if (previewActiva) {
+    await iniciarPreview(null);
+    return;
+  }
+
+  mostrarDiagnostico("Iniciando — consultando config activa...");
+
+  let configCruda: {
+    ubicacion: string;
+    modo_ventana: string;
+    punto_referencia: string;
+  } | null;
+
+  try {
+    configCruda = await conTimeout(
+      invoke("obtener_config_captura_activa"),
+      3000,
+      "obtener_config_captura_activa",
+    );
+  } catch (error) {
+    mostrarDiagnostico(`FALLÓ obtener_config_captura_activa: ${String(error)}`);
+    return;
+  }
+
+  mostrarDiagnostico(`Config recibida: ${JSON.stringify(configCruda)}`);
+
+  // No debería pasar (comandos.rs fija la config antes de crear esta
+  // ventana) — pero si pasa, no hay nada coherente que mostrar.
+  if (!configCruda) {
+    cerrar();
+    return;
+  }
+
+  const config: ConfigCaptura = {
+    ubicacion: configCruda.ubicacion as ConfigCaptura["ubicacion"],
+    modoVentana: configCruda.modo_ventana as ConfigCaptura["modoVentana"],
+    puntoReferencia:
+      configCruda.punto_referencia as ConfigCaptura["puntoReferencia"],
+  };
+
+  let intervaloMs = 100;
+
+  try {
+    intervaloMs = await conTimeout(
+      invoke<number>("obtener_intervalo_captura_coordenada"),
+      3000,
+      "obtener_intervalo_captura_coordenada",
+    );
+  } catch (error) {
+    mostrarDiagnostico(
+      `FALLÓ obtener_intervalo_captura_coordenada (uso 100ms): ${String(error)}`,
+    );
+  }
+
+  try {
+    teclaGuardar = await conTimeout(
+      invoke<string>("obtener_tecla_guardar_coordenada"),
+      3000,
+      "obtener_tecla_guardar_coordenada",
+    );
+  } catch (error) {
+    mostrarDiagnostico(
+      `FALLÓ obtener_tecla_guardar_coordenada (uso F1): ${String(error)}`,
+    );
+  }
+
+  intervaloId = setInterval(() => actualizar(config), intervaloMs);
+  actualizar(config);
+}
+
+// ======================================================
+// 🔄 ACTUALIZAR (un tick de polling)
+// ======================================================
+
+async function actualizar(config: ConfigCaptura): Promise<void> {
+  let cursor: [number, number] | null;
+  let ventana: VentanaActiva | null;
+  let guardar: boolean;
+
+  try {
+    [cursor, ventana, guardar] = await conTimeout(
+      Promise.all([
+        invoke<[number, number]>("obtener_cursor_captura"),
+        invoke<VentanaActiva | null>("obtener_ventana_activa_captura"),
+        invoke<boolean>("consultar_guardado_coordenada"),
+      ]),
+      3000,
+      "polling (cursor/ventana/guardado)",
+    );
+  } catch (error) {
+    detenerPolling();
+    mostrarDiagnostico(`FALLÓ el polling: ${String(error)}`);
+    return;
+  }
+
+  if (!cursor) {
+    return;
+  }
+
+  const [cursorX, cursorY] = cursor;
+
+  cuerpo.innerHTML = "";
+
+  switch (config.ubicacion) {
+    case "absoluta": {
+      dibujarLinea(`Presione ${teclaGuardar} para guardar posición`);
+      dibujarLinea(`X: ${cursorX}  Y: ${cursorY}`, true);
+
+      if (guardar) {
+        guardarYcerrar(cursorX, cursorY);
+      }
+
+      break;
+    }
+
+    case "relativa_cursor": {
+      if (pasoRelativaCursor === 1) {
+        dibujarLinea(`Origen: presione ${teclaGuardar} para marcar origen`);
+        dibujarLinea(`X: ${cursorX}  Y: ${cursorY}`, true);
+
+        if (guardar) {
+          origenRelativaCursor = { x: cursorX, y: cursorY };
+          pasoRelativaCursor = 2;
+        }
+      } else {
+        const origen = origenRelativaCursor!;
+        const offsetX = cursorX - origen.x;
+        const offsetY = cursorY - origen.y;
+
+        dibujarLinea(`Destino: presione ${teclaGuardar} para marcar destino`);
+        dibujarLinea(
+          `X: ${offsetX >= 0 ? "+" : ""}${offsetX}  Y: ${offsetY >= 0 ? "+" : ""}${offsetY}`,
+          true,
+        );
+
+        if (guardar) {
+          guardarYcerrar(offsetX, offsetY);
+        }
+      }
+
+      break;
+    }
+
+    case "relativa_ventana": {
+      if (!ventana) {
+        dibujarLinea("Ventana activa: [fuera de ventana]");
+        dibujarLinea(`Presione ${teclaGuardar} para guardar posición`);
+
+        break;
+      }
+
+      dibujarLinea(`Ventana activa: ${ventana.titulo || "(sin título)"}`);
+
+      if (config.modoVentana === "porcentaje") {
+        const h = ((cursorX - ventana.x) / ventana.ancho) * 100;
+        const v = ((cursorY - ventana.y) / ventana.alto) * 100;
+
+        dibujarLinea(`H: ${h.toFixed(1)}%  V: ${v.toFixed(1)}%`, true);
+
+        if (guardar) {
+          guardarYcerrar(h, v);
+        }
+      } else {
+        dibujarLinea(
+          `Referencia: ${textoPuntoReferencia(config.puntoReferencia)}`,
+        );
+
+        const base = puntoReferenciaAbsoluto(config.puntoReferencia, ventana);
+        const offsetX = cursorX - base.x;
+        const offsetY = cursorY - base.y;
+
+        dibujarLinea(`X: ${offsetX}  Y: ${offsetY}`, true);
+
+        if (guardar) {
+          guardarYcerrar(offsetX, offsetY);
+        }
+      }
+
+      break;
+    }
+  }
+}
+
+// ======================================================
+// 🖊️ DIBUJAR LÍNEA DE TEXTO EN EL CUERPO
+// ======================================================
+
+function dibujarLinea(texto: string, destacada = false): void {
+  const linea = document.createElement("div");
+  linea.className = destacada ? "captura-linea captura-valor" : "captura-linea";
+  linea.textContent = texto;
+  cuerpo.append(linea);
+}
+
+iniciar();

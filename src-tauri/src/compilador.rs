@@ -166,6 +166,8 @@
 //     convertido a enum vía convertir_comportamiento_macro()).
 // ------------------------------------------------------
 
+use crate::back_coordenada;
+
 use crate::cache;
 
 use crate::eventos::InputId;
@@ -175,9 +177,8 @@ use crate::macro_usuario;
 use crate::perfil_cache::{
     AccionCache, AlcanceMultimedia, AppCache, ColorBotonMenu, ComandoMultimedia,
     ComportamientoMacro, ComportamientoMenu, CondicionTrigger, CoordenadaCache, ExtraCache,
-    FormaMenu, IniciarVentana, InstanciasAbrir, MenuBotonCache, PostAccionCache,
-    PuntoReferenciaCache, RemapeoCache, TamanoBotonPortapapeles, TamanoMenu, TriggerCache,
-    UbicacionCache, UbicacionMenu,
+    FormaMenu, IniciarVentana, InstanciasAbrir, MenuBotonCache, PostAccionCache, RemapeoCache,
+    TamanoBotonPortapapeles, TamanoMenu, TriggerCache, UbicacionMenu,
 };
 
 use crate::perfil_json::{perfil_json, AppJson, CoordenadaJson, ItemFilaJson, RemapeoJson};
@@ -865,24 +866,13 @@ fn convertir_coordenada(coordenada: &CoordenadaJson) -> Option<CoordenadaCache> 
     let x = coordenada.x?;
     let y = coordenada.y?;
 
-    let ubicacion = match coordenada.ubicacion.as_str() {
-        "relativa_cursor" => UbicacionCache::RelativaCursor {
-            offset_x: x,
-            offset_y: y,
-        },
-
-        "relativa_ventana" => match coordenada.modo_ventana.as_str() {
-            "porcentaje" => UbicacionCache::RelativaVentanaPorcentaje { h: x, v: y },
-
-            _ => UbicacionCache::RelativaVentanaPixeles {
-                offset_x: x,
-                offset_y: y,
-                referencia: convertir_punto_referencia(&coordenada.punto_referencia),
-            },
-        },
-
-        _ => UbicacionCache::Absoluta { x, y },
-    };
+    let ubicacion = back_coordenada::ubicacion_desde_valores(
+        &coordenada.ubicacion,
+        &coordenada.modo_ventana,
+        &coordenada.punto_referencia,
+        x,
+        y,
+    );
 
     let post_accion = match coordenada.post_accion.as_str() {
         "inicial" => PostAccionCache::Inicial,
@@ -896,16 +886,3 @@ fn convertir_coordenada(coordenada: &CoordenadaJson) -> Option<CoordenadaCache> 
     })
 }
 
-fn convertir_punto_referencia(valor: &str) -> PuntoReferenciaCache {
-    match valor {
-        "sup_der" => PuntoReferenciaCache::SupDer,
-
-        "centro" => PuntoReferenciaCache::Centro,
-
-        "inf_izq" => PuntoReferenciaCache::InfIzq,
-
-        "inf_der" => PuntoReferenciaCache::InfDer,
-
-        _ => PuntoReferenciaCache::SupIzq,
-    }
-}

@@ -724,8 +724,15 @@
   gap: var(--gap8);
 }
 
-.popup-extra-capturar {
-  width: 100%;
+.popup-extra-fila-acciones {
+  display: flex;
+  gap: var(--gap8);
+}
+
+.popup-extra-fila-acciones .popup-extra-capturar,
+.popup-extra-fila-acciones .popup-extra-probar {
+  flex: 1;
+  width: auto;
   font-weight: 600;
 }
 

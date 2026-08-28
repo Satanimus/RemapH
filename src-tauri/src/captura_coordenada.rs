@@ -66,8 +66,34 @@
 // obtener_resultado()
 //     Polling desde el popup de la fila del perfil: retira
 //     el resultado cuando está listo. Se limpia al leerla.
+// guardar_seleccion_banco(coordenada) / obtener_seleccion_banco()
+//     Mismo mecanismo que guardar_resultado()/obtener_resultado(),
+//     pero para la ventana "Coordenadas guardadas" (Etapa C/D):
+//     deja/retira la CoordenadaBanco elegida (existente o recién
+//     creada) para que el popup de la fila del perfil la aplique.
+//     Independiente de ACTIVA/desactivar() — no depende de que la
+//     ventana overlay de captura esté abierta.
+// activar_preview(ubicacion, modo_ventana, punto_referencia, x, y) /
+// desactivar_preview() / obtener_config_preview()
+//     Modo previsualización individual (Etapa E): independiente del
+//     modo captura de arriba, pero mutuamente excluyente con él y
+//     con el modo grupo de abajo en la misma ventana overlay —
+//     activar_preview()/activar()/activar_preview_grupo() se
+//     desactivan entre sí, así nunca coexisten dos modos a la vez.
+//     obtener_config_preview() es polling desde comandos.rs::
+//     obtener_destino_preview_coordenada, sin consumir el valor (a
+//     diferencia de obtener_resultado()).
+// activar_preview_grupo(configs) / desactivar_preview_grupo() /
+// obtener_config_preview_grupo(indice)
+//     Modo previsualización de GRUPO (Etapa G): mismo criterio que
+//     el individual de arriba, pero guarda un Vec<ConfigPreview> (una
+//     entrada por ventana overlay abierta) en vez de una sola config.
+//     obtener_config_preview_grupo(indice) es polling desde
+//     comandos.rs::obtener_destino_preview_grupo, una consulta por
+//     ventana overlay (cada una con su propio índice).
 // ======================================================
 
+use crate::banco_coordenadas::CoordenadaBanco;
 use crate::config;
 use crate::eventos::{InputEvent, InputId, InputState};
 
@@ -86,6 +112,30 @@ static ACTIVA: std::sync::Mutex<bool> = std::sync::Mutex::new(false);
 static GUARDADO_SOLICITADO: std::sync::Mutex<bool> = std::sync::Mutex::new(false);
 static RESULTADO: std::sync::Mutex<Option<(f64, f64)>> = std::sync::Mutex::new(None);
 static CONFIG_ACTIVA: std::sync::Mutex<Option<ConfigCaptura>> = std::sync::Mutex::new(None);
+static SELECCION_BANCO: std::sync::Mutex<Option<CoordenadaBanco>> = std::sync::Mutex::new(None);
+
+/// Config del modo previsualización (Etapa E) — independiente del
+/// resto del estado de arriba (modo captura), mismo vocabulario de
+/// strings que ConfigCaptura.
+#[derive(Clone)]
+pub struct ConfigPreview {
+    pub ubicacion: String,
+
+    pub modo_ventana: String,
+
+    pub punto_referencia: String,
+
+    pub x: f64,
+
+    pub y: f64,
+}
+
+static CONFIG_PREVIEW: std::sync::Mutex<Option<ConfigPreview>> = std::sync::Mutex::new(None);
+
+/// Estado del modo previsualización de GRUPO (Etapa G) — independiente
+/// del CONFIG_PREVIEW individual de arriba (Etapa E), que sigue
+/// intacto para la previsualización de una sola fila.
+static CONFIG_PREVIEW_GRUPO: std::sync::Mutex<Vec<ConfigPreview>> = std::sync::Mutex::new(Vec::new());
 
 // Teclas físicamente abajo relevantes al atajo de guardar coordenada
 // (ahora AtajoSimple: modificadores + gatillo, no una tecla suelta).
@@ -97,6 +147,9 @@ static TECLAS_ABAJO: std::sync::Mutex<Vec<InputId>> = std::sync::Mutex::new(Vec:
 /// Llamada al abrir la ventana de captura, con la config de la fila
 /// que la abrió.
 pub fn activar(ubicacion: String, modo_ventana: String, punto_referencia: String) {
+    desactivar_preview();
+    desactivar_preview_grupo();
+
     *ACTIVA.lock().unwrap() = true;
     *GUARDADO_SOLICITADO.lock().unwrap() = false;
     *RESULTADO.lock().unwrap() = None;
@@ -114,6 +167,62 @@ pub fn desactivar() {
     *ACTIVA.lock().unwrap() = false;
     *GUARDADO_SOLICITADO.lock().unwrap() = false;
     *CONFIG_ACTIVA.lock().unwrap() = None;
+}
+
+/// Llamada al abrir la ventana overlay en modo previsualización
+/// (Etapa E) — mutuamente excluyente con el modo captura de arriba.
+pub fn activar_preview(
+    ubicacion: String,
+    modo_ventana: String,
+    punto_referencia: String,
+    x: f64,
+    y: f64,
+) {
+    desactivar();
+    desactivar_preview_grupo();
+
+    *CONFIG_PREVIEW.lock().unwrap() = Some(ConfigPreview {
+        ubicacion,
+        modo_ventana,
+        punto_referencia,
+        x,
+        y,
+    });
+}
+
+/// Llamada al cerrar la ventana overlay en modo previsualización.
+pub fn desactivar_preview() {
+    *CONFIG_PREVIEW.lock().unwrap() = None;
+}
+
+/// Polling desde comandos.rs: config de previsualización activa, si
+/// hay una. No se consume al leerse (a diferencia de obtener_resultado()) —
+/// el polling de captura.html la necesita en cada tick.
+pub fn obtener_config_preview() -> Option<ConfigPreview> {
+    CONFIG_PREVIEW.lock().unwrap().clone()
+}
+
+/// Llamada al abrir las ventanas overlay en modo previsualización de
+/// GRUPO (Etapa G) — mutuamente excluyente con el modo captura y con
+/// la previsualización individual de arriba.
+pub fn activar_preview_grupo(configs: Vec<ConfigPreview>) {
+    desactivar();
+    desactivar_preview();
+
+    *CONFIG_PREVIEW_GRUPO.lock().unwrap() = configs;
+}
+
+/// Llamada al cerrar las ventanas overlay en modo previsualización de
+/// grupo.
+pub fn desactivar_preview_grupo() {
+    CONFIG_PREVIEW_GRUPO.lock().unwrap().clear();
+}
+
+/// Polling desde comandos.rs: config de previsualización de grupo en
+/// la posición `indice`, si existe. No se consume al leerse — mismo
+/// criterio que obtener_config_preview().
+pub fn obtener_config_preview_grupo(indice: usize) -> Option<ConfigPreview> {
+    CONFIG_PREVIEW_GRUPO.lock().unwrap().get(indice).cloned()
 }
 
 /// Consultada una sola vez por captura.html al cargar.
@@ -178,4 +287,17 @@ pub fn guardar_resultado(x: f64, y: f64) {
 /// cuando esté listo. Se consume al leerse.
 pub fn obtener_resultado() -> Option<(f64, f64)> {
     RESULTADO.lock().unwrap().take()
+}
+
+/// La ventana "Coordenadas guardadas" deja acá la coordenada elegida
+/// (existente o recién creada) para que el popup de la fila del
+/// perfil que abrió esa ventana la retire.
+pub fn guardar_seleccion_banco(coordenada: CoordenadaBanco) {
+    *SELECCION_BANCO.lock().unwrap() = Some(coordenada);
+}
+
+/// Polling desde el popup de la fila del perfil: retira la selección
+/// cuando esté lista. Se consume al leerse.
+pub fn obtener_seleccion_banco() -> Option<CoordenadaBanco> {
+    SELECCION_BANCO.lock().unwrap().take()
 }

@@ -9,6 +9,7 @@
 mod ayuda;
 mod back_app;
 mod back_coordenada;
+mod banco_coordenadas;
 mod back_interception;
 mod back_menu_express;
 mod back_mouse;
@@ -131,6 +132,14 @@ pub fn run() {
             comandos::abrir_selector_emoji,
             comandos::abrir_ventana_captura_coordenada,
             comandos::cerrar_ventana_captura_coordenada,
+            comandos::abrir_ventana_preview_coordenada,
+            comandos::obtener_config_preview_coordenada,
+            comandos::obtener_destino_preview_coordenada,
+            comandos::probar_coordenada,
+            comandos::abrir_ventana_preview_grupo,
+            comandos::cerrar_ventanas_preview_grupo,
+            comandos::obtener_destino_preview_grupo,
+            comandos::probar_grupo_coordenadas,
             comandos::obtener_cursor_captura,
             comandos::obtener_ventana_activa_captura,
             comandos::obtener_config_captura_activa,
@@ -142,6 +151,13 @@ pub fn run() {
             comandos::obtener_tecla_toggle_perfil,
             comandos::establecer_tecla_toggle_perfil,
             comandos::obtener_intervalo_captura_coordenada,
+            comandos::abrir_ventana_coordenadas,
+            comandos::coordenadas_listar,
+            comandos::coordenadas_agregar,
+            comandos::coordenadas_editar,
+            comandos::coordenadas_eliminar,
+            comandos::seleccionar_coordenada_banco,
+            comandos::obtener_seleccion_coordenada_banco,
             comandos::obtener_datos_menu_express,
             comandos::cerrar_menu_express,
             comandos::menu_express_boton_down,

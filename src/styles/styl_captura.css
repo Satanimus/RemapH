@@ -98,3 +98,17 @@ body {
   text-align: center;
   font-size: var(--fs13);
 }
+
+.captura-marcador-x {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  color: var(--text-highlight);
+  font-size: 48px;
+  font-weight: 700;
+  line-height: 1;
+  text-shadow: 0 0 4px color-mix(in srgb, var(--overlay-contraste) 70%, transparent);
+}

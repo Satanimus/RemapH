@@ -35,7 +35,7 @@ import {
 } from "../componentes/comp_capturador";
 
 import type { Entrada } from "../core/core_entrada";
-import { triggerAHTML } from "../core/core_trigger";
+import { triggerAHTML, triggerATexto } from "../core/core_trigger";
 
 import { aplicarOverridesApariencia } from "../core/core_apariencia";
 import { crearPestanaApariencia } from "./vent_configuracion_apariencia";
@@ -282,6 +282,12 @@ function formatearValor(tipo: TipoValorConfiguracion, valor: string): string {
     return `${(ancho ?? "").trim()} × ${(alto ?? "").trim()}`;
   }
 
+  if (tipo === "trigger") {
+    const atajo = parsearAtajoDesdeTexto(valor);
+
+    return triggerATexto({ ...atajo, condicion: "simple" });
+  }
+
   return valor;
 }
 
@@ -435,12 +441,13 @@ function entradaDesdeTexto(texto: string): Entrada | null {
     return null;
   }
 
-  const tipo: Record<string, "Teclado" | "Mouse" | "Multimedia" | "Joystick"> = {
-    keyboard: "Teclado",
-    mouse: "Mouse",
-    multimedia: "Multimedia",
-    joystick: "Joystick",
-  };
+  const tipo: Record<string, "Teclado" | "Mouse" | "Multimedia" | "Joystick"> =
+    {
+      keyboard: "Teclado",
+      mouse: "Mouse",
+      multimedia: "Multimedia",
+      joystick: "Joystick",
+    };
 
   return { tipo: tipo[fuente] ?? "Teclado", codigo, nombre: codigo };
 }

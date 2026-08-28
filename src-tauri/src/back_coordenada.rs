@@ -185,6 +185,70 @@ pub fn calcular_destino(ubicacion: &UbicacionCache) -> (i32, i32) {
 }
 
 // ======================================================
+// 🧮 UBICACIÓN / DESTINO DESDE VALORES CRUDOS
+// ------------------------------------------------------
+// Puente entre el vocabulario de strings de UI (ubicacion/
+// modo_ventana/punto_referencia, mismo que ConfigCaptura) y
+// UbicacionCache — reutilizado por compilador.rs::
+// convertir_coordenada() (perfil real) y por el modo
+// previsualización de captura_coordenada.rs (Etapa E), para
+// no duplicar el match en los dos lugares.
+// ======================================================
+
+pub fn ubicacion_desde_valores(
+    ubicacion: &str,
+    modo_ventana: &str,
+    punto_referencia: &str,
+    x: f64,
+    y: f64,
+) -> UbicacionCache {
+    match ubicacion {
+        "relativa_cursor" => UbicacionCache::RelativaCursor {
+            offset_x: x,
+            offset_y: y,
+        },
+
+        "relativa_ventana" => match modo_ventana {
+            "porcentaje" => UbicacionCache::RelativaVentanaPorcentaje { h: x, v: y },
+
+            _ => UbicacionCache::RelativaVentanaPixeles {
+                offset_x: x,
+                offset_y: y,
+                referencia: punto_referencia_desde_str(punto_referencia),
+            },
+        },
+
+        _ => UbicacionCache::Absoluta { x, y },
+    }
+}
+
+pub fn calcular_destino_valores(
+    ubicacion: &str,
+    modo_ventana: &str,
+    punto_referencia: &str,
+    x: f64,
+    y: f64,
+) -> (i32, i32) {
+    let ubicacion = ubicacion_desde_valores(ubicacion, modo_ventana, punto_referencia, x, y);
+
+    calcular_destino(&ubicacion)
+}
+
+fn punto_referencia_desde_str(valor: &str) -> PuntoReferenciaCache {
+    match valor {
+        "sup_der" => PuntoReferenciaCache::SupDer,
+
+        "centro" => PuntoReferenciaCache::Centro,
+
+        "inf_izq" => PuntoReferenciaCache::InfIzq,
+
+        "inf_der" => PuntoReferenciaCache::InfDer,
+
+        _ => PuntoReferenciaCache::SupIzq,
+    }
+}
+
+// ======================================================
 // 📐 PUNTO DE REFERENCIA → COORDENADA ABSOLUTA
 // ======================================================
 

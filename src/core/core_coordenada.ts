@@ -86,7 +86,7 @@ export function crearCoordenada(): CoordenadaPerfil {
 
 export function textoCoordenada(coordenada: CoordenadaPerfil): string {
   if (coordenada.x === null || coordenada.y === null) {
-    return "Capturar Coordenada";
+    return "Seleccionar coordenada";
   }
 
   switch (coordenada.ubicacion) {

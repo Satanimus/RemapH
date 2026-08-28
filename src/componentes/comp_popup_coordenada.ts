@@ -74,6 +74,12 @@ import {
   esGatilloRueda,
 } from "../core/core_trigger";
 
+import {
+  type CoordenadaBancoJson,
+  convertirCoordenadaBanco,
+  coordenadaBancoAPerfil,
+} from "../core/core_banco_coordenadas";
+
 // ======================================================
 // 🧭 VOCABULARIO Ninguno / Normal / Turbo / Repetición
 // ------------------------------------------------------
@@ -182,6 +188,28 @@ export function cerrarVentanaCapturaCoordenada(): void {
 }
 
 // ======================================================
+// ▶️ PROBAR COORDENADA
+// ------------------------------------------------------
+// Mueve el cursor real al punto calculado (comandos.rs::
+// probar_coordenada) — solo tiene sentido si la coordenada ya
+// fue capturada (x/y no null).
+// ======================================================
+
+function probarCoordenada(coordenada: FilaPerfil["coordenada"]): void {
+  if (coordenada.x === null || coordenada.y === null) {
+    return;
+  }
+
+  invoke("probar_coordenada", {
+    ubicacion: coordenada.ubicacion,
+    modoVentana: coordenada.modoVentana,
+    puntoReferencia: coordenada.puntoReferencia,
+    x: coordenada.x,
+    y: coordenada.y,
+  }).catch(() => {});
+}
+
+// ======================================================
 // ➖ SEPARADOR (reusa el mismo estilo del popup de App)
 // ======================================================
 
@@ -279,40 +307,34 @@ function crearCajaVentana(
 }
 
 // ======================================================
-// 📌 INICIAR CAPTURA
+// 📌 INICIAR SELECCIÓN
 // ------------------------------------------------------
-// Abre la ventana overlay pasándole la ubicación/modo/punto
-// de referencia activos de la fila (comandos.rs los fija en
-// captura_coordenada.rs ANTES de crear la ventana, así que
-// captura.html los lee sin condición de carrera) y sondea el
-// resultado. Si el usuario la cierra con Cancelar sin
-// guardar, obtener_resultado_coordenada nunca deja de
-// devolver null — este polling queda huérfano hasta que se
-// abra una fila/página nueva. Es aceptable: no hace nada,
-// solo un invoke liviano cada 200ms.
+// Abre la ventana "Coordenadas guardadas" (comandos.rs,
+// abrir_ventana_coordenadas — catálogo filtrable + "Nueva
+// coordenada", que internamente reusa el flujo de captura
+// existente) y sondea la coordenada elegida/creada ahí. Si
+// el usuario cierra esa ventana sin elegir nada,
+// obtener_seleccion_coordenada_banco nunca deja de devolver
+// null — este polling queda huérfano hasta que se abra una
+// fila/página nueva. Es aceptable: no hace nada, solo un
+// invoke liviano cada 200ms.
 // ======================================================
 
-function iniciarCaptura(
+function iniciarSeleccion(
   contexto: ContextoFila,
   filaPerfil: FilaPerfil,
   evento: MouseEvent,
   alModificar: () => void,
 ): void {
-  const coordenada = filaPerfil.coordenada;
-
-  invoke("abrir_ventana_captura_coordenada", {
-    ubicacion: coordenada.ubicacion,
-    modoVentana: coordenada.modoVentana,
-    puntoReferencia: coordenada.puntoReferencia,
-  }).catch((error) => {
+  invoke("abrir_ventana_coordenadas").catch((error) => {
     // Antes esto se tragaba en silencio — si .build() falla del lado
     // de Rust (comandos.rs), era invisible. Ahora queda en la consola
     // de devtools de ESTA ventana (F12 en la ventana principal).
-    console.error("abrir_ventana_captura_coordenada FALLÓ:", error);
+    console.error("abrir_ventana_coordenadas FALLÓ:", error);
   });
 
   const intervalo = setInterval(() => {
-    invoke<[number, number] | null>("obtener_resultado_coordenada")
+    invoke<CoordenadaBancoJson | null>("obtener_seleccion_coordenada_banco")
       .then((resultado) => {
         if (!resultado) {
           return;
@@ -320,8 +342,11 @@ function iniciarCaptura(
 
         clearInterval(intervalo);
 
-        filaPerfil.coordenada.x = resultado[0];
-        filaPerfil.coordenada.y = resultado[1];
+        const elegida = coordenadaBancoAPerfil(
+          convertirCoordenadaBanco(resultado),
+        );
+
+        Object.assign(filaPerfil.coordenada, elegida);
 
         reconstruirFila(contexto.id);
         alModificar();
@@ -489,8 +514,11 @@ export function abrirPopupExtraTeclaMouse(
   popup.append(crearSeparador());
 
   // ----------------------------------
-  // BOTÓN — Capturar Coordenada
+  // BOTÓN — Capturar Coordenada / Probar
   // ----------------------------------
+
+  const filaAcciones = document.createElement("div");
+  filaAcciones.className = "popup-extra-fila-acciones";
 
   const botonCapturar = document.createElement("button");
 
@@ -499,10 +527,24 @@ export function abrirPopupExtraTeclaMouse(
   botonCapturar.textContent = `📌 ${textoCoordenada(coordenada)}`;
 
   botonCapturar.addEventListener("click", () => {
-    iniciarCaptura(contexto, filaPerfil, evento, alModificar);
+    iniciarSeleccion(contexto, filaPerfil, evento, alModificar);
   });
 
-  popup.append(botonCapturar);
+  const botonProbar = document.createElement("button");
+
+  botonProbar.className = "ui-btn popup-extra-probar";
+
+  botonProbar.textContent = "▶ Probar";
+
+  botonProbar.disabled = coordenada.x === null || coordenada.y === null;
+
+  botonProbar.addEventListener("click", () => {
+    probarCoordenada(coordenada);
+  });
+
+  filaAcciones.append(botonCapturar, botonProbar);
+
+  popup.append(filaAcciones);
 
   mostrarPopup(popup, evento.clientX, evento.clientY);
 }

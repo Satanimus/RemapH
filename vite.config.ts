@@ -24,6 +24,9 @@ export default defineConfig(async () => ({
   // Quinta página independiente: la Ventana de Configuración
   // (WebviewUrl::App("configuracion.html") — ver comandos.rs,
   // abrir_ventana_configuracion). Mismo motivo.
+  // Sexta página independiente: la ventana normal decorada del
+  // banco de coordenadas guardadas (WebviewUrl::App("coordenadas.html")
+  // — ver comandos.rs, abrir_ventana_coordenadas). Mismo motivo.
   build: {
     rollupOptions: {
       input: {
@@ -37,6 +40,9 @@ export default defineConfig(async () => ({
         ),
         configuracion: fileURLToPath(
           new URL("./configuracion.html", import.meta.url),
+        ),
+        coordenadas: fileURLToPath(
+          new URL("./coordenadas.html", import.meta.url),
         ),
       },
     },
