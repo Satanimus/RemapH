@@ -279,7 +279,15 @@ async function iniciarPreview(indiceGrupo: number | null): Promise<void> {
 
   const marcador = document.createElement("div");
   marcador.className = "captura-marcador-x";
-  marcador.textContent = "X";
+  // SVG en vez de texto "X": un carácter de fuente no es simétrico
+  // (las métricas de line-height/cap-height lo corren del centro
+  // real de su caja), así que centrar la ventana con setPosition()
+  // no alcanza para que la cruz caiga justo sobre el punto. Dos
+  // líneas cruzadas en un viewBox cuadrado sí son simétricas por
+  // definición: el centro del SVG (12,12) cae exacto en el centro
+  // de la ventana, que es donde se posiciona el destino calculado.
+  marcador.innerHTML =
+    '<svg viewBox="0 0 24 24" width="48" height="48"><line x1="4" y1="4" x2="20" y2="20" /><line x1="20" y1="4" x2="4" y2="20" /></svg>';
   raiz.append(marcador);
 
   let intervaloMs = 100;

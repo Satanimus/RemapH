@@ -138,13 +138,13 @@ use crate::captura_coordenada;
 use crate::compilador::ResultadoCompilacion;
 use crate::config;
 use crate::configuracion_usuario;
+use crate::eventos::InputId;
 use crate::macro_cache;
 use crate::macro_json::MacroArchivoJson;
 use crate::macro_usuario;
 use crate::macros;
 use crate::motor;
 use crate::perfil;
-use crate::eventos::InputId;
 use crate::perfil_ui::{
     convertir_atajo_captura, convertir_perfil, AtajoCapturaUI, EntradaUI, ItemFilaUI,
     ResultadoPerfil, ResultadoPerfilInicial, TriggerCapturaUI,
@@ -331,7 +331,10 @@ pub fn compilar_perfil(filas: Vec<ItemFilaUI>) -> Result<ResultadoCompilacion, S
 }
 
 #[tauri::command]
-pub fn guardar_perfil_como(nombre: String, filas: Vec<ItemFilaUI>) -> Result<ResultadoPerfil, String> {
+pub fn guardar_perfil_como(
+    nombre: String,
+    filas: Vec<ItemFilaUI>,
+) -> Result<ResultadoPerfil, String> {
     let perfil = convertir_perfil(filas);
 
     perfil::guardar_perfil_como(nombre, perfil)
@@ -838,7 +841,46 @@ pub async fn abrir_ventana_preview_coordenada(
         }
     }
 
-    captura_coordenada::activar_preview(ubicacion, modo_ventana, punto_referencia, x, y);
+    captura_coordenada::activar_preview(
+        ubicacion.clone(),
+        modo_ventana.clone(),
+        punto_referencia.clone(),
+        x,
+        y,
+    );
+
+    // Mismo criterio que abrir_ventana_preview_grupo: se posiciona la
+    // ventana YA en el builder (en vez de dejarla nacer en la esquina
+    // default del SO y recién moverse cuando el JS de captura.html
+    // arranca y hace su primer setPosition). Físico→lógico con el
+    // scale_factor del monitor que contiene el punto — ver comentario
+    // largo en abrir_ventana_preview_grupo.
+    let (destino_x, destino_y) = back_coordenada::calcular_destino_valores(
+        &ubicacion,
+        &modo_ventana,
+        &punto_referencia,
+        x,
+        y,
+    );
+
+    let escala = app
+        .available_monitors()
+        .ok()
+        .and_then(|monitores| {
+            monitores.into_iter().find(|monitor| {
+                let pos = monitor.position();
+                let size = monitor.size();
+                destino_x >= pos.x
+                    && destino_x < pos.x + size.width as i32
+                    && destino_y >= pos.y
+                    && destino_y < pos.y + size.height as i32
+            })
+        })
+        .map(|monitor| monitor.scale_factor())
+        .unwrap_or(1.0);
+
+    let posicion_x = (destino_x as f64 / escala) - MITAD_ANCHO_PREVIEW_LOGICO;
+    let posicion_y = (destino_y as f64 / escala) - MITAD_ALTO_PREVIEW_LOGICO;
 
     WebviewWindowBuilder::new(
         &app,
@@ -847,6 +889,7 @@ pub async fn abrir_ventana_preview_coordenada(
     )
     .title("RemapH — Captura")
     .inner_size(320.0, 120.0)
+    .position(posicion_x, posicion_y)
     .resizable(false)
     .decorations(false)
     .transparent(true)
@@ -901,8 +944,13 @@ pub fn probar_coordenada(
     x: f64,
     y: f64,
 ) {
-    let (destino_x, destino_y) =
-        back_coordenada::calcular_destino_valores(&ubicacion, &modo_ventana, &punto_referencia, x, y);
+    let (destino_x, destino_y) = back_coordenada::calcular_destino_valores(
+        &ubicacion,
+        &modo_ventana,
+        &punto_referencia,
+        x,
+        y,
+    );
 
     back_coordenada::mover_cursor(destino_x, destino_y);
 }
@@ -918,6 +966,14 @@ pub fn probar_coordenada(
 // ======================================================
 
 const PREFIJO_VENTANA_PREVIEW_GRUPO: &str = "captura_coordenada_grupo_";
+
+// Mitad del tamaño (lógico) de la ventana overlay — mismo valor que
+// MITAD_ANCHO_PREVIEW_LOGICO/MITAD_ALTO_PREVIEW_LOGICO en
+// vent_captura_main.ts (ambos derivan de inner_size(320, 120) más
+// arriba). Se usa acá para posicionar la ventana ya centrada en el
+// builder, antes de que exista JS corriendo que pueda hacerlo.
+const MITAD_ANCHO_PREVIEW_LOGICO: f64 = 160.0;
+const MITAD_ALTO_PREVIEW_LOGICO: f64 = 60.0;
 
 #[tauri::command]
 pub async fn abrir_ventana_preview_grupo(
@@ -941,8 +997,46 @@ pub async fn abrir_ventana_preview_grupo(
             .collect(),
     );
 
-    for indice in 0..coordenadas.len() {
+    for (indice, config) in coordenadas.iter().enumerate() {
         let label = format!("{PREFIJO_VENTANA_PREVIEW_GRUPO}{indice}");
+
+        // Se calcula el destino y se posiciona la ventana YA en el
+        // builder (en vez de dejar que nazca en la esquina default del
+        // SO y recién se mueva cuando el JS de captura.html arranca).
+        // Con varias ventanas overlay always_on_top simultáneas, ese
+        // salto tardío es lo que se veía como una sola X saltando
+        // entre las posiciones de las demás — mismo criterio que
+        // menu_express/portapapeles (ver back_menu_express.rs::
+        // monitor_para_punto): el cálculo de geometría es en físico
+        // (GetCursorPos/GetWindowRect), y WebviewWindowBuilder::
+        // position() espera lógico, así que se convierte acá con el
+        // scale_factor del monitor que contiene el punto.
+        let (destino_x, destino_y) = back_coordenada::calcular_destino_valores(
+            &config.ubicacion,
+            &config.modo_ventana,
+            &config.punto_referencia,
+            config.x,
+            config.y,
+        );
+
+        let escala = app
+            .available_monitors()
+            .ok()
+            .and_then(|monitores| {
+                monitores.into_iter().find(|monitor| {
+                    let pos = monitor.position();
+                    let size = monitor.size();
+                    destino_x >= pos.x
+                        && destino_x < pos.x + size.width as i32
+                        && destino_y >= pos.y
+                        && destino_y < pos.y + size.height as i32
+                })
+            })
+            .map(|monitor| monitor.scale_factor())
+            .unwrap_or(1.0);
+
+        let posicion_x = (destino_x as f64 / escala) - MITAD_ANCHO_PREVIEW_LOGICO;
+        let posicion_y = (destino_y as f64 / escala) - MITAD_ALTO_PREVIEW_LOGICO;
 
         WebviewWindowBuilder::new(
             &app,
@@ -951,6 +1045,7 @@ pub async fn abrir_ventana_preview_grupo(
         )
         .title("RemapH — Captura")
         .inner_size(320.0, 120.0)
+        .position(posicion_x, posicion_y)
         .resizable(false)
         .decorations(false)
         .transparent(true)

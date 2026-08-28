@@ -1,10 +1,11 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "captura-coordenada",
-  "description": "Capability for the coordinate-capture overlay window",
-  "windows": ["captura_coordenada"],
+  "description": "Capability for the coordinate-capture overlay window (and its group-preview siblings, one label per coordinate previsualized at once — Etapa G)",
+  "windows": ["captura_coordenada", "captura_coordenada_grupo_*"],
   "permissions": [
     "core:default",
-    "core:window:allow-start-dragging"
+    "core:window:allow-start-dragging",
+    "core:window:allow-set-position"
   ]
 }
