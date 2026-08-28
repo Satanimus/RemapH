@@ -115,49 +115,69 @@ Hay 3 modos:
 
 Captura la combinación de teclas o clicks que ejecutará la fila.
 
-Permite capturar teclas, combinaciones, clicks y rueda de mouse.
+Permite capturar combinaciones de teclas, clicks y rueda de mouse.
 
-La última tecla o click de la combinación puede ser: Simple, Mantenida [cyan:`[]`], Doble [cyan:`x2`] o triple [cyan:`x3`].
-La rueda del mouse puede ser: Corta o Larga [cyan:"[]"].
+La última tecla o click de la combinación puede ser: 
+-Simple 
+-Mantenida [cyan:`[ ]`] 
+-Doble [cyan:`x2`] 
+-Triple [cyan:`x3`].
 
-## nota-columna
-**Columna Nota**
-
-Campo de texto libre.
-
-Sin efecto en el funcionamiento de la fila — solo para dejarte un recordatorio o comentario propio.
+La rueda del mouse puede ser: 
+-Corta 
+-Larga [cyan:`[ ]`].
 
 ## tipo-fila, selector-tipo
 **Tipos de fila**
 
-Cada fila tiene un tipo, que define qué clase de acción ejecuta.
+Cada fila tiene un tipo, que define qué clase de Acción ejecuta y los Extra disponibles.
 
 🔠 `Teclado - Mouse`
-Repite, mantiene o combina un trigger de tecla/mouse — con opción de click en coordenada.
+Genera la combinación de teclas, clicks o rueda de mouse que quieras (y opcional donde quieras).
 
 🎵 `Multimedia`
 Dispara un comando multimedia (volumen, reproducción, etc.).
 
 ⚡ `MenuExpress`
-Abre un menú propio con botones de otras filas.
+Abre un menú flotante propio con botones para ejecutar con un click cualquier otra fila.
 
 🧩 `Macro`
-Ejecuta una secuencia de pasos.
+Ejecuta una secuencia de pasos, ideal para automatizar tareas repetitivas .
 
 📋 `Portapapeles`
-Pega un texto guardado.
+Abre un menú flotante propio para gestionar texto o imagenes guardadas.
 
 📂 `Abrir Archivo/App`
 Abre un archivo, carpeta o programa.
 
-El tipo se elige desde el selector de la columna `Acción` de esa fila.
+## accion
+**Acción**
+Es la salida generada. Depende de la opción que hayas elegido en `Tipo`.
+
+Para más información de la `Acción` correspondiente a cada `Tipo`, puedes ver la ayuda en sus respectivos popups de esta columna.  
+
+## extra
+`∴` **Extra** 
+
+Configuración opcional para personalizar la `Acción` y así el resultado sea lo que esperas.
+
+Para más información de los `Extras` correspondiente a cada `Tipo`, puedes ver la ayuda en sus respectivos popups de esta columna.  
+
+## nota-columna
+**Nota**
+
+Campo de texto libre.
+
+Sin efecto en el funcionamiento de la fila — solo para dejarte un recordatorio o comentario propio.
+
+PD: puedes agregar emojis 😎
 
 ## estado-toggle
 **On / Off**
 
 Prende o apaga esta fila (o, si es un separador, todo su tramo de filas) sin borrarla.
 
-Con [red:⨉] la fila queda inactiva: no dispara nada aunque el perfil esté activo.
+Con 🔴 la fila queda inactiva: no dispara nada aunque el perfil esté activo.
 
 Si ves [red:⚠️] en vez del ícono, la fila está apagada automáticamente por un conflicto con otra fila o por un aviso de la última compilación — el motivo puntual se explica en la barra de estado, abajo de la ventana.
 

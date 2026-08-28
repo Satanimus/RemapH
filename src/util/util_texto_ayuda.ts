@@ -7,10 +7,23 @@
 // — sin HTML, todo armado vía DOM. Las marcas [color:...] son
 // recursivas: **negrita**/*cursiva*/`código` dentro de un color
 // se combinan (ej. [green:*Activo*] queda verde + cursiva).
+//
+// [FIX] el contenido de un color ya no es ".+?" (no-codicioso
+// hasta el PRIMER "]" que aparezca) — con eso, algo como
+// [cyan:`[ ]`] cerraba el color en el "]" que cierra el literal
+// `[ ]`, no en el "]" final (la primera llave se cerraba con la
+// 3ra). Ahora el contenido es "(?:`[^`]*`|[^\]])+": un tramo
+// entre comillas invertidas cuenta como UN solo bloque protegido
+// (puede traer "]" adentro sin cortar el color), y fuera de
+// comillas invertidas cualquier "]" sigue cerrando la marca como
+// antes. O sea: para meter "[" o "]" literales dentro de un
+// color, se envuelven en `comillas invertidas` — ya funcionan
+// como marca de código Y como escape de corchetes al mismo
+// tiempo, sin sintaxis nueva que aprender.
 // ======================================================
 
 const PATRON_MARCAS =
-  /\*\*(.+?)\*\*|\*(.+?)\*|`(.+?)`|\[cyan:(.+?)\]|\[red:(.+?)\]|\[(orange|yellow|green|blue|purple|pink|gray):(.+?)\]/g;
+  /\*\*(.+?)\*\*|\*(.+?)\*|`(.+?)`|\[cyan:((?:`[^`]*`|[^\]])+)\]|\[red:((?:`[^`]*`|[^\]])+)\]|\[(orange|yellow|green|blue|purple|pink|gray):((?:`[^`]*`|[^\]])+)\]/g;
 
 export function parsearLineaAyuda(linea: string): Node[] {
   const nodos: Node[] = [];
