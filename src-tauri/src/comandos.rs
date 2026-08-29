@@ -789,34 +789,38 @@ pub fn cerrar_ventana_captura_coordenada(app: tauri::AppHandle) {
     }
 
     captura_coordenada::desactivar();
-    captura_coordenada::desactivar_preview();
 }
 
 // ======================================================
-// 👁️ PREVISUALIZACIÓN DE COORDENADA — Etapa E
+// 👁️ PREVISUALIZACIÓN DE COORDENADA — Etapa F
 // ------------------------------------------------------
-// Mismo label/builder que abrir_ventana_captura_coordenada
-// (VENTANA_CAPTURA_COORDENADA) — el modo previsualización usa la
-// misma ventana overlay, nunca las dos a la vez (ver
-// captura_coordenada::activar_preview/activar).
+// A diferencia de abrir_ventana_captura_coordenada (una sola
+// ventana con label fijo, VENTANA_CAPTURA_COORDENADA), cada fila
+// con el toggle ⊙️ encendido tiene su propia ventana overlay
+// independiente — label "captura_coordenada_preview_{id}" (id =
+// CoordenadaBanco::id) — así puede haber cualquier cantidad
+// abiertas a la vez (Regla 16), cada una posicionada en su propia
+// coordenada. captura.html distingue el modo previsualización
+// leyendo ?id= de la URL (ver vent_captura_main.ts) — ya no
+// comparte label/URL con la ventana de captura real.
 // ======================================================
 
-#[derive(Clone, Serialize, serde::Deserialize)]
-pub struct ConfigPreviewJson {
-    pub ubicacion: String,
+const PREFIJO_VENTANA_PREVIEW: &str = "captura_coordenada_preview_";
 
-    pub modo_ventana: String,
-
-    pub punto_referencia: String,
-
-    pub x: f64,
-
-    pub y: f64,
-}
+// Mitad del tamaño (lógico) de la ventana overlay — mismo valor que
+// MITAD_ANCHO_PREVIEW_LOGICO/MITAD_ALTO_PREVIEW_LOGICO en
+// vent_captura_main.ts (ambos derivan de inner_size(320, 120) del
+// builder de abajo). Se usa acá para posicionar la ventana ya
+// centrada en el builder, antes de que exista JS corriendo que
+// pueda hacerlo.
+const MITAD_ANCHO_PREVIEW_LOGICO: f64 = 160.0;
+const MITAD_ALTO_PREVIEW_LOGICO: f64 = 60.0;
 
 #[tauri::command]
 pub async fn abrir_ventana_preview_coordenada(
     app: tauri::AppHandle,
+    id: String,
+    numero: i32,
     ubicacion: String,
     modo_ventana: String,
     punto_referencia: String,
@@ -826,26 +830,36 @@ pub async fn abrir_ventana_preview_coordenada(
     // Ver comentario largo en abrir_ventana_captura_coordenada: misma
     // necesidad de `async fn` (deadlock de WebviewWindowBuilder::build()
     // en Windows si se llama desde comando síncrono) y de esperar a que
-    // una ventana previa con el mismo label termine de cerrarse.
-    if let Some(existente) = app.get_webview_window(VENTANA_CAPTURA_COORDENADA) {
+    // una ventana previa con el mismo label termine de cerrarse. Acá
+    // solo se cierra, si ya existía, la ventana de ESTE id — las demás
+    // previsualizaciones activas (otros ids) siguen intactas.
+    let label = format!("{PREFIJO_VENTANA_PREVIEW}{id}");
+
+    if let Some(existente) = app.get_webview_window(&label) {
         let _ = existente.close();
 
         for _ in 0..50 {
-            if app.get_webview_window(VENTANA_CAPTURA_COORDENADA).is_none() {
+            if app.get_webview_window(&label).is_none() {
                 break;
             }
             std::thread::sleep(std::time::Duration::from_millis(20));
         }
     }
 
-    captura_coordenada::activar_preview(ubicacion.clone(), modo_ventana.clone(), punto_referencia.clone(), x, y);
+    captura_coordenada::activar_preview(
+        id.clone(),
+        ubicacion.clone(),
+        modo_ventana.clone(),
+        punto_referencia.clone(),
+        x,
+        y,
+    );
 
-    // Mismo criterio que abrir_ventana_preview_grupo: se posiciona la
-    // ventana YA en el builder (en vez de dejarla nacer en la esquina
-    // default del SO y recién moverse cuando el JS de captura.html
-    // arranca y hace su primer setPosition). Físico→lógico con el
-    // scale_factor del monitor que contiene el punto — ver comentario
-    // largo en abrir_ventana_preview_grupo.
+    // Se posiciona la ventana YA en el builder (en vez de dejarla nacer
+    // en la esquina default del SO y recién moverse cuando el JS de
+    // captura.html arranca y hace su primer setPosition). Físico→lógico
+    // con el scale_factor del monitor que contiene el punto — mismo
+    // criterio que back_menu_express.rs::monitor_para_punto.
     let (destino_x, destino_y) = back_coordenada::calcular_destino_valores(
         &ubicacion,
         &modo_ventana,
@@ -875,8 +889,8 @@ pub async fn abrir_ventana_preview_coordenada(
 
     WebviewWindowBuilder::new(
         &app,
-        VENTANA_CAPTURA_COORDENADA,
-        WebviewUrl::App("captura.html".into()),
+        label,
+        WebviewUrl::App(format!("captura.html?id={id}&numero={numero}").into()),
     )
     .title("RemapH — Captura")
     .inner_size(320.0, 120.0)
@@ -887,7 +901,13 @@ pub async fn abrir_ventana_preview_coordenada(
     .shadow(false)
     .always_on_top(true)
     .skip_taskbar(true)
-    .focused(true)
+    // A diferencia de la ventana de captura real (una sola a la vez),
+    // acá puede haber varias previsualizaciones abiertas al mismo
+    // tiempo (Regla 16) — con focused(true) cada toggle nuevo le
+    // robaría el foco a la ventana "Coordenadas guardadas" apenas se
+    // abriera (mismo motivo por el que abrir_ventana_preview_grupo
+    // usaba focused(false)).
+    .focused(false)
     .devtools(true)
     .build()
     .map_err(|error| error.to_string())?;
@@ -896,19 +916,19 @@ pub async fn abrir_ventana_preview_coordenada(
 }
 
 #[tauri::command]
-pub fn obtener_config_preview_coordenada() -> Option<ConfigPreviewJson> {
-    captura_coordenada::obtener_config_preview().map(|config| ConfigPreviewJson {
-        ubicacion: config.ubicacion,
-        modo_ventana: config.modo_ventana,
-        punto_referencia: config.punto_referencia,
-        x: config.x,
-        y: config.y,
-    })
+pub fn cerrar_ventana_preview_coordenada(app: tauri::AppHandle, id: String) {
+    let label = format!("{PREFIJO_VENTANA_PREVIEW}{id}");
+
+    if let Some(ventana) = app.get_webview_window(&label) {
+        let _ = ventana.close();
+    }
+
+    captura_coordenada::desactivar_preview(&id);
 }
 
 #[tauri::command]
-pub fn obtener_destino_preview_coordenada() -> Option<(i32, i32)> {
-    let config = captura_coordenada::obtener_config_preview()?;
+pub fn obtener_destino_preview_coordenada(id: String) -> Option<(i32, i32)> {
+    let config = captura_coordenada::obtener_config_preview(&id)?;
 
     Some(back_coordenada::calcular_destino_valores(
         &config.ubicacion,
@@ -917,6 +937,50 @@ pub fn obtener_destino_preview_coordenada() -> Option<(i32, i32)> {
         config.x,
         config.y,
     ))
+}
+
+#[tauri::command]
+pub fn contar_previews_activas() -> usize {
+    captura_coordenada::ids_previews_activas().len()
+}
+
+// ======================================================
+// 🖱️💾 GUARDAR POSICIÓN DE PREVIEW ARRASTRADO — Regla 17
+// ------------------------------------------------------
+// El marcador ⊙ de la ventana overlay se puede arrastrar; al
+// soltarlo, vent_captura_main.ts ya calculó el punto físico de
+// pantalla (destino_x/destino_y) y este comando lo traduce de
+// vuelta a los valores crudos (x/y) que le corresponden a esa
+// coordenada según su ubicacion/modo_ventana/punto_referencia, y
+// los persiste en Coordenadas.tsv.
+// ======================================================
+
+#[tauri::command]
+pub fn guardar_posicion_preview_coordenada(
+    id: String,
+    destino_x: i32,
+    destino_y: i32,
+) -> Result<(), String> {
+    let config = captura_coordenada::obtener_config_preview(&id)
+        .ok_or_else(|| format!("No hay previsualización activa para el id {id}"))?;
+
+    let (x, y) = back_coordenada::valores_desde_destino(
+        &config.ubicacion,
+        &config.modo_ventana,
+        &config.punto_referencia,
+        destino_x,
+        destino_y,
+    );
+
+    banco_coordenadas::actualizar_xy(&id, x, y)?;
+
+    // Sin esto, obtener_config_preview(id) seguiría devolviendo el x/y
+    // ANTERIOR al arrastre mientras la previsualización sigue abierta
+    // (CONFIG_PREVIEWS es memoria, independiente de lo recién escrito
+    // en Coordenadas.tsv) — ver comentario en captura_coordenada.rs.
+    captura_coordenada::actualizar_xy_preview(&id, x, y);
+
+    Ok(())
 }
 
 // ======================================================
@@ -939,153 +1003,6 @@ pub fn probar_coordenada(
         back_coordenada::calcular_destino_valores(&ubicacion, &modo_ventana, &punto_referencia, x, y);
 
     back_coordenada::mover_cursor(destino_x, destino_y);
-}
-
-// ======================================================
-// 👁️▶️ PREVISUALIZACIÓN Y PRUEBA DE GRUPO — Etapa G
-// ------------------------------------------------------
-// Extiende Etapa E/F para operar sobre todas las coordenadas
-// del filtro activo de la ventana "Coordenadas guardadas" a la
-// vez: una ventana overlay por coordenada (label
-// "captura_coordenada_grupo_{indice}"), y un solo comando que
-// mueve el cursor real por cada punto en orden.
-// ======================================================
-
-const PREFIJO_VENTANA_PREVIEW_GRUPO: &str = "captura_coordenada_grupo_";
-
-// Mitad del tamaño (lógico) de la ventana overlay — mismo valor que
-// MITAD_ANCHO_PREVIEW_LOGICO/MITAD_ALTO_PREVIEW_LOGICO en
-// vent_captura_main.ts (ambos derivan de inner_size(320, 120) más
-// arriba). Se usa acá para posicionar la ventana ya centrada en el
-// builder, antes de que exista JS corriendo que pueda hacerlo.
-const MITAD_ANCHO_PREVIEW_LOGICO: f64 = 160.0;
-const MITAD_ALTO_PREVIEW_LOGICO: f64 = 60.0;
-
-#[tauri::command]
-pub async fn abrir_ventana_preview_grupo(
-    app: tauri::AppHandle,
-    coordenadas: Vec<ConfigPreviewJson>,
-) -> Result<(), String> {
-    // Cierra cualquier ventana de grupo (u overlay individual/captura)
-    // que hubiera quedado abierta antes de levantar las nuevas.
-    cerrar_ventanas_preview_grupo(app.clone());
-
-    captura_coordenada::activar_preview_grupo(
-        coordenadas
-            .iter()
-            .map(|config| captura_coordenada::ConfigPreview {
-                ubicacion: config.ubicacion.clone(),
-                modo_ventana: config.modo_ventana.clone(),
-                punto_referencia: config.punto_referencia.clone(),
-                x: config.x,
-                y: config.y,
-            })
-            .collect(),
-    );
-
-    for (indice, config) in coordenadas.iter().enumerate() {
-        let label = format!("{PREFIJO_VENTANA_PREVIEW_GRUPO}{indice}");
-
-        // Se calcula el destino y se posiciona la ventana YA en el
-        // builder (en vez de dejar que nazca en la esquina default del
-        // SO y recién se mueva cuando el JS de captura.html arranca).
-        // Con varias ventanas overlay always_on_top simultáneas, ese
-        // salto tardío es lo que se veía como una sola X saltando
-        // entre las posiciones de las demás — mismo criterio que
-        // menu_express/portapapeles (ver back_menu_express.rs::
-        // monitor_para_punto): el cálculo de geometría es en físico
-        // (GetCursorPos/GetWindowRect), y WebviewWindowBuilder::
-        // position() espera lógico, así que se convierte acá con el
-        // scale_factor del monitor que contiene el punto.
-        let (destino_x, destino_y) = back_coordenada::calcular_destino_valores(
-            &config.ubicacion,
-            &config.modo_ventana,
-            &config.punto_referencia,
-            config.x,
-            config.y,
-        );
-
-        let escala = app
-            .available_monitors()
-            .ok()
-            .and_then(|monitores| {
-                monitores.into_iter().find(|monitor| {
-                    let pos = monitor.position();
-                    let size = monitor.size();
-                    destino_x >= pos.x
-                        && destino_x < pos.x + size.width as i32
-                        && destino_y >= pos.y
-                        && destino_y < pos.y + size.height as i32
-                })
-            })
-            .map(|monitor| monitor.scale_factor())
-            .unwrap_or(1.0);
-
-        let posicion_x = (destino_x as f64 / escala) - MITAD_ANCHO_PREVIEW_LOGICO;
-        let posicion_y = (destino_y as f64 / escala) - MITAD_ALTO_PREVIEW_LOGICO;
-
-        WebviewWindowBuilder::new(
-            &app,
-            label,
-            WebviewUrl::App(format!("captura.html?grupo={indice}").into()),
-        )
-        .title("RemapH — Captura")
-        .inner_size(320.0, 120.0)
-        .position(posicion_x, posicion_y)
-        .resizable(false)
-        .decorations(false)
-        .transparent(true)
-        .shadow(false)
-        .always_on_top(true)
-        .skip_taskbar(true)
-        .focused(false)
-        .devtools(true)
-        .build()
-        .map_err(|error| error.to_string())?;
-    }
-
-    Ok(())
-}
-
-#[tauri::command]
-pub fn cerrar_ventanas_preview_grupo(app: tauri::AppHandle) {
-    for (label, ventana) in app.webview_windows() {
-        if label.starts_with(PREFIJO_VENTANA_PREVIEW_GRUPO) {
-            let _ = ventana.close();
-        }
-    }
-
-    captura_coordenada::desactivar_preview_grupo();
-}
-
-#[tauri::command]
-pub fn obtener_destino_preview_grupo(indice: usize) -> Option<(i32, i32)> {
-    let config = captura_coordenada::obtener_config_preview_grupo(indice)?;
-
-    Some(back_coordenada::calcular_destino_valores(
-        &config.ubicacion,
-        &config.modo_ventana,
-        &config.punto_referencia,
-        config.x,
-        config.y,
-    ))
-}
-
-#[tauri::command]
-pub fn probar_grupo_coordenadas(coordenadas: Vec<ConfigPreviewJson>) {
-    for config in coordenadas {
-        let (destino_x, destino_y) = back_coordenada::calcular_destino_valores(
-            &config.ubicacion,
-            &config.modo_ventana,
-            &config.punto_referencia,
-            config.x,
-            config.y,
-        );
-
-        back_coordenada::mover_cursor(destino_x, destino_y);
-
-        std::thread::sleep(std::time::Duration::from_millis(150));
-    }
 }
 
 #[tauri::command]
@@ -1184,7 +1101,7 @@ pub async fn abrir_ventana_coordenadas(app: tauri::AppHandle) -> Result<(), Stri
         VENTANA_COORDENADAS,
         WebviewUrl::App("coordenadas.html".into()),
     )
-    .title("RemapH — Coordenadas")
+    .title("RemapH — Gestor de Coordenadas guardadas")
     .inner_size(720.0, 480.0)
     .min_inner_size(520.0, 360.0)
     .resizable(true)
@@ -1235,6 +1152,11 @@ pub fn obtener_seleccion_coordenada_banco() -> Option<banco_coordenadas::Coorden
 }
 
 #[tauri::command]
+pub fn coordenadas_listar_grupos() -> Result<Vec<String>, String> {
+    banco_coordenadas::listar_grupos_distintos()
+}
+
+#[tauri::command]
 pub fn coordenadas_editar(
     id: String,
     coordenada: banco_coordenadas::CoordenadaBanco,
@@ -1245,6 +1167,11 @@ pub fn coordenadas_editar(
 #[tauri::command]
 pub fn coordenadas_eliminar(id: String) -> Result<(), String> {
     banco_coordenadas::eliminar(&id)
+}
+
+#[tauri::command]
+pub fn coordenadas_reordenar(orden: Vec<String>) -> Result<(), String> {
+    banco_coordenadas::reordenar(&orden)
 }
 
 // ======================================================

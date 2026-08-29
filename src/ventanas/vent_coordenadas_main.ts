@@ -1,21 +1,30 @@
 // ======================================================
 // 📍 vent_Coordenadas_Main
 // ------------------------------------------------------
-// Punto de entrada de la ventana "Coordenadas guardadas"
-// (coordenadas.html — página independiente, ver
+// Punto de entrada de la ventana "Gestor de Coordenadas
+// guardadas" (coordenadas.html — página independiente, ver
 // vite.config.ts). Ventana normal decorada (no overlay).
 //
 // Lista + filtra el catálogo (banco_coordenadas.rs vía
-// core_banco_coordenadas.ts), permite editar/eliminar cada
-// fila, y "Nueva coordenada" dispara el flujo de captura ya
-// existente (captura.html/captura_coordenada.rs) para
-// agregar una entrada nueva al banco.
+// core_banco_coordenadas.ts) y permite editar/eliminar cada
+// fila. La tabla de filas (columnas #/⁝/⊙️/▶/X/Grupo/Nombre/
+// Tipo/X,Y) se termina de portar en las etapas siguientes.
 // ======================================================
 
 import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 
 import { aplicarOverridesApariencia } from "../core/core_apariencia";
+import { crearControladorArrastre } from "../util/util_arrastrable";
+import {
+  mostrarPopup,
+  crearContenedorPopup,
+  ocultarPopup,
+} from "../componentes/comp_popup_contenedor";
+import {
+  crearGrupoOpciones,
+  crearFilaPopup,
+} from "../componentes/comp_popup_grupo";
 
 import {
   type CoordenadaBanco,
@@ -34,6 +43,8 @@ import {
 import "../styles/styl_variables.css";
 import "../styles/styl_general.css";
 import "../styles/styl_botones.css";
+import "../styles/styl_arrastrable.css";
+import "../styles/styl_layout.css";
 import "../styles/styl_coordenadas.css";
 
 void aplicarOverridesApariencia();
@@ -47,131 +58,26 @@ const raiz = document.getElementById("coordenadas")!;
 const card = document.createElement("div");
 card.className = "coordenadas-card";
 
-const header = document.createElement("div");
-header.className = "coordenadas-header";
-header.textContent = "Coordenadas guardadas";
+// --- Barra superior (sin título de texto, solo botones) ---
 
-// --- Barra de filtros ---
+const barraSuperior = document.createElement("div");
+barraSuperior.className = "coordenadas-barra-superior";
 
-const filtros = document.createElement("div");
-filtros.className = "coordenadas-filtros";
+const botonAgregarFila = document.createElement("button");
+botonAgregarFila.type = "button";
+botonAgregarFila.className = "coordenadas-boton coordenadas-boton-primario";
+botonAgregarFila.textContent = "+ Fila coordenada";
+botonAgregarFila.addEventListener("click", () => {
+  void agregarFila();
+});
 
-const inputFiltroAplicacion = document.createElement("input");
-inputFiltroAplicacion.type = "text";
-inputFiltroAplicacion.placeholder = "Filtrar por aplicación...";
-inputFiltroAplicacion.className = "coordenadas-input";
+const botonFijar = document.createElement("button");
+botonFijar.type = "button";
+botonFijar.className = "btn-ayuda coordenadas-btn-fijar";
+botonFijar.textContent = "📌";
+botonFijar.title = "Fijar ventana";
 
-const selectFiltroTipo = document.createElement("select");
-selectFiltroTipo.className = "coordenadas-select";
-selectFiltroTipo.append(
-  crearOpcion("", "Tipo: todos"),
-  crearOpcion("1", "Absoluta"),
-  crearOpcion("2", "Cursor"),
-  crearOpcion("3", "Ventana"),
-);
-
-const selectFiltroModo = document.createElement("select");
-selectFiltroModo.className = "coordenadas-select";
-selectFiltroModo.append(
-  crearOpcion("", "Modo: todos"),
-  crearOpcion("1", "Píxeles"),
-  crearOpcion("2", "Porcentaje"),
-);
-
-const botonNueva = document.createElement("button");
-botonNueva.type = "button";
-botonNueva.className = "coordenadas-boton coordenadas-boton-primario";
-botonNueva.textContent = "+ Nueva coordenada";
-
-const botonGrupoPreview = document.createElement("button");
-botonGrupoPreview.type = "button";
-botonGrupoPreview.className = "coordenadas-boton";
-botonGrupoPreview.textContent = "👁 Grupo";
-
-const botonGrupoProbar = document.createElement("button");
-botonGrupoProbar.type = "button";
-botonGrupoProbar.className = "coordenadas-boton";
-botonGrupoProbar.textContent = "▶ Grupo";
-
-filtros.append(
-  inputFiltroAplicacion,
-  selectFiltroTipo,
-  selectFiltroModo,
-  botonGrupoPreview,
-  botonGrupoProbar,
-  botonNueva,
-);
-
-// --- Formulario "Nueva coordenada" (oculto hasta que se abre) ---
-
-const formNueva = document.createElement("div");
-formNueva.className = "coordenadas-form-nueva oculto";
-
-const inputNuevaAplicacion = document.createElement("input");
-inputNuevaAplicacion.type = "text";
-inputNuevaAplicacion.placeholder = "Aplicación (nota)";
-inputNuevaAplicacion.className = "coordenadas-input";
-
-const inputNuevaNota = document.createElement("input");
-inputNuevaNota.type = "text";
-inputNuevaNota.placeholder = "Nota / nombre";
-inputNuevaNota.className = "coordenadas-input";
-
-const selectNuevaTipo = document.createElement("select");
-selectNuevaTipo.className = "coordenadas-select";
-selectNuevaTipo.append(
-  crearOpcion("1", "Absoluta"),
-  crearOpcion("2", "Cursor"),
-  crearOpcion("3", "Ventana"),
-);
-
-const selectNuevaModo = document.createElement("select");
-selectNuevaModo.className = "coordenadas-select";
-selectNuevaModo.append(crearOpcion("1", "Píxeles"), crearOpcion("2", "Porcentaje"));
-
-const selectNuevaPuntoReferencia = document.createElement("select");
-selectNuevaPuntoReferencia.className = "coordenadas-select";
-selectNuevaPuntoReferencia.append(
-  crearOpcion("1", "Sup-Izq"),
-  crearOpcion("2", "Sup-Der"),
-  crearOpcion("3", "Centro"),
-  crearOpcion("4", "Inf-Izq"),
-  crearOpcion("5", "Inf-Der"),
-);
-
-const botonCapturarNueva = document.createElement("button");
-botonCapturarNueva.type = "button";
-botonCapturarNueva.className = "coordenadas-boton coordenadas-boton-primario";
-botonCapturarNueva.textContent = "Capturar...";
-
-const botonCancelarNueva = document.createElement("button");
-botonCancelarNueva.type = "button";
-botonCancelarNueva.className = "coordenadas-boton";
-botonCancelarNueva.textContent = "Cancelar";
-
-function actualizarVisibilidadCamposNueva(): void {
-  const esVentana = selectNuevaTipo.value === "3";
-  const esPixeles = selectNuevaModo.value === "1";
-
-  selectNuevaModo.classList.toggle("oculto", !esVentana);
-  selectNuevaPuntoReferencia.classList.toggle(
-    "oculto",
-    !esVentana || !esPixeles,
-  );
-}
-
-selectNuevaTipo.addEventListener("change", actualizarVisibilidadCamposNueva);
-selectNuevaModo.addEventListener("change", actualizarVisibilidadCamposNueva);
-
-formNueva.append(
-  inputNuevaAplicacion,
-  inputNuevaNota,
-  selectNuevaTipo,
-  selectNuevaModo,
-  selectNuevaPuntoReferencia,
-  botonCapturarNueva,
-  botonCancelarNueva,
-);
+barraSuperior.append(botonAgregarFila, botonFijar);
 
 // --- Tabla ---
 
@@ -179,93 +85,311 @@ const tabla = document.createElement("table");
 tabla.className = "coordenadas-tabla";
 
 const thead = document.createElement("thead");
-thead.innerHTML =
-  "<tr><th>Nota</th><th>Aplicación</th><th>Tipo</th><th>Modo</th><th>Referencia</th><th>X</th><th>Y</th><th></th></tr>";
+const filaEncabezado = document.createElement("tr");
+
+function crearEncabezado(
+  contenido: string | HTMLElement,
+): HTMLTableCellElement {
+  const th = document.createElement("th");
+  th.append(contenido);
+  return th;
+}
+
+// ======================================================
+// 🔽 FILTROS DE ENCABEZADO (Grupo / Tipo) — popup en vez de
+// <select> nativo, para tener control total del tema oscuro
+// (el listado desplegable de <select> usa el estilo del SO).
+// ======================================================
+
+let filtroGrupo = "";
+let filtroTipo = "";
+let gruposDisponibles: string[] = [];
+
+const botonFiltroGrupo = document.createElement("button");
+botonFiltroGrupo.type = "button";
+botonFiltroGrupo.className = "coordenadas-boton-filtro";
+
+const botonFiltroTipo = document.createElement("button");
+botonFiltroTipo.type = "button";
+botonFiltroTipo.className = "coordenadas-boton-filtro";
+
+function actualizarTextoFiltros(): void {
+  botonFiltroGrupo.textContent = `Grupo: ${filtroGrupo || "Todos"}`;
+  botonFiltroTipo.textContent = `Tipo: ${filtroTipo ? textoTipoCoordenada(Number(filtroTipo)) : "Todos"}`;
+}
+
+actualizarTextoFiltros();
+
+botonFiltroGrupo.addEventListener("click", (evento) => {
+  void cargarGruposFiltro().then(() => {
+    const lista = document.createElement("div");
+    lista.className = "popup-lista";
+
+    lista.append(
+      crearGrupoOpciones(
+        [
+          { texto: "Todos", valor: "" },
+          ...gruposDisponibles.map((grupo) => ({ texto: grupo, valor: grupo })),
+        ],
+        filtroGrupo,
+        (valor) => {
+          filtroGrupo = valor;
+          actualizarTextoFiltros();
+          recargarPorFiltro();
+          ocultarPopup();
+        },
+        "popup-grupo-vertical",
+      ),
+    );
+
+    mostrarPopup(lista, evento.clientX, evento.clientY);
+  });
+});
+
+botonFiltroTipo.addEventListener("click", (evento) => {
+  const lista = document.createElement("div");
+  lista.className = "popup-lista";
+
+  lista.append(
+    crearGrupoOpciones(
+      [
+        { texto: "Todos", valor: "" },
+        { texto: "Absoluta", valor: "1" },
+        { texto: "Cursor", valor: "2" },
+        { texto: "Ventana", valor: "3" },
+      ],
+      filtroTipo,
+      (valor) => {
+        filtroTipo = valor;
+        actualizarTextoFiltros();
+        recargarPorFiltro();
+        ocultarPopup();
+      },
+      "popup-grupo-vertical",
+    ),
+  );
+
+  mostrarPopup(lista, evento.clientX, evento.clientY);
+});
+
+const botonAsaEncabezado = document.createElement("button");
+botonAsaEncabezado.type = "button";
+botonAsaEncabezado.className = "coordenadas-asa";
+botonAsaEncabezado.textContent = "⁝";
+botonAsaEncabezado.title = "Mostrar/ocultar opciones";
+botonAsaEncabezado.addEventListener("click", () => {
+  tabla.classList.toggle("coordenadas-tabla--iconos-desplegados");
+});
+
+const botonPreviewGlobal = document.createElement("button");
+botonPreviewGlobal.type = "button";
+botonPreviewGlobal.className =
+  "coordenadas-boton-icono coordenadas-icono-togglable";
+botonPreviewGlobal.textContent = "⊙";
+botonPreviewGlobal.title = "Previsualizar todas";
+botonPreviewGlobal.addEventListener("click", () => {
+  void alternarPrevisualizacionGlobal();
+});
+
+const celdaOpcionesEncabezado = document.createElement("div");
+celdaOpcionesEncabezado.className = "coordenadas-celda-opciones";
+celdaOpcionesEncabezado.append(botonAsaEncabezado, botonPreviewGlobal);
+
+filaEncabezado.append(
+  crearEncabezado("#"),
+  crearEncabezado(celdaOpcionesEncabezado),
+  crearEncabezado(botonFiltroGrupo),
+  crearEncabezado("Nombre"),
+  crearEncabezado(botonFiltroTipo),
+  crearEncabezado("X,Y"),
+);
+
+thead.append(filaEncabezado);
 
 const tbody = document.createElement("tbody");
 
 tabla.append(thead, tbody);
 
-card.append(header, filtros, formNueva, tabla);
+card.append(barraSuperior, tabla);
 raiz.append(card);
+raiz.append(crearContenedorPopup());
 
-function crearOpcion(valor: string, texto: string): HTMLOptionElement {
-  const opcion = document.createElement("option");
-  opcion.value = valor;
-  opcion.textContent = texto;
-  return opcion;
+// ======================================================
+// 📌 FIJAR VENTANA
+// ------------------------------------------------------
+// Arranca siempre sin fijar — no se recuerda entre aperturas.
+// ======================================================
+
+let ventanaFijada = false;
+
+botonFijar.addEventListener("click", () => {
+  ventanaFijada = !ventanaFijada;
+  botonFijar.classList.toggle("coordenadas-btn-fijar-activo", ventanaFijada);
+});
+
+// ======================================================
+// ⁝⁝ ARRASTRAR Y SOLTAR (util_arrastrable.ts)
+// ======================================================
+
+function obtenerOrdenIds(): string[] {
+  return Array.from(tbody.children).map(
+    (fila) => (fila as HTMLElement).dataset.id ?? "",
+  );
 }
+
+function onReordenar(nuevoOrden: string[]): void {
+  void invoke("coordenadas_reordenar", { orden: nuevoOrden }).then(cargarLista);
+}
+
+const controladorArrastre = crearControladorArrastre({
+  contenedor: tbody,
+  obtenerOrdenIds,
+  onReordenar,
+});
 
 // ======================================================
 // 📋 CARGAR / RENDERIZAR LISTA
 // ======================================================
 
 async function cargarLista(): Promise<void> {
-  const aplicacion = inputFiltroAplicacion.value.trim() || undefined;
-  const tipo = selectFiltroTipo.value ? Number(selectFiltroTipo.value) : undefined;
-  const modo = selectFiltroModo.value ? Number(selectFiltroModo.value) : undefined;
+  const aplicacion = filtroGrupo || undefined;
+  const tipo = filtroTipo ? Number(filtroTipo) : undefined;
 
   const filas = await invoke<CoordenadaBancoJson[]>("coordenadas_listar", {
     aplicacion,
     tipo,
-    modo,
+    modo: undefined,
   });
 
   listaFiltradaActual = filas.map(convertirCoordenadaBanco);
   renderizarTabla(listaFiltradaActual);
 }
 
-// Última lista filtrada renderizada — usada por Etapa G (Grupo) para
-// saber sobre qué coordenadas operar sin volver a preguntarle a
-// coordenadas_listar.
+async function cargarGruposFiltro(): Promise<void> {
+  gruposDisponibles = await invoke<string[]>("coordenadas_listar_grupos");
+}
+
+// Última lista filtrada renderizada.
 let listaFiltradaActual: CoordenadaBanco[] = [];
 
-let idEnEdicion: string | null = null;
-
-// Id de la coordenada con previsualización (marcador "X") activa en
-// la ventana overlay — null si no hay ninguna. Etapa E.
-let idPrevisualizado: string | null = null;
+// Ids de coordenadas cuyo marcador aún no fue generado (Etapa E) —
+// muestran "Generar marcador ⊙" en la columna X,Y en vez de los dos
+// botones de coordenada.
+const idsSinMarcador = new Set<string>();
 
 // ======================================================
-// 👁️ PREVISUALIZACIÓN — Etapa E
+// ➕ AGREGAR FILA — Regla 7
+// ======================================================
+
+async function agregarFila(): Promise<void> {
+  const nueva = crearCoordenadaBanco();
+
+  if (filtroGrupo) {
+    nueva.aplicacion = filtroGrupo;
+  }
+
+  if (filtroTipo) {
+    nueva.tipo = Number(filtroTipo);
+  }
+
+  if (nueva.tipo === 3) {
+    nueva.modo = 1;
+    nueva.puntoReferencia = 1;
+  }
+
+  const guardada = await invoke<CoordenadaBancoJson>("coordenadas_agregar", {
+    coordenada: coordenadaBancoParaBackend(nueva),
+  });
+
+  idsSinMarcador.add(guardada.id);
+
+  await cargarLista();
+}
+
+// Ids de coordenadas con previsualización (marcador "⊙") activa —
+// cada una en su propia ventana overlay. Etapa F: reemplaza el
+// idPrevisualizado único (Etapa E) porque ahora puede haber
+// cualquier cantidad activas a la vez.
+const idsPrevisualizados = new Set<string>();
+
+// Id de la coordenada con el círculo verde de selección activo — Etapa H.
+let idSeleccionado: string | null = null;
+
+// ======================================================
+// 👁️ PREVISUALIZACIÓN — Etapa F
 // ======================================================
 
 async function cerrarPrevisualizacion(): Promise<void> {
-  if (idPrevisualizado === null) {
+  if (idsPrevisualizados.size === 0) {
     return;
   }
 
-  idPrevisualizado = null;
+  const ids = Array.from(idsPrevisualizados);
+  idsPrevisualizados.clear();
 
-  await invoke("cerrar_ventana_captura_coordenada").catch(() => {});
+  await Promise.all(
+    ids.map((id) =>
+      invoke("cerrar_ventana_preview_coordenada", { id }).catch(() => {}),
+    ),
+  );
+}
+
+async function abrirPrevisualizacion(
+  coordenada: CoordenadaBanco,
+  numero: number,
+): Promise<void> {
+  idsPrevisualizados.add(coordenada.id);
+
+  await invoke("abrir_ventana_preview_coordenada", {
+    id: coordenada.id,
+    numero,
+    ubicacion: TIPO_A_UBICACION[coordenada.tipo] ?? "absoluta",
+    modoVentana: MODO_A_MODO_VENTANA[coordenada.modo] ?? "pixeles",
+    puntoReferencia:
+      PUNTO_REFERENCIA_NUMERO_A_STRING[coordenada.puntoReferencia] ?? "sup_izq",
+    x: coordenada.x,
+    y: coordenada.y,
+  });
+}
+
+async function cerrarPrevisualizacionDe(id: string): Promise<void> {
+  idsPrevisualizados.delete(id);
+
+  await invoke("cerrar_ventana_preview_coordenada", { id }).catch(() => {});
 }
 
 async function alternarPrevisualizacion(
   coordenada: CoordenadaBanco,
+  numero: number,
 ): Promise<void> {
-  if (idPrevisualizado === coordenada.id) {
+  if (idsPrevisualizados.has(coordenada.id)) {
+    await cerrarPrevisualizacionDe(coordenada.id);
+    // Regla 17: si el usuario arrastró el marcador antes de cerrar la
+    // previsualización, x/y ya quedaron guardados en disco (Rust) —
+    // se recarga la lista para reflejarlo en la columna X,Y.
+    await cargarLista();
+    return;
+  }
+
+  await abrirPrevisualizacion(coordenada, numero);
+}
+
+// Regla 10: botón del encabezado ⊙️ — si hay alguna previsualización
+// oculta (ninguna fila activa), muestra el marcador de todas las
+// filas de la tabla filtrada actual; si ya están todas visibles, las
+// oculta todas.
+async function alternarPrevisualizacionGlobal(): Promise<void> {
+  if (idsPrevisualizados.size > 0) {
     await cerrarPrevisualizacion();
     await cargarLista();
     return;
   }
 
-  if (grupoPrevisualizado) {
-    grupoPrevisualizado = false;
-    actualizarBotonGrupoPreview();
-    await cerrarPrevisualizacionGrupo();
-  }
-
-  idPrevisualizado = coordenada.id;
-
-  await invoke("abrir_ventana_preview_coordenada", {
-    ubicacion: TIPO_A_UBICACION[coordenada.tipo] ?? "absoluta",
-    modoVentana: MODO_A_MODO_VENTANA[coordenada.modo] ?? "pixeles",
-    puntoReferencia:
-      PUNTO_REFERENCIA_NUMERO_A_STRING[coordenada.puntoReferencia] ??
-      "sup_izq",
-    x: coordenada.x,
-    y: coordenada.y,
-  });
+  await Promise.all(
+    listaFiltradaActual.map((coordenada, indice) =>
+      abrirPrevisualizacion(coordenada, indice + 1),
+    ),
+  );
 
   await cargarLista();
 }
@@ -279,359 +403,429 @@ function probarCoordenadaBanco(coordenada: CoordenadaBanco): void {
     ubicacion: TIPO_A_UBICACION[coordenada.tipo] ?? "absoluta",
     modoVentana: MODO_A_MODO_VENTANA[coordenada.modo] ?? "pixeles",
     puntoReferencia:
-      PUNTO_REFERENCIA_NUMERO_A_STRING[coordenada.puntoReferencia] ??
-      "sup_izq",
+      PUNTO_REFERENCIA_NUMERO_A_STRING[coordenada.puntoReferencia] ?? "sup_izq",
     x: coordenada.x,
     y: coordenada.y,
   }).catch(() => {});
 }
-
-// ======================================================
-// 👁️▶️ PREVISUALIZACIÓN Y PRUEBA DE GRUPO — Etapa G
-// ------------------------------------------------------
-// Extiende Etapa E/F a la lista filtrada actual completa, en vez de
-// una sola fila.
-// ======================================================
-
-function coordenadaBancoAConfigPreview(coordenada: CoordenadaBanco): {
-  ubicacion: string;
-  modoVentana: string;
-  puntoReferencia: string;
-  x: number;
-  y: number;
-} {
-  return {
-    ubicacion: TIPO_A_UBICACION[coordenada.tipo] ?? "absoluta",
-    modoVentana: MODO_A_MODO_VENTANA[coordenada.modo] ?? "pixeles",
-    puntoReferencia:
-      PUNTO_REFERENCIA_NUMERO_A_STRING[coordenada.puntoReferencia] ??
-      "sup_izq",
-    x: coordenada.x,
-    y: coordenada.y,
-  };
-}
-
-// Etapa G: si hay una previsualización de grupo activa sobre el
-// filtro actual. Mutuamente excluyente con idPrevisualizado (Etapa E)
-// — activar una cierra la otra.
-let grupoPrevisualizado = false;
-
-function actualizarBotonGrupoPreview(): void {
-  botonGrupoPreview.classList.toggle(
-    "coordenadas-boton-primario",
-    grupoPrevisualizado,
-  );
-}
-
-async function abrirPrevisualizacionGrupo(): Promise<void> {
-  await invoke("abrir_ventana_preview_grupo", {
-    coordenadas: listaFiltradaActual.map(coordenadaBancoAConfigPreview),
-  });
-}
-
-async function cerrarPrevisualizacionGrupo(): Promise<void> {
-  await invoke("cerrar_ventanas_preview_grupo").catch(() => {});
-}
-
-botonGrupoPreview.addEventListener("click", async () => {
-  if (grupoPrevisualizado) {
-    grupoPrevisualizado = false;
-    actualizarBotonGrupoPreview();
-    await cerrarPrevisualizacionGrupo();
-    return;
-  }
-
-  await cerrarPrevisualizacion();
-
-  grupoPrevisualizado = true;
-  actualizarBotonGrupoPreview();
-  await abrirPrevisualizacionGrupo();
-});
-
-botonGrupoProbar.addEventListener("click", () => {
-  invoke("probar_grupo_coordenadas", {
-    coordenadas: listaFiltradaActual.map(coordenadaBancoAConfigPreview),
-  }).catch(() => {});
-});
 
 function crearBotonProbar(coordenada: CoordenadaBanco): HTMLButtonElement {
   const boton = document.createElement("button");
   boton.type = "button";
-  boton.className = "coordenadas-boton-icono";
+  boton.className = "coordenadas-boton-icono coordenadas-icono-togglable";
   boton.textContent = "▶";
   boton.title = "Probar";
+
+  if (coordenada.tipo !== 1) {
+    boton.disabled = true;
+    boton.classList.add("coordenadas-boton-icono-bloqueado");
+    return boton;
+  }
+
   boton.addEventListener("click", () => {
     probarCoordenadaBanco(coordenada);
   });
   return boton;
 }
 
-function renderizarTabla(lista: CoordenadaBanco[]): void {
-  tbody.innerHTML = "";
+// ======================================================
+// 📌 GENERAR MARCADOR — Etapa E
+// ------------------------------------------------------
+// Mismo mecanismo de captura ya usado en crearDetalleCoordenada
+// (comp_popup_macro_editor.ts): abre la ventana overlay de
+// captura y sondea obtener_resultado_coordenada cada 200ms.
+// ======================================================
 
-  for (const coordenada of lista) {
-    tbody.append(
-      coordenada.id === idEnEdicion
-        ? crearFilaEdicion(coordenada)
-        : crearFilaLectura(coordenada),
+function iniciarCapturaMarcador(coordenada: CoordenadaBanco): void {
+  invoke("abrir_ventana_captura_coordenada", {
+    ubicacion: TIPO_A_UBICACION[coordenada.tipo] ?? "absoluta",
+    modoVentana: MODO_A_MODO_VENTANA[coordenada.modo] ?? "pixeles",
+    puntoReferencia:
+      PUNTO_REFERENCIA_NUMERO_A_STRING[coordenada.puntoReferencia] ?? "sup_izq",
+  }).catch((error) => {
+    console.error("abrir_ventana_captura_coordenada FALLÓ:", error);
+  });
+
+  const intervalo = setInterval(() => {
+    invoke<[number, number] | null>("obtener_resultado_coordenada")
+      .then((resultado) => {
+        if (!resultado) {
+          return;
+        }
+
+        clearInterval(intervalo);
+
+        coordenada.x = resultado[0];
+        coordenada.y = resultado[1];
+        idsSinMarcador.delete(coordenada.id);
+
+        void invoke("coordenadas_editar", {
+          id: coordenada.id,
+          coordenada: coordenadaBancoParaBackend(coordenada),
+        }).then(cargarLista);
+      })
+      .catch(() => {
+        clearInterval(intervalo);
+      });
+  }, 200);
+}
+
+function crearCeldaXY(coordenada: CoordenadaBanco): HTMLTableCellElement {
+  const td = document.createElement("td");
+  td.className = "coordenadas-celda-xy";
+
+  if (idsSinMarcador.has(coordenada.id)) {
+    const botonGenerar = document.createElement("button");
+    botonGenerar.type = "button";
+    botonGenerar.className = "coordenadas-boton coordenadas-boton-primario";
+    botonGenerar.textContent = "Generar marcador ⊙";
+    botonGenerar.addEventListener("click", () => {
+      iniciarCapturaMarcador(coordenada);
+    });
+    td.append(botonGenerar);
+
+    return td;
+  }
+
+  const botonX = document.createElement("button");
+  botonX.type = "button";
+  botonX.className = "coordenadas-boton-icono";
+  botonX.textContent = `x: ${coordenada.x}`;
+  botonX.addEventListener("click", () => {
+    iniciarCapturaMarcador(coordenada);
+  });
+
+  const botonY = document.createElement("button");
+  botonY.type = "button";
+  botonY.className = "coordenadas-boton-icono";
+  botonY.textContent = `y: ${coordenada.y}`;
+  botonY.addEventListener("click", () => {
+    iniciarCapturaMarcador(coordenada);
+  });
+
+  td.append(botonX, botonY);
+
+  return td;
+}
+
+// ======================================================
+// 🗔 POPUP TIPO — Absoluta / Cursor / Ventana
+// ======================================================
+
+const ICONO_PUNTO_REFERENCIA: Record<number, string> = {
+  1: "⌜",
+  2: "⌝",
+  3: "⊡",
+  4: "⌞",
+  5: "⌟",
+};
+
+function textoBotonTipo(coordenada: CoordenadaBanco): string {
+  if (coordenada.tipo !== 3) {
+    return textoTipoCoordenada(coordenada.tipo);
+  }
+
+  if (coordenada.modo === 2) {
+    return "Ventana: %";
+  }
+
+  return `Ventana: ${ICONO_PUNTO_REFERENCIA[coordenada.puntoReferencia] ?? "?"}`;
+}
+
+function abrirPopupTipo(
+  evento: MouseEvent,
+  coordenada: CoordenadaBanco,
+  alCerrar: () => void,
+): void {
+  const guardarCampo = (cambios: Partial<CoordenadaBanco>): void => {
+    Object.assign(coordenada, cambios);
+
+    void invoke("coordenadas_editar", {
+      id: coordenada.id,
+      coordenada: coordenadaBancoParaBackend(coordenada),
+    });
+
+    dibujar();
+  };
+
+  const dibujar = (): void => {
+    const lista = document.createElement("div");
+    lista.className = "popup-lista";
+
+    lista.append(
+      crearFilaPopup(
+        "Tipo:",
+        crearGrupoOpciones(
+          [
+            { texto: textoTipoCoordenada(1), valor: "1" },
+            { texto: textoTipoCoordenada(2), valor: "2" },
+            { texto: textoTipoCoordenada(3), valor: "3" },
+          ],
+          String(coordenada.tipo),
+          (tipo) => guardarCampo({ tipo: Number(tipo) }),
+        ),
+      ),
     );
+
+    if (coordenada.tipo === 3) {
+      const cajaMedidoEn = document.createElement("div");
+      cajaMedidoEn.className = "popup-caja-interna";
+
+      cajaMedidoEn.append(
+        crearFilaPopup(
+          "Medido en:",
+          crearGrupoOpciones(
+            [
+              { texto: textoModoCoordenada(2), valor: "2" },
+              { texto: textoModoCoordenada(1), valor: "1" },
+            ],
+            String(coordenada.modo),
+            (modo) => guardarCampo({ modo: Number(modo) }),
+          ),
+        ),
+      );
+
+      if (coordenada.modo === 1) {
+        const onSeleccionarPunto = (puntoReferencia: string): void =>
+          guardarCampo({ puntoReferencia: Number(puntoReferencia) });
+
+        cajaMedidoEn.append(
+          crearFilaPopup(
+            "Medido desde:",
+            crearGrupoOpciones(
+              [1, 2, 3].map((punto) => ({
+                texto: `${textoPuntoReferenciaCoordenada(punto)}: ${ICONO_PUNTO_REFERENCIA[punto]}`,
+                valor: String(punto),
+              })),
+              String(coordenada.puntoReferencia),
+              onSeleccionarPunto,
+            ),
+          ),
+        );
+
+        cajaMedidoEn.append(
+          crearGrupoOpciones(
+            [4, 5].map((punto) => ({
+              texto: `${textoPuntoReferenciaCoordenada(punto)}: ${ICONO_PUNTO_REFERENCIA[punto]}`,
+              valor: String(punto),
+            })),
+            String(coordenada.puntoReferencia),
+            onSeleccionarPunto,
+          ),
+        );
+      }
+
+      lista.append(cajaMedidoEn);
+    }
+
+    mostrarPopup(lista, evento.clientX, evento.clientY, alCerrar);
+  };
+
+  dibujar();
+}
+
+// ======================================================
+// ✅ SELECCIÓN HACIA EL LLAMADOR — Etapa H
+// ======================================================
+
+async function seleccionarFila(coordenada: CoordenadaBanco): Promise<void> {
+  idSeleccionado = coordenada.id;
+
+  await invoke("seleccionar_coordenada_banco", {
+    coordenada: coordenadaBancoParaBackend(coordenada),
+  });
+
+  renderizarTabla(listaFiltradaActual);
+
+  if (!ventanaFijada) {
+    await getCurrentWindow().close();
   }
 }
 
-function crearFilaLectura(coordenada: CoordenadaBanco): HTMLTableRowElement {
-  const tr = document.createElement("tr");
+function renderizarTabla(lista: CoordenadaBanco[]): void {
+  tbody.innerHTML = "";
 
-  const celdas = [
-    coordenada.nota,
-    coordenada.aplicacion,
-    textoTipoCoordenada(coordenada.tipo),
-    textoModoCoordenada(coordenada.modo),
-    textoPuntoReferenciaCoordenada(coordenada.puntoReferencia),
-    String(coordenada.x),
-    String(coordenada.y),
-  ];
+  lista.forEach((coordenada, indice) => {
+    const tr = crearFila(coordenada, indice);
+    tbody.append(tr);
 
-  for (const texto of celdas) {
-    const td = document.createElement("td");
-    td.textContent = texto;
-    tr.append(td);
-  }
+    const asa = tr.querySelector<HTMLElement>(".coordenadas-asa");
 
-  const tdAcciones = document.createElement("td");
-  tdAcciones.className = "coordenadas-tabla-acciones";
+    if (asa) {
+      controladorArrastre.registrarFila(coordenada.id, tr, asa);
+    }
+  });
+}
 
-  const botonUsar = document.createElement("button");
-  botonUsar.type = "button";
-  botonUsar.className = "coordenadas-boton-icono";
-  botonUsar.textContent = "✔";
-  botonUsar.title = "Usar esta coordenada";
-  botonUsar.addEventListener("click", async () => {
-    await invoke("seleccionar_coordenada_banco", {
-      coordenada: coordenadaBancoParaBackend(coordenada),
+// Celda de texto editable: muestra un <span>; al hacer click lo
+// reemplaza por un <input> con foco; al perder foco o presionar
+// Enter, guarda y vuelve a mostrar el <span>.
+function crearCeldaEditable(
+  valorInicial: string,
+  onGuardar: (valor: string) => void,
+): HTMLTableCellElement {
+  const td = document.createElement("td");
+
+  const texto = document.createElement("span");
+  texto.textContent = valorInicial;
+  texto.className = "coordenadas-celda-texto";
+
+  const entrarEnEdicion = (): void => {
+    const input = document.createElement("input");
+    input.type = "text";
+    input.value = texto.textContent ?? "";
+    input.className = "coordenadas-celda-input";
+
+    const confirmar = (): void => {
+      const valor = input.value;
+      texto.textContent = valor;
+      td.replaceChildren(texto);
+      onGuardar(valor);
+    };
+
+    input.addEventListener("blur", confirmar);
+    input.addEventListener("keydown", (evento) => {
+      if (evento.key === "Enter") {
+        input.blur();
+      }
     });
-    await getCurrentWindow().close();
+
+    td.replaceChildren(input);
+    input.focus();
+  };
+
+  texto.addEventListener("click", entrarEnEdicion);
+  td.append(texto);
+
+  return td;
+}
+
+function crearFila(
+  coordenada: CoordenadaBanco,
+  indice: number,
+): HTMLTableRowElement {
+  const tr = document.createElement("tr");
+  tr.dataset.id = coordenada.id;
+
+  const tdNumero = document.createElement("td");
+  tdNumero.className = "coordenadas-numero-celda";
+  const botonNumero = document.createElement("button");
+  botonNumero.type = "button";
+  botonNumero.className = "coordenadas-numero-toggle";
+  botonNumero.classList.toggle(
+    "coordenadas-numero-toggle-activo",
+    coordenada.id === idSeleccionado,
+  );
+  const spanNumero = document.createElement("span");
+  spanNumero.textContent = String(indice + 1);
+  botonNumero.append(spanNumero);
+  botonNumero.addEventListener("click", () => {
+    void seleccionarFila(coordenada);
+  });
+  tdNumero.append(botonNumero);
+  tr.append(tdNumero);
+
+  const tdOpciones = document.createElement("td");
+  tdOpciones.className = "coordenadas-celda-opciones";
+
+  const botonAsa = document.createElement("button");
+  botonAsa.type = "button";
+  botonAsa.className = "coordenadas-asa";
+  botonAsa.textContent = "⁝";
+  botonAsa.addEventListener("click", () => {
+    tabla.classList.toggle("coordenadas-tabla--iconos-desplegados");
   });
 
   const botonPreview = document.createElement("button");
   botonPreview.type = "button";
-  botonPreview.className = "coordenadas-boton-icono";
-  botonPreview.textContent = "👁";
+  botonPreview.className =
+    "coordenadas-boton-icono coordenadas-icono-togglable";
+  botonPreview.textContent = "⊙";
   botonPreview.title = "Previsualizar";
   botonPreview.classList.toggle(
     "coordenadas-boton-icono-activo",
-    coordenada.id === idPrevisualizado,
+    idsPrevisualizados.has(coordenada.id),
   );
   botonPreview.addEventListener("click", () => {
-    void alternarPrevisualizacion(coordenada);
-  });
-
-  const botonEditar = document.createElement("button");
-  botonEditar.type = "button";
-  botonEditar.className = "coordenadas-boton-icono";
-  botonEditar.textContent = "✎";
-  botonEditar.addEventListener("click", () => {
-    idEnEdicion = coordenada.id;
-    void cargarLista();
+    void alternarPrevisualizacion(coordenada, indice + 1);
   });
 
   const botonEliminar = document.createElement("button");
   botonEliminar.type = "button";
-  botonEliminar.className = "coordenadas-boton-icono";
-  botonEliminar.textContent = "🗑";
+  botonEliminar.className =
+    "coordenadas-boton-icono coordenadas-icono-togglable coordenadas-boton-eliminar";
+  botonEliminar.textContent = "x";
   botonEliminar.addEventListener("click", async () => {
     await invoke("coordenadas_eliminar", { id: coordenada.id });
     await cargarLista();
   });
 
-  tdAcciones.append(botonUsar, botonPreview, crearBotonProbar(coordenada), botonEditar, botonEliminar);
-  tr.append(tdAcciones);
+  tdOpciones.append(
+    botonAsa,
+    botonPreview,
+    crearBotonProbar(coordenada),
+    botonEliminar,
+  );
+  tr.append(tdOpciones);
+
+  tr.append(
+    crearCeldaEditable(coordenada.aplicacion, (valor) => {
+      void invoke("coordenadas_editar", {
+        id: coordenada.id,
+        coordenada: coordenadaBancoParaBackend({
+          ...coordenada,
+          aplicacion: valor,
+        }),
+      }).then(cargarLista);
+    }),
+  );
+
+  tr.append(
+    crearCeldaEditable(coordenada.nota, (valor) => {
+      void invoke("coordenadas_editar", {
+        id: coordenada.id,
+        coordenada: coordenadaBancoParaBackend({
+          ...coordenada,
+          nota: valor,
+        }),
+      }).then(cargarLista);
+    }),
+  );
+
+  const tdTipo = document.createElement("td");
+  const botonTipo = document.createElement("button");
+  botonTipo.type = "button";
+  botonTipo.className = "coordenadas-boton-icono";
+  botonTipo.textContent = textoBotonTipo(coordenada);
+  botonTipo.addEventListener("click", (evento) => {
+    abrirPopupTipo(evento, coordenada, () => {
+      void cargarLista();
+    });
+  });
+  tdTipo.append(botonTipo);
+  tr.append(tdTipo);
+
+  tr.append(crearCeldaXY(coordenada));
 
   return tr;
 }
-
-function crearFilaEdicion(coordenada: CoordenadaBanco): HTMLTableRowElement {
-  const tr = document.createElement("tr");
-  tr.className = "coordenadas-fila-edicion";
-
-  const inputNota = document.createElement("input");
-  inputNota.type = "text";
-  inputNota.value = coordenada.nota;
-
-  const inputAplicacion = document.createElement("input");
-  inputAplicacion.type = "text";
-  inputAplicacion.value = coordenada.aplicacion;
-
-  const inputX = document.createElement("input");
-  inputX.type = "number";
-  inputX.value = String(coordenada.x);
-
-  const inputY = document.createElement("input");
-  inputY.type = "number";
-  inputY.value = String(coordenada.y);
-
-  for (const elemento of [inputNota, inputAplicacion]) {
-    const td = document.createElement("td");
-    td.append(elemento);
-    tr.append(td);
-  }
-
-  // Tipo/Modo/Referencia quedan de solo lectura en edición — solo
-  // Nota/Aplicación/X/Y son editables acá (recapturar cambia el resto).
-  for (const texto of [
-    textoTipoCoordenada(coordenada.tipo),
-    textoModoCoordenada(coordenada.modo),
-    textoPuntoReferenciaCoordenada(coordenada.puntoReferencia),
-  ]) {
-    const td = document.createElement("td");
-    td.textContent = texto;
-    tr.append(td);
-  }
-
-  const tdX = document.createElement("td");
-  tdX.append(inputX);
-  const tdY = document.createElement("td");
-  tdY.append(inputY);
-  tr.append(tdX, tdY);
-
-  const tdAcciones = document.createElement("td");
-  tdAcciones.className = "coordenadas-tabla-acciones";
-
-  const botonGuardar = document.createElement("button");
-  botonGuardar.type = "button";
-  botonGuardar.className = "coordenadas-boton-icono";
-  botonGuardar.textContent = "✔";
-  botonGuardar.addEventListener("click", async () => {
-    const actualizada: CoordenadaBanco = {
-      ...coordenada,
-      nota: inputNota.value,
-      aplicacion: inputAplicacion.value,
-      x: Number(inputX.value),
-      y: Number(inputY.value),
-    };
-
-    await invoke("coordenadas_editar", {
-      id: coordenada.id,
-      coordenada: coordenadaBancoParaBackend(actualizada),
-    });
-
-    idEnEdicion = null;
-    await cargarLista();
-  });
-
-  const botonCancelar = document.createElement("button");
-  botonCancelar.type = "button";
-  botonCancelar.className = "coordenadas-boton-icono";
-  botonCancelar.textContent = "✕";
-  botonCancelar.addEventListener("click", () => {
-    idEnEdicion = null;
-    void cargarLista();
-  });
-
-  tdAcciones.append(botonGuardar, crearBotonProbar(coordenada), botonCancelar);
-  tr.append(tdAcciones);
-
-  return tr;
-}
-
-// ======================================================
-// ➕ NUEVA COORDENADA
-// ======================================================
-
-botonNueva.addEventListener("click", () => {
-  formNueva.classList.remove("oculto");
-  actualizarVisibilidadCamposNueva();
-});
-
-botonCancelarNueva.addEventListener("click", () => {
-  formNueva.classList.add("oculto");
-});
-
-let intervaloResultado: ReturnType<typeof setInterval> | null = null;
-
-botonCapturarNueva.addEventListener("click", async () => {
-  const tipo = Number(selectNuevaTipo.value);
-  const modo = tipo === 3 ? Number(selectNuevaModo.value) : 0;
-  const puntoReferencia =
-    tipo === 3 && modo === 1 ? Number(selectNuevaPuntoReferencia.value) : 0;
-
-  await invoke("abrir_ventana_captura_coordenada", {
-    ubicacion: TIPO_A_UBICACION[tipo],
-    modoVentana: MODO_A_MODO_VENTANA[modo] ?? "pixeles",
-    puntoReferencia:
-      PUNTO_REFERENCIA_NUMERO_A_STRING[puntoReferencia] ?? "sup_izq",
-  });
-
-  formNueva.classList.add("oculto");
-
-  if (intervaloResultado !== null) {
-    clearInterval(intervaloResultado);
-  }
-
-  intervaloResultado = setInterval(async () => {
-    const resultado = await invoke<[number, number] | null>(
-      "obtener_resultado_coordenada",
-    );
-
-    if (!resultado) {
-      return;
-    }
-
-    clearInterval(intervaloResultado!);
-    intervaloResultado = null;
-
-    const [x, y] = resultado;
-
-    const nueva: CoordenadaBanco = {
-      ...crearCoordenadaBanco(),
-      aplicacion: inputNuevaAplicacion.value,
-      nota: inputNuevaNota.value,
-      tipo,
-      modo,
-      puntoReferencia,
-      x,
-      y,
-    };
-
-    const agregada = await invoke<CoordenadaBancoJson>("coordenadas_agregar", {
-      coordenada: coordenadaBancoParaBackend(nueva),
-    });
-
-    await invoke("seleccionar_coordenada_banco", { coordenada: agregada });
-    await getCurrentWindow().close();
-  }, 250);
-});
 
 // ======================================================
 // 🔎 FILTROS EN VIVO
 // ======================================================
 
 function recargarPorFiltro(): void {
-  if (grupoPrevisualizado) {
-    void cerrarPrevisualizacionGrupo()
-      .then(cargarLista)
-      .then(abrirPrevisualizacionGrupo);
-    return;
-  }
-
   void cerrarPrevisualizacion().then(cargarLista);
 }
 
-inputFiltroAplicacion.addEventListener("input", recargarPorFiltro);
-selectFiltroTipo.addEventListener("change", recargarPorFiltro);
-selectFiltroModo.addEventListener("change", recargarPorFiltro);
-
-// Al cerrar la ventana, no dejar el marcador (ni las de grupo)
-// huérfanas en pantalla.
+// Al cerrar la ventana, no dejar el marcador huérfano en pantalla.
 getCurrentWindow().onCloseRequested(() => {
   void cerrarPrevisualizacion();
-
-  if (grupoPrevisualizado) {
-    void cerrarPrevisualizacionGrupo();
-  }
 });
 
 // ======================================================
 // 🏁 INICIAR
 // ======================================================
 
+void cargarGruposFiltro();
 cargarLista();

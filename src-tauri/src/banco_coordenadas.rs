@@ -215,6 +215,67 @@ pub fn editar(id: &str, coordenada: CoordenadaBanco) -> Result<(), String> {
 }
 
 // ======================================================
+// 🖱️ ACTUALIZAR X,Y — Etapa F
+// ------------------------------------------------------
+// Pisa solo x/y (arrastre del marcador de previsualización),
+// sin tocar el resto de los campos — a diferencia de editar(),
+// que reemplaza la coordenada completa.
+// ======================================================
+
+pub fn actualizar_xy(id: &str, x: f64, y: f64) -> Result<(), String> {
+    let mut lista = cargar()?;
+
+    let Some(existente) = lista.iter_mut().find(|item| item.id == id) else {
+        return Err(format!("No se encontró la coordenada con id {id}"));
+    };
+
+    existente.x = x;
+    existente.y = y;
+
+    guardar(&lista)
+}
+
+// ======================================================
+// ⁝⁝ REORDENAR
+// ------------------------------------------------------
+// `orden` trae solo los ids VISIBLES (la fila arrastrada
+// puede venir de una lista filtrada por Grupo/Tipo). Las
+// coordenadas que no están en `orden`, por quedar fuera del
+// filtro activo, no cambian de posición: se reasignan
+// únicamente los índices que ya ocupaba el subconjunto
+// afectado, en el nuevo orden recibido.
+// ======================================================
+
+pub fn reordenar(orden: &[String]) -> Result<(), String> {
+    let mut lista = cargar()?;
+
+    let indices: Vec<usize> = lista
+        .iter()
+        .enumerate()
+        .filter(|(_, item)| orden.contains(&item.id))
+        .map(|(indice, _)| indice)
+        .collect();
+
+    if indices.len() != orden.len() {
+        return Err("El orden recibido no coincide con las coordenadas guardadas".into());
+    }
+
+    let mut por_id: std::collections::HashMap<String, CoordenadaBanco> = lista
+        .iter()
+        .filter(|item| orden.contains(&item.id))
+        .map(|item| (item.id.clone(), item.clone()))
+        .collect();
+
+    for (indice, id) in indices.into_iter().zip(orden.iter()) {
+        if let Some(coordenada) = por_id.remove(id) {
+            lista[indice] = coordenada;
+        }
+    }
+
+    guardar(&lista)
+}
+
+// ======================================================
 // 🗑️ ELIMINAR
 // ======================================================
 
@@ -269,4 +330,28 @@ pub fn listar_filtrado(
             true
         })
         .collect())
+}
+
+// ======================================================
+// 🗂️ LISTAR GRUPOS DISTINTOS
+// ------------------------------------------------------
+// Valores únicos de `aplicacion` ya guardados (sin vacíos),
+// orden alfabético — para poblar el desplegable de filtro
+// "Grupo" ("Todos" + esta lista) en la ventana de
+// Coordenadas guardadas.
+// ======================================================
+
+pub fn listar_grupos_distintos() -> Result<Vec<String>, String> {
+    let lista = cargar()?;
+
+    let mut grupos: Vec<String> = lista
+        .into_iter()
+        .map(|coordenada| coordenada.aplicacion)
+        .filter(|aplicacion| !aplicacion.is_empty())
+        .collect();
+
+    grupos.sort();
+    grupos.dedup();
+
+    Ok(grupos)
 }

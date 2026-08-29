@@ -17,53 +17,31 @@
   gap: var(--gap12);
 }
 
-.coordenadas-header {
-  font-size: var(--fs16);
-  font-weight: 600;
-  color: var(--text);
-}
-
-/* ======================================================
-   FILTROS / FORMULARIO "NUEVA COORDENADA"
-   ====================================================== */
-
-.coordenadas-filtros,
-.coordenadas-form-nueva {
+.coordenadas-barra-superior {
   display: flex;
   align-items: center;
-  gap: var(--gap8);
+  justify-content: space-between;
   flex-shrink: 0;
 }
 
-.coordenadas-form-nueva {
-  padding: var(--gap12);
-  background: var(--panel);
-  border: 1px solid var(--border);
-  border-radius: var(--r6);
-}
-
-.coordenadas-form-nueva.oculto {
-  display: none;
-}
-
-.coordenadas-input,
-.coordenadas-select {
-  background: var(--bg);
-  border: 1px solid var(--border-light);
+.coordenadas-boton-filtro {
+  background: transparent;
+  border: 1px solid transparent;
   border-radius: var(--r4);
   color: var(--text);
   font-family: var(--font);
   font-size: var(--fs13);
-  padding: var(--gap8);
+  font-weight: 600;
+  padding: var(--gap4) var(--gap8);
+  cursor: pointer;
+  transition:
+    border-color .12s ease,
+    color .12s ease;
 }
 
-.coordenadas-select.oculto {
-  display: none;
-}
-
-.coordenadas-input {
-  flex: 1;
-  min-width: 0;
+.coordenadas-boton-filtro:hover {
+  border-color: var(--highlight);
+  color: var(--highlight);
 }
 
 /* ======================================================
@@ -90,10 +68,6 @@
   transform: translateY(1px);
 }
 
-.coordenadas-boton.oculto {
-  display: none;
-}
-
 .coordenadas-boton-primario {
   background: var(--highlight);
   border-color: var(--highlight);
@@ -103,6 +77,43 @@
 
 .coordenadas-boton-primario:hover {
   filter: brightness(1.1);
+}
+
+/* ======================================================
+   📌 BOTÓN FIJAR VENTANA
+   ------------------------------------------------------
+   Base + hover ya los da .btn-ayuda (styl_botones.css).
+   Este es solo el estado persistente al quedar fijado.
+   ====================================================== */
+
+.coordenadas-btn-fijar-activo {
+  background: color-mix(in srgb, var(--highlight) var(--botones-ghost-opacidad-hover), transparent);
+  border-color: var(--highlight);
+  color: var(--text-highlight);
+}
+
+.coordenadas-asa {
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--r4);
+  color: var(--text-disabled);
+  font-size: var(--fs13);
+  line-height: 1;
+  cursor: grab;
+  padding: var(--gap4) var(--gap8);
+}
+
+.coordenadas-asa:hover {
+  border-color: var(--highlight);
+  color: var(--highlight);
+}
+
+.coordenadas-icono-togglable {
+  display: none;
+}
+
+.coordenadas-tabla--iconos-desplegados .coordenadas-icono-togglable {
+  display: inline-flex;
 }
 
 .coordenadas-boton-icono {
@@ -119,14 +130,24 @@
     color .12s ease;
 }
 
-.coordenadas-boton-icono:hover {
+.coordenadas-boton-icono:hover:not(:disabled) {
   border-color: var(--highlight);
   color: var(--highlight);
+}
+
+.coordenadas-boton-icono-bloqueado {
+  cursor: not-allowed;
+  opacity: 0.35;
 }
 
 .coordenadas-boton-icono-activo {
   border-color: var(--highlight);
   color: var(--highlight);
+}
+
+.coordenadas-boton-eliminar:hover:not(:disabled) {
+  border-color: var(--highlight-red);
+  color: var(--highlight-red);
 }
 
 /* ======================================================
@@ -161,11 +182,21 @@
   font-weight: 600;
   padding: var(--gap8);
   border-bottom: 1px solid var(--border);
+  border-right: 1px solid var(--border-light);
+}
+
+.coordenadas-tabla thead th:last-child {
+  border-right: none;
 }
 
 .coordenadas-tabla tbody td {
   padding: var(--gap8);
   vertical-align: middle;
+  border-right: 1px solid var(--border-light);
+}
+
+.coordenadas-tabla tbody td:last-child {
+  border-right: none;
 }
 
 .coordenadas-tabla tbody tr {
@@ -181,18 +212,75 @@
   background: color-mix(in srgb, var(--tabla-fondo-color-hover) var(--tabla-fondo-opacidad-hover), transparent);
 }
 
-.coordenadas-tabla-acciones {
+.coordenadas-celda-opciones {
   display: flex;
+  align-items: center;
   gap: var(--gap4);
   white-space: nowrap;
 }
 
-/* Fila en edición: inputs propios en vez de texto plano. */
-.coordenadas-fila-edicion input {
+/* Celda editable: span de solo lectura + input que lo reemplaza. */
+.coordenadas-celda-texto {
+  display: inline-block;
+  min-width: 120px;
+  padding: var(--gap4) var(--gap8);
+  border: 1px solid var(--border-light);
+  border-radius: var(--r4);
+  cursor: text;
+}
+
+.coordenadas-celda-texto:hover {
+  border-color: var(--border-light);
+}
+
+.coordenadas-celda-xy {
+  display: flex;
+  gap: var(--gap4);
+}
+
+/* ======================================================
+   ✅ NÚMERO / SELECCIÓN — Etapa H
+   ------------------------------------------------------
+   Mismo patrón que .estado-toggle[data-estado="off"] de
+   styl_botones.css (círculo superpuesto y centrado sobre
+   el número), en verde en vez de rojo.
+   ====================================================== */
+
+.coordenadas-numero-celda {
+  position: relative;
+}
+
+.coordenadas-numero-toggle {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 20px;
+  height: 20px;
+  min-width: 20px;
+  box-sizing: border-box;
+  padding: 0;
+  border-width: 1px;
+  border-style: solid;
+  border-color: transparent;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text);
+  font-family: var(--font);
+  font-size: var(--fs13);
+  cursor: pointer;
+}
+
+.coordenadas-numero-toggle-activo {
+  background: color-mix(in srgb, var(--green-dark) var(--boton-off-opacidad), transparent);
+  border-color: color-mix(in srgb, var(--green-dark) 85%, transparent);
+}
+
+.coordenadas-celda-input {
   width: 100%;
   min-width: 0;
   background: var(--bg);
-  border: 1px solid var(--border-light);
+  border: 1px solid var(--highlight);
   border-radius: var(--r4);
   color: var(--text);
   font-family: var(--font);

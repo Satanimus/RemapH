@@ -610,6 +610,10 @@
   grid-template-columns: repeat(3, 1fr);
 }
 
+.popup-grupo.popup-grupo-vertical {
+  flex-direction: column;
+}
+
 .popup-opcion {
   display: inline-flex;
   align-items: center;

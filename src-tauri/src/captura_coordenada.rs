@@ -73,25 +73,30 @@
 //     creada) para que el popup de la fila del perfil la aplique.
 //     Independiente de ACTIVA/desactivar() — no depende de que la
 //     ventana overlay de captura esté abierta.
-// activar_preview(ubicacion, modo_ventana, punto_referencia, x, y) /
-// desactivar_preview() / obtener_config_preview()
-//     Modo previsualización individual (Etapa E): independiente del
-//     modo captura de arriba, pero mutuamente excluyente con él y
-//     con el modo grupo de abajo en la misma ventana overlay —
-//     activar_preview()/activar()/activar_preview_grupo() se
-//     desactivan entre sí, así nunca coexisten dos modos a la vez.
-//     obtener_config_preview() es polling desde comandos.rs::
-//     obtener_destino_preview_coordenada, sin consumir el valor (a
-//     diferencia de obtener_resultado()).
-// activar_preview_grupo(configs) / desactivar_preview_grupo() /
-// obtener_config_preview_grupo(indice)
-//     Modo previsualización de GRUPO (Etapa G): mismo criterio que
-//     el individual de arriba, pero guarda un Vec<ConfigPreview> (una
-//     entrada por ventana overlay abierta) en vez de una sola config.
-//     obtener_config_preview_grupo(indice) es polling desde
-//     comandos.rs::obtener_destino_preview_grupo, una consulta por
-//     ventana overlay (cada una con su propio índice).
+// activar_preview(id, ubicacion, modo_ventana, punto_referencia, x, y) /
+// desactivar_preview(id) / actualizar_xy_preview(id, x, y) /
+// obtener_config_preview(id) / ids_previews_activas() /
+// desactivar_todas_las_previews()
+//     Previsualización por fila (Etapa F): cada fila con el toggle
+//     ⊙️ encendido tiene su propia entrada en CONFIG_PREVIEWS, key =
+//     id de CoordenadaBanco — puede haber cualquier cantidad activas
+//     a la vez, cada una en su propia ventana overlay. Mutuamente
+//     excluyente con el modo captura de arriba: activar() llama
+//     desactivar_todas_las_previews() y activar_preview() llama
+//     desactivar(). obtener_config_preview(id) es polling desde
+//     comandos.rs::obtener_destino_preview_coordenada, sin consumir
+//     el valor (a diferencia de obtener_resultado()).
+//     ids_previews_activas() es consultado desde
+//     comandos.rs::contar_previews_activas() para decidir si se
+//     muestra el número de fila junto al marcador (Regla 16).
+//     actualizar_xy_preview(id, x, y) la llama comandos.rs::
+//     guardar_posicion_preview_coordenada tras persistir el arrastre
+//     del marcador (Regla 17) en Coordenadas.tsv, para que el x/y en
+//     memoria no quede desincronizado del disco mientras la
+//     previsualización sigue abierta.
 // ======================================================
+
+use std::collections::HashMap;
 
 use crate::banco_coordenadas::CoordenadaBanco;
 use crate::config;
@@ -114,9 +119,8 @@ static RESULTADO: std::sync::Mutex<Option<(f64, f64)>> = std::sync::Mutex::new(N
 static CONFIG_ACTIVA: std::sync::Mutex<Option<ConfigCaptura>> = std::sync::Mutex::new(None);
 static SELECCION_BANCO: std::sync::Mutex<Option<CoordenadaBanco>> = std::sync::Mutex::new(None);
 
-/// Config del modo previsualización (Etapa E) — independiente del
-/// resto del estado de arriba (modo captura), mismo vocabulario de
-/// strings que ConfigCaptura.
+/// Config del modo previsualización, mismo vocabulario de strings
+/// que ConfigCaptura.
 #[derive(Clone)]
 pub struct ConfigPreview {
     pub ubicacion: String,
@@ -130,12 +134,15 @@ pub struct ConfigPreview {
     pub y: f64,
 }
 
-static CONFIG_PREVIEW: std::sync::Mutex<Option<ConfigPreview>> = std::sync::Mutex::new(None);
-
-/// Estado del modo previsualización de GRUPO (Etapa G) — independiente
-/// del CONFIG_PREVIEW individual de arriba (Etapa E), que sigue
-/// intacto para la previsualización de una sola fila.
-static CONFIG_PREVIEW_GRUPO: std::sync::Mutex<Vec<ConfigPreview>> = std::sync::Mutex::new(Vec::new());
+/// Previsualizaciones activas, una entrada por fila con el toggle
+/// ⊙️ encendido (Etapa F) — key = id de CoordenadaBanco. Reemplaza
+/// el par CONFIG_PREVIEW (individual, Etapa E) + CONFIG_PREVIEW_GRUPO
+/// (indexado por posición, Etapa G) — ya no hace falta distinguir
+/// "una" de "un grupo fijo": cada fila abre/cierra su propia entrada
+/// de forma independiente y puede haber cualquier cantidad activas
+/// a la vez.
+static CONFIG_PREVIEWS: std::sync::LazyLock<std::sync::Mutex<HashMap<String, ConfigPreview>>> =
+    std::sync::LazyLock::new(|| std::sync::Mutex::new(HashMap::new()));
 
 // Teclas físicamente abajo relevantes al atajo de guardar coordenada
 // (ahora AtajoSimple: modificadores + gatillo, no una tecla suelta).
@@ -147,8 +154,7 @@ static TECLAS_ABAJO: std::sync::Mutex<Vec<InputId>> = std::sync::Mutex::new(Vec:
 /// Llamada al abrir la ventana de captura, con la config de la fila
 /// que la abrió.
 pub fn activar(ubicacion: String, modo_ventana: String, punto_referencia: String) {
-    desactivar_preview();
-    desactivar_preview_grupo();
+    desactivar_todas_las_previews();
 
     *ACTIVA.lock().unwrap() = true;
     *GUARDADO_SOLICITADO.lock().unwrap() = false;
@@ -169,9 +175,11 @@ pub fn desactivar() {
     *CONFIG_ACTIVA.lock().unwrap() = None;
 }
 
-/// Llamada al abrir la ventana overlay en modo previsualización
-/// (Etapa E) — mutuamente excluyente con el modo captura de arriba.
+/// Llamada al abrir la ventana overlay de previsualización de una
+/// fila (Etapa F) — mutuamente excluyente con el modo captura de
+/// arriba, no con las demás previsualizaciones activas.
 pub fn activar_preview(
+    id: String,
     ubicacion: String,
     modo_ventana: String,
     punto_referencia: String,
@@ -179,50 +187,58 @@ pub fn activar_preview(
     y: f64,
 ) {
     desactivar();
-    desactivar_preview_grupo();
 
-    *CONFIG_PREVIEW.lock().unwrap() = Some(ConfigPreview {
-        ubicacion,
-        modo_ventana,
-        punto_referencia,
-        x,
-        y,
-    });
+    CONFIG_PREVIEWS.lock().unwrap().insert(
+        id,
+        ConfigPreview {
+            ubicacion,
+            modo_ventana,
+            punto_referencia,
+            x,
+            y,
+        },
+    );
 }
 
-/// Llamada al cerrar la ventana overlay en modo previsualización.
-pub fn desactivar_preview() {
-    *CONFIG_PREVIEW.lock().unwrap() = None;
+/// Llamada al cerrar la ventana overlay de previsualización de una
+/// fila puntual.
+pub fn desactivar_preview(id: &str) {
+    CONFIG_PREVIEWS.lock().unwrap().remove(id);
 }
 
-/// Polling desde comandos.rs: config de previsualización activa, si
-/// hay una. No se consume al leerse (a diferencia de obtener_resultado()) —
-/// el polling de captura.html la necesita en cada tick.
-pub fn obtener_config_preview() -> Option<ConfigPreview> {
-    CONFIG_PREVIEW.lock().unwrap().clone()
+/// Llamada desde comandos.rs::guardar_posicion_preview_coordenada
+/// (Regla 17, arrastre del marcador) justo después de persistir en
+/// Coordenadas.tsv — sin esto, obtener_config_preview(id) seguiría
+/// devolviendo el x/y ANTERIOR al arrastre (CONFIG_PREVIEWS es
+/// memoria, independiente del archivo en disco) y el siguiente tick
+/// de polling de captura.html haría que el marcador saltara de
+/// vuelta a la posición vieja. No-op si la fila ya no tiene una
+/// previsualización activa (se cerró la ventana en el ínterin).
+pub fn actualizar_xy_preview(id: &str, x: f64, y: f64) {
+    if let Some(config) = CONFIG_PREVIEWS.lock().unwrap().get_mut(id) {
+        config.x = x;
+        config.y = y;
+    }
 }
 
-/// Llamada al abrir las ventanas overlay en modo previsualización de
-/// GRUPO (Etapa G) — mutuamente excluyente con el modo captura y con
-/// la previsualización individual de arriba.
-pub fn activar_preview_grupo(configs: Vec<ConfigPreview>) {
-    desactivar();
-    desactivar_preview();
-
-    *CONFIG_PREVIEW_GRUPO.lock().unwrap() = configs;
+/// Llamada al activar el modo captura real (mutuamente excluyente
+/// con cualquier previsualización activa).
+pub fn desactivar_todas_las_previews() {
+    CONFIG_PREVIEWS.lock().unwrap().clear();
 }
 
-/// Llamada al cerrar las ventanas overlay en modo previsualización de
-/// grupo.
-pub fn desactivar_preview_grupo() {
-    CONFIG_PREVIEW_GRUPO.lock().unwrap().clear();
+/// Polling desde comandos.rs: config de previsualización activa para
+/// ese id, si hay una. No se consume al leerse — el polling de
+/// captura.html la necesita en cada tick.
+pub fn obtener_config_preview(id: &str) -> Option<ConfigPreview> {
+    CONFIG_PREVIEWS.lock().unwrap().get(id).cloned()
 }
 
-/// Polling desde comandos.rs: config de previsualización de grupo en
-/// la posición `indice`, si existe. No se consume al leerse — mismo
-/// criterio que obtener_config_preview().
-pub fn obtener_config_preview_grupo(indice: usize) -> Option<ConfigPreview> {
-    CONFIG_PREVIEW_GRUPO.lock().unwrap().get(indice).cloned()
+/// Ids de todas las previsualizaciones activas ahora mismo — usado
+/// para decidir si se muestra el número de fila junto al marcador
+/// (Regla 16, más de una activa a la vez).
+pub fn ids_previews_activas() -> Vec<String> {
+    CONFIG_PREVIEWS.lock().unwrap().keys().cloned().collect()
 }
 
 /// Consultada una sola vez por captura.html al cargar.

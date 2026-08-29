@@ -271,11 +271,11 @@ function guardarYcerrar(x: number, y: number): void {
 }
 
 // ======================================================
-// 👁️ MODO PREVISUALIZACIÓN (Etapa E)
+// 👁️ MODO PREVISUALIZACIÓN (Etapa F)
 // ------------------------------------------------------
-// Marcador "X" en vivo, sin header/Cancelar/texto de
+// Marcador "⊙" en vivo, sin header/Cancelar/texto de
 // diagnóstico. El destino ya viene calculado desde Rust
-// (obtener_destino_preview_coordenada) — acá solo se
+// (obtener_destino_preview_coordenada, por id) — acá solo se
 // reposiciona la ventana para centrar el marcador sobre el
 // punto. Mitades fijas: la ventana overlay siempre se crea
 // con inner_size(320, 120) (ver abrir_ventana_preview_coordenada
@@ -288,25 +288,24 @@ function guardarYcerrar(x: number, y: number): void {
 // posicionamiento en cualquier monitor con escalado != 100%: por
 // eso acá se posiciona con PhysicalPosition, convirtiendo la
 // mitad de ventana (lógica, 160x60) a físico vía scaleFactor().
+//
+// El marcador es arrastrable (Regla 17) — ver
+// activarArrastreMarcador() más abajo.
 // ======================================================
 
 const MITAD_ANCHO_PREVIEW_LOGICO = 160;
 const MITAD_ALTO_PREVIEW_LOGICO = 60;
 
-async function iniciarPreview(indiceGrupo: number | null): Promise<void> {
+async function iniciarPreview(id: string, numero: number): Promise<void> {
   raiz.innerHTML = "";
 
   const marcador = document.createElement("div");
-  marcador.className = "captura-marcador-x";
-  // SVG en vez de texto "X": un carácter de fuente no es simétrico
-  // (las métricas de line-height/cap-height lo corren del centro
-  // real de su caja), así que centrar la ventana con setPosition()
-  // no alcanza para que la cruz caiga justo sobre el punto. Dos
-  // líneas cruzadas en un viewBox cuadrado sí son simétricas por
-  // definición: el centro del SVG (12,12) cae exacto en el centro
-  // de la ventana, que es donde se posiciona el destino calculado.
+  marcador.className = "captura-marcador-preview";
+  // Círculo con punto central (Regla 5) en vez de la cruz "X": un
+  // SVG simétrico centrado en (12,12) cae exacto en el centro de la
+  // ventana, que es donde se posiciona el destino calculado.
   marcador.innerHTML =
-    '<svg viewBox="0 0 24 24" width="48" height="48"><line x1="4" y1="4" x2="20" y2="20" /><line x1="20" y1="4" x2="4" y2="20" /></svg>';
+    '<svg viewBox="0 0 24 24" width="48" height="48"><circle cx="12" cy="12" r="9" /><circle class="captura-marcador-punto" cx="12" cy="12" r="1.6" /></svg>';
   raiz.append(marcador);
 
   let intervaloMs = 100;
@@ -324,37 +323,60 @@ async function iniciarPreview(indiceGrupo: number | null): Promise<void> {
   const ventana = getCurrentWindow();
   const escala = await ventana.scaleFactor();
 
+  // Regla 16: el número de fila solo se muestra si hay más de una
+  // previsualización activa a la vez.
+  let activas = 1;
+
+  try {
+    activas = await conTimeout(
+      invoke<number>("contar_previews_activas"),
+      3000,
+      "contar_previews_activas",
+    );
+  } catch {
+    // Sin diagnóstico visible — se asume 1 (sin número visible).
+  }
+
+  if (activas > 1) {
+    const numeroSpan = document.createElement("span");
+    numeroSpan.className = "captura-marcador-numero";
+    numeroSpan.textContent = String(numero);
+    marcador.append(numeroSpan);
+  }
+
+  activarArrastreMarcador(marcador, id, ventana, escala, intervaloMs);
+
+  iniciarPollingPreview(ventana, escala, id, intervaloMs);
+}
+
+function iniciarPollingPreview(
+  ventana: ReturnType<typeof getCurrentWindow>,
+  escala: number,
+  id: string,
+  intervaloMs: number,
+): void {
   intervaloId = setInterval(
-    () => void actualizarPreview(ventana, escala, indiceGrupo),
+    () => void actualizarPreview(ventana, escala, id),
     intervaloMs,
   );
-  void actualizarPreview(ventana, escala, indiceGrupo);
+  void actualizarPreview(ventana, escala, id);
 }
 
 async function actualizarPreview(
   ventana: ReturnType<typeof getCurrentWindow>,
   escala: number,
-  indiceGrupo: number | null,
+  id: string,
 ): Promise<void> {
   let destino: [number, number] | null;
 
   try {
-    destino =
-      indiceGrupo === null
-        ? await conTimeout(
-            invoke<[number, number] | null>(
-              "obtener_destino_preview_coordenada",
-            ),
-            3000,
-            "obtener_destino_preview_coordenada",
-          )
-        : await conTimeout(
-            invoke<[number, number] | null>("obtener_destino_preview_grupo", {
-              indice: indiceGrupo,
-            }),
-            3000,
-            "obtener_destino_preview_grupo",
-          );
+    destino = await conTimeout(
+      invoke<[number, number] | null>("obtener_destino_preview_coordenada", {
+        id,
+      }),
+      3000,
+      "obtener_destino_preview_coordenada",
+    );
   } catch {
     detenerPolling();
     return;
@@ -375,27 +397,93 @@ async function actualizarPreview(
 }
 
 // ======================================================
+// 🖱️ ARRASTRAR EL MARCADOR (Regla 17)
+// ------------------------------------------------------
+// No hay nada más en pantalla en modo previsualización, así que
+// "arrastrar el marcador" es arrastrar la ventana entera con el
+// punto exacto del mouse forzado a quedar bajo su centro, sin
+// importar desde qué parte del marcador se haya tomado el clic.
+// Mientras se arrastra se detiene el polling (si no, cada tick de
+// actualizarPreview movería la ventana de vuelta al punto guardado,
+// que todavía no cambió, peleando con el arrastre); se retoma al
+// soltar, ya con el valor nuevo persistido.
+// ======================================================
+
+function activarArrastreMarcador(
+  marcador: HTMLElement,
+  id: string,
+  ventana: ReturnType<typeof getCurrentWindow>,
+  escala: number,
+  intervaloMs: number,
+): void {
+  marcador.addEventListener("mousedown", (evento) => {
+    if (evento.button !== 0) {
+      return;
+    }
+
+    detenerPolling();
+
+    const puntoFisicoX = evento.clientX * escala;
+    const puntoFisicoY = evento.clientY * escala;
+
+    void ventana.outerPosition().then((posicionActual) => {
+      const nuevaX =
+        posicionActual.x + puntoFisicoX - MITAD_ANCHO_PREVIEW_LOGICO * escala;
+      const nuevaY =
+        posicionActual.y + puntoFisicoY - MITAD_ALTO_PREVIEW_LOGICO * escala;
+
+      void ventana
+        .setPosition(new PhysicalPosition(nuevaX, nuevaY))
+        .then(() => ventana.startDragging());
+    });
+  });
+
+  document.addEventListener("mouseup", () => {
+    // intervaloId !== null: el polling normal sigue vivo, no había
+    // arrastre en curso — nada que guardar.
+    if (intervaloId !== null) {
+      return;
+    }
+
+    void guardarPosicionArrastrada(id, ventana, escala, intervaloMs);
+  });
+}
+
+async function guardarPosicionArrastrada(
+  id: string,
+  ventana: ReturnType<typeof getCurrentWindow>,
+  escala: number,
+  intervaloMs: number,
+): Promise<void> {
+  const posicion = await ventana.outerPosition();
+
+  const destinoX = Math.round(
+    posicion.x + MITAD_ANCHO_PREVIEW_LOGICO * escala,
+  );
+  const destinoY = Math.round(
+    posicion.y + MITAD_ALTO_PREVIEW_LOGICO * escala,
+  );
+
+  await invoke("guardar_posicion_preview_coordenada", {
+    id,
+    destinoX,
+    destinoY,
+  }).catch(() => {});
+
+  iniciarPollingPreview(ventana, escala, id, intervaloMs);
+}
+
+// ======================================================
 // 🏁 INICIAR
 // ======================================================
 
 async function iniciar(): Promise<void> {
-  const parametroGrupo = new URLSearchParams(location.search).get("grupo");
+  const parametros = new URLSearchParams(location.search);
+  const idPreview = parametros.get("id");
 
-  if (parametroGrupo !== null) {
-    await iniciarPreview(Number(parametroGrupo));
-    return;
-  }
-
-  let previewActiva: unknown;
-
-  try {
-    previewActiva = await invoke("obtener_config_preview_coordenada");
-  } catch {
-    previewActiva = null;
-  }
-
-  if (previewActiva) {
-    await iniciarPreview(null);
+  if (idPreview !== null) {
+    const numero = Number(parametros.get("numero") ?? "0");
+    await iniciarPreview(idPreview, numero);
     return;
   }
 
