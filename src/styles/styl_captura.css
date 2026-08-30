@@ -148,11 +148,11 @@ body {
   transform: translate(-50%, -50%);
   border-radius: 50%;
   background: rgba(0, 0, 0, 0.01);
-  cursor: grab;
+  cursor: crosshair;
 }
 
 .captura-marcador-zona-arrastre:active {
-  cursor: grabbing;
+  cursor: crosshair;
 }
 
 .captura-marcador-numero {

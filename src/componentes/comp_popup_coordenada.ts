@@ -279,7 +279,7 @@ function crearBoxResumenCoordenada(
   }
 
   if (coordenada.aplicacion) {
-    box.append(crearLineaResumen("App", coordenada.aplicacion));
+    box.append(crearLineaResumen("Grupo", coordenada.aplicacion));
   }
 
   box.append(
@@ -352,7 +352,10 @@ function crearLineaResumenXY(
 // Un sondeo activo por fila como máximo — si se hace click en
 // Seleccionar/Cambiar de nuevo (misma fila) mientras ya había uno
 // corriendo, se corta el anterior antes de abrir uno nuevo.
-const intervalosSeleccionActivos = new Map<string, ReturnType<typeof setInterval>>();
+const intervalosSeleccionActivos = new Map<
+  string,
+  ReturnType<typeof setInterval>
+>();
 
 function iniciarSeleccion(
   contexto: ContextoFila,

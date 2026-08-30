@@ -719,7 +719,7 @@ fn calcular_grid_cuadricula(n: usize, columnas: u32, filas: u32) -> (u32, u32) {
 // ventana sigue funcionando, solo que sin este pulido.
 // ======================================================
 
-fn desactivar_activacion(ventana: &WebviewWindow) {
+pub(crate) fn desactivar_activacion(ventana: &WebviewWindow) {
     let Ok(handle) = ventana.window_handle() else {
         return;
     };

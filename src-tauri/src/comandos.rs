@@ -138,13 +138,13 @@ use crate::captura_coordenada;
 use crate::compilador::ResultadoCompilacion;
 use crate::config;
 use crate::configuracion_usuario;
-use crate::eventos::InputId;
 use crate::macro_cache;
 use crate::macro_json::MacroArchivoJson;
 use crate::macro_usuario;
 use crate::macros;
 use crate::motor;
 use crate::perfil;
+use crate::eventos::InputId;
 use crate::perfil_ui::{
     convertir_atajo_captura, convertir_perfil, AtajoCapturaUI, EntradaUI, ItemFilaUI,
     ResultadoPerfil, ResultadoPerfilInicial, TriggerCapturaUI,
@@ -331,10 +331,7 @@ pub fn compilar_perfil(filas: Vec<ItemFilaUI>) -> Result<ResultadoCompilacion, S
 }
 
 #[tauri::command]
-pub fn guardar_perfil_como(
-    nombre: String,
-    filas: Vec<ItemFilaUI>,
-) -> Result<ResultadoPerfil, String> {
+pub fn guardar_perfil_como(nombre: String, filas: Vec<ItemFilaUI>) -> Result<ResultadoPerfil, String> {
     let perfil = convertir_perfil(filas);
 
     perfil::guardar_perfil_como(nombre, perfil)
@@ -935,6 +932,19 @@ pub async fn abrir_ventana_preview_coordenada(
         y: posicion_y,
     }));
 
+    // Bug: en modo "relativa a ventana", arrastrar el marcador (mousedown
+    // sobre zonaArrastre) activaba esta ventana overlay pese a
+    // focused(false) — Windows activa cualquier ventana con la que se
+    // interactúa por mouse, sin importar cómo se creó (mismo caso que
+    // back_menu_express.rs::desactivar_activacion). Con esta ventana
+    // como "ventana activa", obtener_ventana_activa_captura() durante el
+    // arrastre devolvía el propio overlay (56x56) en vez de la ventana
+    // real detrás, y el x/y relativo quedaba siempre ~mitad del overlay
+    // (35,35). WS_EX_NOACTIVATE evita que el clic la active, así
+    // GetForegroundWindow() sigue viendo la ventana real de destino
+    // durante todo el arrastre.
+    crate::back_menu_express::desactivar_activacion(&ventana_preview);
+
     Ok(())
 }
 
@@ -963,39 +973,68 @@ pub fn obtener_destino_preview_coordenada(id: String) -> Option<(i32, i32)> {
 }
 
 // ======================================================
-// 🖱️💾 GUARDAR POSICIÓN DE PREVIEW ARRASTRADO — Regla 17
+// ✏️ VALORES CRUDOS DE PREVIEW EN VIVO
 // ------------------------------------------------------
-// El marcador ⊙ de la ventana overlay se puede arrastrar; al
-// soltarlo, vent_captura_main.ts ya calculó el punto físico de
-// pantalla (destino_x/destino_y) y este comando lo traduce de
-// vuelta a los valores crudos (x/y) que le corresponden a esa
-// coordenada según su ubicacion/modo_ventana/punto_referencia, y
-// los persiste en Coordenadas.tsv.
+// Polling desde vent_coordenadas_main.ts (Bug 5, no confundir con
+// obtener_destino_preview_coordenada): esa devuelve el punto de
+// PANTALLA ya calculado, esta devuelve el x/y CRUDO (offset/
+// porcentaje/absoluto, mismo vocabulario que la columna X,Y de la
+// tabla), que es lo que la fila necesita mostrar tras un arrastre
+// del marcador — sin esperar a que se cierre la previsualización
+// para recién ahí releer disco vía coordenadas_listar. Misma fuente
+// que obtener_destino_preview_coordenada (CONFIG_PREVIEWS en
+// memoria), ya actualizada por guardar_posicion_preview_coordenada
+// tras cada arrastre.
 // ======================================================
 
 #[tauri::command]
-pub fn guardar_posicion_preview_coordenada(
-    id: String,
-    destino_x: i32,
-    destino_y: i32,
-) -> Result<(), String> {
-    let config = captura_coordenada::obtener_config_preview(&id)
-        .ok_or_else(|| format!("No hay previsualización activa para el id {id}"))?;
+pub fn obtener_xy_preview_coordenada(id: String) -> Option<(f64, f64)> {
+    let config = captura_coordenada::obtener_config_preview(&id)?;
 
-    let (x, y) = back_coordenada::valores_desde_destino(
-        &config.ubicacion,
-        &config.modo_ventana,
-        &config.punto_referencia,
-        destino_x,
-        destino_y,
-    );
+    Some((config.x, config.y))
+}
 
+// ======================================================
+// 🖱️ ACTUALIZAR X,Y DE PREVIEW EN VIVO (SIN DISCO) — arrastre
+// ------------------------------------------------------
+// Llamada en cada tick de mousemove mientras se arrastra el
+// marcador ⊙ (vent_captura_main.ts::seguirArrastreMarcador) — a
+// diferencia de guardar_posicion_preview_coordenada, esta NO toca
+// Coordenadas.tsv, solo pisa el x/y en memoria (CONFIG_PREVIEWS)
+// para que el polling de la fila en el Gestor
+// (obtener_xy_preview_coordenada, cada 300ms) lo refleje en vivo.
+// El x/y ya viene calculado desde el frontend (mismas fórmulas que
+// el modo captura normal — ver actualizar() en
+// vent_captura_main.ts), no hace falta recalcular acá.
+// ======================================================
+
+#[tauri::command]
+pub fn actualizar_xy_preview_en_vivo(id: String, x: f64, y: f64) {
+    captura_coordenada::actualizar_xy_preview(&id, x, y);
+}
+
+// ======================================================
+// 🖱️💾 GUARDAR POSICIÓN DE PREVIEW ARRASTRADO — Regla 17
+// ------------------------------------------------------
+// Llamada al SOLTAR el mouse tras arrastrar el marcador ⊙. A
+// diferencia de la versión anterior (que recibía destino_x/
+// destino_y y hacía la inversa acá), el x/y crudo ya viene
+// calculado desde el frontend con las mismas fórmulas del modo
+// captura normal (ver actualizar_xy_preview_en_vivo, llamado en
+// cada mousemove del arrastre) — acá solo falta persistirlo a
+// Coordenadas.tsv.
+// ======================================================
+
+#[tauri::command]
+pub fn guardar_posicion_preview_coordenada(id: String, x: f64, y: f64) -> Result<(), String> {
     banco_coordenadas::actualizar_xy(&id, x, y)?;
 
-    // Sin esto, obtener_config_preview(id) seguiría devolviendo el x/y
-    // ANTERIOR al arrastre mientras la previsualización sigue abierta
-    // (CONFIG_PREVIEWS es memoria, independiente de lo recién escrito
-    // en Coordenadas.tsv) — ver comentario en captura_coordenada.rs.
+    // Sin esto, obtener_config_preview(id)/obtener_xy_preview_coordenada
+    // seguirían devolviendo el x/y ya sincronizado por el propio
+    // arrastre (actualizar_xy_preview_en_vivo ya lo dejó al día) —
+    // esta llamada es redundante en la práctica pero se mantiene por
+    // las dudas de que el último tick de mousemove no haya llegado a
+    // tiempo antes del mouseup.
     captura_coordenada::actualizar_xy_preview(&id, x, y);
 
     Ok(())
@@ -1017,13 +1056,8 @@ pub fn probar_coordenada(
     x: f64,
     y: f64,
 ) {
-    let (destino_x, destino_y) = back_coordenada::calcular_destino_valores(
-        &ubicacion,
-        &modo_ventana,
-        &punto_referencia,
-        x,
-        y,
-    );
+    let (destino_x, destino_y) =
+        back_coordenada::calcular_destino_valores(&ubicacion, &modo_ventana, &punto_referencia, x, y);
 
     back_coordenada::mover_cursor(destino_x, destino_y);
 }
@@ -1047,6 +1081,21 @@ pub fn obtener_ventana_activa_captura() -> Option<VentanaActivaJson> {
 #[tauri::command]
 pub fn obtener_config_captura_activa() -> Option<ConfigCapturaJson> {
     captura_coordenada::obtener_config_activa().map(|config| ConfigCapturaJson {
+        ubicacion: config.ubicacion,
+        modo_ventana: config.modo_ventana,
+        punto_referencia: config.punto_referencia,
+    })
+}
+
+// Bug 5: vent_captura_main.ts la necesita en modo previsualización
+// para poder calcular el x/y crudo EN VIVO durante el arrastre del
+// marcador ⊙ (mismas fórmulas que el modo captura normal — ver
+// actualizar() en vent_captura_main.ts) — antes esa config solo
+// vivía server-side (obtener_config_preview en captura_coordenada.rs,
+// sin exponer).
+#[tauri::command]
+pub fn obtener_config_preview_coordenada(id: String) -> Option<ConfigCapturaJson> {
+    captura_coordenada::obtener_config_preview(&id).map(|config| ConfigCapturaJson {
         ubicacion: config.ubicacion,
         modo_ventana: config.modo_ventana,
         punto_referencia: config.punto_referencia,
@@ -1126,7 +1175,6 @@ pub async fn abrir_ventana_coordenadas(app: tauri::AppHandle) -> Result<(), Stri
     )
     .title("RemapH — Gestor de Coordenadas guardadas")
     .inner_size(720.0, 480.0)
-    .min_inner_size(520.0, 360.0)
     .resizable(true)
     .focused(true)
     .devtools(true)

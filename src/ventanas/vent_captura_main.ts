@@ -287,10 +287,10 @@ function guardarYcerrar(x: number, y: number): void {
 // monitor_para_punto). Mezclar eso con LogicalPosition rompe el
 // posicionamiento en cualquier monitor con escalado != 100%: por
 // eso acá se posiciona con PhysicalPosition, convirtiendo la
-// mitad de ventana (lógica, 160x60) a físico vía scaleFactor().
+// mitad de ventana (lógica, 28x28) a físico vía scaleFactor().
 //
-// El marcador es arrastrable (Regla 17) — ver
-// activarArrastreMarcador() más abajo.
+// El marcador es arrastrable (Regla 17/Bug 5) — ver
+// seguirArrastreMarcador() más abajo.
 // ======================================================
 
 const MITAD_LADO_PREVIEW_LOGICO = 28;
@@ -336,39 +336,57 @@ async function iniciarPreview(id: string, numero: number): Promise<void> {
     // Sin diagnóstico visible en este modo — se sigue con 100ms.
   }
 
+  // Bug 5: config (ubicación/modo/punto de referencia) de ESTA fila
+  // — necesaria acá en el frontend para poder calcular el x/y crudo
+  // en vivo durante el arrastre (mismas fórmulas que el modo
+  // captura normal, ver actualizar()), en vez de depender de
+  // startDragging() + outerPosition() al soltar (ver comentario
+  // largo en seguirArrastreMarcador: startDragging() nunca deja
+  // llegar el mouseup al webview en Windows — Tauri #10767 — por
+  // eso antes esto no persistía nunca).
+  let config: ConfigCaptura | null = null;
+
+  try {
+    const configCruda = await conTimeout(
+      invoke<{
+        ubicacion: string;
+        modo_ventana: string;
+        punto_referencia: string;
+      } | null>("obtener_config_preview_coordenada", { id }),
+      3000,
+      "obtener_config_preview_coordenada",
+    );
+
+    if (configCruda) {
+      config = {
+        ubicacion: configCruda.ubicacion as ConfigCaptura["ubicacion"],
+        modoVentana: configCruda.modo_ventana as ConfigCaptura["modoVentana"],
+        puntoReferencia:
+          configCruda.punto_referencia as ConfigCaptura["puntoReferencia"],
+      };
+    }
+  } catch {
+    // Sin config no se puede calcular nada en vivo — el arrastre
+    // simplemente no se engancha más abajo (zonaArrastre queda sin
+    // handlers) y el marcador sigue funcionando en modo solo-lectura
+    // (el polling normal de más abajo lo sigue moviendo con el
+    // destino ya calculado server-side).
+  }
+
   const ventana = getCurrentWindow();
   const escala = await ventana.scaleFactor();
 
-  // DIAGNÓSTICO TEMPORAL: confirmar el tamaño físico real de la
-  // ventana Win32 (no el DOM), para descartar que el rect real
-  // siga siendo el viejo pese a que inner_size ya diga 56x56.
-  try {
-    const tam = await ventana.outerSize();
-    const pos = await ventana.outerPosition();
-    console.log(
-      "[preview] outerSize físico:",
-      tam.width,
-      "x",
-      tam.height,
-      "| outerPosition:",
-      pos.x,
-      pos.y,
-      "| escala:",
-      escala,
-    );
-  } catch (error) {
-    console.error("[preview] no se pudo leer outerSize:", error);
-  }
-
   // Bug 3: zona de arrastre chica (20px de diámetro, ~10px de radio
   // desde el centro) en vez de todo el marcador (que ocupa la ventana
-  // entera, 320x120) — antes la mano "grab" aparecía en cualquier
-  // punto de la ventana, muy lejos del círculo dibujado.
+  // entera) — antes la mano "grab" aparecía en cualquier punto de la
+  // ventana, muy lejos del círculo dibujado.
   const zonaArrastre = document.createElement("div");
   zonaArrastre.className = "captura-marcador-zona-arrastre";
   marcador.append(zonaArrastre);
 
-  activarArrastreMarcador(zonaArrastre, id, ventana, escala, intervaloMs);
+  if (config) {
+    activarArrastreMarcador(zonaArrastre, id, config, ventana, escala, intervaloMs);
+  }
 
   iniciarPollingPreview(ventana, escala, id, intervaloMs);
 }
@@ -426,31 +444,145 @@ async function actualizarPreview(
 }
 
 // ======================================================
-// 🖱️ ARRASTRAR EL MARCADOR (Regla 17)
+// 🖱️ ARRASTRAR EL MARCADOR (Regla 17 / Bug 5)
 // ------------------------------------------------------
-// El elemento recibido es la zona de arrastre chica (ver
-// iniciarPreview), no el marcador completo — así el punto de
-// mousedown ya cae siempre muy cerca del centro real, y alcanza
-// con startDragging() directo (deja que el SO mueva la ventana
-// seguiendo el mouse). Antes se encadenaba un setPosition() +
-// .then(startDragging()) para "saltar" el punto clickeado al
-// centro — esa segunda vuelta async (después de esperar la
-// respuesta de setPosition) llegaba tarde: el SO ya no tomaba el
-// mousedown como válido para iniciar el arrastre nativo, y la
-// ventana no se movía. Mientras se arrastra se detiene el
-// polling (si no, cada tick de actualizarPreview movería la
-// ventana de vuelta al punto guardado, que todavía no cambió,
-// peleando con el arrastre); se retoma al soltar, ya con el
-// valor nuevo persistido.
+// Antes esto usaba ventana.startDragging() (arrastre nativo del
+// SO) + esperar mouseup en document para recién ahí leer
+// outerPosition() y persistir. Eso NUNCA funcionó de forma
+// confiable en Windows: es un bug conocido de Tauri/Tao (issue
+// #10767) que el evento mouseup jamás llega al webview de origen
+// tras un startDragging() — así que guardarPosicionArrastrada()
+// nunca se ejecutaba y el marcador "volvía a su lugar" al reabrir.
+//
+// Ahora, en vez de delegarle el movimiento al SO, esta ventana
+// escucha mousemove ella misma mientras el botón sigue apretado
+// (modo captura "encubierto", mismo cálculo que actualizar() para
+// el modo captura normal) y:
+//   1. calcula el x/y CRUDO en vivo con puntoReferenciaAbsoluto()
+//      según ubicacion/modoVentana/puntoReferencia de esta fila,
+//   2. lo escribe en memoria (actualizar_xy_preview_en_vivo, SIN
+//      tocar disco) para que el polling de la fila en el Gestor
+//      (cada 300ms) lo refleje en vivo en la columna X,Y,
+//   3. mueve la ventana overlay al punto de pantalla resultante
+//      con setPosition, para que el marcador visual siga al mouse.
+// Al soltar (mouseup, escuchado en ESTA ventana — no en document
+// global, que es justamente lo que fallaba con startDragging) se
+// persiste a disco con guardar_posicion_preview_coordenada.
 // ======================================================
 
 function activarArrastreMarcador(
   zonaArrastre: HTMLElement,
   id: string,
+  config: ConfigCaptura,
   ventana: ReturnType<typeof getCurrentWindow>,
   escala: number,
   intervaloMs: number,
 ): void {
+  let arrastrando = false;
+  let ultimoXY: { x: number; y: number } | null = null;
+
+  const calcularXYCrudo = (
+    cursorX: number,
+    cursorY: number,
+    ventanaActiva: VentanaActiva | null,
+  ): { x: number; y: number } | null => {
+    switch (config.ubicacion) {
+      case "absoluta":
+        return { x: cursorX, y: cursorY };
+
+      case "relativa_cursor":
+        // Pendiente (Bug 5, a definir): no hay un "origen" fijo
+        // durante el arrastre de un marcador ya existente (a
+        // diferencia del modo captura de 2 pasos, que sí tiene un
+        // punto de origen marcado explícitamente por el usuario).
+        // Por ahora este tipo NO se persiste al arrastrar — null
+        // hace que onMouseMove no actualice nada (ver más abajo) y
+        // el marcador se puede mover visualmente pero suelta sin
+        // guardar.
+        return null;
+
+      case "relativa_ventana": {
+        if (!ventanaActiva) {
+          return null;
+        }
+
+        if (config.modoVentana === "porcentaje") {
+          const h = ((cursorX - ventanaActiva.x) / ventanaActiva.ancho) * 100;
+          const v = ((cursorY - ventanaActiva.y) / ventanaActiva.alto) * 100;
+          return { x: h, y: v };
+        }
+
+        const base = puntoReferenciaAbsoluto(config.puntoReferencia, ventanaActiva);
+        return { x: cursorX - base.x, y: cursorY - base.y };
+      }
+    }
+  };
+
+  const onMouseMove = async (evento: MouseEvent): Promise<void> => {
+    if (!arrastrando) {
+      return;
+    }
+
+    let cursor: [number, number] | null;
+    let ventanaActiva: VentanaActiva | null;
+
+    try {
+      [cursor, ventanaActiva] = await Promise.all([
+        invoke<[number, number]>("obtener_cursor_captura"),
+        invoke<VentanaActiva | null>("obtener_ventana_activa_captura"),
+      ]);
+    } catch {
+      return;
+    }
+
+    if (!cursor) {
+      return;
+    }
+
+    const [cursorX, cursorY] = cursor;
+
+    const xy = calcularXYCrudo(cursorX, cursorY, ventanaActiva);
+
+    if (!xy) {
+      return;
+    }
+
+    ultimoXY = xy;
+
+    invoke("actualizar_xy_preview_en_vivo", { id, x: xy.x, y: xy.y }).catch(
+      () => {},
+    );
+
+    await ventana.setPosition(
+      new PhysicalPosition(
+        cursorX - MITAD_LADO_PREVIEW_LOGICO * escala,
+        cursorY - MITAD_LADO_PREVIEW_LOGICO * escala,
+      ),
+    );
+
+    evento.preventDefault();
+  };
+
+  const onMouseUp = (): void => {
+    if (!arrastrando) {
+      return;
+    }
+
+    arrastrando = false;
+    document.removeEventListener("mousemove", onMouseMove);
+    document.removeEventListener("mouseup", onMouseUp);
+
+    if (ultimoXY) {
+      void invoke("guardar_posicion_preview_coordenada", {
+        id,
+        x: ultimoXY.x,
+        y: ultimoXY.y,
+      }).catch(() => {});
+    }
+
+    iniciarPollingPreview(ventana, escala, id, intervaloMs);
+  };
+
   zonaArrastre.addEventListener("mousedown", (evento) => {
     if (evento.button !== 0) {
       return;
@@ -458,38 +590,12 @@ function activarArrastreMarcador(
 
     detenerPolling();
 
-    void ventana.startDragging();
+    arrastrando = true;
+    ultimoXY = null;
+
+    document.addEventListener("mousemove", onMouseMove);
+    document.addEventListener("mouseup", onMouseUp);
   });
-
-  document.addEventListener("mouseup", () => {
-    // intervaloId !== null: el polling normal sigue vivo, no había
-    // arrastre en curso — nada que guardar.
-    if (intervaloId !== null) {
-      return;
-    }
-
-    void guardarPosicionArrastrada(id, ventana, escala, intervaloMs);
-  });
-}
-
-async function guardarPosicionArrastrada(
-  id: string,
-  ventana: ReturnType<typeof getCurrentWindow>,
-  escala: number,
-  intervaloMs: number,
-): Promise<void> {
-  const posicion = await ventana.outerPosition();
-
-  const destinoX = Math.round(posicion.x + MITAD_LADO_PREVIEW_LOGICO * escala);
-  const destinoY = Math.round(posicion.y + MITAD_LADO_PREVIEW_LOGICO * escala);
-
-  await invoke("guardar_posicion_preview_coordenada", {
-    id,
-    destinoX,
-    destinoY,
-  }).catch(() => {});
-
-  iniciarPollingPreview(ventana, escala, id, intervaloMs);
 }
 
 // ======================================================

@@ -248,62 +248,7 @@ fn punto_referencia_desde_str(valor: &str) -> PuntoReferenciaCache {
     }
 }
 
-// ======================================================
-// 🧮 VALORES CRUDOS DESDE DESTINO (inversa) — Etapa F
-// ------------------------------------------------------
-// Inversa de calcular_destino_valores(): dado un punto físico
-// de pantalla ya arrastrado por el usuario, devuelve los
-// valores crudos (x, y) que hay que guardar en la
-// CoordenadaBanco para ese ubicacion/modo_ventana/
-// punto_referencia. Sin ventana activa (caso RelativaVentana),
-// devuelve el destino tal cual, mismo criterio de fallback que
-// calcular_destino().
-// ======================================================
 
-pub fn valores_desde_destino(
-    ubicacion: &str,
-    modo_ventana: &str,
-    punto_referencia: &str,
-    destino_x: i32,
-    destino_y: i32,
-) -> (f64, f64) {
-    match ubicacion {
-        "relativa_cursor" => {
-            let (cx, cy) = obtener_cursor();
-
-            ((destino_x - cx) as f64, (destino_y - cy) as f64)
-        }
-
-        "relativa_ventana" => {
-            let Some(ventana) = obtener_ventana_activa() else {
-                return (destino_x as f64, destino_y as f64);
-            };
-
-            if modo_ventana == "porcentaje" {
-                let h = if ventana.ancho != 0 {
-                    ((destino_x - ventana.x) as f64 / ventana.ancho as f64) * 100.0
-                } else {
-                    0.0
-                };
-
-                let v = if ventana.alto != 0 {
-                    ((destino_y - ventana.y) as f64 / ventana.alto as f64) * 100.0
-                } else {
-                    0.0
-                };
-
-                (h, v)
-            } else {
-                let referencia = punto_referencia_desde_str(punto_referencia);
-                let (base_x, base_y) = punto_referencia_absoluto(&referencia, &ventana);
-
-                ((destino_x - base_x) as f64, (destino_y - base_y) as f64)
-            }
-        }
-
-        _ => (destino_x as f64, destino_y as f64),
-    }
-}
 
 // ======================================================
 // 📐 PUNTO DE REFERENCIA → COORDENADA ABSOLUTA

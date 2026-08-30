@@ -349,6 +349,8 @@ async function cerrarPrevisualizacion(): Promise<void> {
   const ids = Array.from(idsPrevisualizados);
   idsPrevisualizados.clear();
 
+  detenerPollingXYEnVivo();
+
   await Promise.all(
     ids.map((id) =>
       invoke("cerrar_ventana_preview_coordenada", { id }).catch(() => {}),
@@ -372,10 +374,98 @@ async function abrirPrevisualizacion(
     x: coordenada.x,
     y: coordenada.y,
   });
+
+  iniciarPollingXYEnVivo();
+}
+
+// ======================================================
+// 🔄 ACTUALIZAR X,Y EN VIVO MIENTRAS SE ARRASTRA EL MARCADOR
+// ------------------------------------------------------
+// Bug 5: antes la columna X,Y solo se refrescaba al CERRAR la
+// previsualización (cargarLista() en cerrarPrevisualizacionDe/
+// alternarPrevisualizacion) — mientras el marcador seguía abierto,
+// arrastrarlo no se reflejaba en la tabla hasta cerrarlo. Mismo
+// patrón de polling que ya usa vent_captura_main.ts (Regla 17):
+// mientras haya al menos una previsualización activa, cada tick
+// consulta el x/y CRUDO en memoria (obtener_xy_preview_coordenada
+// — ya actualizado por guardar_posicion_preview_coordenada tras
+// cada arrastre, sin esperar a releer disco) y pisa solo el texto
+// de los botones x/y de esa fila puntual — nunca re-renderiza toda
+// la tabla (perdería edición en curso de otra fila, foco, etc.).
+// ======================================================
+
+let intervaloXYEnVivo: ReturnType<typeof setInterval> | null = null;
+
+function iniciarPollingXYEnVivo(): void {
+  if (intervaloXYEnVivo !== null) {
+    return;
+  }
+
+  intervaloXYEnVivo = setInterval(() => void actualizarXYEnVivo(), 300);
+}
+
+function detenerPollingXYEnVivo(): void {
+  if (intervaloXYEnVivo !== null) {
+    clearInterval(intervaloXYEnVivo);
+    intervaloXYEnVivo = null;
+  }
+}
+
+async function actualizarXYEnVivo(): Promise<void> {
+  await Promise.all(
+    Array.from(idsPrevisualizados).map(async (id) => {
+      let xy: [number, number] | null;
+
+      try {
+        xy = await invoke<[number, number] | null>(
+          "obtener_xy_preview_coordenada",
+          { id },
+        );
+      } catch {
+        // Mismo criterio que actualizarPreview() en
+        // vent_captura_main.ts: un error transitorio de IPC no debe
+        // cortar el polling entero, solo se salta este tick para
+        // esta fila.
+        return;
+      }
+
+      if (!xy) {
+        return;
+      }
+
+      const [x, y] = xy;
+
+      const coordenada = listaFiltradaActual.find((c) => c.id === id);
+
+      if (!coordenada) {
+        return;
+      }
+
+      // Mantener el objeto en memoria sincronizado — si algo más
+      // dispara renderizarTabla(listaFiltradaActual) mientras la
+      // previsualización sigue abierta (ej. cambiar el filtro), la
+      // celda recién creada debe partir del valor ya arrastrado, no
+      // del viejo.
+      coordenada.x = x;
+      coordenada.y = y;
+
+      const botonXY = document.querySelector<HTMLButtonElement>(
+        `.coordenadas-boton-icono[data-id-coordenada="${id}"]`,
+      );
+
+      if (botonXY) {
+        botonXY.textContent = textoXY(coordenada, x, y);
+      }
+    }),
+  );
 }
 
 async function cerrarPrevisualizacionDe(id: string): Promise<void> {
   idsPrevisualizados.delete(id);
+
+  if (idsPrevisualizados.size === 0) {
+    detenerPollingXYEnVivo();
+  }
 
   await invoke("cerrar_ventana_preview_coordenada", { id }).catch(() => {});
 }
@@ -497,6 +587,14 @@ function iniciarCapturaMarcador(coordenada: CoordenadaBanco): void {
   }, 200);
 }
 
+// Regla 14 (y Bug 5): en modo Porcentaje, máximo 2 decimales — usada
+// tanto al renderizar la celda como al refrescarla en vivo durante
+// el arrastre del marcador (ver actualizarXYEnVivo()).
+function formatearEjeCoordenada(coordenada: CoordenadaBanco, valor: number): string {
+  const esPorcentaje = coordenada.tipo === 3 && coordenada.modo === 2;
+  return esPorcentaje ? valor.toFixed(2) : String(valor);
+}
+
 function crearCeldaXY(coordenada: CoordenadaBanco): HTMLTableCellElement {
   const td = document.createElement("td");
   td.className = "coordenadas-celda-xy";
@@ -514,30 +612,24 @@ function crearCeldaXY(coordenada: CoordenadaBanco): HTMLTableCellElement {
     return td;
   }
 
-  // Regla 14: en modo Porcentaje, máximo 2 decimales.
-  const esPorcentaje = coordenada.tipo === 3 && coordenada.modo === 2;
-  const formatearEje = (valor: number): string =>
-    esPorcentaje ? valor.toFixed(2) : String(valor);
-
-  const botonX = document.createElement("button");
-  botonX.type = "button";
-  botonX.className = "coordenadas-boton-icono";
-  botonX.textContent = `x: ${formatearEje(coordenada.x)}`;
-  botonX.addEventListener("click", () => {
+  const botonXY = document.createElement("button");
+  botonXY.type = "button";
+  botonXY.className = "coordenadas-boton-icono";
+  botonXY.dataset.idCoordenada = coordenada.id;
+  botonXY.textContent = textoXY(coordenada, coordenada.x, coordenada.y);
+  botonXY.addEventListener("click", () => {
     iniciarCapturaMarcador(coordenada);
   });
 
-  const botonY = document.createElement("button");
-  botonY.type = "button";
-  botonY.className = "coordenadas-boton-icono";
-  botonY.textContent = `y: ${formatearEje(coordenada.y)}`;
-  botonY.addEventListener("click", () => {
-    iniciarCapturaMarcador(coordenada);
-  });
-
-  td.append(botonX, botonY);
+  td.append(botonXY);
 
   return td;
+}
+
+// Punto 3: formato "(x,y)" en vez de "x: .. " / "y: .. " en dos
+// botones separados.
+function textoXY(coordenada: CoordenadaBanco, x: number, y: number): string {
+  return `(${formatearEjeCoordenada(coordenada, x)},${formatearEjeCoordenada(coordenada, y)})`;
 }
 
 // ======================================================
