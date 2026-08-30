@@ -29,6 +29,7 @@ tiempo_maximo_retenido	Tiempo máximo retenido, red de seguridad (ms)	5000	numer
 tiempo_inactividad_captura	Tiempo máximo de Captura, red de seguridad (ms)	10000	numero
 tecla_guardar_coordenada	Tecla para guardar coordenada capturada	|keyboard:F1	trigger
 tecla_toggle_perfil	Atajo para Activar/Desactivar el perfil	keyboard:LeftControl|keyboard:F1	trigger
+tecla_grabar_macro	Tecla para Iniciar/Detener grabación de macro	|keyboard:F9	trigger
 intervalo_captura_coordenada	Intervalo de refresco, ventana de captura (ms)	100	numero
 delay_entre_salida_doble	Pausa entre combos, Acción Doble (ms)	30	numero
 delay_rueda_repeticion	Pausa entre repeticiones de rueda (ms)	30	numero

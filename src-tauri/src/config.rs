@@ -510,6 +510,32 @@ pub fn establecer_tecla_toggle_perfil(valor: AtajoSimple) {
 }
 
 // ======================================================
+// 🔴 TECLA GRABAR MACRO (toggle Iniciar/Detener grabación)
+// ------------------------------------------------------
+// Atajo (modificadores + gatillo, ver AtajoSimple) que
+// inicia/detiene la grabación de macro desde el editor de
+// Macro. Configurable, no fijo — mismo patrón que
+// tecla_guardar_coordenada.
+// ======================================================
+
+static TECLA_GRABAR_MACRO: std::sync::Mutex<Option<AtajoSimple>> = std::sync::Mutex::new(None);
+
+pub fn tecla_grabar_macro() -> AtajoSimple {
+    TECLA_GRABAR_MACRO
+        .lock()
+        .unwrap()
+        .clone()
+        .unwrap_or_else(|| AtajoSimple {
+            modificadores: Vec::new(),
+            gatillo: InputId::new("keyboard", "F9"),
+        })
+}
+
+pub fn establecer_tecla_grabar_macro(valor: AtajoSimple) {
+    *TECLA_GRABAR_MACRO.lock().unwrap() = Some(valor);
+}
+
+// ======================================================
 // ⏱️ INTERVALO CAPTURA COORDENADA (polling ventana overlay)
 // ======================================================
 

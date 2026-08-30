@@ -193,7 +193,10 @@ export function crearCapturador(
 // ======================================================
 
 export function crearCapturadorAtajo(
-  claveConfig: "tecla_guardar_coordenada" | "tecla_toggle_perfil",
+  claveConfig:
+    | "tecla_guardar_coordenada"
+    | "tecla_toggle_perfil"
+    | "tecla_grabar_macro",
   atajoInicial: AtajoCaptura,
   alGuardar: (atajo: AtajoCaptura) => void,
 ): HTMLButtonElement {

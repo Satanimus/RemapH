@@ -750,7 +750,10 @@ function crearPestanaEditable(opciones: OpcionesPestana): Pestana {
       // input de texto plano — este tipo nunca cae en el `else`
       // genérico de abajo.
       const boton = crearCapturadorAtajo(
-        fila.clave as "tecla_guardar_coordenada" | "tecla_toggle_perfil",
+        fila.clave as
+          | "tecla_guardar_coordenada"
+          | "tecla_toggle_perfil"
+          | "tecla_grabar_macro",
         parsearAtajoDesdeTexto(valorActual),
         (atajo) => {
           montada.valorTrigger = atajoATexto(atajo);

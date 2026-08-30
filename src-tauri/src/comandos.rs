@@ -973,6 +973,111 @@ pub fn obtener_destino_preview_coordenada(id: String) -> Option<(i32, i32)> {
 }
 
 // ======================================================
+// 🔴 INDICADOR DE GRABACIÓN DE MACRO
+// ------------------------------------------------------
+// Ventana overlay fija (label único "grabacion_macro", no
+// glob) con un punto rojo + el nombre de la tecla toggle de
+// Grabar Macro (config::tecla_grabar_macro / Etapa A) — mismo
+// patrón de creación (decorations/transparent/always_on_top/
+// skip_taskbar/focused(false)) que abrir_ventana_preview_
+// coordenada, pero sin posicionamiento por punto de pantalla
+// ni polling: se posiciona una sola vez en la esquina superior
+// derecha del monitor primario y el contenido es estático.
+// ======================================================
+
+const LABEL_VENTANA_GRABACION_MACRO: &str = "grabacion_macro";
+const MARGEN_GRABACION_MACRO_LOGICO: f64 = 16.0;
+const ANCHO_GRABACION_MACRO_LOGICO: f64 = 220.0;
+const ALTO_GRABACION_MACRO_LOGICO: f64 = 40.0;
+
+/// Percent-encoding mínimo para el query param `tecla` (texto libre
+/// tipo "Control Izquierdo + F1") — sin esto, espacios y "+" rompen
+/// la URL o se decodifican mal en URLSearchParams. Solo se
+/// preservan sin tocar los caracteres que ya son seguros en una
+/// query string; todo lo demás se codifica byte a byte.
+fn codificar_query(texto: &str) -> String {
+    let mut salida = String::with_capacity(texto.len());
+
+    for byte in texto.bytes() {
+        match byte {
+            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => {
+                salida.push(byte as char);
+            }
+            _ => salida.push_str(&format!("%{:02X}", byte)),
+        }
+    }
+
+    salida
+}
+
+#[tauri::command]
+pub async fn abrir_ventana_grabacion_macro(
+    app: tauri::AppHandle,
+    tecla: String,
+) -> Result<(), String> {
+    // Mismo motivo que abrir_ventana_captura_coordenada/abrir_ventana_
+    // preview_coordenada: hay que esperar a que una ventana previa con
+    // el mismo label termine de cerrarse antes de crear la nueva.
+    if let Some(existente) = app.get_webview_window(LABEL_VENTANA_GRABACION_MACRO) {
+        let _ = existente.close();
+
+        for _ in 0..50 {
+            if app.get_webview_window(LABEL_VENTANA_GRABACION_MACRO).is_none() {
+                break;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(20));
+        }
+    }
+
+    let monitor = app
+        .primary_monitor()
+        .ok()
+        .flatten()
+        .ok_or_else(|| "No se pudo determinar el monitor primario".to_string())?;
+
+    let escala = monitor.scale_factor();
+    let pos_monitor = monitor.position();
+    let size_monitor = monitor.size();
+
+    let posicion_x = (pos_monitor.x as f64 + size_monitor.width as f64) / escala
+        - ANCHO_GRABACION_MACRO_LOGICO
+        - MARGEN_GRABACION_MACRO_LOGICO;
+    let posicion_y = pos_monitor.y as f64 / escala + MARGEN_GRABACION_MACRO_LOGICO;
+
+    let url = format!(
+        "grabacion_macro.html?tecla={}",
+        codificar_query(&tecla)
+    );
+
+    WebviewWindowBuilder::new(
+        &app,
+        LABEL_VENTANA_GRABACION_MACRO,
+        WebviewUrl::App(url.into()),
+    )
+    .title("RemapH — Grabando Macro")
+    .inner_size(ANCHO_GRABACION_MACRO_LOGICO, ALTO_GRABACION_MACRO_LOGICO)
+    .position(posicion_x, posicion_y)
+    .resizable(false)
+    .decorations(false)
+    .transparent(true)
+    .shadow(false)
+    .always_on_top(true)
+    .skip_taskbar(true)
+    .focused(false)
+    .build()
+    .map_err(|error| error.to_string())?;
+
+    Ok(())
+}
+
+#[tauri::command]
+pub fn cerrar_ventana_grabacion_macro(app: tauri::AppHandle) {
+    if let Some(ventana) = app.get_webview_window(LABEL_VENTANA_GRABACION_MACRO) {
+        let _ = ventana.close();
+    }
+}
+
+// ======================================================
 // ✏️ VALORES CRUDOS DE PREVIEW EN VIVO
 // ------------------------------------------------------
 // Polling desde vent_coordenadas_main.ts (Bug 5, no confundir con
@@ -1143,6 +1248,21 @@ pub fn establecer_tecla_toggle_perfil(valor: String) -> Result<(), String> {
         .ok_or_else(|| format!("Formato de atajo inválido: \"{}\"", valor))?;
 
     config::establecer_tecla_toggle_perfil(atajo);
+
+    Ok(())
+}
+
+#[tauri::command]
+pub fn obtener_tecla_grabar_macro() -> AtajoCapturaUI {
+    convertir_atajo_captura(&config::tecla_grabar_macro())
+}
+
+#[tauri::command]
+pub fn establecer_tecla_grabar_macro(valor: String) -> Result<(), String> {
+    let atajo = config::AtajoSimple::desde_texto(&valor)
+        .ok_or_else(|| format!("Formato de atajo inválido: \"{}\"", valor))?;
+
+    config::establecer_tecla_grabar_macro(atajo);
 
     Ok(())
 }

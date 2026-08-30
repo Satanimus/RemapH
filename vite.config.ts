@@ -27,6 +27,9 @@ export default defineConfig(async () => ({
   // Sexta página independiente: la ventana normal decorada del
   // banco de coordenadas guardadas (WebviewUrl::App("coordenadas.html")
   // — ver comandos.rs, abrir_ventana_coordenadas). Mismo motivo.
+  // Séptima página independiente: el indicador overlay de Grabación
+  // de Macro (WebviewUrl::App("grabacion_macro.html?tecla=...") —
+  // ver comandos.rs, abrir_ventana_grabacion_macro). Mismo motivo.
   build: {
     rollupOptions: {
       input: {
@@ -43,6 +46,9 @@ export default defineConfig(async () => ({
         ),
         coordenadas: fileURLToPath(
           new URL("./coordenadas.html", import.meta.url),
+        ),
+        grabacionMacro: fileURLToPath(
+          new URL("./grabacion_macro.html", import.meta.url),
         ),
       },
     },

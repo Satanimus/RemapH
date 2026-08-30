@@ -650,6 +650,10 @@ pub fn aplicar_valor(clave: &str, valor: &str) -> Result<(), String> {
             config::establecer_tecla_toggle_perfil(parsear_trigger(valor)?);
         }
 
+        "tecla_grabar_macro" => {
+            config::establecer_tecla_grabar_macro(parsear_trigger(valor)?);
+        }
+
         "intervalo_captura_coordenada" => {
             config::establecer_intervalo_captura_coordenada(parsear_numero(valor)?)
         }

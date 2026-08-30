@@ -581,7 +581,7 @@ pub fn convertir_trigger_captura(
 // ------------------------------------------------------
 // Igual que TriggerCapturaUI, pero sin condicion — para los
 // atajos de config.rs (tecla_guardar_coordenada,
-// tecla_toggle_perfil), limitados a Simple.
+// tecla_toggle_perfil, tecla_grabar_macro), limitados a Simple.
 // ======================================================
 
 #[derive(Serialize)]
@@ -628,8 +628,8 @@ fn condicion_a_texto(condicion: &crate::perfil_cache::CondicionTrigger) -> Strin
 // ------------------------------------------------------
 // Compara una captura (modificadores + gatillo) contra los
 // atajos reservados de config.rs (tecla_toggle_perfil,
-// tecla_guardar_coordenada). Sin importar el orden de los
-// modificadores.
+// tecla_guardar_coordenada, tecla_grabar_macro). Sin importar
+// el orden de los modificadores.
 // ======================================================
 
 pub fn coincide_con_atajo_reservado(
@@ -647,6 +647,7 @@ pub fn coincide_con_atajo_reservado(
 
     coincide_con(&crate::config::tecla_toggle_perfil())
         || coincide_con(&crate::config::tecla_guardar_coordenada())
+        || coincide_con(&crate::config::tecla_grabar_macro())
 }
 
 // ======================================================

@@ -1,0 +1,16 @@
+/* ======================================================
+   🔴 styl_grabar_macro.css
+   ------------------------------------------------------
+   Estilos propios del popup de inicio de Grabación de Macro
+   (comp_popup_grabar_macro_inicio.ts). El contenedor
+   comparte layout base con .popup-extra (styl_layout.css);
+   acá solo lo específico de este popup.
+   ====================================================== */
+
+.popup-grabar-macro-ms input {
+  width: 100%;
+}
+
+.popup-grabar-macro-ms input:disabled {
+  opacity: 0.4;
+}
