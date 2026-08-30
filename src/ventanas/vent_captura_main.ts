@@ -339,6 +339,27 @@ async function iniciarPreview(id: string, numero: number): Promise<void> {
   const ventana = getCurrentWindow();
   const escala = await ventana.scaleFactor();
 
+  // DIAGNÓSTICO TEMPORAL: confirmar el tamaño físico real de la
+  // ventana Win32 (no el DOM), para descartar que el rect real
+  // siga siendo el viejo pese a que inner_size ya diga 56x56.
+  try {
+    const tam = await ventana.outerSize();
+    const pos = await ventana.outerPosition();
+    console.log(
+      "[preview] outerSize físico:",
+      tam.width,
+      "x",
+      tam.height,
+      "| outerPosition:",
+      pos.x,
+      pos.y,
+      "| escala:",
+      escala,
+    );
+  } catch (error) {
+    console.error("[preview] no se pudo leer outerSize:", error);
+  }
+
   // Bug 3: zona de arrastre chica (20px de diámetro, ~10px de radio
   // desde el centro) en vez de todo el marcador (que ocupa la ventana
   // entera, 320x120) — antes la mano "grab" aparecía en cualquier

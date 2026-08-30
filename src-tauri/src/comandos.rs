@@ -138,13 +138,13 @@ use crate::captura_coordenada;
 use crate::compilador::ResultadoCompilacion;
 use crate::config;
 use crate::configuracion_usuario;
+use crate::eventos::InputId;
 use crate::macro_cache;
 use crate::macro_json::MacroArchivoJson;
 use crate::macro_usuario;
 use crate::macros;
 use crate::motor;
 use crate::perfil;
-use crate::eventos::InputId;
 use crate::perfil_ui::{
     convertir_atajo_captura, convertir_perfil, AtajoCapturaUI, EntradaUI, ItemFilaUI,
     ResultadoPerfil, ResultadoPerfilInicial, TriggerCapturaUI,
@@ -331,7 +331,10 @@ pub fn compilar_perfil(filas: Vec<ItemFilaUI>) -> Result<ResultadoCompilacion, S
 }
 
 #[tauri::command]
-pub fn guardar_perfil_como(nombre: String, filas: Vec<ItemFilaUI>) -> Result<ResultadoPerfil, String> {
+pub fn guardar_perfil_como(
+    nombre: String,
+    filas: Vec<ItemFilaUI>,
+) -> Result<ResultadoPerfil, String> {
     let perfil = convertir_perfil(filas);
 
     perfil::guardar_perfil_como(nombre, perfil)
@@ -890,7 +893,7 @@ pub async fn abrir_ventana_preview_coordenada(
     let posicion_x = (destino_x as f64 / escala) - MITAD_LADO_PREVIEW_LOGICO;
     let posicion_y = (destino_y as f64 / escala) - MITAD_LADO_PREVIEW_LOGICO;
 
-    WebviewWindowBuilder::new(
+    let ventana_preview = WebviewWindowBuilder::new(
         &app,
         label,
         WebviewUrl::App(format!("captura.html?id={id}&numero={numero}").into()),
@@ -914,6 +917,23 @@ pub async fn abrir_ventana_preview_coordenada(
     .devtools(true)
     .build()
     .map_err(|error| error.to_string())?;
+
+    // Fix ancho mínimo: en Windows, WebviewWindowBuilder::inner_size()
+    // por debajo de ~130px de ANCHO no se respeta en la creación (el
+    // alto sí) — se ve confirmado por outerSize() reportando ~166
+    // físicos (~133 lógicos) de ancho contra los 56 pedidos. Forzar
+    // el tamaño de nuevo DESPUÉS de crear la ventana sí lo aplica.
+    // El resize puede correr la posición (ancla sup-izq) — se
+    // reposiciona también para que el marcador siga centrado en
+    // destino_x/destino_y.
+    let _ = ventana_preview.set_size(tauri::Size::Logical(tauri::LogicalSize {
+        width: 56.0,
+        height: 56.0,
+    }));
+    let _ = ventana_preview.set_position(tauri::Position::Logical(tauri::LogicalPosition {
+        x: posicion_x,
+        y: posicion_y,
+    }));
 
     Ok(())
 }
@@ -997,8 +1017,13 @@ pub fn probar_coordenada(
     x: f64,
     y: f64,
 ) {
-    let (destino_x, destino_y) =
-        back_coordenada::calcular_destino_valores(&ubicacion, &modo_ventana, &punto_referencia, x, y);
+    let (destino_x, destino_y) = back_coordenada::calcular_destino_valores(
+        &ubicacion,
+        &modo_ventana,
+        &punto_referencia,
+        x,
+        y,
+    );
 
     back_coordenada::mover_cursor(destino_x, destino_y);
 }
