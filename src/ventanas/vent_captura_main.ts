@@ -308,6 +308,23 @@ async function iniciarPreview(id: string, numero: number): Promise<void> {
     '<svg viewBox="0 0 24 24" width="48" height="48"><circle cx="12" cy="12" r="9" /><circle class="captura-marcador-punto" cx="12" cy="12" r="1.6" /></svg>';
   raiz.append(marcador);
 
+  // Bug 2: el número de la fila que creó el marcador se muestra
+  // siempre, apegado abajo dentro del círculo. Se crea ACÁ, antes de
+  // cualquier "await" — si alguno de los invoke() de abajo (config
+  // de intervalo, scaleFactor) tarda o falla, no debe arrastrar
+  // consigo la aparición del número. Va como hermano de "marcador"
+  // (no adentro): .captura-marcador-preview tiene opacity:0.4 para
+  // que el círculo quede discreto, y ese opacity diluye TODO su
+  // subárbol por igual — metido adentro, el número quedaba
+  // prácticamente invisible. Como hermano, con position:absolute y
+  // sin ancestro posicionado de por medio, cae en el mismo centro
+  // (ver .captura-marcador-numero en styl_captura.css) pero a
+  // opacidad plena.
+  const numeroSpan = document.createElement("span");
+  numeroSpan.className = "captura-marcador-numero";
+  numeroSpan.textContent = String(numero);
+  raiz.append(numeroSpan);
+
   let intervaloMs = 100;
 
   try {
@@ -323,28 +340,15 @@ async function iniciarPreview(id: string, numero: number): Promise<void> {
   const ventana = getCurrentWindow();
   const escala = await ventana.scaleFactor();
 
-  // Regla 16: el número de fila solo se muestra si hay más de una
-  // previsualización activa a la vez.
-  let activas = 1;
+  // Bug 2: zona de arrastre chica (30px de diámetro, ~15px de radio
+  // desde el centro) en vez de todo el marcador (que ocupa la ventana
+  // entera, 320x120) — antes la mano "grab" aparecía en cualquier
+  // punto de la ventana, muy lejos del círculo dibujado.
+  const zonaArrastre = document.createElement("div");
+  zonaArrastre.className = "captura-marcador-zona-arrastre";
+  marcador.append(zonaArrastre);
 
-  try {
-    activas = await conTimeout(
-      invoke<number>("contar_previews_activas"),
-      3000,
-      "contar_previews_activas",
-    );
-  } catch {
-    // Sin diagnóstico visible — se asume 1 (sin número visible).
-  }
-
-  if (activas > 1) {
-    const numeroSpan = document.createElement("span");
-    numeroSpan.className = "captura-marcador-numero";
-    numeroSpan.textContent = String(numero);
-    marcador.append(numeroSpan);
-  }
-
-  activarArrastreMarcador(marcador, id, ventana, escala, intervaloMs);
+  activarArrastreMarcador(zonaArrastre, id, ventana, escala, intervaloMs);
 
   iniciarPollingPreview(ventana, escala, id, intervaloMs);
 }
@@ -399,43 +403,37 @@ async function actualizarPreview(
 // ======================================================
 // 🖱️ ARRASTRAR EL MARCADOR (Regla 17)
 // ------------------------------------------------------
-// No hay nada más en pantalla en modo previsualización, así que
-// "arrastrar el marcador" es arrastrar la ventana entera con el
-// punto exacto del mouse forzado a quedar bajo su centro, sin
-// importar desde qué parte del marcador se haya tomado el clic.
-// Mientras se arrastra se detiene el polling (si no, cada tick de
-// actualizarPreview movería la ventana de vuelta al punto guardado,
-// que todavía no cambió, peleando con el arrastre); se retoma al
-// soltar, ya con el valor nuevo persistido.
+// El elemento recibido es la zona de arrastre chica (ver
+// iniciarPreview), no el marcador completo — así el punto de
+// mousedown ya cae siempre muy cerca del centro real, y alcanza
+// con startDragging() directo (deja que el SO mueva la ventana
+// seguiendo el mouse). Antes se encadenaba un setPosition() +
+// .then(startDragging()) para "saltar" el punto clickeado al
+// centro — esa segunda vuelta async (después de esperar la
+// respuesta de setPosition) llegaba tarde: el SO ya no tomaba el
+// mousedown como válido para iniciar el arrastre nativo, y la
+// ventana no se movía. Mientras se arrastra se detiene el
+// polling (si no, cada tick de actualizarPreview movería la
+// ventana de vuelta al punto guardado, que todavía no cambió,
+// peleando con el arrastre); se retoma al soltar, ya con el
+// valor nuevo persistido.
 // ======================================================
 
 function activarArrastreMarcador(
-  marcador: HTMLElement,
+  zonaArrastre: HTMLElement,
   id: string,
   ventana: ReturnType<typeof getCurrentWindow>,
   escala: number,
   intervaloMs: number,
 ): void {
-  marcador.addEventListener("mousedown", (evento) => {
+  zonaArrastre.addEventListener("mousedown", (evento) => {
     if (evento.button !== 0) {
       return;
     }
 
     detenerPolling();
 
-    const puntoFisicoX = evento.clientX * escala;
-    const puntoFisicoY = evento.clientY * escala;
-
-    void ventana.outerPosition().then((posicionActual) => {
-      const nuevaX =
-        posicionActual.x + puntoFisicoX - MITAD_ANCHO_PREVIEW_LOGICO * escala;
-      const nuevaY =
-        posicionActual.y + puntoFisicoY - MITAD_ALTO_PREVIEW_LOGICO * escala;
-
-      void ventana
-        .setPosition(new PhysicalPosition(nuevaX, nuevaY))
-        .then(() => ventana.startDragging());
-    });
+    void ventana.startDragging();
   });
 
   document.addEventListener("mouseup", () => {
@@ -457,12 +455,8 @@ async function guardarPosicionArrastrada(
 ): Promise<void> {
   const posicion = await ventana.outerPosition();
 
-  const destinoX = Math.round(
-    posicion.x + MITAD_ANCHO_PREVIEW_LOGICO * escala,
-  );
-  const destinoY = Math.round(
-    posicion.y + MITAD_ALTO_PREVIEW_LOGICO * escala,
-  );
+  const destinoX = Math.round(posicion.x + MITAD_ANCHO_PREVIEW_LOGICO * escala);
+  const destinoY = Math.round(posicion.y + MITAD_ALTO_PREVIEW_LOGICO * escala);
 
   await invoke("guardar_posicion_preview_coordenada", {
     id,

@@ -135,7 +135,6 @@ pub fn run() {
             comandos::abrir_ventana_preview_coordenada,
             comandos::cerrar_ventana_preview_coordenada,
             comandos::obtener_destino_preview_coordenada,
-            comandos::contar_previews_activas,
             comandos::guardar_posicion_preview_coordenada,
             comandos::probar_coordenada,
             comandos::obtener_cursor_captura,

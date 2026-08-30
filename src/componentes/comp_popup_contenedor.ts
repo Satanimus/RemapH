@@ -172,6 +172,49 @@ function ajustarPosicionDentroDeVentana(
   }
 }
 
+// ======================================================
+// 🔄 ACTUALIZAR CONTENIDO SIN REPOSICIONAR
+// ------------------------------------------------------
+// Reemplaza el contenido de un popup ya abierto conservando
+// exactamente la posición (left/top/right/bottom) ya calculada
+// en el mostrarPopup() original. Para popups que se redibujan a
+// sí mismos al cambiar una opción (p. ej. el popup Tipo del
+// gestor de coordenadas): si en cada redibujo se recalculara la
+// posición contra el punto de click original, un crecimiento de
+// tamaño puede cruzar el borde de la ventana y hacer que el
+// popup "salte" de lugar (cambio de anclaje izq/der o arriba/
+// abajo). Acá se preserva el anclaje ya elegido la primera vez.
+// ======================================================
+
+export function actualizarContenidoPopup(contenido: HTMLElement): void {
+  if (!capaPopup) {
+    return;
+  }
+
+  const anterior = capaPopup.firstElementChild as HTMLElement | null;
+
+  const posicion = anterior
+    ? {
+        position: anterior.style.position,
+        left: anterior.style.left,
+        top: anterior.style.top,
+        right: anterior.style.right,
+        bottom: anterior.style.bottom,
+      }
+    : null;
+
+  capaPopup.innerHTML = "";
+  capaPopup.append(contenido);
+
+  if (posicion) {
+    contenido.style.position = posicion.position;
+    contenido.style.left = posicion.left;
+    contenido.style.top = posicion.top;
+    contenido.style.right = posicion.right;
+    contenido.style.bottom = posicion.bottom;
+  }
+}
+
 export function ocultarPopup(): void {
   if (!capaPopup) {
     return;

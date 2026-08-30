@@ -20,6 +20,7 @@ import {
   mostrarPopup,
   crearContenedorPopup,
   ocultarPopup,
+  actualizarContenidoPopup,
 } from "../componentes/comp_popup_contenedor";
 import {
   crearGrupoOpciones,
@@ -223,7 +224,15 @@ const tbody = document.createElement("tbody");
 
 tabla.append(thead, tbody);
 
-card.append(barraSuperior, tabla);
+// Bug 1: la tabla en sí no scrollea — este contenedor es el que
+// tiene overflow-y y ocupa el espacio disponible de la card, dejando
+// que la tabla crezca a su altura natural adentro (mismo patrón que
+// vent_configuracion_main.ts::scrollTabla).
+const scrollTabla = document.createElement("div");
+scrollTabla.className = "coordenadas-tabla-scroll";
+scrollTabla.append(tabla);
+
+card.append(barraSuperior, scrollTabla);
 raiz.append(card);
 raiz.append(crearContenedorPopup());
 
@@ -560,6 +569,14 @@ function abrirPopupTipo(
   coordenada: CoordenadaBanco,
   alCerrar: () => void,
 ): void {
+  // Bug 4: solo el primer dibujado posiciona el popup (mostrarPopup,
+  // que calcula el anclaje contra el punto de click). Los redibujados
+  // siguientes (al elegir una opción) solo reemplazan el contenido en
+  // el mismo lugar (actualizarContenidoPopup) — si se recalculara la
+  // posición cada vez, un cambio de tamaño que cruce el borde de la
+  // ventana hace "saltar" el popup a otro anclaje.
+  let primerDibujado = true;
+
   const guardarCampo = (cambios: Partial<CoordenadaBanco>): void => {
     Object.assign(coordenada, cambios);
 
@@ -641,7 +658,13 @@ function abrirPopupTipo(
       lista.append(cajaMedidoEn);
     }
 
-    mostrarPopup(lista, evento.clientX, evento.clientY, alCerrar);
+    if (primerDibujado) {
+      primerDibujado = false;
+      mostrarPopup(lista, evento.clientX, evento.clientY, alCerrar);
+      return;
+    }
+
+    actualizarContenidoPopup(lista);
   };
 
   dibujar();
@@ -720,6 +743,11 @@ function crearCeldaEditable(
   const entrarEnEdicion = (): void => {
     const input = document.createElement("input");
     input.type = "text";
+    // Bug 3: sin esto, el ancho mínimo por defecto del <input> (basado
+    // en el atributo "size", 20 por defecto) fuerza a la tabla a
+    // ensanchar la columna al entrar en edición. Con size=1, el ancho
+    // real lo sigue dando el CSS (width:100% de .coordenadas-celda-input).
+    input.size = 1;
     input.value = texto.textContent ?? "";
     input.className = "coordenadas-celda-input";
 
@@ -773,11 +801,18 @@ function crearCeldaGrupo(
   const entrarEnEdicion = (evento: MouseEvent): void => {
     const input = document.createElement("input");
     input.type = "text";
+    // Bug 3: ver comentario equivalente en crearCeldaEditable.
+    input.size = 1;
     input.value = texto.textContent ?? "";
     input.className = "coordenadas-celda-input";
 
     input.addEventListener("blur", () => confirmarValor(input.value));
     input.addEventListener("keydown", (eventoTecla) => {
+      // Bug 2: al empezar a escribir, el popup de grupos ya creados
+      // (mostrado más abajo) debe desaparecer con el down de cualquier
+      // tecla, no solo al confirmar con Enter.
+      ocultarPopup();
+
       if (eventoTecla.key === "Enter") {
         input.blur();
       }
@@ -842,8 +877,15 @@ function crearFila(
   tdNumero.append(botonNumero);
   tr.append(tdNumero);
 
+  // Bug 5: el flex va en un div INTERNO, no en el <td> mismo — igual
+  // que el encabezado (celdaOpcionesEncabezado). Poner display:flex
+  // directo sobre el <td> le hace perder su layout de celda de tabla,
+  // y la columna termina calculando un ancho distinto al del
+  // encabezado (el borde derecho queda corrido, a mitad de los botones).
   const tdOpciones = document.createElement("td");
-  tdOpciones.className = "coordenadas-celda-opciones";
+
+  const cajaOpciones = document.createElement("div");
+  cajaOpciones.className = "coordenadas-celda-opciones";
 
   const botonAsa = document.createElement("button");
   botonAsa.type = "button";
@@ -877,12 +919,13 @@ function crearFila(
     await cargarLista();
   });
 
-  tdOpciones.append(
+  cajaOpciones.append(
     botonAsa,
     botonPreview,
     crearBotonProbar(coordenada),
     botonEliminar,
   );
+  tdOpciones.append(cajaOpciones);
   tr.append(tdOpciones);
 
   tr.append(

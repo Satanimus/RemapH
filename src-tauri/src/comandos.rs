@@ -939,11 +939,6 @@ pub fn obtener_destino_preview_coordenada(id: String) -> Option<(i32, i32)> {
     ))
 }
 
-#[tauri::command]
-pub fn contar_previews_activas() -> usize {
-    captura_coordenada::ids_previews_activas().len()
-}
-
 // ======================================================
 // 🖱️💾 GUARDAR POSICIÓN DE PREVIEW ARRASTRADO — Regla 17
 // ------------------------------------------------------

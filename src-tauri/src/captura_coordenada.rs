@@ -75,8 +75,7 @@
 //     ventana overlay de captura esté abierta.
 // activar_preview(id, ubicacion, modo_ventana, punto_referencia, x, y) /
 // desactivar_preview(id) / actualizar_xy_preview(id, x, y) /
-// obtener_config_preview(id) / ids_previews_activas() /
-// desactivar_todas_las_previews()
+// obtener_config_preview(id) / desactivar_todas_las_previews()
 //     Previsualización por fila (Etapa F): cada fila con el toggle
 //     ⊙️ encendido tiene su propia entrada en CONFIG_PREVIEWS, key =
 //     id de CoordenadaBanco — puede haber cualquier cantidad activas
@@ -86,9 +85,6 @@
 //     desactivar(). obtener_config_preview(id) es polling desde
 //     comandos.rs::obtener_destino_preview_coordenada, sin consumir
 //     el valor (a diferencia de obtener_resultado()).
-//     ids_previews_activas() es consultado desde
-//     comandos.rs::contar_previews_activas() para decidir si se
-//     muestra el número de fila junto al marcador (Regla 16).
 //     actualizar_xy_preview(id, x, y) la llama comandos.rs::
 //     guardar_posicion_preview_coordenada tras persistir el arrastre
 //     del marcador (Regla 17) en Coordenadas.tsv, para que el x/y en
@@ -232,13 +228,6 @@ pub fn desactivar_todas_las_previews() {
 /// captura.html la necesita en cada tick.
 pub fn obtener_config_preview(id: &str) -> Option<ConfigPreview> {
     CONFIG_PREVIEWS.lock().unwrap().get(id).cloned()
-}
-
-/// Ids de todas las previsualizaciones activas ahora mismo — usado
-/// para decidir si se muestra el número de fila junto al marcador
-/// (Regla 16, más de una activa a la vez).
-pub fn ids_previews_activas() -> Vec<String> {
-    CONFIG_PREVIEWS.lock().unwrap().keys().cloned().collect()
 }
 
 /// Consultada una sola vez por captura.html al cargar.

@@ -349,12 +349,23 @@ function crearLineaResumenXY(
 // invoke liviano cada 200ms.
 // ======================================================
 
+// Un sondeo activo por fila como máximo — si se hace click en
+// Seleccionar/Cambiar de nuevo (misma fila) mientras ya había uno
+// corriendo, se corta el anterior antes de abrir uno nuevo.
+const intervalosSeleccionActivos = new Map<string, ReturnType<typeof setInterval>>();
+
 function iniciarSeleccion(
   contexto: ContextoFila,
   filaPerfil: FilaPerfil,
   evento: MouseEvent,
   alModificar: () => void,
 ): void {
+  const anterior = intervalosSeleccionActivos.get(contexto.id);
+
+  if (anterior !== undefined) {
+    clearInterval(anterior);
+  }
+
   invoke("abrir_ventana_coordenadas").catch((error) => {
     // Antes esto se tragaba en silencio — si .build() falla del lado
     // de Rust (comandos.rs), era invisible. Ahora queda en la consola
@@ -369,7 +380,10 @@ function iniciarSeleccion(
           return;
         }
 
-        clearInterval(intervalo);
+        // Regla (bug 1): NO se corta el sondeo acá — con la ventana de
+        // coordenadas fijada, el usuario puede seguir haciendo click en
+        // el número de otras filas para mandar más selecciones, y este
+        // popup debe seguir refrescándose con cada una.
 
         const elegida = coordenadaBancoAPerfil(
           convertirCoordenadaBanco(resultado),
@@ -383,8 +397,11 @@ function iniciarSeleccion(
       })
       .catch(() => {
         clearInterval(intervalo);
+        intervalosSeleccionActivos.delete(contexto.id);
       });
   }, 200);
+
+  intervalosSeleccionActivos.set(contexto.id, intervalo);
 }
 
 // ======================================================

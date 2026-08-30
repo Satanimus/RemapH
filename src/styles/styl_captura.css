@@ -113,11 +113,6 @@ body {
   justify-content: center;
   background: transparent;
   opacity: 0.4;
-  cursor: grab;
-}
-
-.captura-marcador-preview:active {
-  cursor: grabbing;
 }
 
 .captura-marcador-preview svg {
@@ -136,12 +131,34 @@ body {
   stroke: none;
 }
 
+/* Zona de arrastre — único punto de la ventana que agarra el mouse
+   para mover el marcador (~15px de radio desde el centro real). */
+.captura-marcador-zona-arrastre {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 30px;
+  height: 30px;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  cursor: grab;
+}
+
+.captura-marcador-zona-arrastre:active {
+  cursor: grabbing;
+}
+
 .captura-marcador-numero {
   position: absolute;
   left: 50%;
   top: 50%;
-  transform: translate(10px, -100%);
+  /* Dentro del círculo (radio real ≈18px), pegado a su borde
+     inferior: translateX centra horizontalmente, translateY baja
+     desde el centro sin salirse del círculo. */
+  transform: translate(-50%, 8px);
   font-size: var(--fs11);
   font-weight: 600;
   color: var(--text-highlight);
+  text-shadow: 0 0 3px color-mix(in srgb, var(--overlay-contraste) 80%, transparent);
+  pointer-events: none;
 }
