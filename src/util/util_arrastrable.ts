@@ -527,6 +527,28 @@ export function crearControladorArrastre(
   }
 
   function crearPlaceholder(anchoPx: number): HTMLElement {
+    // Bug: si `contenedor` es un <tbody> real (tabla de Coordenadas),
+    // insertar un <div> directo como hijo es HTML inválido — el motor
+    // de layout de tabla lo trata como fila anónima de ancho 100% y
+    // descoloca las columnas de las demás filas (el campo de número
+    // terminaba ocupando toda la pantalla). Acá se arma un <tr><td>
+    // real, con colSpan = cantidad de columnas de la tabla, para que
+    // el resto de las filas no se vea afectado.
+    if (contenedor.tagName === "TBODY") {
+      const fila = document.createElement("tr");
+
+      fila.className = CLASE_PLACEHOLDER;
+
+      const celda = document.createElement("td");
+      const filaEjemplo = contenedor.querySelector("tr");
+
+      celda.colSpan = filaEjemplo ? filaEjemplo.children.length : 1;
+
+      fila.append(celda);
+
+      return fila;
+    }
+
     const placeholder = document.createElement("div");
 
     placeholder.className = CLASE_PLACEHOLDER;

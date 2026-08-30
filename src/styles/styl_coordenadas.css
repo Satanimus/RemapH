@@ -44,6 +44,13 @@
   color: var(--highlight);
 }
 
+/* Regla 5: borde cyan permanente mientras el filtro esté activo
+   (Grupo o Tipo distinto de "Todos"), para recordar que la lista
+   está filtrada aunque el mouse no esté encima. */
+.coordenadas-boton-filtro-activo {
+  border-color: var(--highlight);
+}
+
 /* ======================================================
    BOTONES
    ====================================================== */
@@ -87,9 +94,13 @@
    ====================================================== */
 
 .coordenadas-btn-fijar-activo {
-  background: color-mix(in srgb, var(--highlight) var(--botones-ghost-opacidad-hover), transparent);
+  background: transparent;
   border-color: var(--highlight);
   color: var(--text-highlight);
+}
+
+.coordenadas-btn-fijar:active {
+  transform: translateY(1px);
 }
 
 .coordenadas-asa {
@@ -162,12 +173,48 @@
   flex: 1;
   min-height: 0;
   overflow-y: auto;
+  overflow-x: hidden;
 }
 
 .coordenadas-tabla {
   border-collapse: collapse;
   width: 100%;
   font-size: var(--fs13);
+}
+
+/* ======================================================
+   📏 ANCHO DE COLUMNAS — Reglas 2, 3, 4
+   ------------------------------------------------------
+   #/Opciones/Tipo/X,Y (1º, 2º, 5º, 6º): se ajustan a su
+   contenido (nowrap + width:1%, truco estándar para que la
+   tabla les dé el mínimo posible) y no cambian con el ancho
+   de ventana. Grupo/Nombre (3º, 4º) absorben todo el espacio
+   sobrante — si igual no entran, la tabla completa se recorta
+   contra el borde derecho (overflow-x:hidden del contenedor),
+   nunca pasan a doble línea.
+   ====================================================== */
+
+.coordenadas-tabla th,
+.coordenadas-tabla td {
+  white-space: nowrap;
+}
+
+.coordenadas-tabla th:nth-child(1),
+.coordenadas-tabla td:nth-child(1),
+.coordenadas-tabla th:nth-child(2),
+.coordenadas-tabla td:nth-child(2),
+.coordenadas-tabla th:nth-child(5),
+.coordenadas-tabla td:nth-child(5),
+.coordenadas-tabla th:nth-child(6),
+.coordenadas-tabla td:nth-child(6) {
+  width: 1%;
+}
+
+.coordenadas-tabla th:nth-child(3),
+.coordenadas-tabla td:nth-child(3),
+.coordenadas-tabla th:nth-child(4),
+.coordenadas-tabla td:nth-child(4) {
+  min-width: 90px;
 }
 
 .coordenadas-tabla thead th {
@@ -219,17 +266,26 @@
   white-space: nowrap;
 }
 
-/* Celda editable: span de solo lectura + input que lo reemplaza. */
+/* Celda editable: span de solo lectura + input que lo reemplaza.
+   Regla 13: el borde gris solo se muestra si el campo está vacío
+   (ver .coordenadas-celda-texto--vacia) — una vez escrito algún
+   valor, queda sin borde en reposo. */
 .coordenadas-celda-texto {
   display: inline-block;
-  min-width: 120px;
+  max-width: 100%;
+  box-sizing: border-box;
   padding: var(--gap4) var(--gap8);
-  border: 1px solid var(--border-light);
+  border: 1px solid transparent;
   border-radius: var(--r4);
   cursor: text;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: middle;
 }
 
-.coordenadas-celda-texto:hover {
+.coordenadas-celda-texto--vacia {
+  min-width: 120px;
   border-color: var(--border-light);
 }
 
@@ -276,9 +332,27 @@
   border-color: color-mix(in srgb, var(--green-dark) 85%, transparent);
 }
 
+/* ======================================================
+   ✅ TOAST "Enviado" — Regla 9
+   ====================================================== */
+
+.coordenadas-toast-enviado {
+  position: fixed;
+  z-index: 10000;
+  pointer-events: none;
+  padding: var(--gap4) var(--gap8);
+  background: color-mix(in srgb, var(--green-dark) 85%, transparent);
+  color: var(--text-highdark);
+  font-family: var(--font);
+  font-size: var(--fs13);
+  font-weight: 600;
+  border-radius: var(--r4);
+}
+
 .coordenadas-celda-input {
   width: 100%;
   min-width: 0;
+  box-sizing: border-box;
   background: var(--bg);
   border: 1px solid var(--highlight);
   border-radius: var(--r4);

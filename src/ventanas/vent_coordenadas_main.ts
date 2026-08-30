@@ -116,6 +116,16 @@ botonFiltroTipo.className = "coordenadas-boton-filtro";
 function actualizarTextoFiltros(): void {
   botonFiltroGrupo.textContent = `Grupo: ${filtroGrupo || "Todos"}`;
   botonFiltroTipo.textContent = `Tipo: ${filtroTipo ? textoTipoCoordenada(Number(filtroTipo)) : "Todos"}`;
+
+  // Regla 5: borde cyan mientras el filtro esté activo.
+  botonFiltroGrupo.classList.toggle(
+    "coordenadas-boton-filtro-activo",
+    filtroGrupo !== "",
+  );
+  botonFiltroTipo.classList.toggle(
+    "coordenadas-boton-filtro-activo",
+    filtroTipo !== "",
+  );
 }
 
 actualizarTextoFiltros();
@@ -195,8 +205,11 @@ const celdaOpcionesEncabezado = document.createElement("div");
 celdaOpcionesEncabezado.className = "coordenadas-celda-opciones";
 celdaOpcionesEncabezado.append(botonAsaEncabezado, botonPreviewGlobal);
 
+const thNumero = crearEncabezado("✓");
+thNumero.title = "Seleccionar esta fila";
+
 filaEncabezado.append(
-  crearEncabezado("#"),
+  thNumero,
   crearEncabezado(celdaOpcionesEncabezado),
   crearEncabezado(botonFiltroGrupo),
   crearEncabezado("Nombre"),
@@ -372,6 +385,11 @@ async function alternarPrevisualizacion(
   }
 
   await abrirPrevisualizacion(coordenada, numero);
+
+  // Regla 15: sin esto, el botón ⊙ de ESTA fila no queda marcado como
+  // activo hasta que algún otro evento (cerrar una, o el botón global)
+  // vuelva a renderizar la tabla completa.
+  renderizarTabla(listaFiltradaActual);
 }
 
 // Regla 10: botón del encabezado ⊙️ — si hay alguna previsualización
@@ -487,10 +505,15 @@ function crearCeldaXY(coordenada: CoordenadaBanco): HTMLTableCellElement {
     return td;
   }
 
+  // Regla 14: en modo Porcentaje, máximo 2 decimales.
+  const esPorcentaje = coordenada.tipo === 3 && coordenada.modo === 2;
+  const formatearEje = (valor: number): string =>
+    esPorcentaje ? valor.toFixed(2) : String(valor);
+
   const botonX = document.createElement("button");
   botonX.type = "button";
   botonX.className = "coordenadas-boton-icono";
-  botonX.textContent = `x: ${coordenada.x}`;
+  botonX.textContent = `x: ${formatearEje(coordenada.x)}`;
   botonX.addEventListener("click", () => {
     iniciarCapturaMarcador(coordenada);
   });
@@ -498,7 +521,7 @@ function crearCeldaXY(coordenada: CoordenadaBanco): HTMLTableCellElement {
   const botonY = document.createElement("button");
   botonY.type = "button";
   botonY.className = "coordenadas-boton-icono";
-  botonY.textContent = `y: ${coordenada.y}`;
+  botonY.textContent = `y: ${formatearEje(coordenada.y)}`;
   botonY.addEventListener("click", () => {
     iniciarCapturaMarcador(coordenada);
   });
@@ -628,7 +651,27 @@ function abrirPopupTipo(
 // ✅ SELECCIÓN HACIA EL LLAMADOR — Etapa H
 // ======================================================
 
-async function seleccionarFila(coordenada: CoordenadaBanco): Promise<void> {
+// Regla 9: mensaje flotante junto al mouse al enviar la selección con
+// la ventana fijada (si no está fijada, la ventana se cierra sola —
+// no hace falta confirmación visual).
+function mostrarToastEnviado(clientX: number, clientY: number): void {
+  const toast = document.createElement("div");
+  toast.className = "coordenadas-toast-enviado";
+  toast.textContent = "✓ Enviado";
+  toast.style.left = `${clientX + 12}px`;
+  toast.style.top = `${clientY + 12}px`;
+
+  raiz.append(toast);
+
+  setTimeout(() => {
+    toast.remove();
+  }, 1000);
+}
+
+async function seleccionarFila(
+  coordenada: CoordenadaBanco,
+  evento: MouseEvent,
+): Promise<void> {
   idSeleccionado = coordenada.id;
 
   await invoke("seleccionar_coordenada_banco", {
@@ -639,7 +682,10 @@ async function seleccionarFila(coordenada: CoordenadaBanco): Promise<void> {
 
   if (!ventanaFijada) {
     await getCurrentWindow().close();
+    return;
   }
+
+  mostrarToastEnviado(evento.clientX, evento.clientY);
 }
 
 function renderizarTabla(lista: CoordenadaBanco[]): void {
@@ -669,6 +715,7 @@ function crearCeldaEditable(
   const texto = document.createElement("span");
   texto.textContent = valorInicial;
   texto.className = "coordenadas-celda-texto";
+  texto.classList.toggle("coordenadas-celda-texto--vacia", valorInicial === "");
 
   const entrarEnEdicion = (): void => {
     const input = document.createElement("input");
@@ -679,6 +726,7 @@ function crearCeldaEditable(
     const confirmar = (): void => {
       const valor = input.value;
       texto.textContent = valor;
+      texto.classList.toggle("coordenadas-celda-texto--vacia", valor === "");
       td.replaceChildren(texto);
       onGuardar(valor);
     };
@@ -700,6 +748,74 @@ function crearCeldaEditable(
   return td;
 }
 
+// Regla 11: celda de la columna Grupo — mismo comportamiento de
+// crearCeldaEditable (click → input, escribe nombre nuevo), más un
+// popup compacto con los grupos ya existentes para elegir con un
+// click sin tener que escribirlo.
+function crearCeldaGrupo(
+  valorInicial: string,
+  onGuardar: (valor: string) => void,
+): HTMLTableCellElement {
+  const td = document.createElement("td");
+
+  const texto = document.createElement("span");
+  texto.textContent = valorInicial;
+  texto.className = "coordenadas-celda-texto";
+  texto.classList.toggle("coordenadas-celda-texto--vacia", valorInicial === "");
+
+  const confirmarValor = (valor: string): void => {
+    texto.textContent = valor;
+    texto.classList.toggle("coordenadas-celda-texto--vacia", valor === "");
+    td.replaceChildren(texto);
+    onGuardar(valor);
+  };
+
+  const entrarEnEdicion = (evento: MouseEvent): void => {
+    const input = document.createElement("input");
+    input.type = "text";
+    input.value = texto.textContent ?? "";
+    input.className = "coordenadas-celda-input";
+
+    input.addEventListener("blur", () => confirmarValor(input.value));
+    input.addEventListener("keydown", (eventoTecla) => {
+      if (eventoTecla.key === "Enter") {
+        input.blur();
+      }
+    });
+
+    td.replaceChildren(input);
+    input.focus();
+
+    void cargarGruposFiltro().then(() => {
+      if (gruposDisponibles.length === 0) {
+        return;
+      }
+
+      const lista = document.createElement("div");
+      lista.className = "popup-lista coordenadas-popup-grupo-compacto";
+
+      lista.append(
+        crearGrupoOpciones(
+          gruposDisponibles.map((grupo) => ({ texto: grupo, valor: grupo })),
+          texto.textContent ?? "",
+          (valor) => {
+            confirmarValor(valor);
+            ocultarPopup();
+          },
+          "popup-grupo-vertical",
+        ),
+      );
+
+      mostrarPopup(lista, evento.clientX, evento.clientY);
+    });
+  };
+
+  texto.addEventListener("click", entrarEnEdicion);
+  td.append(texto);
+
+  return td;
+}
+
 function crearFila(
   coordenada: CoordenadaBanco,
   indice: number,
@@ -712,6 +828,7 @@ function crearFila(
   const botonNumero = document.createElement("button");
   botonNumero.type = "button";
   botonNumero.className = "coordenadas-numero-toggle";
+  botonNumero.title = "Seleccionar esta fila";
   botonNumero.classList.toggle(
     "coordenadas-numero-toggle-activo",
     coordenada.id === idSeleccionado,
@@ -719,8 +836,8 @@ function crearFila(
   const spanNumero = document.createElement("span");
   spanNumero.textContent = String(indice + 1);
   botonNumero.append(spanNumero);
-  botonNumero.addEventListener("click", () => {
-    void seleccionarFila(coordenada);
+  botonNumero.addEventListener("click", (evento) => {
+    void seleccionarFila(coordenada, evento);
   });
   tdNumero.append(botonNumero);
   tr.append(tdNumero);
@@ -769,7 +886,7 @@ function crearFila(
   tr.append(tdOpciones);
 
   tr.append(
-    crearCeldaEditable(coordenada.aplicacion, (valor) => {
+    crearCeldaGrupo(coordenada.aplicacion, (valor) => {
       void invoke("coordenadas_editar", {
         id: coordenada.id,
         coordenada: coordenadaBancoParaBackend({
