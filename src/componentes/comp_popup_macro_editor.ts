@@ -2518,9 +2518,18 @@ function crearBoxResumenCoordenadaPaso(paso: PasoMacro): HTMLElement {
 // Un sondeo activo por paso como máximo — mismo criterio que
 // intervalosSeleccionActivos en comp_popup_coordenada.ts, acá
 // indexado por referencia de paso (PasoMacro no tiene id propio).
+// Bug (varios pasos "coordenada" en una Macro): con un buzón único
+// en Rust, dos pasos sondeando a la vez se pisaban el resultado (uno
+// se quedaba sin nada, o recibía el valor del otro). Cada sesión de
+// selección ahora se identifica con un "destino" propio (contador
+// incremental, solo necesita ser único mientras el sondeo está
+// activo) — ver comentario junto a SeleccionBanco en
+// captura_coordenada.rs.
+let contadorDestinoCoordenadaPaso = 0;
+
 const intervalosSeleccionCoordenadaPaso = new WeakMap<
   PasoMacro,
-  ReturnType<typeof setInterval>
+  { intervalo: ReturnType<typeof setInterval>; destino: string }
 >();
 
 function iniciarSeleccionCoordenadaPaso(
@@ -2530,15 +2539,20 @@ function iniciarSeleccionCoordenadaPaso(
   const anterior = intervalosSeleccionCoordenadaPaso.get(paso);
 
   if (anterior !== undefined) {
-    clearInterval(anterior);
+    clearInterval(anterior.intervalo);
   }
 
-  invoke("abrir_ventana_coordenadas").catch((error) => {
+  contadorDestinoCoordenadaPaso += 1;
+  const destino = `macro-paso-${contadorDestinoCoordenadaPaso}`;
+
+  invoke("abrir_ventana_coordenadas", { destino }).catch((error) => {
     console.error("abrir_ventana_coordenadas FALLÓ:", error);
   });
 
   const intervalo = setInterval(() => {
-    invoke<CoordenadaBancoJson | null>("obtener_seleccion_coordenada_banco")
+    invoke<CoordenadaBancoJson | null>("obtener_seleccion_coordenada_banco", {
+      destino,
+    })
       .then((resultado) => {
         if (!resultado) {
           return;
@@ -2564,7 +2578,7 @@ function iniciarSeleccionCoordenadaPaso(
       });
   }, 200);
 
-  intervalosSeleccionCoordenadaPaso.set(paso, intervalo);
+  intervalosSeleccionCoordenadaPaso.set(paso, { intervalo, destino });
 }
 
 // ======================================================

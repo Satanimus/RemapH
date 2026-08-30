@@ -347,6 +347,10 @@ export function crearLineaResumenXY(
 // null — este polling queda huérfano hasta que se abra una
 // fila/página nueva. Es aceptable: no hace nada, solo un
 // invoke liviano cada 200ms.
+//
+// destino: contexto.id (bug — dos filas sondeando a la vez se
+// pisaban el resultado con un buzón único en Rust; ver
+// comentario junto a SeleccionBanco en captura_coordenada.rs).
 // ======================================================
 
 // Un sondeo activo por fila como máximo — si se hace click en
@@ -366,7 +370,7 @@ function iniciarSeleccion(
     clearInterval(anterior);
   }
 
-  invoke("abrir_ventana_coordenadas").catch((error) => {
+  invoke("abrir_ventana_coordenadas", { destino: contexto.id }).catch((error) => {
     // Antes esto se tragaba en silencio — si .build() falla del lado
     // de Rust (comandos.rs), era invisible. Ahora queda en la consola
     // de devtools de ESTA ventana (F12 en la ventana principal).
@@ -374,7 +378,9 @@ function iniciarSeleccion(
   });
 
   const intervalo = setInterval(() => {
-    invoke<CoordenadaBancoJson | null>("obtener_seleccion_coordenada_banco")
+    invoke<CoordenadaBancoJson | null>("obtener_seleccion_coordenada_banco", {
+      destino: contexto.id,
+    })
       .then((resultado) => {
         if (!resultado) {
           return;

@@ -1162,7 +1162,17 @@ pub fn establecer_tecla_toggle_perfil(valor: String) -> Result<(), String> {
 const VENTANA_COORDENADAS: &str = "coordenadas";
 
 #[tauri::command]
-pub async fn abrir_ventana_coordenadas(app: tauri::AppHandle) -> Result<(), String> {
+pub async fn abrir_ventana_coordenadas(
+    app: tauri::AppHandle,
+    destino: String,
+) -> Result<(), String> {
+    // Bug (varias filas de Coordenada a la vez, tabla principal o
+    // Macro): se fija ACÁ, antes del early-return de reenfoque, para
+    // que reabrir/reenfocar la ventana ya fijada también redirija a
+    // dónde va la próxima selección — ver comentario junto a
+    // SeleccionBanco en captura_coordenada.rs.
+    captura_coordenada::fijar_destino_activo(destino);
+
     if let Some(existente) = app.get_webview_window(VENTANA_COORDENADAS) {
         let _ = existente.set_focus();
         return Ok(());
@@ -1218,8 +1228,10 @@ pub fn seleccionar_coordenada_banco(coordenada: banco_coordenadas::CoordenadaBan
 }
 
 #[tauri::command]
-pub fn obtener_seleccion_coordenada_banco() -> Option<banco_coordenadas::CoordenadaBanco> {
-    captura_coordenada::obtener_seleccion_banco()
+pub fn obtener_seleccion_coordenada_banco(
+    destino: String,
+) -> Option<banco_coordenadas::CoordenadaBanco> {
+    captura_coordenada::obtener_seleccion_banco(&destino)
 }
 
 #[tauri::command]

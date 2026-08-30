@@ -99,6 +99,24 @@ const CLASE_PLACEHOLDER = "arr-placeholder";
 // arrastre en vez de quedar en un clic simple.
 const UMBRAL_ARRASTRE_PX = 5;
 
+// Bug (Macro): el placeholder usa el alto real de la fila
+// arrastrada (rectPrimero.height más abajo), que para un paso
+// colapsado del editor de Macro es bastante más bajo que
+// --row-height (filas compactas de una sola línea) — quedaba
+// "muy bajito" y costaba identificar dónde iba a quedar. Nunca
+// baja de este mínimo (mismo alto de fila que ya usa la tabla
+// principal), sin tocar el alto real cuando la fila arrastrada
+// ya es más alta (paso expandido, fila de la tabla, etc.).
+function alturaMinimaPlaceholder(): number {
+  const valor = getComputedStyle(document.documentElement).getPropertyValue(
+    "--row-height",
+  );
+
+  const numero = parseFloat(valor);
+
+  return Number.isFinite(numero) ? numero : 40;
+}
+
 // Duración de la animación de reordenamiento por teclado —
 // más rápida que la de soltar con ratón (var(--speed), ver
 // styl_variables.css), y sin placeholder (spec, sección 3).
@@ -730,7 +748,10 @@ export function crearControladorArrastre(
 
     const placeholder = crearPlaceholder(rectPrimero.width);
 
-    placeholder.style.height = `${rectPrimero.height}px`;
+    placeholder.style.height = `${Math.max(
+      rectPrimero.height,
+      alturaMinimaPlaceholder(),
+    )}px`;
 
     idsGrupo.forEach((id) => {
       filas.get(id)?.elemento.classList.add(CLASE_FILA_OCULTA);

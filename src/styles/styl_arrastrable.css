@@ -110,4 +110,15 @@
     border-radius: var(--r4);
     margin: 2px 0;
     box-sizing: border-box;
+    /* Bug (todas las tablas/listas con este componente): al superar
+       la altura del contenedor y aparecer el scroll vertical, el
+       ancho/alto explícito puesto por JS (iniciarArrastre) no
+       alcanza — flex-shrink por defecto (1) sigue aplastando el
+       placeholder porque, a diferencia de una fila real (con texto,
+       que le da un tamaño mínimo de contenido), este es un <div>
+       vacío sin nada que le impida encogerse hasta 0. Con más filas
+       compitiendo por el mismo espacio, se aplasta más — hasta
+       desaparecer. flex-shrink: 0 lo deja fijo en el alto/ancho que
+       ya se le asignó, sin importar cuántas filas más haya. */
+    flex-shrink: 0;
 }

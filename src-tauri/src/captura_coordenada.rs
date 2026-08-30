@@ -66,13 +66,17 @@
 // obtener_resultado()
 //     Polling desde el popup de la fila del perfil: retira
 //     el resultado cuando está listo. Se limpia al leerla.
-// guardar_seleccion_banco(coordenada) / obtener_seleccion_banco()
+// guardar_seleccion_banco(coordenada) / obtener_seleccion_banco(destino)
 //     Mismo mecanismo que guardar_resultado()/obtener_resultado(),
 //     pero para la ventana "Coordenadas guardadas" (Etapa C/D):
 //     deja/retira la CoordenadaBanco elegida (existente o recién
-//     creada) para que el popup de la fila del perfil la aplique.
-//     Independiente de ACTIVA/desactivar() — no depende de que la
-//     ventana overlay de captura esté abierta.
+//     creada) para que el popup que la pidió la aplique. Con
+//     `destino` (fijar_destino_activo/DESTINO_ACTIVO) para que dos
+//     popups sondeando a la vez (dos filas, o dos pasos "coordenada"
+//     de una Macro) no se pisen el resultado entre sí — ver
+//     comentario junto a SeleccionBanco. Independiente de ACTIVA/
+//     desactivar() — no depende de que la ventana overlay de
+//     captura esté abierta.
 // activar_preview(id, ubicacion, modo_ventana, punto_referencia, x, y) /
 // desactivar_preview(id) / actualizar_xy_preview(id, x, y) /
 // obtener_config_preview(id) / desactivar_todas_las_previews()
@@ -113,7 +117,27 @@ static ACTIVA: std::sync::Mutex<bool> = std::sync::Mutex::new(false);
 static GUARDADO_SOLICITADO: std::sync::Mutex<bool> = std::sync::Mutex::new(false);
 static RESULTADO: std::sync::Mutex<Option<(f64, f64)>> = std::sync::Mutex::new(None);
 static CONFIG_ACTIVA: std::sync::Mutex<Option<ConfigCaptura>> = std::sync::Mutex::new(None);
-static SELECCION_BANCO: std::sync::Mutex<Option<CoordenadaBanco>> = std::sync::Mutex::new(None);
+static SELECCION_BANCO: std::sync::Mutex<Option<SeleccionBanco>> = std::sync::Mutex::new(None);
+static DESTINO_ACTIVO: std::sync::Mutex<Option<String>> = std::sync::Mutex::new(None);
+
+/// Bug: con SELECCION_BANCO como buzón único, dos popups sondeando a
+/// la vez (dos filas de la tabla principal, o dos pasos "coordenada"
+/// dentro de una Macro) competían por el mismo valor — el primero en
+/// sondear se lo llevaba aunque fuera para otro, y el resto se
+/// quedaba sin nada ("a veces no guarda, o guarda en una distinta").
+/// destino identifica al popup que pidió la selección (contexto.id
+/// de la fila, o un id sintético por sesión de selección en el
+/// editor de Macro) — abrir_ventana_coordenadas() lo deja en
+/// DESTINO_ACTIVO (se actualiza en cada apertura/reenfoque, incluso
+/// si la ventana ya estaba abierta y fijada), seleccionar_coordenada_
+/// banco() lo copia acá tal cual al guardar, y obtener_seleccion_
+/// banco(destino) solo retira (consume) la selección si el destino
+/// coincide — si no coincide, la deja intacta para su dueño real.
+struct SeleccionBanco {
+    destino: String,
+
+    coordenada: CoordenadaBanco,
+}
 
 /// Config del modo previsualización, mismo vocabulario de strings
 /// que ConfigCaptura.
@@ -294,15 +318,34 @@ pub fn obtener_resultado() -> Option<(f64, f64)> {
     RESULTADO.lock().unwrap().take()
 }
 
-/// La ventana "Coordenadas guardadas" deja acá la coordenada elegida
-/// (existente o recién creada) para que el popup de la fila del
-/// perfil que abrió esa ventana la retire.
-pub fn guardar_seleccion_banco(coordenada: CoordenadaBanco) {
-    *SELECCION_BANCO.lock().unwrap() = Some(coordenada);
+/// Llamada por abrir_ventana_coordenadas() en CADA apertura/reenfoque
+/// (incluso si la ventana ya estaba abierta y fijada) — deja marcado
+/// quién es el destinatario de la PRÓXIMA selección que se haga
+/// desde esa ventana.
+pub fn fijar_destino_activo(destino: String) {
+    *DESTINO_ACTIVO.lock().unwrap() = Some(destino);
 }
 
-/// Polling desde el popup de la fila del perfil: retira la selección
-/// cuando esté lista. Se consume al leerse.
-pub fn obtener_seleccion_banco() -> Option<CoordenadaBanco> {
-    SELECCION_BANCO.lock().unwrap().take()
+/// La ventana "Coordenadas guardadas" deja acá la coordenada elegida
+/// (existente o recién creada), etiquetada con el destino activo en
+/// ese momento, para que el popup dueño de ese destino la retire.
+pub fn guardar_seleccion_banco(coordenada: CoordenadaBanco) {
+    let destino = DESTINO_ACTIVO.lock().unwrap().clone().unwrap_or_default();
+
+    *SELECCION_BANCO.lock().unwrap() = Some(SeleccionBanco { destino, coordenada });
+}
+
+/// Polling desde el popup dueño de `destino`: retira la selección
+/// solo si el destino guardado coincide — si hay una selección
+/// esperando para OTRO destino, la deja intacta (no la consume) para
+/// que su verdadero dueño la retire en su propio próximo sondeo.
+pub fn obtener_seleccion_banco(destino: &str) -> Option<CoordenadaBanco> {
+    let mut guardia = SELECCION_BANCO.lock().unwrap();
+
+    match guardia.as_ref() {
+        Some(actual) if actual.destino == destino => {
+            guardia.take().map(|seleccion| seleccion.coordenada)
+        }
+        _ => None,
+    }
 }
