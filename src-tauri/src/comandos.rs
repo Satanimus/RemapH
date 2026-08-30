@@ -807,14 +807,17 @@ pub fn cerrar_ventana_captura_coordenada(app: tauri::AppHandle) {
 
 const PREFIJO_VENTANA_PREVIEW: &str = "captura_coordenada_preview_";
 
-// Mitad del tamaño (lógico) de la ventana overlay — mismo valor que
-// MITAD_ANCHO_PREVIEW_LOGICO/MITAD_ALTO_PREVIEW_LOGICO en
-// vent_captura_main.ts (ambos derivan de inner_size(320, 120) del
-// builder de abajo). Se usa acá para posicionar la ventana ya
-// centrada en el builder, antes de que exista JS corriendo que
-// pueda hacerlo.
-const MITAD_ANCHO_PREVIEW_LOGICO: f64 = 160.0;
-const MITAD_ALTO_PREVIEW_LOGICO: f64 = 60.0;
+// Mitad del tamaño (lógico) de la ventana overlay del marcador ⊙ —
+// mismo valor que MITAD_LADO_PREVIEW_LOGICO en vent_captura_main.ts
+// (ambos derivan de inner_size(56, 56) del builder de abajo). Bug: antes compartía el tamaño 320x120 de la
+// ventana de captura real (con header/texto) — el marcador solo
+// dibuja un círculo de 48px, así que el resto del rectángulo era
+// ventana real de Windows (always_on_top) tapando clicks/scroll de
+// lo que hay debajo aunque se viera "vacío". 56x56 deja el margen
+// justo para el círculo (48px) + su drop-shadow. Se usa acá para
+// posicionar la ventana ya centrada en el builder, antes de que
+// exista JS corriendo que pueda hacerlo.
+const MITAD_LADO_PREVIEW_LOGICO: f64 = 28.0;
 
 #[tauri::command]
 pub async fn abrir_ventana_preview_coordenada(
@@ -884,8 +887,8 @@ pub async fn abrir_ventana_preview_coordenada(
         .map(|monitor| monitor.scale_factor())
         .unwrap_or(1.0);
 
-    let posicion_x = (destino_x as f64 / escala) - MITAD_ANCHO_PREVIEW_LOGICO;
-    let posicion_y = (destino_y as f64 / escala) - MITAD_ALTO_PREVIEW_LOGICO;
+    let posicion_x = (destino_x as f64 / escala) - MITAD_LADO_PREVIEW_LOGICO;
+    let posicion_y = (destino_y as f64 / escala) - MITAD_LADO_PREVIEW_LOGICO;
 
     WebviewWindowBuilder::new(
         &app,
@@ -893,7 +896,7 @@ pub async fn abrir_ventana_preview_coordenada(
         WebviewUrl::App(format!("captura.html?id={id}&numero={numero}").into()),
     )
     .title("RemapH — Captura")
-    .inner_size(320.0, 120.0)
+    .inner_size(56.0, 56.0)
     .position(posicion_x, posicion_y)
     .resizable(false)
     .decorations(false)

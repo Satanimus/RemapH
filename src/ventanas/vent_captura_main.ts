@@ -278,7 +278,7 @@ function guardarYcerrar(x: number, y: number): void {
 // (obtener_destino_preview_coordenada, por id) — acá solo se
 // reposiciona la ventana para centrar el marcador sobre el
 // punto. Mitades fijas: la ventana overlay siempre se crea
-// con inner_size(320, 120) (ver abrir_ventana_preview_coordenada
+// con inner_size(56, 56) (ver abrir_ventana_preview_coordenada
 // en comandos.rs), no es resizable.
 //
 // x/y llegan en coordenadas FÍSICAS (mismo sistema que
@@ -293,8 +293,7 @@ function guardarYcerrar(x: number, y: number): void {
 // activarArrastreMarcador() más abajo.
 // ======================================================
 
-const MITAD_ANCHO_PREVIEW_LOGICO = 160;
-const MITAD_ALTO_PREVIEW_LOGICO = 60;
+const MITAD_LADO_PREVIEW_LOGICO = 28;
 
 async function iniciarPreview(id: string, numero: number): Promise<void> {
   raiz.innerHTML = "";
@@ -399,8 +398,8 @@ async function actualizarPreview(
 
   await ventana.setPosition(
     new PhysicalPosition(
-      x - MITAD_ANCHO_PREVIEW_LOGICO * escala,
-      y - MITAD_ALTO_PREVIEW_LOGICO * escala,
+      x - MITAD_LADO_PREVIEW_LOGICO * escala,
+      y - MITAD_LADO_PREVIEW_LOGICO * escala,
     ),
   );
 }
@@ -460,8 +459,8 @@ async function guardarPosicionArrastrada(
 ): Promise<void> {
   const posicion = await ventana.outerPosition();
 
-  const destinoX = Math.round(posicion.x + MITAD_ANCHO_PREVIEW_LOGICO * escala);
-  const destinoY = Math.round(posicion.y + MITAD_ALTO_PREVIEW_LOGICO * escala);
+  const destinoX = Math.round(posicion.x + MITAD_LADO_PREVIEW_LOGICO * escala);
+  const destinoY = Math.round(posicion.y + MITAD_LADO_PREVIEW_LOGICO * escala);
 
   await invoke("guardar_posicion_preview_coordenada", {
     id,
