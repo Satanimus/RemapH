@@ -1,0 +1,136 @@
+// ======================================================
+// 🔴 Grabacion_Macro
+// ------------------------------------------------------
+// Captura cruda de la Etapa D del Grabador de Macro. Tap
+// pasivo sobre entrada.rs (mismo patrón que
+// captura_coordenada.rs): mientras está activa, registra
+// cada evento físico tal cual llega, sin retenerlo ni
+// bloquearlo — Windows sigue funcionando normal. Registro
+// propio de teclas abajo, independiente del de entrada.rs
+// y del de captura_coordenada.rs.
+// ======================================================
+
+use crate::back_coordenada;
+use crate::config;
+use crate::eventos::{InputEvent, InputId, InputState};
+
+use serde::Serialize;
+use std::sync::Mutex;
+use std::time::Instant;
+
+// ======================================================
+// 📦 EVENTO GRABADO
+// ======================================================
+
+#[derive(Clone, Serialize)]
+pub struct EventoGrabado {
+    pub input: InputId,
+
+    pub state: InputState,
+
+    pub magnitud: Option<i16>,
+
+    pub momento_ms: u64,
+
+    /// Cursor absoluto de pantalla en el momento del evento. Solo se
+    /// completa en Down/Pulse — None en Up.
+    pub posicion: Option<(i32, i32)>,
+
+    /// Rect de la ventana activa (x, y, ancho, alto) en el momento
+    /// del evento. Solo se completa en Down/Pulse — None en Up.
+    pub ventana: Option<(i32, i32, i32, i32)>,
+}
+
+static ACTIVA: Mutex<bool> = Mutex::new(false);
+static INICIO: Mutex<Option<Instant>> = Mutex::new(None);
+static EVENTOS: Mutex<Vec<EventoGrabado>> = Mutex::new(Vec::new());
+static TECLAS_ABAJO: Mutex<Vec<InputId>> = Mutex::new(Vec::new());
+
+/// Arranca la grabación: limpia buffer y registro de teclas abajo,
+/// reinicia el reloj de momento_ms.
+pub fn activar_grabacion() {
+    *ACTIVA.lock().unwrap() = true;
+    *INICIO.lock().unwrap() = Some(Instant::now());
+    EVENTOS.lock().unwrap().clear();
+    TECLAS_ABAJO.lock().unwrap().clear();
+}
+
+pub fn grabacion_activa() -> bool {
+    *ACTIVA.lock().unwrap()
+}
+
+fn desactivar_interna() {
+    *ACTIVA.lock().unwrap() = false;
+}
+
+/// Tap pasivo llamado por entrada.rs en CADA evento físico. Si no
+/// hay grabación activa, es un chequeo de un bool y listo. Nunca
+/// retorna nada que cambie el flujo de entrada.rs.
+pub fn observar_evento(evento: &InputEvent) {
+    if !*ACTIVA.lock().unwrap() {
+        return;
+    }
+
+    let mut abajo = TECLAS_ABAJO.lock().unwrap();
+
+    let es_toggle = match evento.state {
+        InputState::Up => {
+            abajo.retain(|i| i != &evento.input);
+            false
+        }
+        InputState::Down => {
+            if abajo.contains(&evento.input) {
+                false
+            } else {
+                abajo.push(evento.input.clone());
+
+                let atajo = config::tecla_grabar_macro();
+
+                atajo.gatillo == evento.input
+                    && atajo.modificadores.len() == abajo.len().saturating_sub(1)
+                    && atajo
+                        .modificadores
+                        .iter()
+                        .all(|modificador| abajo.contains(modificador))
+            }
+        }
+        InputState::Pulse => false,
+    };
+
+    drop(abajo);
+
+    if es_toggle {
+        desactivar_interna();
+        return;
+    }
+
+    let inicio_opt: Option<Instant> = *INICIO.lock().unwrap();
+    let momento_ms = inicio_opt
+        .map(|inicio| inicio.elapsed().as_millis() as u64)
+        .unwrap_or(0);
+
+    let (posicion, ventana) = match evento.state {
+        InputState::Down | InputState::Pulse => {
+            let cursor = back_coordenada::obtener_cursor();
+            let ventana_activa = back_coordenada::obtener_ventana_activa()
+                .map(|v| (v.x, v.y, v.ancho, v.alto));
+
+            (Some(cursor), ventana_activa)
+        }
+        InputState::Up => (None, None),
+    };
+
+    EVENTOS.lock().unwrap().push(EventoGrabado {
+        input: evento.input.clone(),
+        state: evento.state.clone(),
+        magnitud: evento.magnitud,
+        momento_ms,
+        posicion,
+        ventana,
+    });
+}
+
+/// Consumida una sola vez: devuelve el buffer acumulado y lo vacía.
+pub fn tomar_eventos() -> Vec<EventoGrabado> {
+    std::mem::take(&mut *EVENTOS.lock().unwrap())
+}

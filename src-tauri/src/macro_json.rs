@@ -112,6 +112,12 @@ pub struct PasoMacroJson {
 
     pub tecla_duracion_ms: Option<u64>,
 
+    // Etapa F: arrastre diferido. "down" retiene mods+gatillo abajo
+    // hasta que llegue un paso "up" posterior con la misma
+    // secuencia; "up" libera. None = comportamiento normal (sin
+    // retención), sin cambios respecto a lo existente.
+    pub tecla_retencion: Option<String>,
+
     pub espera_ms: u64,
 
     pub bucle_marcador_destino: Option<String>,

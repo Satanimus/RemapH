@@ -193,6 +193,7 @@ use crate::cache;
 use crate::captura_coordenada;
 use crate::config;
 use crate::eventos::{InputEvent, InputId, InputState};
+use crate::grabacion_macro;
 use crate::motor;
 use crate::perfil;
 use std::cell::RefCell;
@@ -379,6 +380,11 @@ pub fn procesar_evento(evento: InputEvent) {
     // abajo (ese sí consume todo); acá Windows sigue funcionando
     // normal.
     captura_coordenada::observar_evento(&evento);
+
+    // Tap pasivo para la captura cruda del Grabador de Macro (Etapa
+    // D, ver grabacion_macro.rs): mismo criterio que el de arriba,
+    // nunca decide nada sobre el evento.
+    grabacion_macro::observar_evento(&evento);
 
     // EXCEPCIÓN — Modo Captura: se consume TODO, incondicionalmente, y
     // ni se mira RETENIDO/DEVOLVIENDO ni el estado de la cache. Esto va

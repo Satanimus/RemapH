@@ -356,12 +356,24 @@ fn ejecutar_macro_completa(
     // Ver decisión E) — posición capturada UNA vez, antes del primer paso.
     let posicion_inicial = back_coordenada::obtener_cursor();
 
+    // Etapa F: teclas retenidas por un paso "Solo Down" que todavía
+    // no recibieron su "Solo Up" — se libera cualquier resto al
+    // terminar la macro (red de seguridad si se detiene a mitad de
+    // un Down sin Up, ver Regla 16 para la validación que evita esto
+    // en el editor).
+    let mut retenidos: Vec<InputId> = Vec::new();
+
     ejecutar_pasos(
         &macro_archivo.pasos,
         programa,
         posicion_inicial,
         debe_detenerse,
+        &mut retenidos,
     );
+
+    for input in retenidos.into_iter().rev() {
+        runtime::emitir_up_input(input);
+    }
 }
 
 // ======================================================
@@ -373,6 +385,7 @@ fn ejecutar_pasos(
     programa: &Option<String>,
     posicion_inicial: (i32, i32),
     debe_detenerse: &dyn Fn() -> bool,
+    retenidos: &mut Vec<InputId>,
 ) {
     let mut contadores: HashMap<usize, u32> = HashMap::new();
     let mut i = 0;
@@ -411,7 +424,7 @@ fn ejecutar_pasos(
             continue;
         }
 
-        ejecutar_paso(paso, programa, posicion_inicial, debe_detenerse);
+        ejecutar_paso(paso, programa, posicion_inicial, debe_detenerse, retenidos);
 
         i += 1;
     }
@@ -422,9 +435,10 @@ fn ejecutar_paso(
     programa: &Option<String>,
     posicion_inicial: (i32, i32),
     debe_detenerse: &dyn Fn() -> bool,
+    retenidos: &mut Vec<InputId>,
 ) {
     match paso.tipo.as_str() {
-        "tecla_mouse" => ejecutar_paso_tecla_mouse(paso, debe_detenerse),
+        "tecla_mouse" => ejecutar_paso_tecla_mouse(paso, debe_detenerse, retenidos),
 
         "espera" => esperar_interrumpible(paso.espera_ms, debe_detenerse),
 
@@ -447,7 +461,11 @@ fn ejecutar_paso(
 // Ver decisión D) en el header.
 // ======================================================
 
-fn ejecutar_paso_tecla_mouse(paso: &PasoMacroJson, debe_detenerse: &dyn Fn() -> bool) {
+fn ejecutar_paso_tecla_mouse(
+    paso: &PasoMacroJson,
+    debe_detenerse: &dyn Fn() -> bool,
+    retenidos: &mut Vec<InputId>,
+) {
     let mods = convertir_inputs(&paso.tecla_accion.modificadores);
 
     let Some(gatillo_json) = &paso.tecla_accion.gatillo else {
@@ -455,6 +473,39 @@ fn ejecutar_paso_tecla_mouse(paso: &PasoMacroJson, debe_detenerse: &dyn Fn() -> 
     };
 
     let gatillo = convertir_input(gatillo_json);
+
+    // Etapa F: arrastre diferido. "down" retiene mods+gatillo abajo
+    // (mismo orden que el tramo Down de Mantenido) hasta que un paso
+    // "up" posterior los libere (mismo orden que el tramo Up de
+    // Mantenido: gatillo primero, mods en reversa) — sin pasar por
+    // tecla_extra/condicion normales.
+    match paso.tecla_retencion.as_deref() {
+        Some("down") => {
+            for modificador in &mods {
+                runtime::emitir_down_input(modificador.clone());
+                retenidos.push(modificador.clone());
+            }
+
+            runtime::emitir_down_input(gatillo.clone());
+            retenidos.push(gatillo);
+
+            return;
+        }
+
+        Some("up") => {
+            runtime::emitir_up_input(gatillo.clone());
+            retenidos.retain(|input| input != &gatillo);
+
+            for modificador in mods.iter().rev() {
+                runtime::emitir_up_input(modificador.clone());
+                retenidos.retain(|input| input != modificador);
+            }
+
+            return;
+        }
+
+        _ => {}
+    }
 
     match paso.tecla_extra.as_str() {
         "normal" | "turbo" => {

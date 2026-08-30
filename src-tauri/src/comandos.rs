@@ -144,10 +144,12 @@ use crate::macro_usuario;
 use crate::macros;
 use crate::motor;
 use crate::perfil;
-use crate::eventos::InputId;
+use crate::eventos::{InputId, InputState};
+use crate::grabacion_macro;
 use crate::perfil_ui::{
-    convertir_atajo_captura, convertir_perfil, AtajoCapturaUI, EntradaUI, ItemFilaUI,
-    ResultadoPerfil, ResultadoPerfilInicial, TriggerCapturaUI,
+    convertir_atajo_captura, convertir_input_captura, convertir_perfil, AtajoCapturaUI,
+    EntradaCapturaUI, EntradaUI, ItemFilaUI, ResultadoPerfil, ResultadoPerfilInicial,
+    TriggerCapturaUI,
 };
 use crate::pulsadores;
 use crate::usuario;
@@ -1075,6 +1077,66 @@ pub fn cerrar_ventana_grabacion_macro(app: tauri::AppHandle) {
     if let Some(ventana) = app.get_webview_window(LABEL_VENTANA_GRABACION_MACRO) {
         let _ = ventana.close();
     }
+}
+
+// ======================================================
+// 🔴 GRABACIÓN DE MACRO — CONTROL (Etapa G)
+// ------------------------------------------------------
+// Arranque/consulta de estado de grabacion_macro.rs. El cierre
+// (tomar_eventos_grabacion_macro) ya se expone en el bloque de
+// Etapa E más abajo.
+// ======================================================
+
+#[tauri::command]
+pub fn iniciar_grabacion_macro() {
+    grabacion_macro::activar_grabacion();
+}
+
+#[tauri::command]
+pub fn grabacion_macro_activa() -> bool {
+    grabacion_macro::grabacion_activa()
+}
+
+// ======================================================
+// 🔴 GRABACIÓN DE MACRO — ANÁLISIS (Etapa E)
+// ------------------------------------------------------
+// Espejo UI de EventoGrabado (grabacion_macro.rs), con
+// InputId ya traducido a EntradaCapturaUI (mismo patrón que
+// convertir_trigger_captura/convertir_atajo_captura) para que
+// el análisis del lado TypeScript (core_analisis_grabacion.ts)
+// trabaje con la forma {tipo, codigo, nombre} en vez de
+// InputId crudo.
+// ======================================================
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EventoGrabadoCapturaUI {
+    pub entrada: EntradaCapturaUI,
+
+    pub state: InputState,
+
+    pub magnitud: Option<i16>,
+
+    pub momento_ms: u64,
+
+    pub posicion: Option<(i32, i32)>,
+
+    pub ventana: Option<(i32, i32, i32, i32)>,
+}
+
+#[tauri::command]
+pub fn tomar_eventos_grabacion_macro() -> Vec<EventoGrabadoCapturaUI> {
+    grabacion_macro::tomar_eventos()
+        .into_iter()
+        .map(|evento| EventoGrabadoCapturaUI {
+            entrada: convertir_input_captura(&evento.input),
+            state: evento.state,
+            magnitud: evento.magnitud,
+            momento_ms: evento.momento_ms,
+            posicion: evento.posicion,
+            ventana: evento.ventana,
+        })
+        .collect()
 }
 
 // ======================================================

@@ -359,10 +359,23 @@ function crearCampoNumero(
 
 function textoAccionPaso(paso: PasoMacro): string {
   switch (paso.tipo) {
-    case "tecla_mouse":
-      return paso.teclaAccion.gatillo
-        ? triggerATexto(paso.teclaAccion)
-        : "Sin capturar";
+    case "tecla_mouse": {
+      if (!paso.teclaAccion.gatillo) {
+        return "Sin capturar";
+      }
+
+      const texto = triggerATexto(paso.teclaAccion);
+
+      if (paso.teclaRetencion === "down") {
+        return `${texto} (down)`;
+      }
+
+      if (paso.teclaRetencion === "up") {
+        return `${texto} (up)`;
+      }
+
+      return texto;
+    }
 
     case "espera":
       return `${paso.esperaMs} ms`;
@@ -400,6 +413,73 @@ function textoAccionPaso(paso: PasoMacro): string {
       return opcion ? `${opcion.icono} ${opcion.texto}` : "Sin comando";
     }
   }
+}
+
+// ======================================================
+// 🔒 VALIDACIÓN DE CIERRE DOWN/UP (Regla 16)
+// ------------------------------------------------------
+// Cada paso "Solo Down" debe cerrar con exactamente un paso "Solo
+// Up" posterior con la misma secuencia completa (modificadores +
+// gatillo, mismos códigos y mismo orden) antes de que se repita
+// otro Down que comparta alguna tecla de esa secuencia, o termine
+// la macro. Devuelve null si todo cierra, o un mensaje con el
+// primer Down sin su Up correspondiente.
+// ======================================================
+
+function secuenciaCompleta(trigger: PasoMacro["teclaAccion"]): string[] {
+  const codigos = trigger.modificadores.map((entrada) => entrada.codigo);
+
+  if (trigger.gatillo) {
+    codigos.push(trigger.gatillo.codigo);
+  }
+
+  return codigos;
+}
+
+function mismaSecuencia(a: string[], b: string[]): boolean {
+  return a.length === b.length && a.every((codigo, i) => codigo === b[i]);
+}
+
+function validarRetencionMacro(pasos: PasoMacro[]): string | null {
+  const abiertos: { secuencia: string[]; texto: string }[] = [];
+
+  for (const paso of pasos) {
+    if (paso.tipo !== "tecla_mouse" || paso.teclaRetencion === "") {
+      continue;
+    }
+
+    const secuencia = secuenciaCompleta(paso.teclaAccion);
+
+    if (paso.teclaRetencion === "down") {
+      const chocaConAbierto = abiertos.some((abierto) =>
+        abierto.secuencia.some((codigo) => secuencia.includes(codigo)),
+      );
+
+      if (chocaConAbierto) {
+        return `"${textoAccionPaso(paso)}" repite una tecla de un Down aún no cerrado con su Up correspondiente.`;
+      }
+
+      abiertos.push({ secuencia, texto: textoAccionPaso(paso) });
+      continue;
+    }
+
+    // "up"
+    const indice = abiertos.findIndex((abierto) =>
+      mismaSecuencia(abierto.secuencia, secuencia),
+    );
+
+    if (indice === -1) {
+      return `"${textoAccionPaso(paso)}" no tiene un Down previo con la misma secuencia.`;
+    }
+
+    abiertos.splice(indice, 1);
+  }
+
+  if (abiertos.length > 0) {
+    return `"${abiertos[0].texto}" quedó sin su Up correspondiente.`;
+  }
+
+  return null;
 }
 
 // ======================================================
@@ -768,6 +848,14 @@ function montarEditor(
     const botonGuardar = crearBoton({ texto: "Guardar" });
 
     botonGuardar.addEventListener("click", async () => {
+      const errorRetencion = validarRetencionMacro(macroArchivo.pasos);
+
+      if (errorRetencion) {
+        window.alert(errorRetencion);
+
+        return;
+      }
+
       cancelarDebounceGuardado();
 
       try {
@@ -829,6 +917,14 @@ function montarEditor(
     const botonConfirmar = crearBoton({ texto: "Guardar como" });
 
     const confirmar = async (): Promise<void> => {
+      const errorRetencion = validarRetencionMacro(macroArchivo.pasos);
+
+      if (errorRetencion) {
+        window.alert(errorRetencion);
+
+        return;
+      }
+
       cancelarDebounceGuardado();
 
       try {
@@ -2215,30 +2311,66 @@ function crearDetalleTeclaMouse(
 
   contenedor.append(crearFilaPopup("Combo", botonCapturar));
 
+  // Limitar (Regla 14): retención Down/Up diferido — arrastre entre
+  // pasos. Dos interruptores independientes (no crearGrupoOpciones:
+  // deben poder quedar ambos apagados). Activar uno apaga el otro;
+  // click sobre el ya activo lo apaga (vuelve a "").
+  const interruptorDown = crearInterruptor(
+    "Solo Down",
+    paso.teclaRetencion === "down",
+    () => {
+      paso.teclaRetencion = paso.teclaRetencion === "down" ? "" : "down";
+
+      guardarYRedibujar();
+    },
+  );
+
+  const interruptorUp = crearInterruptor(
+    "Solo Up",
+    paso.teclaRetencion === "up",
+    () => {
+      paso.teclaRetencion = paso.teclaRetencion === "up" ? "" : "up";
+
+      guardarYRedibujar();
+    },
+  );
+
+  const grupoLimitar = document.createElement("div");
+
+  grupoLimitar.className = "popup-grupo";
+
+  grupoLimitar.append(interruptorDown, interruptorUp);
+
+  contenedor.append(crearFilaPopup("Limitar", grupoLimitar));
+
   // Extra (Repetición): mismo vocabulario que Tecla/Mouse de la
   // tabla principal tras el rediseño — Simple/Mantenido ya no son
   // opciones acá, se leen de paso.teclaAccion.condicion (el
   // gatillo capturado arriba). Sin "repeticion_rueda" (no hay
   // gatillo Rueda dentro de una Macro, ver core_macro.ts).
+  // Regla 15: con "Solo Up" no se muestra — el Up solo libera lo
+  // retenido por el Down correspondiente, no admite Extra propio.
   const extraOpciones: { texto: string; valor: ExtraTeclaMouseMacro }[] = [
     { texto: "Ninguno", valor: "" },
     { texto: "Normal", valor: "normal" },
     { texto: "Turbo", valor: "turbo" },
   ];
 
-  contenedor.append(
-    crearFilaPopup(
-      "Extra",
-      crearGrupoOpciones(extraOpciones, paso.teclaExtra, (valor) => {
-        // No hace falta limpiar teclaDuracionMs al cambiar de Extra
-        // — se conserva por si se vuelve a necesitar después,
-        // simplemente deja de mostrarse/usarse mientras tanto.
-        paso.teclaExtra = valor;
+  if (paso.teclaRetencion !== "up") {
+    contenedor.append(
+      crearFilaPopup(
+        "Extra",
+        crearGrupoOpciones(extraOpciones, paso.teclaExtra, (valor) => {
+          // No hace falta limpiar teclaDuracionMs al cambiar de Extra
+          // — se conserva por si se vuelve a necesitar después,
+          // simplemente deja de mostrarse/usarse mientras tanto.
+          paso.teclaExtra = valor;
 
-        guardarYRedibujar();
-      }),
-    ),
-  );
+          guardarYRedibujar();
+        }),
+      ),
+    );
+  }
 
   // Duración (ms) — aparece cuando hace falta un tiempo simulado
   // que en una macro no llega de un Up físico real: condición
@@ -2246,9 +2378,11 @@ function crearDetalleTeclaMouse(
   // cualquier condición con Extra Normal/Turbo (dura el bucle de
   // repetición). Con Extra Ninguno + Simple/Doble/Triple no hace
   // falta — el combo se envía una sola vez, sin tiempo que
-  // configurar.
+  // configurar. Regla 15: con "Solo Down" tampoco — la duración la
+  // da el paso "Solo Up" correspondiente más adelante en la macro.
   const necesitaDuracion =
-    paso.teclaExtra !== "" || paso.teclaAccion.condicion === "mantenido";
+    paso.teclaRetencion !== "down" &&
+    (paso.teclaExtra !== "" || paso.teclaAccion.condicion === "mantenido");
 
   if (necesitaDuracion) {
     contenedor.append(

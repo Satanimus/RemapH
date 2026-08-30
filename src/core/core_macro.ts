@@ -140,6 +140,12 @@ export type TipoPasoMacro =
 // no hay Rueda dentro de una Macro.
 export type ExtraTeclaMouseMacro = "" | "normal" | "turbo";
 
+// Etapa F: arrastre diferido. "down" retiene mods+gatillo abajo
+// hasta que un paso "up" posterior con la misma secuencia los
+// libere. "" (Ninguno) es el comportamiento normal de siempre —
+// ver Reglas 14-16.
+export type RetencionTeclaMacro = "" | "down" | "up";
+
 // Mismo vocabulario que CoordenadaPerfil.ubicacion
 // (core_coordenada.ts), sin postAccion — ver nota de
 // PasoCoordenadaMacro más abajo.
@@ -196,6 +202,10 @@ export interface PasoMacro {
   teclaAccion: Trigger;
 
   teclaExtra: ExtraTeclaMouseMacro;
+
+  // Etapa F: marca "Solo Down"/"Solo Up" del subtítulo "Limitar"
+  // (Regla 14). "" cuando no está limitado.
+  teclaRetencion: RetencionTeclaMacro;
 
   // Un solo campo de Duración (ms), con dos usos según
   // contexto — no hay Up físico real dentro de una Macro, así
@@ -296,6 +306,8 @@ export function crearPasoMacro(tipo: TipoPasoMacro): PasoMacro {
     teclaAccion: crearTrigger(),
 
     teclaExtra: "",
+
+    teclaRetencion: "",
 
     teclaDuracionMs: null,
 
@@ -549,6 +561,8 @@ export function macroArchivoParaBackend(
       ...paso,
 
       teclaAccion: triggerABackend(paso.teclaAccion),
+
+      teclaRetencion: paso.teclaRetencion === "" ? null : paso.teclaRetencion,
     })),
   };
 }
@@ -648,7 +662,10 @@ function recolectarControles(macroArchivo: {
 export async function macroArchivoDesdeBackend(macroArchivoBackend: {
   nombre: string;
 
-  pasos: (Omit<PasoMacro, "teclaAccion"> & { teclaAccion: TriggerBackend })[];
+  pasos: (Omit<PasoMacro, "teclaAccion" | "teclaRetencion"> & {
+    teclaAccion: TriggerBackend;
+    teclaRetencion: string | null;
+  })[];
 }): Promise<MacroArchivo> {
   const controles = recolectarControles(macroArchivoBackend);
 
@@ -663,6 +680,9 @@ export async function macroArchivoDesdeBackend(macroArchivoBackend: {
       ...paso,
 
       teclaAccion: triggerDesdeBackend(paso.teclaAccion, mapaNombres),
+
+      teclaRetencion: (paso.teclaRetencion ??
+        "") as PasoMacro["teclaRetencion"],
     })),
   };
 }
