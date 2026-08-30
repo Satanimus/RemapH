@@ -340,7 +340,7 @@ async function iniciarPreview(id: string, numero: number): Promise<void> {
   const ventana = getCurrentWindow();
   const escala = await ventana.scaleFactor();
 
-  // Bug 2: zona de arrastre chica (30px de diámetro, ~15px de radio
+  // Bug 3: zona de arrastre chica (20px de diámetro, ~10px de radio
   // desde el centro) en vez de todo el marcador (que ocupa la ventana
   // entera, 320x120) — antes la mano "grab" aparecía en cualquier
   // punto de la ventana, muy lejos del círculo dibujado.
@@ -382,7 +382,12 @@ async function actualizarPreview(
       "obtener_destino_preview_coordenada",
     );
   } catch {
-    detenerPolling();
+    // Bug 4: antes cualquier error transitorio de IPC (un timeout
+    // puntual, etc.) cortaba el polling para siempre con
+    // detenerPolling() — el marcador quedaba "congelado" en su
+    // última posición en vez de seguir a la ventana/cursor. Ahora se
+    // salta este tick nada más; el intervalo sigue vivo y lo
+    // reintenta en el próximo (100ms después por defecto).
     return;
   }
 
