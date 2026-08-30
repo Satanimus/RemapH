@@ -60,8 +60,6 @@ import type {
   PasoMacro,
   TipoPasoMacro,
   ExtraTeclaMouseMacro,
-  UbicacionPasoMacro,
-  ModoVentanaPasoMacro,
   PuntoReferenciaPasoMacro,
   IniciarPasoMacro,
   InstanciasPasoMacro,
@@ -100,6 +98,22 @@ import {
 
 import { crearControladorArrastre } from "../util/util_arrastrable";
 import type { ControladorArrastre } from "../util/util_arrastrable";
+
+import {
+  textoUbicacionCoordenada,
+  textoModoVentanaCoordenada,
+  textoPuntoReferencia,
+} from "../core/core_coordenada";
+
+import {
+  type CoordenadaBancoJson,
+  convertirCoordenadaBanco,
+  coordenadaBancoAPerfil,
+} from "../core/core_banco_coordenadas";
+import {
+  crearLineaResumen,
+  crearLineaResumenXY,
+} from "./comp_popup_coordenada";
 
 // ======================================================
 // 📦 MODELOS BACKEND (ícono + "abrir con", mismo shape que
@@ -363,9 +377,7 @@ function textoAccionPaso(paso: PasoMacro): string {
         return "Posición inicial";
       }
 
-      return paso.coordX !== null && paso.coordY !== null
-        ? `X: ${paso.coordX}, Y: ${paso.coordY}`
-        : "Sin capturar";
+      return textoResumenCoordenadaPaso(paso);
 
     case "pegar":
       return paso.pegarRuta ? nombreDeRuta(paso.pegarRuta) : "Sin ruta";
@@ -388,6 +400,59 @@ function textoAccionPaso(paso: PasoMacro): string {
       return opcion ? `${opcion.icono} ${opcion.texto}` : "Sin comando";
     }
   }
+}
+
+// ======================================================
+// 📝 RESUMEN "Grupo: Nombre" / Tipo reducido (X,Y) — coordenada
+// ------------------------------------------------------
+// Si la coordenada elegida trae Grupo o Nombre (copiados del
+// banco al seleccionar), se muestra eso. Si no tiene ninguno de
+// los dos, se cae a la versión reducida de Tipo + (X,Y), mismo
+// formato que usan las columnas Tipo/X,Y de la ventana del
+// gestor de coordenadas (vent_coordenadas_main.ts).
+// ======================================================
+
+const ICONO_PUNTO_REFERENCIA_PASO: Record<PuntoReferenciaPasoMacro, string> = {
+  sup_izq: "⌜",
+  sup_der: "⌝",
+  centro: "⊡",
+  inf_izq: "⌞",
+  inf_der: "⌟",
+};
+
+function textoTipoReducidoPaso(paso: PasoMacro): string {
+  if (paso.coordUbicacion !== "relativa_ventana") {
+    return textoUbicacionCoordenada(paso.coordUbicacion);
+  }
+
+  if (paso.coordModoVentana === "porcentaje") {
+    return "Ventana: %";
+  }
+
+  return `Ventana: ${ICONO_PUNTO_REFERENCIA_PASO[paso.coordPuntoReferencia]}`;
+}
+
+// Regla 14 (mismo criterio que formatearEjeCoordenada en
+// vent_coordenadas_main.ts): máximo 2 decimales en modo
+// Porcentaje.
+function textoEjeReducidoPaso(paso: PasoMacro, valor: number): string {
+  const esPorcentaje =
+    paso.coordUbicacion === "relativa_ventana" &&
+    paso.coordModoVentana === "porcentaje";
+
+  return esPorcentaje ? valor.toFixed(2) : String(valor);
+}
+
+function textoResumenCoordenadaPaso(paso: PasoMacro): string {
+  if (paso.coordX === null || paso.coordY === null) {
+    return "Sin capturar";
+  }
+
+  if (paso.coordAplicacion || paso.coordNota) {
+    return `${paso.coordAplicacion}: ${paso.coordNota}`;
+  }
+
+  return `${textoTipoReducidoPaso(paso)} (${textoEjeReducidoPaso(paso, paso.coordX)},${textoEjeReducidoPaso(paso, paso.coordY)})`;
 }
 
 // ======================================================
@@ -2323,141 +2388,183 @@ function crearDetalleCoordenada(
 
   contenedor.append(crearSeparador());
 
-  const ubicacionOpciones: { texto: string; valor: UbicacionPasoMacro }[] = [
-    { texto: "Absoluta", valor: "absoluta" },
-    { texto: "Cursor", valor: "relativa_cursor" },
-    { texto: "Ventana", valor: "relativa_ventana" },
-  ];
+  // ----------------------------------
+  // COORDENADA — mismo flujo que la sección "Coordenada" del
+  // popup Extra de Tecla/Mouse (comp_popup_coordenada.ts):
+  // Seleccionar/Cambiar (abre el gestor de coordenadas) + ▶
+  // Probar (solo Absoluta) + ✕ eliminar + box resumen. "En
+  // relación a"/"Medido en"/"Medido desde" ya no se eligen acá
+  // a mano — son responsabilidad exclusiva del gestor.
+  // ----------------------------------
 
-  contenedor.append(
-    crearFilaPopup(
-      "Ubicación relativa a:",
-      crearGrupoOpciones(ubicacionOpciones, paso.coordUbicacion, (valor) => {
-        paso.coordUbicacion = valor;
+  const tieneCoordenada = paso.coordX !== null && paso.coordY !== null;
 
-        paso.coordX = null;
-        paso.coordY = null;
+  const labelCoordenada = document.createElement("span");
+  labelCoordenada.className = "popup-fila-label";
+  labelCoordenada.textContent = "Coordenada:";
+  contenedor.append(labelCoordenada);
 
-        guardarYRedibujar();
-      }),
-    ),
+  const filaSeleccionar = document.createElement("div");
+  filaSeleccionar.className = "popup-extra-fila-acciones";
+
+  const botonSeleccionar = document.createElement("button");
+  botonSeleccionar.className = "ui-btn popup-extra-capturar";
+  botonSeleccionar.textContent = tieneCoordenada
+    ? "📌 Cambiar"
+    : "📌 Seleccionar";
+  botonSeleccionar.addEventListener("click", () => {
+    iniciarSeleccionCoordenadaPaso(paso, guardarYRedibujar);
+  });
+
+  filaSeleccionar.append(botonSeleccionar);
+
+  if (tieneCoordenada && paso.coordUbicacion === "absoluta") {
+    const botonProbar = document.createElement("button");
+    botonProbar.className = "ui-btn popup-extra-probar";
+    botonProbar.textContent = "▶ Probar";
+    botonProbar.title = "Mover mouse a coordenada";
+    botonProbar.addEventListener("click", () => {
+      invoke("probar_coordenada", {
+        ubicacion: paso.coordUbicacion,
+        modoVentana: paso.coordModoVentana,
+        puntoReferencia: paso.coordPuntoReferencia,
+        x: paso.coordX,
+        y: paso.coordY,
+      }).catch(() => {});
+    });
+
+    filaSeleccionar.append(botonProbar);
+  }
+
+  if (tieneCoordenada) {
+    const botonEliminar = document.createElement("button");
+    botonEliminar.className = "ui-btn popup-extra-eliminar";
+    botonEliminar.textContent = "✕";
+    botonEliminar.title = "Eliminar coordenada";
+    botonEliminar.addEventListener("click", () => {
+      paso.coordX = null;
+      paso.coordY = null;
+      paso.coordNota = "";
+      paso.coordAplicacion = "";
+
+      guardarYRedibujar();
+    });
+
+    filaSeleccionar.append(botonEliminar);
+  }
+
+  contenedor.append(filaSeleccionar);
+
+  if (tieneCoordenada) {
+    contenedor.append(crearBoxResumenCoordenadaPaso(paso));
+  }
+
+  return contenedor;
+}
+
+// Mismo box informativo que crearBoxResumenCoordenada en
+// comp_popup_coordenada.ts (Nota → Grupo → Tipo → Medido en →
+// Medido desde → X/Y), operando sobre los campos planos coord*
+// del paso en vez de FilaPerfil["coordenada"].
+function crearBoxResumenCoordenadaPaso(paso: PasoMacro): HTMLElement {
+  const box = document.createElement("div");
+
+  box.className = "popup-caja-interna popup-coordenada-resumen";
+
+  if (paso.coordNota) {
+    const nota = document.createElement("div");
+    nota.className = "popup-coordenada-resumen-nota";
+    nota.textContent = paso.coordNota;
+    box.append(nota);
+  }
+
+  if (paso.coordAplicacion) {
+    box.append(crearLineaResumen("Grupo", paso.coordAplicacion));
+  }
+
+  box.append(
+    crearLineaResumen("Tipo", textoUbicacionCoordenada(paso.coordUbicacion)),
   );
 
   if (paso.coordUbicacion === "relativa_ventana") {
-    const caja = document.createElement("div");
-
-    caja.className = "popup-caja-interna";
-
-    const modoOpciones: { texto: string; valor: ModoVentanaPasoMacro }[] = [
-      { texto: "Píxeles", valor: "pixeles" },
-      { texto: "Porcentaje", valor: "porcentaje" },
-    ];
-
-    caja.append(
-      crearFilaPopup(
-        "Método de Medición",
-        crearGrupoOpciones(modoOpciones, paso.coordModoVentana, (valor) => {
-          paso.coordModoVentana = valor;
-
-          paso.coordPuntoReferencia = "sup_izq";
-          paso.coordX = null;
-          paso.coordY = null;
-
-          guardarYRedibujar();
-        }),
+    box.append(
+      crearLineaResumen(
+        "Medido en",
+        textoModoVentanaCoordenada(paso.coordModoVentana),
       ),
     );
 
     if (paso.coordModoVentana === "pixeles") {
-      const puntoOpciones: {
-        texto: string;
-        valor: PuntoReferenciaPasoMacro;
-      }[] = [
-        { texto: "Sup-Izq", valor: "sup_izq" },
-        { texto: "Sup-Der", valor: "sup_der" },
-        { texto: "Centro", valor: "centro" },
-        { texto: "Inf-Izq", valor: "inf_izq" },
-        { texto: "Inf-Der", valor: "inf_der" },
-      ];
-
-      caja.append(
-        crearFilaPopup(
-          "Punto de Referencia",
-          crearGrupoOpciones(
-            puntoOpciones,
-            paso.coordPuntoReferencia,
-            (valor) => {
-              paso.coordPuntoReferencia = valor;
-
-              paso.coordX = null;
-              paso.coordY = null;
-
-              guardarYRedibujar();
-            },
-            "popup-grupo-grid3",
-          ),
+      box.append(
+        crearLineaResumen(
+          "Medido desde",
+          textoPuntoReferencia(paso.coordPuntoReferencia),
         ),
       );
     }
-
-    contenedor.append(caja);
   }
 
-  contenedor.append(crearSeparador());
+  const filaXY = document.createElement("div");
+  filaXY.className = "popup-coordenada-resumen-linea";
+  filaXY.append(
+    crearLineaResumenXY("X", paso.coordX),
+    crearLineaResumenXY("Y", paso.coordY),
+  );
+  box.append(filaXY);
 
-  const botonCapturar = document.createElement("button");
+  return box;
+}
 
-  botonCapturar.className = "ui-btn popup-extra-capturar";
+// Un sondeo activo por paso como máximo — mismo criterio que
+// intervalosSeleccionActivos en comp_popup_coordenada.ts, acá
+// indexado por referencia de paso (PasoMacro no tiene id propio).
+const intervalosSeleccionCoordenadaPaso = new WeakMap<
+  PasoMacro,
+  ReturnType<typeof setInterval>
+>();
 
-  const textoCapturarActual = (): string => {
-    if (paso.coordX === null || paso.coordY === null) {
-      return "📌 Capturar Coordenada";
-    }
+function iniciarSeleccionCoordenadaPaso(
+  paso: PasoMacro,
+  guardarYRedibujar: () => void,
+): void {
+  const anterior = intervalosSeleccionCoordenadaPaso.get(paso);
 
-    if (
-      paso.coordUbicacion === "relativa_ventana" &&
-      paso.coordModoVentana === "porcentaje"
-    ) {
-      return `📌 H: ${paso.coordX}%, V: ${paso.coordY}%`;
-    }
+  if (anterior !== undefined) {
+    clearInterval(anterior);
+  }
 
-    return `📌 X: ${paso.coordX}, Y: ${paso.coordY}`;
-  };
-
-  botonCapturar.textContent = textoCapturarActual();
-
-  botonCapturar.addEventListener("click", () => {
-    invoke("abrir_ventana_captura_coordenada", {
-      ubicacion: paso.coordUbicacion,
-      modoVentana: paso.coordModoVentana,
-      puntoReferencia: paso.coordPuntoReferencia,
-    }).catch((error) => {
-      console.error("abrir_ventana_captura_coordenada FALLÓ:", error);
-    });
-
-    const intervalo = setInterval(() => {
-      invoke<[number, number] | null>("obtener_resultado_coordenada")
-        .then((resultado) => {
-          if (!resultado) {
-            return;
-          }
-
-          clearInterval(intervalo);
-
-          paso.coordX = resultado[0];
-          paso.coordY = resultado[1];
-
-          guardarYRedibujar();
-        })
-        .catch(() => {
-          clearInterval(intervalo);
-        });
-    }, 200);
+  invoke("abrir_ventana_coordenadas").catch((error) => {
+    console.error("abrir_ventana_coordenadas FALLÓ:", error);
   });
 
-  contenedor.append(botonCapturar);
+  const intervalo = setInterval(() => {
+    invoke<CoordenadaBancoJson | null>("obtener_seleccion_coordenada_banco")
+      .then((resultado) => {
+        if (!resultado) {
+          return;
+        }
 
-  return contenedor;
+        const elegida = coordenadaBancoAPerfil(
+          convertirCoordenadaBanco(resultado),
+        );
+
+        paso.coordNota = elegida.nota;
+        paso.coordAplicacion = elegida.aplicacion;
+        paso.coordUbicacion = elegida.ubicacion;
+        paso.coordModoVentana = elegida.modoVentana;
+        paso.coordPuntoReferencia = elegida.puntoReferencia;
+        paso.coordX = elegida.x;
+        paso.coordY = elegida.y;
+
+        guardarYRedibujar();
+      })
+      .catch(() => {
+        clearInterval(intervalo);
+        intervalosSeleccionCoordenadaPaso.delete(paso);
+      });
+  }, 200);
+
+  intervalosSeleccionCoordenadaPaso.set(paso, intervalo);
 }
 
 // ======================================================

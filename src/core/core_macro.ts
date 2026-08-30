@@ -243,6 +243,14 @@ export interface PasoMacro {
 
   coordY: number | null;
 
+  // Nota/Grupo (antes "App") copiados de la CoordenadaBanco al
+  // momento de seleccionar (mismo criterio que CoordenadaPerfil.
+  // nota/aplicacion en core_coordenada.ts) — solo para mostrar en
+  // el box informativo del popup, no en vivo contra el gestor.
+  coordNota: string;
+
+  coordAplicacion: string;
+
   // Solo relevante cuando tipo === "pegar". Misma ruta sirve
   // para un fijado del Portapapeles (con "copiar ruta") o
   // cualquier archivo del disco — back_portapapeles::pegar()
@@ -308,6 +316,10 @@ export function crearPasoMacro(tipo: TipoPasoMacro): PasoMacro {
     coordX: null,
 
     coordY: null,
+
+    coordNota: "",
+
+    coordAplicacion: "",
 
     pegarRuta: null,
 

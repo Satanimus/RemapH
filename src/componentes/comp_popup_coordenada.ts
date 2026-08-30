@@ -246,7 +246,7 @@ function crearSeparador(): HTMLElement {
 // textoExtraTeclaMouse para el tooltip).
 // ======================================================
 
-function crearLineaResumen(titulo: string, valor: string): HTMLElement {
+export function crearLineaResumen(titulo: string, valor: string): HTMLElement {
   const linea = document.createElement("div");
 
   linea.className = "popup-coordenada-resumen-linea";
@@ -315,7 +315,7 @@ function crearBoxResumenCoordenada(
   return box;
 }
 
-function crearLineaResumenXY(
+export function crearLineaResumenXY(
   eje: "X" | "Y",
   valor: number | null,
 ): HTMLElement {
@@ -352,10 +352,7 @@ function crearLineaResumenXY(
 // Un sondeo activo por fila como máximo — si se hace click en
 // Seleccionar/Cambiar de nuevo (misma fila) mientras ya había uno
 // corriendo, se corta el anterior antes de abrir uno nuevo.
-const intervalosSeleccionActivos = new Map<
-  string,
-  ReturnType<typeof setInterval>
->();
+const intervalosSeleccionActivos = new Map<string, ReturnType<typeof setInterval>>();
 
 function iniciarSeleccion(
   contexto: ContextoFila,

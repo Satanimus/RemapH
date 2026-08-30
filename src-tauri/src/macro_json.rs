@@ -73,8 +73,11 @@ impl MacroArchivoJson {
 //   mouse (sin click). coord_posicion_inicial es única y
 //   excluyente: en true ignora el resto de estos campos y usa
 //   la posición del mouse al inicio de la ejecución de la
-//   macro. Sin post_accion (no aplica desacoplado de una
-//   tecla, a diferencia de CoordenadaJson).
+//   macro. coord_nota/coord_aplicacion son copia informativa de
+//   la CoordenadaBanco elegida (mismo criterio que CoordenadaJson
+//   en perfil_json.rs) — no se usan al ejecutar, solo para el
+//   resumen del editor. Sin post_accion (no aplica desacoplado de
+//   una tecla, a diferencia de CoordenadaJson).
 //
 // pegar_ruta: solo cuando tipo == "pegar". Misma ruta sirve
 //   para un fijado del Portapapeles, cualquier archivo del
@@ -126,6 +129,10 @@ pub struct PasoMacroJson {
     pub coord_x: Option<f64>,
 
     pub coord_y: Option<f64>,
+
+    pub coord_nota: String,
+
+    pub coord_aplicacion: String,
 
     pub pegar_ruta: Option<String>,
 
