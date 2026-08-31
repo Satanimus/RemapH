@@ -596,11 +596,15 @@ function crearPanelInicioGrabacion(
   contenedor.append(
     crearFilaPopup(
       "Tipo de Coordenada:",
-      crearGrupoOpciones(OPCIONES_TIPO_COORDENADA, estado.tipoCoordenada, (valor) => {
-        estado.tipoCoordenada = valor;
+      crearGrupoOpciones(
+        OPCIONES_TIPO_COORDENADA,
+        estado.tipoCoordenada,
+        (valor) => {
+          estado.tipoCoordenada = valor;
 
-        onCambiar();
-      }),
+          onCambiar();
+        },
+      ),
     ),
   );
 
@@ -803,6 +807,19 @@ function montarEditor(
   // a la vez.
   let idMenuAbierto: string | null = null;
 
+  // Etapa B: toggle de la columna Opciones — expande/contrae el
+  // ancho de esa columna en header + todas las filas a la vez. El
+  // ancho de columna se recalcula solo (Grid `auto`, ver
+  // .popup-macro-editor-columna-derecha) al cambiar el contenido de
+  // la celda opciones de cada fila — no requiere ningún selector CSS
+  // propio. Mismo criterio "solo un desplegable a la vez" que
+  // idMenuAbierto.
+  let opcionesExpandido = false;
+
+  // Ids de paso con previsualización (⊙) activa — mismo patrón que
+  // idsPrevisualizados en vent_coordenadas_main.ts.
+  const idsPreviosMacro = new Set<string>();
+
   // Etapa G: popup de inicio de Grabación (Modo de Coordenadas /
   // Tiempos de espera, Reglas 2/3) anidado bajo el botón "Grabar
   // Macro" del panel Funciones — mismo criterio de "solo un
@@ -847,14 +864,6 @@ function montarEditor(
   // de un click a otro. Tras el primer dibujado se fuerza left/top
   // explícitos (más abajo) en vez de dejar que se recalcule.
   let posicionYaAjustada = false;
-
-  // Ids de los pasos actualmente en "modo Mover" — espejo propio del
-  // Set `seleccionadas` que vive DENTRO de controladorArrastre, porque
-  // ese controlador se destruye y recrea en cada dibujar(). Guarda
-  // TODA la selección (no solo la fila inicial) para que arrastres y
-  // movimientos con flecha, que disparan redibujar() vía onReordenar,
-  // restauren el grupo completo en el controlador nuevo.
-  let idsPasosEnModoMover: string[] = [];
 
   // Limpieza del listener "click afuera" (más abajo, en dibujar())
   // del redibujado ANTERIOR — cada dibujar() con una caja anidada
@@ -918,7 +927,9 @@ function montarEditor(
   // ya agregado a la tabla) y cierra la ventana overlay.
   // ----------------------------------
 
-  async function finalizarGrabacion(config: ConfigInicioGrabacion): Promise<void> {
+  async function finalizarGrabacion(
+    config: ConfigInicioGrabacion,
+  ): Promise<void> {
     try {
       const eventos = await invoke<EventoGrabadoUI[]>(
         "tomar_eventos_grabacion_macro",
@@ -1136,6 +1147,24 @@ function montarEditor(
       const rectInicial = contenedorPopup.getBoundingClientRect();
       const xInicial = eventoInicial.clientX;
       const yInicial = eventoInicial.clientY;
+
+      // El popup pudo quedar anclado por right/bottom (en vez de
+      // left/top) si mostrarPopupFijo lo pegó al borde de la
+      // ventana al abrirse (ajustarPosicionDentroDeVentana). Fijar
+      // left/top explícitos ahora, antes de tocar el tamaño, evita
+      // que un ancho/alto creciente “tire” del borde opuesto (el
+      // que sigue anclado por right/bottom) y el popup parezca
+      // crecer para el lado contrario al arrastrado. Se actualiza
+      // también posicionX/posicionY (mismo criterio que el resize
+      // por w/n más abajo) para que el próximo redibujar() no
+      // vuelva a escribir la posición de apertura original.
+      posicionX = rectInicial.left;
+      posicionY = rectInicial.top;
+
+      contenedorPopup.style.left = `${posicionX}px`;
+      contenedorPopup.style.top = `${posicionY}px`;
+      contenedorPopup.style.right = "";
+      contenedorPopup.style.bottom = "";
 
       const alMover = (eventoMover: MouseEvent): void => {
         const deltaX = eventoMover.clientX - xInicial;
@@ -1499,6 +1528,35 @@ function montarEditor(
   }
 
   // ----------------------------------
+  // ⁝ TOGGLE DE LA COLUMNA OPCIONES (Etapa B)
+  // ----------------------------------
+
+  function alternarOpciones(): void {
+    opcionesExpandido = !opcionesExpandido;
+    idMenuAbierto = null;
+    idPasoExpandido = null;
+    grabacionInicioAbierto = false;
+    estadoInicioGrabacion = null;
+
+    redibujar();
+  }
+
+  async function cerrarPreviosMacro(): Promise<void> {
+    if (idsPreviosMacro.size === 0) {
+      return;
+    }
+
+    const ids = Array.from(idsPreviosMacro);
+    idsPreviosMacro.clear();
+
+    await Promise.all(
+      ids.map((id) =>
+        invoke("cerrar_ventana_preview_coordenada", { id }).catch(() => {}),
+      ),
+    );
+  }
+
+  // ----------------------------------
   // 🚪 CIERRE DEL EDITOR
   // ------------------------------------------------------
   // Ya NO se dispara por click afuera (el popup es fijo, ver
@@ -1508,6 +1566,8 @@ function montarEditor(
   // ----------------------------------
 
   function cerrarEditor(): void {
+    void cerrarPreviosMacro();
+
     if (controladorArrastre) {
       controladorArrastre.destruir();
 
@@ -1536,16 +1596,6 @@ function montarEditor(
 
   function dibujar(): void {
     if (controladorArrastre) {
-      // Capturar la selección completa ANTES de destruir — incluye
-      // todas las filas del grupo (selección múltiple con Ctrl),
-      // no solo idsPasosEnModoMover que puede quedar desactualizado
-      // entre un Ctrl+click y el siguiente redibujo.
-      const seleccionActual = controladorArrastre.obtenerSeleccionadas();
-
-      if (seleccionActual.length > 0) {
-        idsPasosEnModoMover = seleccionActual;
-      }
-
       controladorArrastre.destruir();
 
       controladorArrastre = null;
@@ -1558,7 +1608,7 @@ function montarEditor(
     );
     let anchoGuardado: string | null = null;
     let altoGuardado: string | null = null;
-    let colExtraGuardado: string | null = null;
+    let colNotaGuardado: string | null = null;
 
     if (popupPrevio) {
       const rect = popupPrevio.getBoundingClientRect();
@@ -1590,8 +1640,8 @@ function montarEditor(
     );
 
     if (colDerechaPrevio) {
-      colExtraGuardado =
-        colDerechaPrevio.style.getPropertyValue("--col-extra-width");
+      colNotaGuardado =
+        colDerechaPrevio.style.getPropertyValue("--col-nota-width");
     }
 
     // Preservar la posición de scroll de la lista de pasos (spec
@@ -1669,12 +1719,9 @@ function montarEditor(
     // del editor (spec F3) — los resizers del encabezado (F2) y las
     // celdas de cada fila de paso (Etapa 7) leen las mismas variables,
     // así quedan sincronizados sin duplicar el ancho en dos lugares.
-    columnaDerecha.style.setProperty("--col-asa-width", "28px");
-    columnaDerecha.style.setProperty("--col-numero-width", "32px");
-    columnaDerecha.style.setProperty("--col-tipo-width", "40px");
     columnaDerecha.style.setProperty(
-      "--col-extra-width",
-      colExtraGuardado ?? "260px",
+      "--col-nota-width",
+      colNotaGuardado ?? "160px",
     );
 
     columnaDerecha.append(crearEncabezadoColumnas(columnaDerecha));
@@ -1704,6 +1751,9 @@ function montarEditor(
           programaFiltroApp,
           idPasoExpandido,
           idMenuAbierto,
+          opcionesExpandido,
+          alternarOpciones,
+          idsPreviosMacro,
           (nuevoId) => {
             // Solo un popup anidado (Opción/Tipo/Extra/Grabación) puede
             // estar abierto a la vez en todo el editor (spec punto 3 +
@@ -1726,25 +1776,6 @@ function montarEditor(
           guardarYRedibujar,
           guardarSinRedibujar,
           redibujar,
-          (idPasoAMover) => {
-            idMenuAbierto = null;
-
-            // Se guarda acá (además de aplicarse al controlador
-            // vigente) porque cada dibujar() destruye y recrea
-            // controladorArrastre desde cero (con su Set de
-            // seleccionadas vacío) — sin este registro propio, el
-            // modo Mover se perdía en el primer redibujado posterior
-            // (spec punto 4: "al presionarlas se sale del modo
-            // mover"), por ejemplo el que dispara moverGrupoConFlecha
-            // al mover con las flechas. Se restaura más abajo, justo
-            // después de crear el controlador nuevo.
-            idsPasosEnModoMover = [idPasoAMover];
-
-            // El controlador se reasigna en cada dibujar() — se lee
-            // en el momento del click (no se captura antes), porque
-            // para entonces ya está montado y registrado más abajo.
-            controladorArrastre?.activarModoMoverPara(idPasoAMover);
-          },
         ),
       );
     });
@@ -1784,14 +1815,6 @@ function montarEditor(
     }
 
     mostrarPopupFijo(popup, posicionX, posicionY);
-
-    // Posiciona las líneas divisorias verticales de cada fila
-    // (.popup-macro-editor-divisor) MIDIENDO el layout real ya
-    // aplicado — recién ahora el popup está en el DOM y tiene
-    // tamaño real. rAF: el navegador necesita un frame para aplicar
-    // el layout tras la inserción antes de que getBoundingClientRect
-    // devuelva valores útiles.
-    requestAnimationFrame(() => sincronizarDivisoresColumnaDerecha(columnaDerecha));
 
     // Solo la PRIMERA vez se deja que ajustarPosicionDentroDeVentana
     // (dentro de mostrarPopupFijo) decida entre left/right y
@@ -1889,24 +1912,7 @@ function montarEditor(
           redibujar();
         }, 0);
       },
-      onSalirModoMover: () => {
-        // Limpiar el espejo propio (spec punto 4) — si no se hace
-        // acá, el próximo redibujado (por cualquier otro motivo)
-        // volvería a activar el modo Mover sobre estas filas aunque
-        // el usuario ya haya salido explícitamente (click afuera,
-        // Escape). No hace falta redibujar: salirModoMover ya
-        // limpió las clases de selección directamente sobre el DOM
-        // existente.
-        idsPasosEnModoMover = [];
-      },
     });
-
-    // Restaurar el modo Mover tras recrear el controlador (spec
-    // punto 4) — ver comentario en la declaración de
-    // idPasoEnModoMover más arriba. Debe ir DESPUÉS de
-    // crearControladorArrastre (activarModoMoverPara necesita que
-    // la fila ya esté registrada, lo que ocurre más abajo) — se
-    // repite acá también tras registrar filas, tal como estaba.
 
     lista.querySelectorAll<HTMLElement>("[data-paso-id]").forEach((fila) => {
       const idPaso = fila.dataset.pasoId!;
@@ -1917,31 +1923,6 @@ function montarEditor(
         controladorArrastre!.registrarFila(idPaso, fila, asa);
       }
     });
-
-    // Recién acá, con todas las filas ya registradas, se puede
-    // restaurar el modo Mover en el controlador nuevo (spec punto
-    // 4). Se restauran TODOS los ids del grupo, filtrando los que
-    // ya no existan (el paso pudo haberse eliminado mientras estaba
-    // seleccionado). El primero usa activarModoMoverPara (reemplaza
-    // la selección); los adicionales usan seleccionarAdicional para
-    // sumar al grupo sin borrar lo anterior.
-    const idsRestaurados = idsPasosEnModoMover.filter((id) =>
-      macroArchivo.pasos.some((p) => idDePaso(p) === id),
-    );
-
-    if (idsRestaurados.length > 0) {
-      // El primero activa el modo Mover (reemplaza cualquier selección).
-      controladorArrastre.activarModoMoverPara(idsRestaurados[0]);
-
-      // Los adicionales se agregan a la selección existente.
-      idsRestaurados.slice(1).forEach((id) => {
-        controladorArrastre!.seleccionarAdicional(id);
-      });
-
-      idsPasosEnModoMover = idsRestaurados;
-    } else {
-      idsPasosEnModoMover = [];
-    }
 
     // Cerrar el popup anidado abierto (Opción/Tipo/Extra/Grabación —
     // spec punto 3 + Etapa G, solo una instancia a la vez) al hacer
@@ -1972,7 +1953,7 @@ function montarEditor(
 
       const cerrarAlClickFuera = (evento: MouseEvent): void => {
         const menuAbierto = popup.querySelector<HTMLElement>(
-          ".popup-lista, .popup-macro-editor-menu-asa, .popup-macro-editor-detalle, .popup-macro-grabacion-grupo[data-abierto='true']",
+          ".popup-lista, .popup-macro-editor-detalle, .popup-macro-grabacion-grupo[data-abierto='true']",
         );
 
         if (menuAbierto && !menuAbierto.contains(evento.target as Node)) {
@@ -2010,11 +1991,10 @@ function montarEditor(
 // 📐 ENCABEZADO DE COLUMNAS (# · ⁝ · Tipo · Extra · Nota)
 // ------------------------------------------------------
 // Fila fija arriba de la lista de pasos (spec punto 10). Único
-// separador arrastrable: entre Extra y Nota (spec: "las demás
-// columnas tendrán ancho fijo", "la flexible será la columna
-// Nota"). Arrastrarlo ajusta --col-extra-width — Nota (flex:1
-// en CSS) se acomoda sola al espacio que sobra, sin variable
-// propia.
+// separador arrastrable: entre Extra y Nota. Numero/Opciones/Tipo
+// miden su ancho solos (grid auto), Extra es la flexible (1fr) y
+// Nota es la única columna de ancho fijo, controlada por
+// --col-nota-width — ver .popup-macro-editor-columna-derecha.
 // ======================================================
 
 const COLUMNAS_ENCABEZADO: { nombre: string; etiqueta: string }[] = [
@@ -2031,19 +2011,6 @@ function crearEncabezadoColumnas(columnaDerecha: HTMLElement): HTMLElement {
   encabezado.className = "popup-macro-editor-header";
 
   COLUMNAS_ENCABEZADO.forEach((columna) => {
-    // Celda fantasma del ancho del Marcador — SIEMPRE antes de
-    // "Extra" (exista o no la columna Marcador en las filas), para
-    // que el título "Extra" arranque en la misma X que el texto del
-    // botón de acción de cada fila. Ver .popup-macro-col-header
-    // [data-columna="extra"] (resta este mismo ancho vía calc()).
-    if (columna.nombre === "extra") {
-      const espacioMarcador = document.createElement("div");
-
-      espacioMarcador.className = "popup-macro-col-header-marcador";
-
-      encabezado.append(espacioMarcador);
-    }
-
     const celda = document.createElement("div");
 
     celda.className = "popup-macro-col-header";
@@ -2074,7 +2041,9 @@ function crearResizerColumna(columnaDerecha: HTMLElement): HTMLElement {
   // entra y la celda se ve forzada a un ancho mayor al pedido.
   const ANCHO_MINIMO_EXTRA = 26;
 
-  const variable = "--col-extra-width";
+  // Etapa D: el resizer ahora escribe --col-nota-width en vez de
+  // --col-extra-width — Extra (1fr) se ajusta solo con lo que sobre.
+  const variable = "--col-nota-width";
 
   resizer.addEventListener("mousedown", (eventoInicial) => {
     eventoInicial.preventDefault();
@@ -2085,15 +2054,12 @@ function crearResizerColumna(columnaDerecha: HTMLElement): HTMLElement {
 
     const xInicial = eventoInicial.clientX;
 
-    // [FIX] Techo faltante: --col-extra-width no tenía límite
-    // superior — arrastrar el resizer hacia la derecha podía
-    // agrandar Extra sin fin, empujando Nota a 0 y sacando la
-    // columna entera fuera de la ventana visible. Se limita al
-    // ancho real disponible de la fila en este momento (medido, no
-    // supuesto) menos un mínimo razonable para que Nota (flex:1)
-    // siempre conserve algo de espacio utilizable.
+    // Piso mínimo de Nota, para que siga siendo legible/editable.
     const ANCHO_MINIMO_NOTA = 60;
 
+    // Techo de Nota: el ancho real disponible de la fila en este
+    // momento (medido, no supuesto) menos el mínimo de Extra, para
+    // que Extra (1fr) nunca quede sin espacio.
     const anchoDisponibleFila = (): number => {
       const filaEjemplo = columnaDerecha.querySelector<HTMLElement>(
         ".popup-macro-editor-paso-fila",
@@ -2105,23 +2071,23 @@ function crearResizerColumna(columnaDerecha: HTMLElement): HTMLElement {
     };
 
     const alMover = (eventoMover: MouseEvent): void => {
-      // El resizer queda a la derecha de Extra: arrastrar hacia la
-      // derecha amplía Extra, hacia la izquierda la encoge.
+      // El resizer es el borde izquierdo de Nota (= borde derecho de
+      // Extra): arrastrar hacia la derecha encoge Nota (y agranda
+      // Extra), hacia la izquierda agranda Nota (y encoge Extra) —
+      // signo invertido respecto del control anterior de Extra.
       const delta = eventoMover.clientX - xInicial;
 
       const anchoMaximo = Math.max(
-        ANCHO_MINIMO_EXTRA,
-        anchoDisponibleFila() - ANCHO_MINIMO_NOTA,
+        ANCHO_MINIMO_NOTA,
+        anchoDisponibleFila() - ANCHO_MINIMO_EXTRA,
       );
 
       const nuevoAncho = Math.min(
         anchoMaximo,
-        Math.max(ANCHO_MINIMO_EXTRA, anchoInicial + delta),
+        Math.max(ANCHO_MINIMO_NOTA, anchoInicial - delta),
       );
 
       columnaDerecha.style.setProperty(variable, `${nuevoAncho}px`);
-
-      sincronizarDivisoresColumnaDerecha(columnaDerecha);
     };
 
     const alSoltar = (): void => {
@@ -2136,54 +2102,6 @@ function crearResizerColumna(columnaDerecha: HTMLElement): HTMLElement {
   return resizer;
 }
 
-// ======================================================
-// 📏 LÍNEAS DIVISORIAS DE COLUMNA (medidas, no calculadas)
-// ------------------------------------------------------
-// Cada .popup-macro-editor-paso-fila lleva 4 <span class="popup-
-// macro-editor-divisor"> intercalados entre sus columnas (ver
-// crearDivisorColumna / crearFilaPaso). Nacen sin left — acá se les
-// mide el borde derecho REAL del hermano anterior
-// (getBoundingClientRect, ya con el layout aplicado) y se posiciona
-// cada línea ahí. Se recalcula: 1) una vez al montar el popup (tras
-// mostrarPopupFijo + rAF), 2) en cada mousemove del resizer de
-// Extra. Nunca se desalinea porque no reproduce ninguna fórmula del
-// layout — sea cual sea el layout real, esto lo sigue.
-// ======================================================
-
-function crearDivisorColumna(): HTMLElement {
-  const divisor = document.createElement("span");
-
-  divisor.className = "popup-macro-editor-divisor";
-
-  return divisor;
-}
-
-function sincronizarDivisoresColumnaDerecha(columnaDerecha: HTMLElement): void {
-  const filas = columnaDerecha.querySelectorAll<HTMLElement>(
-    ".popup-macro-editor-paso-fila",
-  );
-
-  filas.forEach(sincronizarDivisoresFila);
-}
-
-function sincronizarDivisoresFila(fila: HTMLElement): void {
-  const rectFila = fila.getBoundingClientRect();
-
-  const hijos = Array.from(fila.children) as HTMLElement[];
-
-  hijos.forEach((hijo, indice) => {
-    if (!hijo.classList.contains("popup-macro-editor-divisor")) return;
-
-    const anterior = hijos[indice - 1];
-
-    if (!anterior) return;
-
-    const rectAnterior = anterior.getBoundingClientRect();
-
-    hijo.style.left = `${rectAnterior.right - rectFila.left}px`;
-  });
-}
-
 // 📄 FILA DE UN PASO (cerrada o expandida)
 // ======================================================
 
@@ -2196,12 +2114,14 @@ function crearFilaPaso(
   programaFiltroApp: string | null,
   idPasoExpandido: string | null,
   idMenuAbierto: string | null,
+  opcionesExpandido: boolean,
+  alAlternarOpciones: () => void,
+  idsPreviosMacro: Set<string>,
   alternarExpandido: (idPaso: string) => void,
   alternarMenu: (idPaso: string) => void,
   guardarYRedibujar: () => void,
   guardarSinRedibujar: () => void,
   redibujar: () => void,
-  activarModoMover: (idPaso: string) => void,
 ): HTMLElement {
   const idPaso = idDePaso(paso);
 
@@ -2230,31 +2150,79 @@ function crearFilaPaso(
 
   filaPrincipal.append(numero);
 
-  // Línea divisoria numero|asa — ver .popup-macro-editor-divisor en
-  // styl_layout.css y sincronizarDivisoresFila() más abajo (mide la
-  // posición real, no la calcula).
-  filaPrincipal.append(crearDivisorColumna());
+  // ⁝ Opciones — celda real de esa columna del grid (Etapa B):
+  // siempre contiene el botón ⁝ (toggle de columna completa, clic
+  // mantenido lo sigue manejando util_arrastrable.ts directamente
+  // sobre este mismo botón vía su clase) y, si opcionesExpandido,
+  // además X (Eliminar) / ⧉ (Duplicar) / ⊙ (Previsualizar).
+  const celdaOpciones = document.createElement("div");
 
-  // ⁝ Asa — reusa el mismo botón de opciones de fila de ventana
-  // principal (mismo comportamiento de arrastre, con su marcador de
-  // 6 puntos): clic corto abre el popup Mover/Duplicar/Eliminar
-  // (ver crearMenuAsa), clic mantenido lo maneja util_arrastrable.ts
-  // directamente sobre este mismo botón.
+  celdaOpciones.className = "popup-macro-editor-opciones";
+
   const asa = document.createElement("button");
 
   asa.className = "ui-btn popup-macro-editor-asa";
   asa.textContent = "⁝";
   asa.title = "Opciones";
-  asa.dataset.abierto = String(idMenuAbierto === idPaso);
+  asa.dataset.abierto = String(opcionesExpandido);
 
   asa.addEventListener("click", () => {
-    alternarMenu(idPaso);
+    alAlternarOpciones();
   });
 
-  filaPrincipal.append(asa);
+  celdaOpciones.append(asa);
 
-  // Línea divisoria asa|tipo.
-  filaPrincipal.append(crearDivisorColumna());
+  if (opcionesExpandido) {
+    const botonEliminarRapido = document.createElement("button");
+
+    botonEliminarRapido.className = "ui-btn popup-macro-editor-eliminar";
+    botonEliminarRapido.textContent = "X";
+    botonEliminarRapido.title = "Eliminar";
+
+    botonEliminarRapido.addEventListener("click", () => {
+      eliminarPasoMacro(paso, indice, macroArchivo, guardarYRedibujar);
+    });
+
+    celdaOpciones.append(botonEliminarRapido);
+
+    const botonDuplicarRapido = document.createElement("button");
+
+    botonDuplicarRapido.className = "ui-btn";
+    botonDuplicarRapido.textContent = "⧉";
+    botonDuplicarRapido.title = "Duplicar";
+
+    botonDuplicarRapido.addEventListener("click", () => {
+      duplicarPasoMacro(paso, indice, macroArchivo, guardarYRedibujar);
+    });
+
+    celdaOpciones.append(botonDuplicarRapido);
+
+    // ⊙ Previsualizar — Etapa C: solo en filas Tipo === "coordenada",
+    // sin afectar el ancho de columna en las demás (Grid ya reparte
+    // auto tomando el máximo real entre todas).
+    if (paso.tipo === "coordenada") {
+      const botonPreviewRapido = document.createElement("button");
+
+      botonPreviewRapido.className = "ui-btn";
+      botonPreviewRapido.textContent = "⊙";
+      botonPreviewRapido.title = "Previsualizar";
+      botonPreviewRapido.dataset.activo = String(idsPreviosMacro.has(idPaso));
+
+      botonPreviewRapido.addEventListener("click", () => {
+        void alternarPrevisualizacionPaso(
+          paso,
+          idPaso,
+          indice,
+          idsPreviosMacro,
+          redibujar,
+        );
+      });
+
+      celdaOpciones.append(botonPreviewRapido);
+    }
+  }
+
+  filaPrincipal.append(celdaOpciones);
 
   // Tipo — SOLO ÍCONO (spec punto 11/G3). Clic despliega la lista
   // vertical de los 7 tipos in-place (mismo look que abrirPopupTipo
@@ -2280,9 +2248,6 @@ function crearFilaPaso(
 
   filaPrincipal.append(botonTipo);
 
-  // Línea divisoria tipo|extra.
-  filaPrincipal.append(crearDivisorColumna());
-
   // Extra — sin el listado de Tipos (spec punto 11): el resumen de
   // una línea del paso (cerrado) o "editando" mientras está
   // expandido (el detalle real va debajo). La columna Marcador
@@ -2295,9 +2260,9 @@ function crearFilaPaso(
 
   // Columna Marcador — SIEMPRE reserva su espacio (haya o no Bucles
   // en la macro), para que el encabezado "Extra" quede alineado con
-  // el texto de esta celda en todos los casos (ver
-  // .popup-macro-col-header-marcador, que resta el mismo ancho fijo
-  // del lado del título). Cuatro casos:
+  // el texto de esta celda en todos los casos (ver padding-left en
+  // .popup-macro-col-header[data-columna="extra"], que compensa
+  // ese mismo ancho fijo del lado del título). Cuatro casos:
   // 1. Paso Bucle: muestra su propia letra (bucleMarcadorDestino) con
   //    estilo invertido (borde azul, fondo transparente, letra azul).
   // 2. Paso no-Bucle anterior a algún Bucle: muestra círculo ciclable
@@ -2354,10 +2319,6 @@ function crearFilaPaso(
 
   filaPrincipal.append(extra);
 
-  // Línea divisoria extra|nota. Nota es flex:1 y llega sola hasta
-  // el borde derecho real, sin línea propia ahí.
-  filaPrincipal.append(crearDivisorColumna());
-
   // Nota — input de texto plano, letra gris, no se envía al
   // ejecutar (spec punto 11/G4). Guarda con debounce, sin
   // redibujar todo el popup (perdería el foco), mismo criterio que
@@ -2388,25 +2349,6 @@ function crearFilaPaso(
   // Y LISTA VERTICAL DE TIPOS — comparten idMenuAbierto (uno solo
   // desplegado a la vez), distinguidos por prefijo de id.
   // ----------------------------------
-
-  if (idMenuAbierto === idPaso) {
-    // elementoMenu se referencia dentro de cerrarMenuLigero antes de
-    // quedar asignado — seguro porque ese callback solo se invoca
-    // desde un click posterior (ver comentario en crearMenuAsa).
-    let elementoMenu: HTMLElement | undefined;
-
-    elementoMenu = crearMenuAsa(
-      paso,
-      indice,
-      idPaso,
-      macroArchivo,
-      () => alternarMenu(idPaso),
-      () => elementoMenu?.remove(),
-      activarModoMover,
-    );
-
-    contenedor.append(elementoMenu);
-  }
 
   if (tipoAbierto) {
     contenedor.append(
@@ -2596,102 +2538,90 @@ function crearControlMarcador(
   return boton;
 }
 
-// ======================================================
-// ⁝ MENÚ DEL BOTÓN DE OPCIONES (Mover / Duplicar / Eliminar)
-// ------------------------------------------------------
-// Reusa el mismo patrón que el popup de Opciones de fila de
-// ventana principal (comp_popup_abrir.ts): "Mover" activa el modo
-// mover del controlador de arrastre para este paso puntual (sin
-// pasar por el clic mantenido sobre el asa) — a partir de ahí el
-// usuario arrastra con el mouse o mueve con las flechas, igual
-// que con el mantenido. Sin íconos en los botones. "Eliminar" con
-// letra roja y borde rojo al pasar el mouse (clase
-// popup-btn-peligro, Etapa 8).
-// ======================================================
-
-function crearMenuAsa(
+// Etapa B: cuerpo real de Duplicar/Eliminar, reusado por los
+// botones ⧉/X de la columna Opciones (crearFilaPaso).
+function duplicarPasoMacro(
   paso: PasoMacro,
   indice: number,
-  idPaso: string,
   macroArchivo: MacroArchivo,
-  cerrarMenu: () => void,
-  cerrarMenuLigero: () => void,
-  activarModoMover: (idPaso: string) => void,
-): HTMLElement {
-  const menu = document.createElement("div");
+  guardarYRedibujar: () => void,
+): void {
+  const nuevoPaso = clonarPasoMacro(paso);
 
-  menu.className = "popup-lista popup-macro-editor-menu-asa";
+  // Duplicar un Bucle crea un Bucle limpio (spec punto 4): sin la
+  // letra del original — clonarPasoMacro ya la vació — y con una
+  // letra propia nueva, igual que al crear un Bucle desde el
+  // panel Funciones (ver crearPanelFunciones).
+  if (nuevoPaso.tipo === "bucle") {
+    nuevoPaso.bucleMarcadorDestino = letraBucleDisponible(macroArchivo.pasos);
+  }
 
-  // "Mover" NO puede cerrar el menú con un redibujado completo: eso
-  // destruiría y recrearía el controladorArrastre recién activado
-  // (dibujar() lo destruye/reconstruye siempre, ver montarEditor),
-  // perdiendo la selección que activarModoMoverPara acaba de aplicar.
-  // Por eso usa cerrarMenuLigero (solo saca este menú del DOM) en vez
-  // de cerrarMenu (que sí redibuja completo).
-  const botonMover = document.createElement("button");
+  macroArchivo.pasos.splice(indice + 1, 0, nuevoPaso);
 
-  botonMover.className = "ui-btn";
-  botonMover.textContent = "Mover";
+  guardarYRedibujar();
+}
 
-  botonMover.addEventListener("click", () => {
-    activarModoMover(idPaso);
-    cerrarMenuLigero();
-  });
+function eliminarPasoMacro(
+  paso: PasoMacro,
+  indice: number,
+  macroArchivo: MacroArchivo,
+  guardarYRedibujar: () => void,
+): void {
+  // Si se elimina un Bucle, cualquier fila que tenía su letra
+  // de marcador queda huérfana — se limpia para que los círculos
+  // no muestren una letra que ya no existe.
+  if (paso.tipo === "bucle" && paso.bucleMarcadorDestino) {
+    const letra = paso.bucleMarcadorDestino;
 
-  menu.append(botonMover);
+    macroArchivo.pasos.forEach((p) => {
+      if (p.marcador === letra) {
+        p.marcador = null;
+      }
+    });
+  }
 
-  const botonDuplicar = document.createElement("button");
+  macroArchivo.pasos.splice(indice, 1);
 
-  botonDuplicar.className = "ui-btn";
-  botonDuplicar.textContent = "Duplicar";
+  guardarYRedibujar();
+}
 
-  botonDuplicar.addEventListener("click", () => {
-    const nuevoPaso = clonarPasoMacro(paso);
+// Etapa B: ⊙ Previsualizar — mismo mecanismo que alternarPrevisualizacion
+// en vent_coordenadas_main.ts (abrir_ventana_preview_coordenada /
+// cerrar_ventana_preview_coordenada), usando idPaso como id en vez del
+// id de un CoordenadaBanco (el paso de Macro guarda sus campos de
+// coordenada sueltos, no una referencia al banco).
+async function alternarPrevisualizacionPaso(
+  paso: PasoMacro,
+  idPaso: string,
+  indice: number,
+  idsPreviosMacro: Set<string>,
+  redibujar: () => void,
+): Promise<void> {
+  if (idsPreviosMacro.has(idPaso)) {
+    idsPreviosMacro.delete(idPaso);
 
-    // Duplicar un Bucle crea un Bucle limpio (spec punto 4): sin la
-    // letra del original — clonarPasoMacro ya la vació — y con una
-    // letra propia nueva, igual que al crear un Bucle desde el
-    // panel Funciones (ver crearPanelFunciones).
-    if (nuevoPaso.tipo === "bucle") {
-      nuevoPaso.bucleMarcadorDestino = letraBucleDisponible(macroArchivo.pasos);
-    }
+    await invoke("cerrar_ventana_preview_coordenada", { id: idPaso }).catch(
+      () => {},
+    );
 
-    macroArchivo.pasos.splice(indice + 1, 0, nuevoPaso);
+    redibujar();
 
-    guardarConDebounce(macroArchivo);
-    cerrarMenu();
-  });
+    return;
+  }
 
-  menu.append(botonDuplicar);
+  idsPreviosMacro.add(idPaso);
 
-  const botonEliminar = document.createElement("button");
+  await invoke("abrir_ventana_preview_coordenada", {
+    id: idPaso,
+    numero: indice + 1,
+    ubicacion: paso.coordUbicacion,
+    modoVentana: paso.coordModoVentana,
+    puntoReferencia: paso.coordPuntoReferencia,
+    x: paso.coordX,
+    y: paso.coordY,
+  }).catch(() => {});
 
-  botonEliminar.className = "ui-btn popup-btn-peligro";
-  botonEliminar.textContent = "Eliminar";
-
-  botonEliminar.addEventListener("click", () => {
-    // Si se elimina un Bucle, cualquier fila que tenía su letra
-    // de marcador queda huérfana — se limpia para que los círculos
-    // no muestren una letra que ya no existe.
-    if (paso.tipo === "bucle" && paso.bucleMarcadorDestino) {
-      const letra = paso.bucleMarcadorDestino;
-
-      macroArchivo.pasos.forEach((p) => {
-        if (p.marcador === letra) {
-          p.marcador = null;
-        }
-      });
-    }
-
-    macroArchivo.pasos.splice(indice, 1);
-
-    guardarConDebounce(macroArchivo);
-    cerrarMenu();
-  });
-
-  menu.append(botonEliminar);
-
-  return menu;
+  redibujar();
 }
 
 // ======================================================
@@ -2727,7 +2657,7 @@ function crearListaTipoPaso(
 ): HTMLElement {
   const lista = document.createElement("div");
 
-  lista.className = "popup-lista popup-macro-editor-menu-asa";
+  lista.className = "popup-lista popup-macro-editor-lista-tipo";
 
   TIPOS_PASO_MACRO.forEach((tipo) => {
     const boton = document.createElement("button");

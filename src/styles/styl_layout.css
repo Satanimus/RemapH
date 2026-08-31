@@ -963,12 +963,6 @@
   right: 0;
 }
 
-.popup-macro-editor-titulo {
-  margin-bottom: var(--gap8);
-  color: var(--text);
-  font-weight: 600;
-}
-
 /* ======================================================
    🚫 BOTÓN "PELIGRO" (Eliminar — Etapa H1)
    ------------------------------------------------------
@@ -1087,6 +1081,7 @@
   display: flex;
   flex-direction: column;
   gap: var(--gap4);
+  --grid-columnas: auto auto auto 1fr var(--col-nota-width);
 }
 
 .popup-macro-funciones {
@@ -1170,9 +1165,10 @@
 
 .popup-macro-editor-header {
   flex: 0 0 auto;
-  display: flex;
+  position: relative;
+  display: grid;
+  grid-template-columns: var(--grid-columnas);
   align-items: center;
-  gap: var(--gap8);
   /* Mismo padding que .popup-macro-editor-lista (var(--gap4)) +
        .popup-macro-editor-paso (var(--gap4)) sumados, para que las
        columnas de esta fila caigan exactamente en la misma posición
@@ -1190,21 +1186,6 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-}
-
-.popup-macro-col-header[data-columna="numero"] {
-  flex: 0 0 auto;
-  width: var(--col-numero-width);
-}
-
-.popup-macro-col-header[data-columna="asa"] {
-  flex: 0 0 auto;
-  width: var(--col-asa-width);
-}
-
-.popup-macro-col-header[data-columna="tipo"] {
-  flex: 0 0 auto;
-  width: var(--col-tipo-width);
 }
 
 /* Líneas finas verticales entre columnas (numero|asa, asa|tipo,
@@ -1230,42 +1211,19 @@
   background: var(--border-light);
 }
 
-/* Espacio reservado para la columna Marcador (círculo/letra de
-   Bucle) que vive DENTRO de la celda Extra de cada fila, antes del
-   botón de acción — ver .popup-macro-editor-extra. Mismo ancho +
-   gap que .ui-btn.popup-macro-editor-marcador, así el título "Extra"
-   arranca exactamente donde arranca el texto del botón de acción de
-   la fila, esté o no la macro usando Bucles. Se agrega SIEMPRE
-   (aunque la columna Marcador no exista sin Bucles) para que el
-   ancho de "Extra" no dependa de si hay Bucles o no.
-   */
-.popup-macro-col-header-marcador {
-  flex: 0 0 auto;
-  width: 22px;
-  /* El gap del contenedor (--gap8) es el que separa numero/asa/
-       tipo/extra en la fila real. Pero DENTRO de la celda Extra de
-       la fila, marcador↔botón usan --gap4 (.popup-macro-editor-extra).
-       Se corrige acá restando la diferencia del lado derecho de esta
-       celda fantasma para que el próximo gap efectivo sea --gap4. */
-  margin-right: calc(var(--gap4) - var(--gap8));
-}
-
 .popup-macro-col-header[data-columna="extra"] {
-  /* Restar el ancho + gap reservados por
-       .popup-macro-col-header-marcador (22px + gap4, mismo gap que
-       .popup-macro-editor-extra), así el TEXTO "Extra" arranca
-       alineado con el texto del botón de acción de la fila (que va
-       después del marcador dentro de la misma celda flex), no con
-       el borde izquierdo de la celda completa. */
-  width: calc(var(--col-extra-width) - 22px - var(--gap4));
-  min-width: 20px;
-  flex: 0 0 auto;
   text-align: left;
+  /* Compensa el ancho del marcador (22px, ver
+     .popup-macro-editor-marcador/-espacio) + su gap4, para que el
+     título "Extra" arranque en la misma X que el texto del botón
+     de acción real de cada fila (spec punto 11 original). Antes
+     esto lo lograba una celda fantasma extra en el DOM del
+     encabezado — incompatible con Grid (desincroniza el conteo de
+     columnas de --grid-columnas), reemplazada por este padding. */
+  padding-left: calc(22px + var(--gap4));
 }
 
 .popup-macro-col-header[data-columna="nota"] {
-  flex: 1;
-  min-width: 0;
   text-align: left;
 }
 
@@ -1275,12 +1233,17 @@
    styl_tabla.css. Antes el propio elemento de 4px de ancho +
    border-radius se pintaba entero con --border-light, lo que se
    veía como una barra gruesa (fácil de confundir con una barra de
-   scroll) en vez de una línea. */
+   scroll) en vez de una línea.
+   El resizer no es una columna del grid (solo la función de
+   redimensionar Nota para el usuario) — se saca del flujo con
+   position:absolute, anclado al borde entre Extra y Nota, así no
+   suma un ítem de más contra --grid-columnas. */
 .popup-macro-col-resizer {
-  position: relative;
-  flex: 0 0 auto;
+  position: absolute;
+  top: 0;
+  right: calc(var(--col-nota-width) - 4px);
   width: 8px;
-  align-self: stretch;
+  height: 100%;
   cursor: col-resize;
 }
 
@@ -1340,53 +1303,82 @@
 }
 
 .popup-macro-editor-paso-fila {
-  display: flex;
-  /* [FIX] Líneas verticales entre columnas: esto era align-items:
-     center, que no estira los hijos al alto real de la fila. Se
-     deja en stretch (afecta también al alto de los botones, mejora
-     aparte). */
-  align-items: stretch;
-  gap: var(--gap8);
+  display: grid;
+  grid-template-columns: var(--grid-columnas);
   position: relative;
+  /* Etapa E: líneas divisorias nativas del grid — el fondo de la fila
+     es el color de línea (--border-light), asomando solo por el
+     column-gap de 1px; cada celda real tapa ese fondo con el color de
+     fila (ver reglas :where() más abajo), así que no queda visible en
+     ningún otro lado. Cero JS, cero pseudo-elementos. */
+  column-gap: 1px;
+  background: var(--border-light);
 }
 
-/* [FIX RAÍZ, 2 intentos previos fallidos] Las 4 líneas divisorias
-   (numero|asa, asa|tipo, tipo|extra, extra|nota) NO se calculan más
-   con calc() a partir de los anchos de columna — eso replicaba a
-   mano la fórmula real del layout del header (celda fantasma de
-   marcador + margin negativo cancelando su gap, ver crearEncabezado
-   Columnas) y quedaba desalineado apenas algo no cuadraba exacto, y
-   además no tenía techo: --col-extra-width no tiene límite máximo,
-   así que arrastrar el resizer hacia la derecha podía sacar toda la
-   columna de la pantalla.
-   Ahora cada línea es un <span> absoluto vacío (uno por hueco entre
-   columnas, insertados por JS en crearFilaPaso), sin left propio en
-   CSS — su posición X real la fija JS (sincronizarDivisoresFila en
-   comp_popup_macro_editor.ts) MIDIENDO el borde derecho real de la
-   celda anterior con getBoundingClientRect(), exactamente igual que
-   se vería si fuera un border-right normal. No hay fórmula que
-   pueda desalinearse: si el layout cambia, la medición cambia con
-   él. Se recalcula en cada resize del split (mismo listener que ya
-   movía --col-extra-width) y al abrir/expandir cualquier fila. */
-.popup-macro-editor-divisor {
-  position: absolute;
-  top: 0;
-  width: 1px;
-  height: 100%;
-  background: var(--border-light);
-  pointer-events: none;
+/* Etapa E: color de fila (impar) en cada celda real que antes era
+   transparente (dejaba ver el fondo cebreado de .popup-macro-editor-
+   paso "a través" porque .popup-macro-editor-paso-fila no tenía fondo
+   propio) — ahora que sí lo tiene (línea de arriba, el gris de línea
+   divisoria asomando por el column-gap), cada celda debe taparlo con
+   su propio color de fila. Se usa el color SÓLIDO (sin mezclar con
+   transparent) — .popup-macro-editor-paso, debajo, YA aplica la
+   mezcla semitransparente sobre el fondo de la lista; si la celda
+   repitiera color-mix(..., transparent) encima, ambas capas
+   semitransparentes se suman (dos veces 50% ≈ 75% real) y el
+   resultado queda más oscuro/marcado de lo esperado — muy notorio en
+   Nota (fondo transparente en reposo, sin ningún elemento opaco
+   propio que lo disimule) y más sutil en el resto. Tipo, en cambio,
+   no entra en este :where() y solo recibe la capa simple del padre,
+   por eso se veía más claro que las demás — con color sólido acá
+   las cinco columnas quedan con la misma opacidad efectiva. Los
+   botones (asa/tipo/X/⧉/⊙/acción) no entran acá: ya traen su propio
+   fondo opaco vía .ui-btn, con más especificidad. :where() mantiene
+   la especificidad en 1 clase para que las reglas propias de
+   .popup-macro-nota (más abajo en este archivo) sigan ganando en sus
+   estados :hover/:focus. */
+.popup-macro-editor-paso-fila> :where(.popup-macro-editor-numero,
+  .popup-macro-editor-opciones,
+  .popup-macro-editor-extra,
+  .popup-macro-nota) {
+  background: var(--tabla-fondo-color-impar);
+}
+
+.popup-macro-editor-paso:nth-child(even) .popup-macro-editor-paso-fila> :where(.popup-macro-editor-numero,
+  .popup-macro-editor-opciones,
+  .popup-macro-editor-extra,
+  .popup-macro-nota) {
+  background: var(--tabla-fondo-color-par);
+}
+
+.popup-macro-editor-paso:hover .popup-macro-editor-paso-fila> :where(.popup-macro-editor-numero,
+  .popup-macro-editor-opciones,
+  .popup-macro-editor-extra,
+  .popup-macro-nota) {
+  background: var(--tabla-fondo-color-hover);
 }
 
 .popup-macro-editor-asa {
-  flex: 0 0 auto;
-  width: var(--col-asa-width);
   padding: 0;
   cursor: grab;
 }
 
+/* Etapa B7: celda real de la columna Opciones — siempre contiene
+   ⁝ (asa) y, si opcionesExpandido, además X/⧉/⊙ en línea (ver
+   crearFilaPaso). Los botones sin clase de color propia (⧉/⊙)
+   reusan .ui-btn con padding:0, mismo criterio compacto que ya
+   tenía .popup-macro-editor-asa — X ya trae su color propio de
+   .popup-macro-editor-eliminar, existente. */
+.popup-macro-editor-opciones {
+  display: flex;
+  align-items: center;
+  gap: var(--gap4);
+}
+
+.popup-macro-editor-opciones .ui-btn {
+  padding: 0;
+}
+
 .popup-macro-editor-numero {
-  flex: 0 0 auto;
-  width: var(--col-numero-width);
   font-size: var(--fs11);
   color: var(--text-disabled);
   text-align: center;
@@ -1437,9 +1429,28 @@
   pointer-events: none;
 }
 
+/* Etapa E/bug 2: a diferencia de numero/opciones/extra/nota (celdas
+   <div>/<input> normales, tapadas por :where() más arriba), Tipo ES
+   el propio botón (.ui-btn) — .ui-btn trae background:var(--bg)
+   sólido y opaco propio (más especificidad que :where()), que tapaba
+   por completo el cebreado y dejaba la columna con el mismo fondo
+   claro en todas las filas. Repite acá el mismo color sólido de fila
+   que usan las demás celdas, con la especificidad de dos clases
+   (.ui-btn.popup-macro-editor-tipo) necesaria para ganarle al
+   background de .ui-btn base. */
+.ui-btn.popup-macro-editor-tipo {
+  background: var(--tabla-fondo-color-impar);
+}
+
+.popup-macro-editor-paso:nth-child(even) .ui-btn.popup-macro-editor-tipo {
+  background: var(--tabla-fondo-color-par);
+}
+
+.popup-macro-editor-paso:hover .ui-btn.popup-macro-editor-tipo {
+  background: var(--tabla-fondo-color-hover);
+}
+
 .popup-macro-editor-tipo {
-  flex: 0 0 auto;
-  width: var(--col-tipo-width);
   padding: 0;
   font-size: var(--fs16);
 }
@@ -1455,12 +1466,6 @@
 }
 
 .popup-macro-editor-extra {
-  flex: 0 0 auto;
-  width: var(--col-extra-width);
-  /* [FIX] Antes 20px — por debajo del piso real (22px de marcador +
-     su gap4), quedaba desalineado del resizer del header. Ver
-     comentario largo en crearResizerColumna (comp_popup_macro_
-     editor.ts), mismo valor 26px. */
   min-width: 26px;
   display: flex;
   align-items: center;
@@ -1478,54 +1483,25 @@
 }
 
 /* ======================================================
-   🟦 POPUPS ANIDADOS UNIFICADOS (Opción ⋮ / Tipo / Extra —
-   spec punto 3)
-   ------------------------------------------------------
-   Los tres comparten la misma estructura visual: fondo gris
-   (.popup-caja-interna), alineados con el borde izquierdo de la
-   fila (mismo offset que .popup-macro-editor-detalle), y solo uno
-   puede estar abierto a la vez (ver idMenuAbierto/idPasoExpandido
-   en comp_popup_macro_editor.ts). El botón que abrió el popup
-   activo queda con borde cyan mientras dure (data-abierto="true").
-   ====================================================== */
-
-/* ======================================================
-   🟦 POPUPS ANIDADOS UNIFICADOS (Opción ⋮ / Tipo / Extra —
+   🟦 POPUPS ANIDADOS UNIFICADOS (Lista de Tipo / Detalle —
    spec punto 3-4)
    ------------------------------------------------------
-   Los tres comparten la misma estructura visual: fondo gris
-   (.popup-caja-interna), pegados al borde izquierdo real de la
-   fila (bajo la columna #), y solo uno puede estar abierto a la
-   vez (ver idMenuAbierto/idPasoExpandido en
-   comp_popup_macro_editor.ts). El botón que abrió el popup activo
-   queda con borde cyan mientras dure (data-abierto="true").
+   Los dos comparten la misma estructura visual: pegados al borde
+   izquierdo real de la fila (bajo la columna #), llegan hasta el
+   separador Extra↔Nota, y solo uno puede estar abierto a la vez
+   (ver idMenuAbierto/idPasoExpandido en comp_popup_macro_editor.ts).
+   El botón que abrió el popup activo (asa/Tipo/Extra) queda con
+   borde cyan mientras dure (data-abierto="true").
    ------------------------------------------------------
    BUG previo (spec punto 3, "queda a 3/4 del botón Opciones"): acá
-   se declaraba margin-left: calc(--col-asa-width + --col-numero-width)
-   para las tres, pero .popup-lista (styl_botones.css, clase que SOLO
-   llevan Opciones/Tipo) trae margin:0 y styl_botones.css se importa
-   DESPUÉS de este archivo (ver styles.css) — con igual especificidad
-   (una clase), ese margin:0 ganaba la cascada y pisaba el
-   margin-left de acá. Opciones/Tipo terminaban en 0 mientras Extra
-   (sin la clase popup-lista) sí quedaba desplazado. Ahora las tres
-   declaran margin-left: 0 explícito, sin depender del orden de los
-   @import.
+   se declaraba margin-left: calc(--col-asa-width + --col-numero-width),
+   pero .popup-lista (styl_botones.css, clase que lleva la lista de
+   Tipo) trae margin:0 y styl_botones.css se importa DESPUÉS de este
+   archivo (ver styles.css) — con igual especificidad (una clase),
+   ese margin:0 ganaba la cascada y pisaba el margin-left de acá.
+   Ahora se declara margin-left: 0 explícito, sin depender del orden
+   de los @import.
    ====================================================== */
-
-.popup-macro-editor-menu-asa {
-  margin-left: 0;
-  /* Llega desde el borde izquierdo hasta el separador Extra↔Nota
-       (spec punto 4), no hasta el borde derecho de la tabla: mismo
-       ancho acumulado que numero+asa+tipo+extra en la fila real,
-       con sus 3 gaps intermedios (numero↔asa, asa↔tipo, tipo↔extra
-       — .popup-macro-editor-paso-fila usa gap: var(--gap8)). */
-  width: calc(var(--col-numero-width) + var(--col-asa-width) + var(--col-tipo-width) + var(--col-extra-width) + (var(--gap8) * 3));
-  box-sizing: border-box;
-  padding: var(--gap8);
-  background: var(--bg);
-  border: 1px solid var(--border-light);
-  border-radius: var(--r4);
-}
 
 .ui-btn.popup-macro-editor-asa[data-abierto="true"],
 .ui-btn.popup-macro-editor-tipo[data-abierto="true"],
@@ -1542,13 +1518,25 @@
   color: var(--text);
 }
 
+.popup-macro-editor-lista-tipo,
 .popup-macro-editor-detalle {
   margin-left: 0;
-  /* Mismo criterio de ancho que .popup-macro-editor-menu-asa (spec
-       punto 4): llega hasta el separador Extra↔Nota, no hasta el
-       borde derecho de la tabla. */
-  width: calc(var(--col-numero-width) + var(--col-asa-width) + var(--col-tipo-width) + var(--col-extra-width) + (var(--gap8) * 3));
+  /* Mismo criterio de ancho: llega hasta el separador Extra↔Nota
+       (spec punto 4), no hasta el borde derecho de la tabla. Con
+       Grid (.popup-macro-editor-paso-fila sin gap entre columnas),
+       ese ancho es simplemente el total menos la columna Nota. */
+  width: calc(100% - var(--col-nota-width));
   box-sizing: border-box;
+}
+
+.popup-macro-editor-lista-tipo {
+  padding: var(--gap8);
+  background: var(--bg);
+  border: 1px solid var(--border-light);
+  border-radius: var(--r4);
+}
+
+.popup-macro-editor-detalle {
   display: flex;
   flex-direction: column;
   gap: var(--gap8);
@@ -1571,7 +1559,7 @@
    ====================================================== */
 
 .popup-macro-nota {
-  flex: 1;
+  width: var(--col-nota-width);
   min-width: 0;
   height: 28px;
   padding: 0 var(--gap8);
