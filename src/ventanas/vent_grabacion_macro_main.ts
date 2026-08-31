@@ -36,6 +36,10 @@ function iniciar(): void {
   const raiz = document.getElementById("grabacion");
   if (!raiz) return;
 
+  // Arrastrable (spec revisada) — mismo patrón que portapapeles/
+  // menu_express (ver capabilities/grabacion_macro.json).
+  raiz.setAttribute("data-tauri-drag-region", "");
+
   const parametros = new URLSearchParams(window.location.search);
   const tecla = parametros.get("tecla") ?? "";
 

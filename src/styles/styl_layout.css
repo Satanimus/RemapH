@@ -1051,6 +1051,11 @@
   border-color: var(--text-red);
 }
 
+.ui-btn.popup-macro-boton-grabar[data-armada="true"] {
+  color: var(--tag-yellow);
+  border-color: var(--tag-yellow);
+}
+
 .popup-grabar-macro-ms input {
   width: 100%;
   box-sizing: border-box;

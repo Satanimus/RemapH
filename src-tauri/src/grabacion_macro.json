@@ -1,0 +1,10 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "grabacion-macro",
+  "description": "Capability for the macro-recording indicator overlay window (single label, draggable — no resize/positioning otherwise needed)",
+  "windows": ["grabacion_macro"],
+  "permissions": [
+    "core:default",
+    "core:window:allow-start-dragging"
+  ]
+}

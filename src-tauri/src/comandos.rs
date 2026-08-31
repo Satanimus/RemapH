@@ -989,7 +989,7 @@ pub fn obtener_destino_preview_coordenada(id: String) -> Option<(i32, i32)> {
 
 const LABEL_VENTANA_GRABACION_MACRO: &str = "grabacion_macro";
 const MARGEN_GRABACION_MACRO_LOGICO: f64 = 16.0;
-const ANCHO_GRABACION_MACRO_LOGICO: f64 = 220.0;
+const ANCHO_GRABACION_MACRO_LOGICO: f64 = 200.0;
 const ALTO_GRABACION_MACRO_LOGICO: f64 = 40.0;
 
 /// Percent-encoding mínimo para el query param `tecla` (texto libre
@@ -1039,11 +1039,9 @@ pub async fn abrir_ventana_grabacion_macro(
 
     let escala = monitor.scale_factor();
     let pos_monitor = monitor.position();
-    let size_monitor = monitor.size();
 
-    let posicion_x = (pos_monitor.x as f64 + size_monitor.width as f64) / escala
-        - ANCHO_GRABACION_MACRO_LOGICO
-        - MARGEN_GRABACION_MACRO_LOGICO;
+    // Esquina superior IZQUIERDA (spec revisada) — antes iba a la derecha.
+    let posicion_x = pos_monitor.x as f64 / escala + MARGEN_GRABACION_MACRO_LOGICO;
     let posicion_y = pos_monitor.y as f64 / escala + MARGEN_GRABACION_MACRO_LOGICO;
 
     let url = format!(

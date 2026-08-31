@@ -35,6 +35,11 @@ body {
   align-items: center;
   gap: 6px;
   padding: 0 10px;
+  /* Fondo cyan semi-transparente (spec revisada) — llama la
+     atención sobre el escritorio sin tapar del todo lo que hay
+     detrás. La ventana en sí ya es del tamaño exacto del cartel
+     (200x40, ver comandos.rs), así que esto cubre toda la ventana. */
+  background: color-mix(in srgb, var(--tag-cyan) 55%, transparent);
 }
 
 .grabacion-punto {

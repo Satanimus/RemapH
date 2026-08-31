@@ -535,6 +535,7 @@ function atajoCapturaATexto(atajo: AtajoCapturaUI): string {
 function crearBotonGrabarMacro(
   estadoGrabacion: EstadoGrabacionMacro,
   grabacionInicioAbierto: boolean,
+  textoTecla: string | null,
   onClick: () => void,
 ): HTMLElement {
   const boton = document.createElement("button");
@@ -543,9 +544,23 @@ function crearBotonGrabarMacro(
 
   boton.dataset.activo = grabacionInicioAbierto ? "true" : "false";
   boton.dataset.grabando = estadoGrabacion === "activa" ? "true" : "false";
+  boton.dataset.armada = estadoGrabacion === "armada" ? "true" : "false";
 
-  boton.textContent =
-    estadoGrabacion === "activa" ? "🔴 Grabando..." : "🔴 Grabar Macro";
+  // Espejo de la ventana overlay (vent_grabacion_macro_main.ts,
+  // textoEstado): Armada → 🟡 "Presione <tecla> para grabar",
+  // Activa → 🔴 "Presione <tecla> para detener". textoTecla es null
+  // hasta que armarGrabacion() resuelve obtener_tecla_grabar_macro,
+  // así que en ese breve instante (y en reposo) se muestra el texto
+  // genérico de siempre.
+  if (estadoGrabacion === "activa" && textoTecla) {
+    boton.textContent = `🔴 Presione ${textoTecla} para detener`;
+  } else if (estadoGrabacion === "armada" && textoTecla) {
+    boton.textContent = `🟡 Presione ${textoTecla} para grabar`;
+  } else {
+    boton.textContent =
+      estadoGrabacion === "activa" ? "🔴 Grabando..." : "🔴 Grabar Macro";
+  }
+
   boton.disabled = estadoGrabacion === "activa";
 
   boton.addEventListener("click", (eventoClick) => {
@@ -806,6 +821,13 @@ function montarEditor(
   // eventos — null solo cuando no hay ninguna sesión en curso.
   let estadoInicioGrabacion: ConfigInicioGrabacion | null = null;
 
+  // Texto de la tecla toggle configurada (ej. "F9"), obtenido una
+  // vez en armarGrabacion() vía obtener_tecla_grabar_macro — se usa
+  // para que el botón "Grabar Macro" refleje el mismo texto que la
+  // ventana overlay (vent_grabacion_macro_main.ts). null hasta que
+  // esa consulta resuelve, o tras terminar/cancelar la sesión.
+  let textoTeclaGrabacion: string | null = null;
+
   // Formulario inline de renombrar (botón [...] de la barra) — solo
   // uno puede estar abierto a la vez, y reemplaza el nombre de la
   // barra mientras dure.
@@ -833,6 +855,20 @@ function montarEditor(
   // movimientos con flecha, que disparan redibujar() vía onReordenar,
   // restauren el grupo completo en el controlador nuevo.
   let idsPasosEnModoMover: string[] = [];
+
+  // Limpieza del listener "click afuera" (más abajo, en dibujar())
+  // del redibujado ANTERIOR — cada dibujar() con una caja anidada
+  // abierta agregaba su propio par de listeners sin remover el del
+  // redibujado previo, así que al segundo click sobre una opción
+  // (o incluso en el primero, porque armarGrabacion() ya dispara un
+  // redibujado extra tras su invoke) quedaban dos listeners vivos:
+  // el viejo, con su propio popup ya desmontado del DOM en su
+  // clausura, evaluaba el click como "afuera" (el target real vive
+  // en el popup nuevo, no en el desmontado) y cerraba la caja sin
+  // guardar la selección. Se guarda acá la función de limpieza del
+  // ÚLTIMO par registrado para poder removerlo antes de agregar uno
+  // nuevo.
+  let limpiarClickAfueraActual: (() => void) | null = null;
 
   const redibujar = (): void => {
     dibujar();
@@ -902,6 +938,7 @@ function montarEditor(
 
       estadoGrabacion = "inactiva";
       estadoInicioGrabacion = null;
+      textoTeclaGrabacion = null;
 
       guardarYRedibujar();
     }
@@ -924,6 +961,7 @@ function montarEditor(
     estadoGrabacion = "inactiva";
     grabacionInicioAbierto = false;
     estadoInicioGrabacion = null;
+    textoTeclaGrabacion = null;
 
     redibujar();
   }
@@ -975,8 +1013,10 @@ function montarEditor(
     try {
       const atajo = await invoke<AtajoCapturaUI>("obtener_tecla_grabar_macro");
 
+      textoTeclaGrabacion = atajoCapturaATexto(atajo);
+
       await invoke("abrir_ventana_grabacion_macro", {
-        tecla: atajoCapturaATexto(atajo),
+        tecla: textoTeclaGrabacion,
       });
 
       await invoke("armar_grabacion_macro");
@@ -985,6 +1025,7 @@ function montarEditor(
 
       grabacionInicioAbierto = false;
       estadoInicioGrabacion = null;
+      textoTeclaGrabacion = null;
 
       redibujar();
 
@@ -1508,6 +1549,7 @@ function montarEditor(
         estadoGrabacion,
         grabacionInicioAbierto,
         estadoInicioGrabacion,
+        textoTeclaGrabacion,
         alAlternarGrabacionInicio,
         redibujar,
       ),
@@ -1797,10 +1839,18 @@ function montarEditor(
     // dispararse en el mismo click que lo abrió. Se usa capture para
     // interceptar antes que los botones internos (que tienen
     // stopPropagation).
+    // Remover el par de listeners del redibujado anterior ANTES de
+    // registrar el nuevo — ver comentario en la declaración de
+    // limpiarClickAfueraActual más arriba.
+    limpiarClickAfueraActual?.();
+    limpiarClickAfueraActual = null;
+
     if (idMenuAbierto || idPasoExpandido || grabacionInicioAbierto) {
       const cerrarCajasAnidadas = (): void => {
         document.removeEventListener("click", cerrarAlClickFuera, true);
         document.removeEventListener("keydown", cerrarAlEsc, true);
+
+        limpiarClickAfueraActual = null;
 
         idMenuAbierto = null;
         idPasoExpandido = null;
@@ -1835,6 +1885,11 @@ function montarEditor(
         document.addEventListener("click", cerrarAlClickFuera, true);
         document.addEventListener("keydown", cerrarAlEsc, true);
       }, 0);
+
+      limpiarClickAfueraActual = (): void => {
+        document.removeEventListener("click", cerrarAlClickFuera, true);
+        document.removeEventListener("keydown", cerrarAlEsc, true);
+      };
     }
   }
 
@@ -2535,6 +2590,7 @@ function crearPanelFunciones(
   estadoGrabacion: EstadoGrabacionMacro,
   grabacionInicioAbierto: boolean,
   estadoInicioGrabacion: ConfigInicioGrabacion | null,
+  textoTeclaGrabacion: string | null,
   onAlternarGrabacionInicio: () => void,
   onCambiarEstadoInicio: () => void,
 ): HTMLElement {
@@ -2570,6 +2626,7 @@ function crearPanelFunciones(
     crearBotonGrabarMacro(
       estadoGrabacion,
       grabacionInicioAbierto,
+      textoTeclaGrabacion,
       onAlternarGrabacionInicio,
     ),
   );
