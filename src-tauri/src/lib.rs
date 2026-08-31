@@ -6,10 +6,11 @@
 // Inicializa el motor principal.
 // ======================================================
 
+use tauri::Manager;
+
 mod ayuda;
 mod back_app;
 mod back_coordenada;
-mod banco_coordenadas;
 mod back_interception;
 mod back_menu_express;
 mod back_mouse;
@@ -20,6 +21,7 @@ mod back_portapapeles_captura;
 mod back_registro;
 mod back_teclas;
 mod back_windows;
+mod banco_coordenadas;
 mod cache;
 mod captura_coordenada;
 mod comandos;
@@ -90,6 +92,26 @@ pub fn run() {
             // exista la carpeta de usuario, pero no depende de
             // ninguna ventana — se hace apenas arranca.
             configuracion_usuario::cargar_al_iniciar();
+
+            // Al cerrarse la ventana principal ("main"), fuerza el
+            // cierre de cualquier ventana secundaria que siga abierta
+            // (captura, previews, grabación de macro, coordenadas,
+            // menú express, portapapeles, etc.) — evita que el
+            // proceso quede vivo en segundo plano sostenido por una
+            // ventana huérfana.
+            if let Some(ventana_principal) = app.get_webview_window("main") {
+                let handle = app.handle().clone();
+
+                ventana_principal.on_window_event(move |evento| {
+                    if let tauri::WindowEvent::CloseRequested { .. } = evento {
+                        for ventana in handle.webview_windows().values() {
+                            if ventana.label() != "main" {
+                                let _ = ventana.close();
+                            }
+                        }
+                    }
+                });
+            }
 
             Ok(())
         })

@@ -223,7 +223,22 @@
 
     display: flex;
 
-    align-items: center;
+    /* [FIX] Bug (líneas verticales entre columnas): esto era
+       align-items: center. Con "center" el eje transversal de un
+       flex container NO estira a los hijos — cada .cabecera-celda/
+       .celda quedaba con la altura de SU PROPIO contenido (el
+       ícono), no la de la fila entera. El border-right de
+       .celda:not(:last-child) (línea divisoria vertical) heredaba
+       ese mismo alto recortado: por eso solo se veía "por dentro"
+       de la fila, del mismo alto que los iconos, sin llegar a los
+       bordes superior/inferior reales de la fila. "stretch" hace
+       que cada celda ocupe el 100% del alto de la fila (ahora sí
+       coincide con su height:100% ya declarado más abajo), así el
+       borde vertical se dibuja de punta a punta. El centrado
+       vertical del CONTENIDO de cada celda no depende de esto —
+       .cabecera-celda/.celda ya tienen su propio align-items:center
+       para eso. */
+    align-items: stretch;
 
     /* calc, no 100%: el margin-right de respiro (ver abajo) debe
        restarse del ancho, no sumarse afuera — con solo 100% el
@@ -474,7 +489,7 @@
 
 .celda:not(:last-child) {
 
-    border-right: 1px solid color-mix(in srgb, var(--overlay-contraste) 2.5%, transparent);
+    border-right: 1px solid var(--border-light);
 }
 
 .celda.nota-separador {

@@ -138,14 +138,14 @@ use crate::captura_coordenada;
 use crate::compilador::ResultadoCompilacion;
 use crate::config;
 use crate::configuracion_usuario;
+use crate::eventos::{InputId, InputState};
+use crate::grabacion_macro;
 use crate::macro_cache;
 use crate::macro_json::MacroArchivoJson;
 use crate::macro_usuario;
 use crate::macros;
 use crate::motor;
 use crate::perfil;
-use crate::eventos::{InputId, InputState};
-use crate::grabacion_macro;
 use crate::perfil_ui::{
     convertir_atajo_captura, convertir_input_captura, convertir_perfil, AtajoCapturaUI,
     EntradaCapturaUI, EntradaUI, ItemFilaUI, ResultadoPerfil, ResultadoPerfilInicial,
@@ -333,7 +333,10 @@ pub fn compilar_perfil(filas: Vec<ItemFilaUI>) -> Result<ResultadoCompilacion, S
 }
 
 #[tauri::command]
-pub fn guardar_perfil_como(nombre: String, filas: Vec<ItemFilaUI>) -> Result<ResultadoPerfil, String> {
+pub fn guardar_perfil_como(
+    nombre: String,
+    filas: Vec<ItemFilaUI>,
+) -> Result<ResultadoPerfil, String> {
     let perfil = convertir_perfil(filas);
 
     perfil::guardar_perfil_como(nombre, perfil)
@@ -1024,7 +1027,10 @@ pub async fn abrir_ventana_grabacion_macro(
         let _ = existente.close();
 
         for _ in 0..50 {
-            if app.get_webview_window(LABEL_VENTANA_GRABACION_MACRO).is_none() {
+            if app
+                .get_webview_window(LABEL_VENTANA_GRABACION_MACRO)
+                .is_none()
+            {
                 break;
             }
             std::thread::sleep(std::time::Duration::from_millis(20));
@@ -1044,12 +1050,9 @@ pub async fn abrir_ventana_grabacion_macro(
     let posicion_x = pos_monitor.x as f64 / escala + MARGEN_GRABACION_MACRO_LOGICO;
     let posicion_y = pos_monitor.y as f64 / escala + MARGEN_GRABACION_MACRO_LOGICO;
 
-    let url = format!(
-        "grabacion_macro.html?tecla={}",
-        codificar_query(&tecla)
-    );
+    let url = format!("grabacion_macro.html?tecla={}", codificar_query(&tecla));
 
-    WebviewWindowBuilder::new(
+    let ventana_grabacion = WebviewWindowBuilder::new(
         &app,
         LABEL_VENTANA_GRABACION_MACRO,
         WebviewUrl::App(url.into()),
@@ -1066,6 +1069,19 @@ pub async fn abrir_ventana_grabacion_macro(
     .focused(false)
     .build()
     .map_err(|error| error.to_string())?;
+
+    // Mismo bug que abrir_ventana_preview_coordenada (ver comentario
+    // largo ahí): pese a focused(false), Windows activa igual esta
+    // ventana en cuanto se hace mousedown sobre ella para arrastrarla
+    // — y ese primer click se consume para activar la ventana en vez
+    // de llegar como mousedown normal al webview, por eso el arrastre
+    // manual (mousemove/mouseup en vent_grabacion_macro_main.ts)
+    // nunca arrancaba. WS_EX_NOACTIVATE evita que el click la active.
+    // Se aplica sobre la ventana devuelta por el builder (no una
+    // rebúsqueda por label vía get_webview_window) — mismo patrón que
+    // preview_coordenada, sin depender de que el label ya esté
+    // resuelto en el AppHandle en este instante.
+    crate::back_menu_express::desactivar_activacion(&ventana_grabacion);
 
     Ok(())
 }
@@ -1237,8 +1253,13 @@ pub fn probar_coordenada(
     x: f64,
     y: f64,
 ) {
-    let (destino_x, destino_y) =
-        back_coordenada::calcular_destino_valores(&ubicacion, &modo_ventana, &punto_referencia, x, y);
+    let (destino_x, destino_y) = back_coordenada::calcular_destino_valores(
+        &ubicacion,
+        &modo_ventana,
+        &punto_referencia,
+        x,
+        y,
+    );
 
     back_coordenada::mover_cursor(destino_x, destino_y);
 }

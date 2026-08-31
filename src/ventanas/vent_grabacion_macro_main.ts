@@ -15,6 +15,7 @@
 // ======================================================
 
 import { invoke } from "@tauri-apps/api/core";
+import { getCurrentWindow, PhysicalPosition } from "@tauri-apps/api/window";
 
 import { aplicarOverridesApariencia } from "../core/core_apariencia";
 import type { EstadoGrabacionMacro } from "../core/core_grabacion_macro";
@@ -32,13 +33,85 @@ function textoEstado(tecla: string, estado: EstadoGrabacionMacro): string {
   return `Presione ${tecla} para grabar`;
 }
 
+// ======================================================
+// 🖱️ ARRASTRE MANUAL
+// ------------------------------------------------------
+// NO se usa data-tauri-drag-region / startDragging() nativo: mismo
+// bug de Tauri/Tao ya documentado en vent_captura_main.ts (issue
+// #10767) — en Windows el arrastre nativo no es confiable para
+// estas ventanas overlay.
+//
+// El intento anterior calculaba el delta con evento.screenX/screenY
+// (coordenadas del evento del mouse dentro del webview) multiplicado
+// por scaleFactor() — en Webview2/Windows esas coordenadas no
+// siempre están en la misma base física que outerPosition(), lo que
+// hacía que el arrastre no funcionara. Se cambia al mismo patrón que
+// SÍ funciona en el marcador arrastrable de vent_captura_main.ts
+// (activarArrastreMarcador): en cada mousemove se pide el cursor
+// físico real vía el comando obtener_cursor_captura (mismo backend,
+// GetCursorPos) y la ventana se reposiciona directo a esa coordenada
+// menos el offset fijado al mousedown — sin depender de deltas de
+// eventos del webview.
+// ======================================================
+
+function activarArrastre(raiz: HTMLElement): void {
+  const ventana = getCurrentWindow();
+
+  let arrastrando = false;
+  let offsetX = 0;
+  let offsetY = 0;
+
+  const alMover = async (): Promise<void> => {
+    if (!arrastrando) return;
+
+    let cursor: [number, number];
+
+    try {
+      cursor = await invoke<[number, number]>("obtener_cursor_captura");
+    } catch {
+      return;
+    }
+
+    if (!arrastrando) return; // pudo soltarse mientras el invoke estaba en vuelo.
+
+    const [cursorX, cursorY] = cursor;
+
+    void ventana.setPosition(
+      new PhysicalPosition(cursorX - offsetX, cursorY - offsetY),
+    );
+  };
+
+  const alSoltar = (): void => {
+    arrastrando = false;
+
+    document.removeEventListener("mousemove", alMover);
+    document.removeEventListener("mouseup", alSoltar);
+  };
+
+  raiz.addEventListener("mousedown", (evento) => {
+    if (evento.button !== 0) return;
+
+    void (async () => {
+      const [posicion, cursor] = await Promise.all([
+        ventana.outerPosition(),
+        invoke<[number, number]>("obtener_cursor_captura"),
+      ]);
+
+      offsetX = cursor[0] - posicion.x;
+      offsetY = cursor[1] - posicion.y;
+      arrastrando = true;
+
+      document.addEventListener("mousemove", alMover);
+      document.addEventListener("mouseup", alSoltar);
+    })();
+  });
+}
+
 function iniciar(): void {
   const raiz = document.getElementById("grabacion");
   if (!raiz) return;
 
-  // Arrastrable (spec revisada) — mismo patrón que portapapeles/
-  // menu_express (ver capabilities/grabacion_macro.json).
-  raiz.setAttribute("data-tauri-drag-region", "");
+  activarArrastre(raiz);
 
   const parametros = new URLSearchParams(window.location.search);
   const tecla = parametros.get("tecla") ?? "";

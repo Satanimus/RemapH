@@ -208,27 +208,37 @@ interface GrupoAbierto {
 // ======================================================
 // 🚪 CERRAR GRUPO → PASOS
 // ------------------------------------------------------
-// Devuelve, en orden: Espera (si > 0) + Coordenada (si hubo
-// posición capturada) + Tecla/Mouse (Regla 7).
+// Devuelve, en orden: Espera (si > 0 y no es el primer grupo de
+// la sesión) + Coordenada (si hubo posición capturada Y difiere
+// de la última posición ya emitida) + Tecla/Mouse (Regla 7).
 // ======================================================
 
 function cerrarGrupo(
   grupo: GrupoAbierto,
   config: ConfigInicioGrabacion,
-  momentoCierreAnterior: number,
+  momentoCierreAnterior: number | null,
+  omitirCoordenada: boolean,
 ): PasoMacro[] {
   const pasos: PasoMacro[] = [];
 
-  const deltaReal = grupo.momentoApertura - momentoCierreAnterior;
-  const esperaMs = calcularEsperaMs(Math.max(deltaReal, 0), config);
+  // momentoCierreAnterior null == primer grupo de la sesión: se
+  // omite el tiempo entre F9 (arranque real de la grabación,
+  // momento_ms = 0 en grabacion_macro.rs) y la primera tecla —
+  // ese tiempo de "reacción" del usuario no es parte de la macro.
+  if (momentoCierreAnterior !== null) {
+    const deltaReal = grupo.momentoApertura - momentoCierreAnterior;
+    const esperaMs = calcularEsperaMs(Math.max(deltaReal, 0), config);
 
-  if (esperaMs > 0) {
-    const pasoEspera = crearPasoMacro("espera");
-    pasoEspera.esperaMs = esperaMs;
-    pasos.push(pasoEspera);
+    if (esperaMs > 0) {
+      const pasoEspera = crearPasoMacro("espera");
+      pasoEspera.esperaMs = esperaMs;
+      pasos.push(pasoEspera);
+    }
   }
 
-  if (grupo.posicion) {
+  // omitirCoordenada: la posición del mouse es la misma que la del
+  // último paso Coordenada ya agregado — no hace falta repetirla.
+  if (grupo.posicion && !omitirCoordenada) {
     const coordenada = posicionACoordenada(
       grupo.posicion,
       grupo.ventana,
@@ -274,15 +284,50 @@ export function analizarGrabacion(
   const pasos: PasoMacro[] = [];
 
   let grupo: GrupoAbierto | null = null;
-  let momentoCierreAnterior = 0;
+
+  // null == todavía no se cerró ningún grupo (arranque de sesión,
+  // Regla revisada: se omite el tiempo antes del primer paso).
+  let momentoCierreAnterior: number | null = null;
+
+  // Última posición de mouse efectivamente puesta en un paso
+  // Coordenada — null hasta el primer grupo con posición. Se
+  // actualiza siempre que un grupo trae posición, la haya emitido
+  // o no (si es igual a la anterior, "seguir en la misma posición"
+  // no cambia).
+  let ultimaPosicionEmitida: [number, number] | null = null;
+
+  const emitirCierre = (
+    grupoACerrar: GrupoAbierto,
+    momentoCierre: number,
+  ): void => {
+    const posicionIgual =
+      !!grupoACerrar.posicion &&
+      !!ultimaPosicionEmitida &&
+      grupoACerrar.posicion[0] === ultimaPosicionEmitida[0] &&
+      grupoACerrar.posicion[1] === ultimaPosicionEmitida[1];
+
+    pasos.push(
+      ...cerrarGrupo(
+        grupoACerrar,
+        config,
+        momentoCierreAnterior,
+        posicionIgual,
+      ),
+    );
+
+    if (grupoACerrar.posicion) {
+      ultimaPosicionEmitida = grupoACerrar.posicion;
+    }
+
+    momentoCierreAnterior = momentoCierre;
+  };
 
   const cerrar = (): void => {
     if (!grupo) {
       return;
     }
 
-    pasos.push(...cerrarGrupo(grupo, config, momentoCierreAnterior));
-    momentoCierreAnterior = grupo.momentoUltimo;
+    emitirCierre(grupo, grupo.momentoUltimo);
     grupo = null;
   };
 
@@ -342,46 +387,37 @@ export function analizarGrabacion(
     if (grupo && evento.momentoMs - grupo.momentoUltimo <= ventanaComboMs) {
       const modificadores = [...grupo.modificadores, grupo.gatillo];
 
-      pasos.push(
-        ...cerrarGrupo(
-          {
-            modificadores,
-            gatillo: evento.entrada,
-            teclasVivas: [],
-            posicion: grupo.posicion ?? evento.posicion,
-            ventana: grupo.ventana ?? evento.ventana,
-            momentoApertura: grupo.momentoApertura,
-            momentoUltimo: evento.momentoMs,
-          },
-          config,
-          momentoCierreAnterior,
-        ),
+      emitirCierre(
+        {
+          modificadores,
+          gatillo: evento.entrada,
+          teclasVivas: [],
+          posicion: grupo.posicion ?? evento.posicion,
+          ventana: grupo.ventana ?? evento.ventana,
+          momentoApertura: grupo.momentoApertura,
+          momentoUltimo: evento.momentoMs,
+        },
+        evento.momentoMs,
       );
 
-      momentoCierreAnterior = evento.momentoMs;
       grupo = null;
       continue;
     }
 
     cerrar();
 
-    pasos.push(
-      ...cerrarGrupo(
-        {
-          modificadores: [],
-          gatillo: evento.entrada,
-          teclasVivas: [],
-          posicion: evento.posicion,
-          ventana: evento.ventana,
-          momentoApertura: evento.momentoMs,
-          momentoUltimo: evento.momentoMs,
-        },
-        config,
-        momentoCierreAnterior,
-      ),
+    emitirCierre(
+      {
+        modificadores: [],
+        gatillo: evento.entrada,
+        teclasVivas: [],
+        posicion: evento.posicion,
+        ventana: evento.ventana,
+        momentoApertura: evento.momentoMs,
+        momentoUltimo: evento.momentoMs,
+      },
+      evento.momentoMs,
     );
-
-    momentoCierreAnterior = evento.momentoMs;
   }
 
   cerrar();

@@ -1109,6 +1109,106 @@ function montarEditor(
   }
 
   // ----------------------------------
+  // ↔️↕️ ASAS DE REDIMENSIÓN (4 bordes + 4 esquinas)
+  // ------------------------------------------------------
+  // Reemplaza el `resize: both` nativo (solo esquina inferior
+  // derecha). Cada asa mide el rect real ANTES de arrastrar y va
+  // aplicando width/height según la dirección; para los bordes
+  // norte/oeste, además hay que correr left/top para que el borde
+  // opuesto quede fijo — se recalcula con el rect DESPUÉS de
+  // aplicar el tamaño (no con el delta pedido), porque min-width/
+  // max-width/min-height/max-height del CSS pueden recortarlo.
+  // ----------------------------------
+
+  type DireccionRedimension = "n" | "s" | "e" | "w" | "ne" | "nw" | "se" | "sw";
+
+  function activarRedimension(
+    contenedorPopup: HTMLElement,
+    asa: HTMLElement,
+    direccion: DireccionRedimension,
+  ): void {
+    asa.addEventListener("mousedown", (eventoInicial) => {
+      if (eventoInicial.button !== 0) return;
+
+      eventoInicial.preventDefault();
+      eventoInicial.stopPropagation();
+
+      const rectInicial = contenedorPopup.getBoundingClientRect();
+      const xInicial = eventoInicial.clientX;
+      const yInicial = eventoInicial.clientY;
+
+      const alMover = (eventoMover: MouseEvent): void => {
+        const deltaX = eventoMover.clientX - xInicial;
+        const deltaY = eventoMover.clientY - yInicial;
+
+        if (direccion.includes("e")) {
+          contenedorPopup.style.width = `${rectInicial.width + deltaX}px`;
+        }
+
+        if (direccion.includes("w")) {
+          contenedorPopup.style.width = `${rectInicial.width - deltaX}px`;
+        }
+
+        if (direccion.includes("s")) {
+          contenedorPopup.style.height = `${rectInicial.height + deltaY}px`;
+        }
+
+        if (direccion.includes("n")) {
+          contenedorPopup.style.height = `${rectInicial.height - deltaY}px`;
+        }
+
+        if (direccion.includes("w") || direccion.includes("n")) {
+          const rectActual = contenedorPopup.getBoundingClientRect();
+
+          if (direccion.includes("w")) {
+            posicionX = rectInicial.right - rectActual.width;
+            contenedorPopup.style.left = `${posicionX}px`;
+          }
+
+          if (direccion.includes("n")) {
+            posicionY = rectInicial.bottom - rectActual.height;
+            contenedorPopup.style.top = `${posicionY}px`;
+          }
+
+          contenedorPopup.style.right = "";
+          contenedorPopup.style.bottom = "";
+        }
+      };
+
+      const alSoltar = (): void => {
+        document.removeEventListener("mousemove", alMover);
+        document.removeEventListener("mouseup", alSoltar);
+      };
+
+      document.addEventListener("mousemove", alMover);
+      document.addEventListener("mouseup", alSoltar);
+    });
+  }
+
+  function crearRedimensionadores(contenedorPopup: HTMLElement): HTMLElement[] {
+    const direcciones: DireccionRedimension[] = [
+      "n",
+      "s",
+      "e",
+      "w",
+      "ne",
+      "nw",
+      "se",
+      "sw",
+    ];
+
+    return direcciones.map((direccion) => {
+      const asa = document.createElement("div");
+
+      asa.className = `popup-macro-editor-resize popup-macro-editor-resize-${direccion}`;
+
+      activarRedimension(contenedorPopup, asa, direccion);
+
+      return asa;
+    });
+  }
+
+  // ----------------------------------
   // 🏷️ BARRA DE TÍTULO (arrastrable, con [...] Renombrar)
   // ----------------------------------
 
@@ -1663,7 +1763,9 @@ function montarEditor(
 
     popup.append(crearPieBotones());
 
-    // Aplicar el tamaño ajustado por el usuario (resize: both) ANTES
+    crearRedimensionadores(popup).forEach((asa) => popup.append(asa));
+
+    // Aplicar el tamaño ajustado por el usuario ANTES
     // de mostrarPopupFijo — asignar style.width/height no requiere
     // que el nodo esté en el DOM (a diferencia de leer offsetWidth).
     // Se necesita en este orden porque mostrarPopupFijo llama
@@ -2158,7 +2260,7 @@ function crearFilaPaso(
 
   inputNota.className = "popup-macro-nota";
   inputNota.type = "text";
-  inputNota.placeholder = "...";
+  inputNota.placeholder = "Nota...";
   inputNota.value = paso.nota;
 
   inputNota.addEventListener("click", (eventoClick) => {

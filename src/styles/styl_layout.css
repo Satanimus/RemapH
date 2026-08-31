@@ -876,10 +876,91 @@
   max-width: 1100px;
   min-height: 420px;
   max-height: 90vh;
-  resize: both;
   overflow: hidden;
   display: flex;
   flex-direction: column;
+}
+
+/* ======================================================
+   ↔️↕️ ASAS DE REDIMENSIÓN EN LOS 4 BORDES + 4 ESQUINAS
+   ------------------------------------------------------
+   Reemplazan el `resize: both` nativo (solo esquina inferior
+   derecha) — ver activarRedimension()/crearRedimensionadores() en
+   comp_popup_macro_editor.ts. Se apoyan hacia ADENTRO del borde
+   (top/right/bottom/left: 0, nunca offsets negativos) porque
+   .popup-macro-editor tiene overflow:hidden y recortaría cualquier
+   asa que sobresaliera del borde.
+   ====================================================== */
+
+.popup-macro-editor-resize {
+  position: absolute;
+  z-index: 5;
+}
+
+.popup-macro-editor-resize-n,
+.popup-macro-editor-resize-s {
+  left: 10px;
+  right: 10px;
+  height: 6px;
+  cursor: ns-resize;
+}
+
+.popup-macro-editor-resize-n {
+  top: 0;
+}
+
+.popup-macro-editor-resize-s {
+  bottom: 0;
+}
+
+.popup-macro-editor-resize-e,
+.popup-macro-editor-resize-w {
+  top: 10px;
+  bottom: 10px;
+  width: 6px;
+  cursor: ew-resize;
+}
+
+.popup-macro-editor-resize-e {
+  right: 0;
+}
+
+.popup-macro-editor-resize-w {
+  left: 0;
+}
+
+.popup-macro-editor-resize-ne,
+.popup-macro-editor-resize-sw {
+  width: 12px;
+  height: 12px;
+  cursor: nesw-resize;
+}
+
+.popup-macro-editor-resize-ne {
+  top: 0;
+  right: 0;
+}
+
+.popup-macro-editor-resize-sw {
+  bottom: 0;
+  left: 0;
+}
+
+.popup-macro-editor-resize-nw,
+.popup-macro-editor-resize-se {
+  width: 12px;
+  height: 12px;
+  cursor: nwse-resize;
+}
+
+.popup-macro-editor-resize-nw {
+  top: 0;
+  left: 0;
+}
+
+.popup-macro-editor-resize-se {
+  bottom: 0;
+  right: 0;
 }
 
 .popup-macro-editor-titulo {
@@ -1126,6 +1207,29 @@
   width: var(--col-tipo-width);
 }
 
+/* Líneas finas verticales entre columnas (numero|asa, asa|tipo,
+   tipo|extra) — mismo trazo que .popup-macro-col-resizer::before,
+   pero fijo (sin arrastre) y centrado en el gap de --gap8 entre
+   columnas. La separación Extra|Nota ya tiene su propia línea vía
+   el resizer real, no se repite acá. */
+.popup-macro-col-header[data-columna="numero"],
+.popup-macro-col-header[data-columna="asa"],
+.popup-macro-col-header[data-columna="tipo"] {
+  position: relative;
+}
+
+.popup-macro-col-header[data-columna="numero"]::after,
+.popup-macro-col-header[data-columna="asa"]::after,
+.popup-macro-col-header[data-columna="tipo"]::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: calc(var(--gap8) / -2 - 0.5px);
+  width: 1px;
+  height: 100%;
+  background: var(--border-light);
+}
+
 /* Espacio reservado para la columna Marcador (círculo/letra de
    Bucle) que vive DENTRO de la celda Extra de cada fila, antes del
    botón de acción — ver .popup-macro-editor-extra. Mismo ancho +
@@ -1246,6 +1350,7 @@
   width: var(--col-asa-width);
   padding: 0;
   cursor: grab;
+  position: relative;
 }
 
 .popup-macro-editor-numero {
@@ -1254,6 +1359,18 @@
   font-size: var(--fs11);
   color: var(--text-disabled);
   text-align: center;
+  position: relative;
+}
+
+.popup-macro-editor-asa::after,
+.popup-macro-editor-numero::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: calc(var(--gap8) / -2 - 0.5px);
+  width: 1px;
+  height: 100%;
+  background: var(--border-light);
 }
 
 .ui-btn.popup-macro-editor-marcador,
@@ -1303,6 +1420,17 @@
   width: var(--col-tipo-width);
   padding: 0;
   font-size: var(--fs16);
+  position: relative;
+}
+
+.popup-macro-editor-tipo::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: calc(var(--gap8) / -2 - 0.5px);
+  width: 1px;
+  height: 100%;
+  background: var(--border-light);
 }
 
 .popup-macro-editor-extra {
@@ -1441,5 +1569,10 @@
 }
 
 .popup-macro-nota::placeholder {
+  color: transparent;
+}
+
+.popup-macro-nota:hover::placeholder,
+.popup-macro-nota:focus::placeholder {
   color: var(--text-disabled);
 }
