@@ -1306,55 +1306,24 @@
   display: grid;
   grid-template-columns: var(--grid-columnas);
   position: relative;
-  /* Etapa E: líneas divisorias nativas del grid — el fondo de la fila
-     es el color de línea (--border-light), asomando solo por el
-     column-gap de 1px; cada celda real tapa ese fondo con el color de
-     fila (ver reglas :where() más abajo), así que no queda visible en
-     ningún otro lado. Cero JS, cero pseudo-elementos. */
-  column-gap: 1px;
-  background: var(--border-light);
 }
 
-/* Etapa E: color de fila (impar) en cada celda real que antes era
-   transparente (dejaba ver el fondo cebreado de .popup-macro-editor-
-   paso "a través" porque .popup-macro-editor-paso-fila no tenía fondo
-   propio) — ahora que sí lo tiene (línea de arriba, el gris de línea
-   divisoria asomando por el column-gap), cada celda debe taparlo con
-   su propio color de fila. Se usa el color SÓLIDO (sin mezclar con
-   transparent) — .popup-macro-editor-paso, debajo, YA aplica la
-   mezcla semitransparente sobre el fondo de la lista; si la celda
-   repitiera color-mix(..., transparent) encima, ambas capas
-   semitransparentes se suman (dos veces 50% ≈ 75% real) y el
-   resultado queda más oscuro/marcado de lo esperado — muy notorio en
-   Nota (fondo transparente en reposo, sin ningún elemento opaco
-   propio que lo disimule) y más sutil en el resto. Tipo, en cambio,
-   no entra en este :where() y solo recibe la capa simple del padre,
-   por eso se veía más claro que las demás — con color sólido acá
-   las cinco columnas quedan con la misma opacidad efectiva. Los
-   botones (asa/tipo/X/⧉/⊙/acción) no entran acá: ya traen su propio
-   fondo opaco vía .ui-btn, con más especificidad. :where() mantiene
-   la especificidad en 1 clase para que las reglas propias de
-   .popup-macro-nota (más abajo en este archivo) sigan ganando en sus
-   estados :hover/:focus. */
-.popup-macro-editor-paso-fila> :where(.popup-macro-editor-numero,
-  .popup-macro-editor-opciones,
-  .popup-macro-editor-extra,
-  .popup-macro-nota) {
-  background: var(--tabla-fondo-color-impar);
-}
-
-.popup-macro-editor-paso:nth-child(even) .popup-macro-editor-paso-fila> :where(.popup-macro-editor-numero,
-  .popup-macro-editor-opciones,
-  .popup-macro-editor-extra,
-  .popup-macro-nota) {
-  background: var(--tabla-fondo-color-par);
-}
-
-.popup-macro-editor-paso:hover .popup-macro-editor-paso-fila> :where(.popup-macro-editor-numero,
-  .popup-macro-editor-opciones,
-  .popup-macro-editor-extra,
-  .popup-macro-nota) {
-  background: var(--tabla-fondo-color-hover);
+/* Bug 2/3: líneas divisorias entre columnas, mismo mecanismo que la
+   tabla del gestor de coordenadas (border-right en cada celda, ver
+   .coordenadas-tabla tbody td en styl_coordenadas.css) — en vez del
+   fondo-de-gap anterior, que obligaba a cada celda a repintar su
+   propio color de fila encima del cebreado ya puesto en
+   .popup-macro-editor-paso (dos capas semitransparentes apiladas
+   por celda, contraste exagerado). Acá el cebreado se pinta UNA sola
+   vez, en .popup-macro-editor-paso, y las celdas quedan transparentes
+   — igual que <tr>/<td> en una tabla real. La columna Nota no lleva
+   línea a su derecha (es la última) y Tipo la trae de fábrica por
+   ser un .ui-btn con borde propio, así que no se repite acá.
+   Los botones (asa/tipo/X/⧉/⊙/acción) no entran en la lista */
+.popup-macro-editor-paso-fila>.popup-macro-editor-numero,
+.popup-macro-editor-paso-fila>.popup-macro-editor-opciones,
+.popup-macro-editor-paso-fila>.popup-macro-editor-extra {
+  border-right: 1px solid var(--border-light);
 }
 
 .popup-macro-editor-asa {
@@ -1376,6 +1345,10 @@
 
 .popup-macro-editor-opciones .ui-btn {
   padding: 0;
+  /* Mismo criterio que .popup-macro-editor-tipo: botón dentro de una
+     celda cebreada, transparente en reposo para no tapar el color de
+     fila de .popup-macro-editor-paso con el fondo opaco de .ui-btn. */
+  background: transparent;
 }
 
 .popup-macro-editor-numero {
@@ -1429,25 +1402,21 @@
   pointer-events: none;
 }
 
-/* Etapa E/bug 2: a diferencia de numero/opciones/extra/nota (celdas
-   <div>/<input> normales, tapadas por :where() más arriba), Tipo ES
-   el propio botón (.ui-btn) — .ui-btn trae background:var(--bg)
-   sólido y opaco propio (más especificidad que :where()), que tapaba
-   por completo el cebreado y dejaba la columna con el mismo fondo
-   claro en todas las filas. Repite acá el mismo color sólido de fila
-   que usan las demás celdas, con la especificidad de dos clases
-   (.ui-btn.popup-macro-editor-tipo) necesaria para ganarle al
-   background de .ui-btn base. */
+/* Bug 2/3: a diferencia de numero/opciones/extra (celdas <div>
+   normales, transparentes, que dejan ver el color de fila puesto una
+   sola vez en .popup-macro-editor-paso), Tipo ES el propio botón
+   (.ui-btn) — .ui-btn trae background:var(--bg) sólido y opaco
+   propio (más especificidad que la celda), que tapaba por completo
+   el cebreado y dejaba la columna con el mismo fondo en todas las
+   filas. Mismo criterio que .coordenadas-numero-toggle en
+   styl_coordenadas.css (botón dentro de una celda de tabla
+   cebreada): en reposo queda transparente, así se ve el color de
+   fila de .popup-macro-editor-paso por debajo sin repetirlo (evita
+   apilar dos capas semitransparentes = contraste exagerado). El
+   :hover propio de .ui-btn ya pasa a transparent (styl_botones.css),
+   así que solo hace falta vencer el reposo. */
 .ui-btn.popup-macro-editor-tipo {
-  background: var(--tabla-fondo-color-impar);
-}
-
-.popup-macro-editor-paso:nth-child(even) .ui-btn.popup-macro-editor-tipo {
-  background: var(--tabla-fondo-color-par);
-}
-
-.popup-macro-editor-paso:hover .ui-btn.popup-macro-editor-tipo {
-  background: var(--tabla-fondo-color-hover);
+  background: transparent;
 }
 
 .popup-macro-editor-tipo {
@@ -1480,6 +1449,10 @@
   text-overflow: ellipsis;
   text-align: left;
   justify-content: flex-start;
+  /* Mismo criterio que .popup-macro-editor-tipo: botón dentro de una
+     celda cebreada (Extra), transparente en reposo para no tapar el
+     color de fila con el fondo opaco de .ui-btn. */
+  background: transparent;
 }
 
 /* ======================================================
