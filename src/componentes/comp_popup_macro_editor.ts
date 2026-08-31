@@ -1785,6 +1785,14 @@ function montarEditor(
 
     mostrarPopupFijo(popup, posicionX, posicionY);
 
+    // Posiciona las líneas divisorias verticales de cada fila
+    // (.popup-macro-editor-divisor) MIDIENDO el layout real ya
+    // aplicado — recién ahora el popup está en el DOM y tiene
+    // tamaño real. rAF: el navegador necesita un frame para aplicar
+    // el layout tras la inserción antes de que getBoundingClientRect
+    // devuelva valores útiles.
+    requestAnimationFrame(() => sincronizarDivisoresColumnaDerecha(columnaDerecha));
+
     // Solo la PRIMERA vez se deja que ajustarPosicionDentroDeVentana
     // (dentro de mostrarPopupFijo) decida entre left/right y
     // top/bottom según si el popup entra en la ventana. En
@@ -2059,6 +2067,13 @@ function crearResizerColumna(columnaDerecha: HTMLElement): HTMLElement {
 
   resizer.className = "popup-macro-col-resizer";
 
+  // Piso mínimo real de Extra: la celda del CUERPO
+  // (.popup-macro-editor-extra) siempre contiene el marcador (22px,
+  // real o placeholder .popup-macro-editor-marcador-espacio) + su
+  // gap (--gap4 = 4px) — por debajo de esos ~26px el marcador ya no
+  // entra y la celda se ve forzada a un ancho mayor al pedido.
+  const ANCHO_MINIMO_EXTRA = 26;
+
   const variable = "--col-extra-width";
 
   resizer.addEventListener("mousedown", (eventoInicial) => {
@@ -2070,14 +2085,43 @@ function crearResizerColumna(columnaDerecha: HTMLElement): HTMLElement {
 
     const xInicial = eventoInicial.clientX;
 
+    // [FIX] Techo faltante: --col-extra-width no tenía límite
+    // superior — arrastrar el resizer hacia la derecha podía
+    // agrandar Extra sin fin, empujando Nota a 0 y sacando la
+    // columna entera fuera de la ventana visible. Se limita al
+    // ancho real disponible de la fila en este momento (medido, no
+    // supuesto) menos un mínimo razonable para que Nota (flex:1)
+    // siempre conserve algo de espacio utilizable.
+    const ANCHO_MINIMO_NOTA = 60;
+
+    const anchoDisponibleFila = (): number => {
+      const filaEjemplo = columnaDerecha.querySelector<HTMLElement>(
+        ".popup-macro-editor-paso-fila",
+      );
+
+      const referencia = filaEjemplo ?? columnaDerecha;
+
+      return referencia.getBoundingClientRect().width;
+    };
+
     const alMover = (eventoMover: MouseEvent): void => {
       // El resizer queda a la derecha de Extra: arrastrar hacia la
       // derecha amplía Extra, hacia la izquierda la encoge.
       const delta = eventoMover.clientX - xInicial;
 
-      const nuevoAncho = Math.max(20, anchoInicial + delta);
+      const anchoMaximo = Math.max(
+        ANCHO_MINIMO_EXTRA,
+        anchoDisponibleFila() - ANCHO_MINIMO_NOTA,
+      );
+
+      const nuevoAncho = Math.min(
+        anchoMaximo,
+        Math.max(ANCHO_MINIMO_EXTRA, anchoInicial + delta),
+      );
 
       columnaDerecha.style.setProperty(variable, `${nuevoAncho}px`);
+
+      sincronizarDivisoresColumnaDerecha(columnaDerecha);
     };
 
     const alSoltar = (): void => {
@@ -2093,6 +2137,53 @@ function crearResizerColumna(columnaDerecha: HTMLElement): HTMLElement {
 }
 
 // ======================================================
+// 📏 LÍNEAS DIVISORIAS DE COLUMNA (medidas, no calculadas)
+// ------------------------------------------------------
+// Cada .popup-macro-editor-paso-fila lleva 4 <span class="popup-
+// macro-editor-divisor"> intercalados entre sus columnas (ver
+// crearDivisorColumna / crearFilaPaso). Nacen sin left — acá se les
+// mide el borde derecho REAL del hermano anterior
+// (getBoundingClientRect, ya con el layout aplicado) y se posiciona
+// cada línea ahí. Se recalcula: 1) una vez al montar el popup (tras
+// mostrarPopupFijo + rAF), 2) en cada mousemove del resizer de
+// Extra. Nunca se desalinea porque no reproduce ninguna fórmula del
+// layout — sea cual sea el layout real, esto lo sigue.
+// ======================================================
+
+function crearDivisorColumna(): HTMLElement {
+  const divisor = document.createElement("span");
+
+  divisor.className = "popup-macro-editor-divisor";
+
+  return divisor;
+}
+
+function sincronizarDivisoresColumnaDerecha(columnaDerecha: HTMLElement): void {
+  const filas = columnaDerecha.querySelectorAll<HTMLElement>(
+    ".popup-macro-editor-paso-fila",
+  );
+
+  filas.forEach(sincronizarDivisoresFila);
+}
+
+function sincronizarDivisoresFila(fila: HTMLElement): void {
+  const rectFila = fila.getBoundingClientRect();
+
+  const hijos = Array.from(fila.children) as HTMLElement[];
+
+  hijos.forEach((hijo, indice) => {
+    if (!hijo.classList.contains("popup-macro-editor-divisor")) return;
+
+    const anterior = hijos[indice - 1];
+
+    if (!anterior) return;
+
+    const rectAnterior = anterior.getBoundingClientRect();
+
+    hijo.style.left = `${rectAnterior.right - rectFila.left}px`;
+  });
+}
+
 // 📄 FILA DE UN PASO (cerrada o expandida)
 // ======================================================
 
@@ -2139,6 +2230,11 @@ function crearFilaPaso(
 
   filaPrincipal.append(numero);
 
+  // Línea divisoria numero|asa — ver .popup-macro-editor-divisor en
+  // styl_layout.css y sincronizarDivisoresFila() más abajo (mide la
+  // posición real, no la calcula).
+  filaPrincipal.append(crearDivisorColumna());
+
   // ⁝ Asa — reusa el mismo botón de opciones de fila de ventana
   // principal (mismo comportamiento de arrastre, con su marcador de
   // 6 puntos): clic corto abre el popup Mover/Duplicar/Eliminar
@@ -2156,6 +2252,9 @@ function crearFilaPaso(
   });
 
   filaPrincipal.append(asa);
+
+  // Línea divisoria asa|tipo.
+  filaPrincipal.append(crearDivisorColumna());
 
   // Tipo — SOLO ÍCONO (spec punto 11/G3). Clic despliega la lista
   // vertical de los 7 tipos in-place (mismo look que abrirPopupTipo
@@ -2180,6 +2279,9 @@ function crearFilaPaso(
   });
 
   filaPrincipal.append(botonTipo);
+
+  // Línea divisoria tipo|extra.
+  filaPrincipal.append(crearDivisorColumna());
 
   // Extra — sin el listado de Tipos (spec punto 11): el resumen de
   // una línea del paso (cerrado) o "editando" mientras está
@@ -2251,6 +2353,10 @@ function crearFilaPaso(
   extra.append(accion);
 
   filaPrincipal.append(extra);
+
+  // Línea divisoria extra|nota. Nota es flex:1 y llega sola hasta
+  // el borde derecho real, sin línea propia ahí.
+  filaPrincipal.append(crearDivisorColumna());
 
   // Nota — input de texto plano, letra gris, no se envía al
   // ejecutar (spec punto 11/G4). Guarda con debounce, sin

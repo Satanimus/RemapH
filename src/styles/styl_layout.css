@@ -1341,8 +1341,40 @@
 
 .popup-macro-editor-paso-fila {
   display: flex;
-  align-items: center;
+  /* [FIX] Líneas verticales entre columnas: esto era align-items:
+     center, que no estira los hijos al alto real de la fila. Se
+     deja en stretch (afecta también al alto de los botones, mejora
+     aparte). */
+  align-items: stretch;
   gap: var(--gap8);
+  position: relative;
+}
+
+/* [FIX RAÍZ, 2 intentos previos fallidos] Las 4 líneas divisorias
+   (numero|asa, asa|tipo, tipo|extra, extra|nota) NO se calculan más
+   con calc() a partir de los anchos de columna — eso replicaba a
+   mano la fórmula real del layout del header (celda fantasma de
+   marcador + margin negativo cancelando su gap, ver crearEncabezado
+   Columnas) y quedaba desalineado apenas algo no cuadraba exacto, y
+   además no tenía techo: --col-extra-width no tiene límite máximo,
+   así que arrastrar el resizer hacia la derecha podía sacar toda la
+   columna de la pantalla.
+   Ahora cada línea es un <span> absoluto vacío (uno por hueco entre
+   columnas, insertados por JS en crearFilaPaso), sin left propio en
+   CSS — su posición X real la fija JS (sincronizarDivisoresFila en
+   comp_popup_macro_editor.ts) MIDIENDO el borde derecho real de la
+   celda anterior con getBoundingClientRect(), exactamente igual que
+   se vería si fuera un border-right normal. No hay fórmula que
+   pueda desalinearse: si el layout cambia, la medición cambia con
+   él. Se recalcula en cada resize del split (mismo listener que ya
+   movía --col-extra-width) y al abrir/expandir cualquier fila. */
+.popup-macro-editor-divisor {
+  position: absolute;
+  top: 0;
+  width: 1px;
+  height: 100%;
+  background: var(--border-light);
+  pointer-events: none;
 }
 
 .popup-macro-editor-asa {
@@ -1350,7 +1382,6 @@
   width: var(--col-asa-width);
   padding: 0;
   cursor: grab;
-  position: relative;
 }
 
 .popup-macro-editor-numero {
@@ -1359,18 +1390,9 @@
   font-size: var(--fs11);
   color: var(--text-disabled);
   text-align: center;
-  position: relative;
-}
-
-.popup-macro-editor-asa::after,
-.popup-macro-editor-numero::after {
-  content: "";
-  position: absolute;
-  top: 0;
-  right: calc(var(--gap8) / -2 - 0.5px);
-  width: 1px;
-  height: 100%;
-  background: var(--border-light);
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .ui-btn.popup-macro-editor-marcador,
@@ -1420,7 +1442,6 @@
   width: var(--col-tipo-width);
   padding: 0;
   font-size: var(--fs16);
-  position: relative;
 }
 
 .popup-macro-editor-tipo::after {
@@ -1436,7 +1457,11 @@
 .popup-macro-editor-extra {
   flex: 0 0 auto;
   width: var(--col-extra-width);
-  min-width: 20px;
+  /* [FIX] Antes 20px — por debajo del piso real (22px de marcador +
+     su gap4), quedaba desalineado del resizer del header. Ver
+     comentario largo en crearResizerColumna (comp_popup_macro_
+     editor.ts), mismo valor 26px. */
+  min-width: 26px;
   display: flex;
   align-items: center;
   gap: var(--gap4);
