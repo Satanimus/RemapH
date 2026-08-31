@@ -1085,16 +1085,32 @@ pub fn cerrar_ventana_grabacion_macro(app: tauri::AppHandle) {
 // Arranque/consulta de estado de grabacion_macro.rs. El cierre
 // (tomar_eventos_grabacion_macro) ya se expone en el bloque de
 // Etapa E más abajo.
+// ------------------------------------------------------
+// Revisado: "Grabar Macro" ya no arranca la captura directo —
+// solo arma la escucha de la tecla toggle (Armada). Es la propia
+// tecla la que hace Armada→Activa (y Activa→Inactiva), ver
+// grabacion_macro::observar_evento(). El frontend consulta el
+// estado de a 3 (armada/activa/inactiva) en vez de un bool suelto,
+// para poder mostrar el indicador 🟡/🔴 correcto.
 // ======================================================
 
 #[tauri::command]
-pub fn iniciar_grabacion_macro() {
-    grabacion_macro::activar_grabacion();
+pub fn armar_grabacion_macro() {
+    grabacion_macro::armar_grabacion();
 }
 
 #[tauri::command]
-pub fn grabacion_macro_activa() -> bool {
-    grabacion_macro::grabacion_activa()
+pub fn obtener_estado_grabacion_macro() -> grabacion_macro::EstadoGrabacion {
+    grabacion_macro::estado_grabacion()
+}
+
+/// Corte forzado desde la UI (Etapa G, agregado sobre el plan
+/// original): el editor lo invoca si Cancelar/Guardar cierran el
+/// popup mientras el panel de inicio seguía Armada o ya estaba
+/// Activa — ver grabacion_macro::detener_grabacion().
+#[tauri::command]
+pub fn detener_grabacion_macro() {
+    grabacion_macro::detener_grabacion();
 }
 
 // ======================================================

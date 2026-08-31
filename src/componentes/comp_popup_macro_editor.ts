@@ -78,6 +78,7 @@ import {
 
 import type { Trigger } from "../core/core_trigger";
 import { triggerATexto, triggerAHTML } from "../core/core_trigger";
+import type { Entrada } from "../core/core_entrada";
 
 import {
   COMANDOS_VOLUMEN,
@@ -89,6 +90,20 @@ import {
 import type { OpcionMultimedia } from "../core/core_multimedia";
 
 import { esRutaExe, nombreDeRuta, extensionDeRuta } from "../core/core_abrir";
+
+import {
+  OPCIONES_TIPO_COORDENADA,
+  OPCIONES_MEDIDO_EN,
+  OPCIONES_MODO_ESPERA,
+  configInicioGrabacionPorDefecto,
+  type ConfigInicioGrabacion,
+  type EstadoGrabacionMacro,
+} from "../core/core_grabacion_macro";
+
+import {
+  analizarGrabacion,
+  type EventoGrabadoUI,
+} from "../core/core_analisis_grabacion";
 
 import {
   crearGrupoOpciones,
@@ -483,6 +498,176 @@ function validarRetencionMacro(pasos: PasoMacro[]): string | null {
 }
 
 // ======================================================
+// 🔴 GRABACIÓN DE MACRO (Etapa G)
+// ------------------------------------------------------
+// Botón "Grabar Macro" del panel Funciones — su panel de inicio
+// (Tipo/Medido en/Medido desde + Tiempos de espera) se arma
+// anidado bajo el propio botón (crearPanelInicioGrabacion más
+// abajo, montado desde crearPanelFunciones), NO con el
+// mecanismo global mostrarPopup (comp_popup_grabar_macro_inicio.ts,
+// eliminado): ese reemplaza toda la capa global de popups y
+// destruiría este editor (montado con mostrarPopupFijo, misma
+// capa única — ver nota de cabecera del archivo).
+// ======================================================
+
+interface AtajoCapturaUI {
+  modificadores: Entrada[];
+  gatillo: Entrada;
+}
+
+function atajoCapturaATexto(atajo: AtajoCapturaUI): string {
+  return [
+    ...atajo.modificadores.map((entrada) => entrada.nombre),
+    atajo.gatillo.nombre,
+  ].join("+");
+}
+
+// ======================================================
+// 🔴 BOTÓN "Grabar Macro" (panel Funciones, arriba de todo)
+// ------------------------------------------------------
+// Estados: reposo (click abre el panel + arma la escucha de la
+// tecla toggle), armada (panel de inicio abierto, dataset.activo
+// — un segundo click cancela: desarma y cierra todo), grabando
+// de verdad (texto distinto + disabled — desde acá solo la tecla
+// física, Regla 4, puede detenerla).
+// ======================================================
+
+function crearBotonGrabarMacro(
+  estadoGrabacion: EstadoGrabacionMacro,
+  grabacionInicioAbierto: boolean,
+  onClick: () => void,
+): HTMLElement {
+  const boton = document.createElement("button");
+
+  boton.className = "ui-btn popup-macro-boton-grabar";
+
+  boton.dataset.activo = grabacionInicioAbierto ? "true" : "false";
+  boton.dataset.grabando = estadoGrabacion === "activa" ? "true" : "false";
+
+  boton.textContent =
+    estadoGrabacion === "activa" ? "🔴 Grabando..." : "🔴 Grabar Macro";
+  boton.disabled = estadoGrabacion === "activa";
+
+  boton.addEventListener("click", (eventoClick) => {
+    eventoClick.stopPropagation();
+
+    onClick();
+  });
+
+  return boton;
+}
+
+// ======================================================
+// 🔴 PANEL DE INICIO DE GRABACIÓN
+// ------------------------------------------------------
+// Anidado bajo el botón "Grabar Macro" (Nota2 del plan). Mismo
+// orden/piezas que abrirPopupTipo (vent_coordenadas_main.ts,
+// tomado de referencia): Tipo → Medido en (solo si Tipo=Ventana)
+// → Medido desde (solo si Medido en=Pixeles, 3 arriba + 2 abajo)
+// → separador → Tiempos de espera → Milisegundos (solo si
+// Tiempos ≠ Real). Sin botón "Iniciar grabación": arrancar de
+// verdad es cosa de la tecla toggle física (Regla 4) — este
+// panel solo junta la config antes de que se presione.
+// ======================================================
+
+function crearPanelInicioGrabacion(
+  estado: ConfigInicioGrabacion,
+  onCambiar: () => void,
+): HTMLElement {
+  const contenedor = document.createElement("div");
+
+  contenedor.className = "popup-caja-interna popup-macro-grabacion-inicio";
+
+  contenedor.append(
+    crearFilaPopup(
+      "Tipo de Coordenada:",
+      crearGrupoOpciones(OPCIONES_TIPO_COORDENADA, estado.tipoCoordenada, (valor) => {
+        estado.tipoCoordenada = valor;
+
+        onCambiar();
+      }),
+    ),
+  );
+
+  if (estado.tipoCoordenada === "relativa_ventana") {
+    contenedor.append(
+      crearFilaPopup(
+        "Medido en:",
+        crearGrupoOpciones(OPCIONES_MEDIDO_EN, estado.medidoEn, (valor) => {
+          estado.medidoEn = valor;
+
+          onCambiar();
+        }),
+      ),
+    );
+
+    if (estado.medidoEn === "pixeles") {
+      const onSeleccionarPunto = (punto: PuntoReferenciaPasoMacro): void => {
+        estado.medidoDesde = punto;
+
+        onCambiar();
+      };
+
+      const filaMedidoDesde = crearFilaPopup(
+        "Medido desde:",
+        crearGrupoOpciones(
+          (["sup_izq", "sup_der", "centro"] as const).map((punto) => ({
+            texto: `${textoPuntoReferencia(punto)}: ${ICONO_PUNTO_REFERENCIA_PASO[punto]}`,
+            valor: punto,
+          })),
+          estado.medidoDesde,
+          onSeleccionarPunto,
+        ),
+      );
+
+      const filaSegundaMedidoDesde = crearGrupoOpciones(
+        (["inf_izq", "inf_der"] as const).map((punto) => ({
+          texto: `${textoPuntoReferencia(punto)}: ${ICONO_PUNTO_REFERENCIA_PASO[punto]}`,
+          valor: punto,
+        })),
+        estado.medidoDesde,
+        onSeleccionarPunto,
+      );
+
+      contenedor.append(filaMedidoDesde, filaSegundaMedidoDesde);
+    }
+  }
+
+  contenedor.append(crearSeparador());
+
+  contenedor.append(
+    crearFilaPopup(
+      "Tiempos de espera:",
+      crearGrupoOpciones(OPCIONES_MODO_ESPERA, estado.modoEspera, (valor) => {
+        estado.modoEspera = valor;
+
+        onCambiar();
+      }),
+    ),
+  );
+
+  if (estado.modoEspera !== "real") {
+    const inputMs = document.createElement("input");
+
+    inputMs.type = "number";
+    inputMs.min = "0";
+    inputMs.step = "1";
+    inputMs.value = String(estado.msEspera);
+
+    inputMs.addEventListener("input", () => {
+      estado.msEspera = Number(inputMs.value) || 0;
+    });
+
+    const filaMs = crearFilaPopup("Milisegundos", inputMs);
+    filaMs.classList.add("popup-grabar-macro-ms");
+
+    contenedor.append(filaMs);
+  }
+
+  return contenedor;
+}
+
+// ======================================================
 // 📝 RESUMEN "Grupo: Nombre" / Tipo reducido (X,Y) — coordenada
 // ------------------------------------------------------
 // Si la coordenada elegida trae Grupo o Nombre (copiados del
@@ -603,6 +788,24 @@ function montarEditor(
   // a la vez.
   let idMenuAbierto: string | null = null;
 
+  // Etapa G: popup de inicio de Grabación (Modo de Coordenadas /
+  // Tiempos de espera, Reglas 2/3) anidado bajo el botón "Grabar
+  // Macro" del panel Funciones — mismo criterio de "solo un
+  // desplegable a la vez" que idPasoExpandido/idMenuAbierto, así que
+  // abrir este cierra esos dos y viceversa (ver alternarGrabacionInicio
+  // más abajo).
+  let grabacionInicioAbierto = false;
+  let estadoGrabacion: EstadoGrabacionMacro = "inactiva";
+  let pollingGrabacionId: ReturnType<typeof setInterval> | null = null;
+
+  // Config elegida en el panel de inicio — vive desde que se abre
+  // el panel (arma la grabación) hasta que termina la sesión
+  // (cancelada estando armada, o finalizada tras Activa→Inactiva).
+  // Sigue viva aunque el panel se oculte al pasar a Activa (Regla
+  // 8) porque finalizarGrabacion la necesita para analizar los
+  // eventos — null solo cuando no hay ninguna sesión en curso.
+  let estadoInicioGrabacion: ConfigInicioGrabacion | null = null;
+
   // Formulario inline de renombrar (botón [...] de la barra) — solo
   // uno puede estar abierto a la vez, y reemplaza el nombre de la
   // barra mientras dure.
@@ -645,6 +848,174 @@ function montarEditor(
   // inputNombre en comp_popup_menu_express_editor.ts.
   const guardarSinRedibujar = (): void => {
     guardarConDebounce(macroArchivo);
+  };
+
+  // ----------------------------------
+  // 🔴 GRABACIÓN DE MACRO — CONTROL (Etapa G, revisado)
+  // ------------------------------------------------------
+  // alAlternarGrabacionInicio: click en el botón "Grabar Macro".
+  // Según estadoGrabacion:
+  //  • inactiva → abre el panel de inicio (mismo criterio que
+  //    idPasoExpandido/idMenuAbierto: cierra cualquier otra caja
+  //    anidada) y arma la escucha de la tecla toggle (armarGrabacion).
+  //  • armada (el usuario se arrepiente antes de presionar la
+  //    tecla) → cancela: desarma, cierra la ventana overlay y el
+  //    panel.
+  //  • activa → no hace nada (disabled — solo la tecla física
+  //    detiene, Regla 4).
+  //
+  // armarGrabacion: abre la ventana overlay del indicador (Etapa
+  // B, arranca en 🟡 armada) + arma el hook en Rust (Etapa D) para
+  // que empiece a escuchar la tecla toggle. Deja un polling (mismo
+  // patrón que capturarTeclaPaso/vent_captura_main.ts) sobre
+  // obtener_estado_grabacion_macro para reaccionar a las dos
+  // transiciones que dispara la tecla física: Armada→Activa (oculta
+  // el panel, Regla 8) y Activa→Inactiva (analiza y cierra).
+  //
+  // finalizarGrabacion: trae los eventos crudos (Etapa D), los
+  // traduce a Pasos con analizarGrabacion (Etapa E) usando la
+  // config elegida en el panel de inicio y la ventana de combo del
+  // capturador normal (Regla 9 — mismo valor que usa
+  // AnalizadorTrigger para decidir que una secuencia terminó, ver
+  // tiempo_doble() en config.rs), los inserta al final de
+  // macroArchivo.pasos (Regla 8: el usuario solo ve el resultado
+  // ya agregado a la tabla) y cierra la ventana overlay.
+  // ----------------------------------
+
+  async function finalizarGrabacion(config: ConfigInicioGrabacion): Promise<void> {
+    try {
+      const eventos = await invoke<EventoGrabadoUI[]>(
+        "tomar_eventos_grabacion_macro",
+      );
+
+      const ventanaComboMs = await invoke<number>("obtener_tiempo_doble");
+
+      const nuevosPasos = analizarGrabacion(eventos, config, ventanaComboMs);
+
+      macroArchivo.pasos.push(...nuevosPasos);
+    } catch (error) {
+      console.error("❌ No se pudo analizar la grabación de macro:", error);
+    } finally {
+      invoke("cerrar_ventana_grabacion_macro").catch((error) => {
+        console.error("❌ No se pudo cerrar el indicador de grabación:", error);
+      });
+
+      estadoGrabacion = "inactiva";
+      estadoInicioGrabacion = null;
+
+      guardarYRedibujar();
+    }
+  }
+
+  function cancelarArmado(): void {
+    if (pollingGrabacionId !== null) {
+      clearInterval(pollingGrabacionId);
+      pollingGrabacionId = null;
+    }
+
+    invoke("detener_grabacion_macro").catch((error) => {
+      console.error("❌ No se pudo cancelar la grabación armada:", error);
+    });
+
+    invoke("cerrar_ventana_grabacion_macro").catch((error) => {
+      console.error("❌ No se pudo cerrar el indicador de grabación:", error);
+    });
+
+    estadoGrabacion = "inactiva";
+    grabacionInicioAbierto = false;
+    estadoInicioGrabacion = null;
+
+    redibujar();
+  }
+
+  function iniciarPollingGrabacion(config: ConfigInicioGrabacion): void {
+    pollingGrabacionId = setInterval(() => {
+      invoke<EstadoGrabacionMacro>("obtener_estado_grabacion_macro")
+        .then((nuevoEstado) => {
+          if (nuevoEstado === estadoGrabacion) {
+            return;
+          }
+
+          const estadoAnterior = estadoGrabacion;
+          estadoGrabacion = nuevoEstado;
+
+          if (nuevoEstado === "activa") {
+            // Armada → Activa: la tecla toggle arrancó la captura
+            // de verdad — se oculta el panel de config (Regla 8).
+            grabacionInicioAbierto = false;
+
+            redibujar();
+            return;
+          }
+
+          if (nuevoEstado === "inactiva" && estadoAnterior === "activa") {
+            // Activa → Inactiva: la tecla toggle detuvo la
+            // grabación de verdad.
+            if (pollingGrabacionId !== null) {
+              clearInterval(pollingGrabacionId);
+              pollingGrabacionId = null;
+            }
+
+            finalizarGrabacion(config);
+            return;
+          }
+
+          redibujar();
+        })
+        .catch((error) => {
+          console.error(
+            "❌ No se pudo consultar el estado de grabación:",
+            error,
+          );
+        });
+    }, 200);
+  }
+
+  async function armarGrabacion(config: ConfigInicioGrabacion): Promise<void> {
+    try {
+      const atajo = await invoke<AtajoCapturaUI>("obtener_tecla_grabar_macro");
+
+      await invoke("abrir_ventana_grabacion_macro", {
+        tecla: atajoCapturaATexto(atajo),
+      });
+
+      await invoke("armar_grabacion_macro");
+    } catch (error) {
+      console.error("❌ No se pudo armar la grabación de macro:", error);
+
+      grabacionInicioAbierto = false;
+      estadoInicioGrabacion = null;
+
+      redibujar();
+
+      return;
+    }
+
+    estadoGrabacion = "armada";
+
+    redibujar();
+
+    iniciarPollingGrabacion(config);
+  }
+
+  const alAlternarGrabacionInicio = (): void => {
+    if (estadoGrabacion === "activa") {
+      return;
+    }
+
+    if (estadoGrabacion === "armada") {
+      cancelarArmado();
+      return;
+    }
+
+    grabacionInicioAbierto = true;
+    estadoInicioGrabacion = configInicioGrabacionPorDefecto();
+    idPasoExpandido = null;
+    idMenuAbierto = null;
+
+    redibujar();
+
+    armarGrabacion(estadoInicioGrabacion);
   };
 
   // ----------------------------------
@@ -1002,6 +1373,21 @@ function montarEditor(
       controladorArrastre = null;
     }
 
+    // Si el editor se cierra (Cancelar/Guardar) mientras una sesión
+    // de grabación seguía Armada o Activa, se corta el polling y se
+    // apaga tanto el hook de Rust como la ventana overlay del
+    // indicador — sin esto, ambos quedarían vivos sin nadie
+    // escuchando el resultado.
+    if (pollingGrabacionId !== null) {
+      clearInterval(pollingGrabacionId);
+      pollingGrabacionId = null;
+    }
+
+    if (estadoGrabacion !== "inactiva") {
+      invoke("detener_grabacion_macro").catch(() => {});
+      invoke("cerrar_ventana_grabacion_macro").catch(() => {});
+    }
+
     ocultarPopup();
 
     reconstruirFila(contexto.id);
@@ -1115,7 +1501,17 @@ function montarEditor(
 
     cuerpo.className = "popup-macro-editor-cuerpo";
 
-    cuerpo.append(crearPanelFunciones(macroArchivo, guardarYRedibujar));
+    cuerpo.append(
+      crearPanelFunciones(
+        macroArchivo,
+        guardarYRedibujar,
+        estadoGrabacion,
+        grabacionInicioAbierto,
+        estadoInicioGrabacion,
+        alAlternarGrabacionInicio,
+        redibujar,
+      ),
+    );
 
     // ----------------------------------
     // 📋 LISTA DE PASOS
@@ -1167,16 +1563,21 @@ function montarEditor(
           idPasoExpandido,
           idMenuAbierto,
           (nuevoId) => {
-            // Solo un popup anidado (Opción/Tipo/Extra) puede estar
-            // abierto a la vez en todo el editor (spec punto 3).
+            // Solo un popup anidado (Opción/Tipo/Extra/Grabación) puede
+            // estar abierto a la vez en todo el editor (spec punto 3 +
+            // Etapa G).
             idPasoExpandido = idPasoExpandido === nuevoId ? null : nuevoId;
             idMenuAbierto = null;
+            grabacionInicioAbierto = false;
+            estadoInicioGrabacion = null;
 
             redibujar();
           },
           (nuevoId) => {
             idMenuAbierto = idMenuAbierto === nuevoId ? null : nuevoId;
             idPasoExpandido = null;
+            grabacionInicioAbierto = false;
+            estadoInicioGrabacion = null;
 
             redibujar();
           },
@@ -1390,25 +1791,28 @@ function montarEditor(
       idsPasosEnModoMover = [];
     }
 
-    // Cerrar el popup anidado abierto (Opción/Tipo/Extra — spec
-    // punto 3, solo una instancia a la vez) al hacer click fuera de
-    // él. Se registra con setTimeout para no dispararse en el mismo
-    // click que lo abrió. Se usa capture para interceptar antes que
-    // los botones internos (que tienen stopPropagation).
-    if (idMenuAbierto || idPasoExpandido) {
+    // Cerrar el popup anidado abierto (Opción/Tipo/Extra/Grabación —
+    // spec punto 3 + Etapa G, solo una instancia a la vez) al hacer
+    // click fuera de él. Se registra con setTimeout para no
+    // dispararse en el mismo click que lo abrió. Se usa capture para
+    // interceptar antes que los botones internos (que tienen
+    // stopPropagation).
+    if (idMenuAbierto || idPasoExpandido || grabacionInicioAbierto) {
       const cerrarCajasAnidadas = (): void => {
         document.removeEventListener("click", cerrarAlClickFuera, true);
         document.removeEventListener("keydown", cerrarAlEsc, true);
 
         idMenuAbierto = null;
         idPasoExpandido = null;
+        grabacionInicioAbierto = false;
+        estadoInicioGrabacion = null;
 
         redibujar();
       };
 
       const cerrarAlClickFuera = (evento: MouseEvent): void => {
         const menuAbierto = popup.querySelector<HTMLElement>(
-          ".popup-lista, .popup-macro-editor-menu-asa, .popup-macro-editor-detalle",
+          ".popup-lista, .popup-macro-editor-menu-asa, .popup-macro-editor-detalle, .popup-macro-grabacion-grupo[data-abierto='true']",
         );
 
         if (menuAbierto && !menuAbierto.contains(evento.target as Node)) {
@@ -2128,12 +2532,55 @@ function crearListaTipoPaso(
 function crearPanelFunciones(
   macroArchivo: MacroArchivo,
   guardarYRedibujar: () => void,
+  estadoGrabacion: EstadoGrabacionMacro,
+  grabacionInicioAbierto: boolean,
+  estadoInicioGrabacion: ConfigInicioGrabacion | null,
+  onAlternarGrabacionInicio: () => void,
+  onCambiarEstadoInicio: () => void,
 ): HTMLElement {
   const panel = document.createElement("div");
 
   panel.className = "popup-macro-funciones";
 
   panel.dataset.ayudaId = "macro-editor-panel-funciones";
+
+  // Envuelve botón + panel de inicio en un mismo contenedor: el
+  // chequeo de "click afuera" (más abajo, en dibujar()) busca este
+  // grupo completo — si buscara solo el panel de inicio, el propio
+  // click en el botón para CERRARLO se interpretaría primero como
+  // "click afuera" (capture-phase, corre antes que el listener del
+  // botón) y lo reabriría en el mismo click.
+  const grupoGrabar = document.createElement("div");
+
+  grupoGrabar.className = "popup-macro-grabacion-grupo";
+
+  // El grupo (botón + panel) existe SIEMPRE en el DOM, esté o no
+  // abierto el panel — data-abierto distingue el caso para el
+  // querySelector de "click afuera" (más abajo, en dibujar()), que
+  // si no confundiría este contenedor siempre presente con la caja
+  // anidada realmente abierta cuando lo que está abierto es un paso
+  // (Opción/Tipo/Extra), no la grabación. También controla el ancho
+  // más generoso de la columna mientras el panel está desplegado
+  // (ver .popup-macro-funciones[data-grabacion-abierta] en CSS).
+  grupoGrabar.dataset.abierto = grabacionInicioAbierto ? "true" : "false";
+
+  panel.dataset.grabacionAbierta = grabacionInicioAbierto ? "true" : "false";
+
+  grupoGrabar.append(
+    crearBotonGrabarMacro(
+      estadoGrabacion,
+      grabacionInicioAbierto,
+      onAlternarGrabacionInicio,
+    ),
+  );
+
+  if (grabacionInicioAbierto && estadoInicioGrabacion) {
+    grupoGrabar.append(
+      crearPanelInicioGrabacion(estadoInicioGrabacion, onCambiarEstadoInicio),
+    );
+  }
+
+  panel.append(grupoGrabar);
 
   const subtitulo = document.createElement("span");
 

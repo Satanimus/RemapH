@@ -42,32 +42,88 @@ pub struct EventoGrabado {
 }
 
 static ACTIVA: Mutex<bool> = Mutex::new(false);
+static ARMADA: Mutex<bool> = Mutex::new(false);
 static INICIO: Mutex<Option<Instant>> = Mutex::new(None);
 static EVENTOS: Mutex<Vec<EventoGrabado>> = Mutex::new(Vec::new());
 static TECLAS_ABAJO: Mutex<Vec<InputId>> = Mutex::new(Vec::new());
 
-/// Arranca la grabación: limpia buffer y registro de teclas abajo,
-/// reinicia el reloj de momento_ms.
-pub fn activar_grabacion() {
+// ======================================================
+// 🟡🔴 ESTADO (Etapa G, revisado — botón "Grabar Macro" ya
+// no arranca la captura directo: solo arma la escucha de la
+// tecla toggle. La propia tecla física decide cuándo pasa de
+// Armada a Activa, y de Activa de vuelta a Inactiva).
+// ======================================================
+
+#[derive(Clone, Copy, PartialEq, Eq, serde::Serialize)]
+#[serde(rename_all = "lowercase")]
+pub enum EstadoGrabacion {
+    /// Panel de inicio abierto, ventana overlay visible (🟡),
+    /// esperando que se presione la tecla toggle para arrancar
+    /// de verdad. Los eventos NO se registran todavía.
+    Armada,
+    /// Tecla toggle presionada estando Armada: grabando de
+    /// verdad (🔴), eventos yendo a EVENTOS.
+    Activa,
+    /// Ni armada ni grabando.
+    Inactiva,
+}
+
+pub fn estado_grabacion() -> EstadoGrabacion {
+    if *ACTIVA.lock().unwrap() {
+        EstadoGrabacion::Activa
+    } else if *ARMADA.lock().unwrap() {
+        EstadoGrabacion::Armada
+    } else {
+        EstadoGrabacion::Inactiva
+    }
+}
+
+/// Llamada al abrir el panel de inicio (botón "Grabar Macro"):
+/// deja la escucha de la tecla toggle lista, pero sin arrancar
+/// la captura todavía — eso lo dispara observar_evento() cuando
+/// detecta la tecla mientras está Armada.
+pub fn armar_grabacion() {
+    *ARMADA.lock().unwrap() = true;
+    TECLAS_ABAJO.lock().unwrap().clear();
+}
+
+/// Arranca la grabación de verdad (Armada → Activa, disparado
+/// desde observar_evento() al detectar la tecla toggle): limpia
+/// buffer y registro de teclas abajo, reinicia el reloj de
+/// momento_ms.
+fn activar_grabacion() {
+    *ARMADA.lock().unwrap() = false;
     *ACTIVA.lock().unwrap() = true;
     *INICIO.lock().unwrap() = Some(Instant::now());
     EVENTOS.lock().unwrap().clear();
     TECLAS_ABAJO.lock().unwrap().clear();
 }
 
-pub fn grabacion_activa() -> bool {
-    *ACTIVA.lock().unwrap()
-}
-
 fn desactivar_interna() {
     *ACTIVA.lock().unwrap() = false;
 }
 
+/// Corte forzado desde la UI (Etapa G): el editor lo llama si se
+/// cierra (Cancelar/Guardar) mientras el panel de inicio seguía
+/// Armada o ya estaba Activa — sin esto, el hook (observar_evento)
+/// seguiría escuchando la tecla toggle indefinidamente sin que
+/// nadie vaya a leer tomar_eventos(), y la ventana overlay del
+/// indicador quedaría huérfana. Cubre ambos estados de una vez
+/// (no distingue Armada/Activa porque para la UI el efecto que
+/// necesita es el mismo: "cortar todo, ya").
+pub fn detener_grabacion() {
+    *ARMADA.lock().unwrap() = false;
+    desactivar_interna();
+}
+
 /// Tap pasivo llamado por entrada.rs en CADA evento físico. Si no
-/// hay grabación activa, es un chequeo de un bool y listo. Nunca
-/// retorna nada que cambie el flujo de entrada.rs.
+/// hay grabación armada ni activa, es un chequeo de dos bools y
+/// listo. Nunca retorna nada que cambie el flujo de entrada.rs.
 pub fn observar_evento(evento: &InputEvent) {
-    if !*ACTIVA.lock().unwrap() {
+    let armada = *ARMADA.lock().unwrap();
+    let activa = *ACTIVA.lock().unwrap();
+
+    if !armada && !activa {
         return;
     }
 
@@ -100,7 +156,20 @@ pub fn observar_evento(evento: &InputEvent) {
     drop(abajo);
 
     if es_toggle {
-        desactivar_interna();
+        if activa {
+            desactivar_interna();
+        } else {
+            // Armada → Activa: la propia tecla toggle es la que
+            // arranca la captura de verdad.
+            activar_grabacion();
+        }
+        return;
+    }
+
+    // Armada pero todavía no llegó la tecla toggle: el evento solo
+    // sirvió para el bookkeeping de arriba (abajo), no se registra
+    // como parte de la grabación.
+    if !activa {
         return;
     }
 

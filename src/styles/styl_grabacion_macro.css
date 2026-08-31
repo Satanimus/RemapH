@@ -42,6 +42,11 @@ body {
   width: 12px;
   height: 12px;
   border-radius: 50%;
+  background: var(--tag-yellow);
+  filter: drop-shadow(0 0 4px color-mix(in srgb, var(--tag-yellow) 70%, transparent));
+}
+
+.grabacion-punto[data-estado="activa"] {
   background: var(--tag-red);
   filter: drop-shadow(0 0 4px color-mix(in srgb, var(--tag-red) 70%, transparent));
 }

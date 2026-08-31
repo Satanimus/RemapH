@@ -104,6 +104,7 @@ function puntoReferenciaAbsoluto(
 interface CoordenadaCalculada {
   coordUbicacion: PasoMacro["coordUbicacion"];
   coordModoVentana: PasoMacro["coordModoVentana"];
+  coordPuntoReferencia: PuntoReferenciaPasoMacro;
   coordX: number;
   coordY: number;
 }
@@ -115,10 +116,11 @@ function posicionACoordenada(
 ): CoordenadaCalculada {
   const [cursorX, cursorY] = posicion;
 
-  if (config.claveModoCoordenadas === "absoluta" || !ventana) {
+  if (config.tipoCoordenada === "absoluta" || !ventana) {
     return {
       coordUbicacion: "absoluta",
       coordModoVentana: "pixeles",
+      coordPuntoReferencia: "sup_izq",
       coordX: cursorX,
       coordY: cursorY,
     };
@@ -126,24 +128,26 @@ function posicionACoordenada(
 
   const ventanaTupla = ventanaDesdeTupla(ventana);
 
-  if (config.claveModoCoordenadas === "ventana_porcentaje") {
+  if (config.medidoEn === "porcentaje") {
     const h = ((cursorX - ventanaTupla.x) / ventanaTupla.ancho) * 100;
     const v = ((cursorY - ventanaTupla.y) / ventanaTupla.alto) * 100;
 
     return {
       coordUbicacion: "relativa_ventana",
       coordModoVentana: "porcentaje",
+      coordPuntoReferencia: "sup_izq",
       coordX: h,
       coordY: v,
     };
   }
 
-  // ventana_pixeles
-  const base = puntoReferenciaAbsoluto("sup_izq", ventanaTupla);
+  // medidoEn === "pixeles"
+  const base = puntoReferenciaAbsoluto(config.medidoDesde, ventanaTupla);
 
   return {
     coordUbicacion: "relativa_ventana",
     coordModoVentana: "pixeles",
+    coordPuntoReferencia: config.medidoDesde,
     coordX: cursorX - base.x,
     coordY: cursorY - base.y,
   };
@@ -234,6 +238,7 @@ function cerrarGrupo(
     const pasoCoordenada = crearPasoMacro("coordenada");
     pasoCoordenada.coordUbicacion = coordenada.coordUbicacion;
     pasoCoordenada.coordModoVentana = coordenada.coordModoVentana;
+    pasoCoordenada.coordPuntoReferencia = coordenada.coordPuntoReferencia;
     pasoCoordenada.coordX = coordenada.coordX;
     pasoCoordenada.coordY = coordenada.coordY;
     pasos.push(pasoCoordenada);
