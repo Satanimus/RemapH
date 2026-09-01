@@ -1072,6 +1072,10 @@
   display: flex;
   align-items: stretch;
   gap: var(--gap12);
+  /* Referencia compartida: Extra usa este mismo ancho como mínimo
+     (ver .popup-macro-editor-extra), para que la columna de acción
+     nunca quede más angosta que los botones de Funciones. */
+  --macro-funciones-min-width: 120px;
 }
 
 .popup-macro-editor-columna-derecha {
@@ -1101,7 +1105,7 @@
 .popup-macro-funciones {
   flex: 0 0 auto;
   width: auto;
-  min-width: 120px;
+  min-width: var(--macro-funciones-min-width);
   max-width: 280px;
   min-height: 0;
   overflow-y: auto;
@@ -1222,6 +1226,7 @@
 
 .popup-macro-col-header[data-columna="extra"] {
   grid-column: 4;
+  min-width: var(--macro-funciones-min-width);
 }
 
 .popup-macro-col-header[data-columna="nota"] {
@@ -1278,7 +1283,15 @@
 .popup-macro-col-resizer {
   position: absolute;
   top: 0;
-  right: calc(var(--col-nota-width) - 4px);
+  /* El wrapper (containing block de este "right") no tiene padding
+     propio, pero .popup-macro-editor-header sí (0 calc(--gap4*2)) —
+     y ese padding es justamente el que compensa el padding
+     acumulado de .popup-macro-editor-lista + .popup-macro-editor-paso
+     del lado de las filas (ver comentario en
+     .popup-macro-editor-header). Sin sumarlo acá, el resizer quedaba
+     corrido ese mismo padding respecto al borde real Extra|Nota de
+     cada fila. */
+  right: calc(var(--gap4) * 2 + var(--col-nota-width) - 4px);
   width: 8px;
   height: 100%;
   cursor: col-resize;
@@ -1472,7 +1485,7 @@
 }
 
 .popup-macro-editor-extra {
-  min-width: 26px;
+  min-width: var(--macro-funciones-min-width);
   overflow: hidden;
   display: flex;
   align-items: center;

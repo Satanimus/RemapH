@@ -2039,13 +2039,6 @@ function crearResizerColumna(columnaDerecha: HTMLElement): HTMLElement {
 
   resizer.className = "popup-macro-col-resizer";
 
-  // Piso mínimo real de Extra: la celda del CUERPO
-  // (.popup-macro-editor-extra) siempre contiene el marcador (22px,
-  // real o placeholder .popup-macro-editor-marcador-espacio) + su
-  // gap (--gap4 = 4px) — por debajo de esos ~26px el marcador ya no
-  // entra y la celda se ve forzada a un ancho mayor al pedido.
-  const ANCHO_MINIMO_EXTRA = 26;
-
   // Etapa D: el resizer ahora escribe --col-nota-width en vez de
   // --col-extra-width — Extra (1fr) se ajusta solo con lo que sobre.
   const variable = "--col-nota-width";
@@ -2053,18 +2046,38 @@ function crearResizerColumna(columnaDerecha: HTMLElement): HTMLElement {
   resizer.addEventListener("mousedown", (eventoInicial) => {
     eventoInicial.preventDefault();
 
-    const anchoInicial = parseFloat(
-      getComputedStyle(columnaDerecha).getPropertyValue(variable),
-    );
+    const estilo = getComputedStyle(columnaDerecha);
+
+    const anchoInicial = parseFloat(estilo.getPropertyValue(variable));
 
     const xInicial = eventoInicial.clientX;
 
     // Piso mínimo de Nota, para que siga siendo legible/editable.
     const ANCHO_MINIMO_NOTA = 60;
 
+    // Piso mínimo real de Extra: mismo ancho que los botones de
+    // Funciones (--macro-funciones-min-width, ver
+    // .popup-macro-editor-extra en styl_layout.css) — por debajo de
+    // eso la columna de acción queda ilegible.
+    const anchoMinimoExtra = parseFloat(
+      estilo.getPropertyValue("--macro-funciones-min-width"),
+    );
+
+    // Ancho fijo de numero+asa+tipo — ya no son "auto" (ver
+    // --grid-columnas), así que hay que descontarlas del ancho
+    // disponible de la fila para no dejarle a Nota más espacio del
+    // que realmente le puede sobrar. Antes esto NO se restaba, lo
+    // que dejaba a Nota crecer ~192px de más, tapando Extra por
+    // completo (y numero/asa/tipo terminaban desbordando la fila).
+    const anchoColumnasFijas =
+      parseFloat(estilo.getPropertyValue("--col-numero-width")) +
+      parseFloat(estilo.getPropertyValue("--col-asa-width")) +
+      parseFloat(estilo.getPropertyValue("--col-tipo-width"));
+
     // Techo de Nota: el ancho real disponible de la fila en este
-    // momento (medido, no supuesto) menos el mínimo de Extra, para
-    // que Extra (1fr) nunca quede sin espacio.
+    // momento (medido, no supuesto) menos numero+asa+tipo (fijas) y
+    // menos el mínimo de Extra, para que ninguna de las dos se quede
+    // sin espacio.
     const anchoDisponibleFila = (): number => {
       const filaEjemplo = columnaDerecha.querySelector<HTMLElement>(
         ".popup-macro-editor-paso-fila",
@@ -2084,7 +2097,7 @@ function crearResizerColumna(columnaDerecha: HTMLElement): HTMLElement {
 
       const anchoMaximo = Math.max(
         ANCHO_MINIMO_NOTA,
-        anchoDisponibleFila() - ANCHO_MINIMO_EXTRA,
+        anchoDisponibleFila() - anchoColumnasFijas - anchoMinimoExtra,
       );
 
       const nuevoAncho = Math.min(
