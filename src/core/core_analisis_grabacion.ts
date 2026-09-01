@@ -333,6 +333,20 @@ export function analizarGrabacion(
 
   for (const evento of eventos) {
     if (evento.state === "Down") {
+      // Auto-repetición del SO: mientras se mantiene una tecla
+      // presionada, Windows reenvía Down periódicamente sin que
+      // haya habido Up de por medio. Si el código ya está vivo en
+      // el grupo actual, es esa repetición — se descarta entera
+      // (no abre grupo nuevo, no cierra el actual, no se suma
+      // como modificador) para que la tecla aparezca una sola vez
+      // sin importar el "tiempo" que se la mantuvo, y para que no
+      // corte el combo en dos si la repetición llega después de
+      // ventanaComboMs.
+      if (grupo && grupo.teclasVivas.includes(evento.entrada.codigo)) {
+        grupo.momentoUltimo = evento.momentoMs;
+        continue;
+      }
+
       if (!grupo) {
         grupo = {
           modificadores: [],
