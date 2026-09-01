@@ -1733,7 +1733,13 @@ function montarEditor(
       colNotaGuardado ?? "160px",
     );
 
-    columnaDerecha.append(crearEncabezadoColumnas(columnaDerecha));
+    columnaDerecha.append(
+      crearEncabezadoColumnas(
+        columnaDerecha,
+        opcionesExpandido,
+        alternarOpciones,
+      ),
+    );
 
     const lista = document.createElement("div");
 
@@ -2037,13 +2043,16 @@ function montarEditor(
 
 const COLUMNAS_ENCABEZADO: { nombre: string; etiqueta: string }[] = [
   { nombre: "numero", etiqueta: "#" },
-  { nombre: "asa", etiqueta: "⁝" },
   { nombre: "tipo", etiqueta: "Tipo" },
   { nombre: "extra", etiqueta: "Extra" },
   { nombre: "nota", etiqueta: "Nota" },
 ];
 
-function crearEncabezadoColumnas(columnaDerecha: HTMLElement): HTMLElement {
+function crearEncabezadoColumnas(
+  columnaDerecha: HTMLElement,
+  opcionesExpandido: boolean,
+  alAlternarOpciones: () => void,
+): HTMLElement {
   const wrapper = document.createElement("div");
 
   wrapper.className = "popup-macro-editor-header-wrapper";
@@ -2052,7 +2061,33 @@ function crearEncabezadoColumnas(columnaDerecha: HTMLElement): HTMLElement {
 
   encabezado.className = "popup-macro-editor-header";
 
+  // ⁝ Opciones — mismo botón (clase, ícono, comportamiento) que el de
+  // cada fila: alterna la misma columna Opciones para todo el editor.
+  const botonAsa = document.createElement("button");
+
+  botonAsa.className = "ui-btn popup-macro-editor-asa popup-macro-col-header";
+  botonAsa.dataset.columna = "asa";
+  botonAsa.textContent = "⁝";
+  botonAsa.title = "Opciones";
+  botonAsa.dataset.abierto = String(opcionesExpandido);
+
+  botonAsa.addEventListener("click", () => {
+    alAlternarOpciones();
+  });
+
+  // Orden de inserción = orden de columna (1 numero, 2 asa, 3 tipo...):
+  // el auto-placement de Grid usa un cursor que solo avanza de
+  // columna en columna en el mismo orden del DOM cuando el row es
+  // "auto" en todos los ítems (como acá) — insertar asa (columna 2)
+  // ANTES que numero (columna 1) hace que el cursor retroceda al
+  // llegar a numero y salte a una fila nueva, empujando tipo/extra/
+  // nota con él y dejando asa solo en la fila de arriba (el bug
+  // reportado: "encabezado mide como dos filas de alto").
   COLUMNAS_ENCABEZADO.forEach((columna) => {
+    if (columna.nombre === "tipo") {
+      encabezado.append(botonAsa);
+    }
+
     const celda = document.createElement("div");
 
     celda.className = "popup-macro-col-header";

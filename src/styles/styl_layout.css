@@ -1257,11 +1257,15 @@
   background: var(--border-light);
 }
 
-/* Opciones: anclado al borde izquierdo de su columna para que el
-   símbolo ⁝ no se mueva cuando la celda se ensancha al expandirse
-   (aparecen X/⧉/⊙ junto a él en el cuerpo). */
+/* Opciones: es un botón real (.ui-btn + .popup-macro-editor-asa,
+   mismas clases que el de cada fila) — mismo tamaño 28x28 que ese,
+   sin achicarlo. Solo se ancla al borde izquierdo de su columna
+   (justify-self:start) para que no se estire con el stretch por
+   defecto de Grid cuando la columna mide cientos de px con Opciones
+   expandida. El orden de inserción correcto (ver crearEncabezadoColumnas)
+   ya evita que quede en una fila de Grid aparte. */
 .popup-macro-col-header[data-columna="asa"] {
-  text-align: left;
+  justify-self: start;
 }
 
 /* H12: hitbox invisible (8px, mismo footprint que antes: 4px +
@@ -1568,9 +1572,10 @@
   color: var(--text-red);
 }
 
-.popup-macro-editor-eliminar:hover {
-  background: var(--highlight-red);
-  color: var(--text);
+.ui-btn.popup-macro-editor-eliminar:hover {
+  background: transparent;
+  border-color: var(--text-red);
+  color: var(--text-red);
 }
 
 .popup-macro-editor-lista-tipo,
