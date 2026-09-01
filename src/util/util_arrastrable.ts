@@ -202,6 +202,18 @@ export interface ControladorArrastre {
   // múltiple tras recrear el controlador en cada redibujo.
   seleccionarAdicional(id: string): void;
 
+  // Ancla de Shift+click (última fila de referencia para calcular el
+  // rango) — igual que la selección, vive en el closure de esta
+  // instancia y se pierde al destruir/recrear el controlador. El
+  // editor de Macros la lee antes de destruir y la reestablece en la
+  // instancia nueva junto con seleccionarAdicional, para que un
+  // Shift+click después de un redibujo (ej. tras la primera fila
+  // seleccionada, que dispara onSeleccionCambio → redibujar) siga
+  // extendiendo el rango en vez de reemplazar la selección.
+  obtenerAncla(): string | null;
+
+  establecerAncla(id: string | null): void;
+
   // No pedido en la interfaz original — agregado porque este
   // controlador engancha listeners en `document` (clic afuera,
   // flechas) que viven mientras exista el controlador. Un
@@ -1316,6 +1328,10 @@ export function crearControladorArrastre(
     activarModoMoverPara,
     seleccionarAdicional: (id: string) => {
       if (filas.has(id)) seleccionar(id);
+    },
+    obtenerAncla: () => anclaSeleccion,
+    establecerAncla: (id: string | null) => {
+      anclaSeleccion = id;
     },
     destruir,
   };

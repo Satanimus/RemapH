@@ -1637,6 +1637,18 @@ function montarEditor(
     ).filter((id) => idsPasosVigentes.has(id));
     const haySeleccion = idsSeleccionadosGuardados.length > 0;
 
+    // Misma lógica que idsSeleccionadosGuardados, pero para la ancla
+    // de Shift+click (ver comentario en la interfaz ControladorArrastre,
+    // util_arrastrable.ts): sin esto, seleccionar la primera fila
+    // dispara onSeleccionCambio → redibujar() → nueva instancia con
+    // ancla null, y el próximo Shift+click cae al branch que reemplaza
+    // la selección en vez de extender el rango.
+    const anclaSeleccionGuardada = controladorArrastre?.obtenerAncla();
+    const anclaSeleccionRestaurable =
+      anclaSeleccionGuardada && idsPasosVigentes.has(anclaSeleccionGuardada)
+        ? anclaSeleccionGuardada
+        : null;
+
     if (controladorArrastre) {
       controladorArrastre.destruir();
 
@@ -1979,8 +1991,7 @@ function montarEditor(
         ".popup-macro-editor-header .popup-macro-editor-opciones",
       );
 
-      const anchoFila =
-        celdaOpcionesFila?.getBoundingClientRect().width ?? 0;
+      const anchoFila = celdaOpcionesFila?.getBoundingClientRect().width ?? 0;
       const anchoPropio =
         celdaOpcionesPropia?.getBoundingClientRect().width ?? 0;
 
@@ -2095,6 +2106,8 @@ function montarEditor(
     idsSeleccionadosGuardados.forEach((id) => {
       controladorArrastre!.seleccionarAdicional(id);
     });
+
+    controladorArrastre!.establecerAncla(anclaSeleccionRestaurable);
 
     // Cerrar el popup anidado abierto (Opción/Tipo/Extra/Grabación —
     // spec punto 3 + Etapa G, solo una instancia a la vez) al hacer
@@ -2252,8 +2265,7 @@ function crearEncabezadoColumnas(
   if (opcionesExpandido) {
     const botonEliminarSeleccionadas = document.createElement("button");
 
-    botonEliminarSeleccionadas.className =
-      "ui-btn popup-macro-editor-eliminar";
+    botonEliminarSeleccionadas.className = "ui-btn popup-macro-editor-eliminar";
     botonEliminarSeleccionadas.textContent = "X";
     botonEliminarSeleccionadas.title = "Eliminar seleccionadas";
     botonEliminarSeleccionadas.disabled = !haySeleccion;
