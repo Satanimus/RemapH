@@ -1344,8 +1344,18 @@ function montarEditor(
       redibujar();
     });
 
+    // Renombrar (Etapa E5, spec punto 5): pegado a la derecha del
+    // nombre en esta misma barra, para que se lea como "esto
+    // renombra al nombre de al lado" — ya no flota suelto en el
+    // extremo derecho junto a Cancelar. El spacer de abajo empuja
+    // Cancelar al otro extremo y es lo que evita el toque accidental
+    // entre ambos (ver comentario de Cancelar más abajo).
+    const spacer = document.createElement("span");
+
+    spacer.className = "popup-macro-barra-spacer";
+
     // Cancelar (Etapa J): esquina superior derecha de la barra,
-    // separado de nombre/Renombrar por el spacer de abajo para que
+    // separado de nombre/Renombrar por el spacer de arriba para que
     // no se confunda con ellos ni se toque sin querer. Ícono ✕ solo
     // (mismo criterio que el ✕ Eliminar de cada fila): rojo en
     // hover, ver .popup-macro-barra-cancelar en styl_layout.css.
@@ -1364,7 +1374,7 @@ function montarEditor(
       cerrarEditor();
     });
 
-    barra.append(nombre, botonRenombrar, botonCancelar);
+    barra.append(nombre, botonRenombrar, spacer, botonCancelar);
 
     barra.addEventListener("mousedown", (eventoDown) => {
       // Ignora el mousedown que empieza en el botón [...] — ese
@@ -1870,6 +1880,41 @@ function montarEditor(
       lista.scrollTop = scrollTopGuardado;
     }
 
+    // Auto-scroll al expandir Tipo/Extra (spec punto 6): si la fila
+    // que se acaba de expandir es de las últimas visibles, sus
+    // opciones (lista de Tipos o detalle de Acción/Extra) se abren
+    // hacia abajo y quedan tapadas por el borde inferior de la
+    // lista — parece que no pasó nada. Se corre el scroll lo mínimo
+    // necesario para que TODO el contenido expandido (fila + su
+    // detalle) entre en el área visible, sin tocar el scroll cuando
+    // no hay nada expandido (ese caso ya quedó resuelto arriba con
+    // scrollTopGuardado). Se difiere un frame porque recién ahí el
+    // detalle expandido ya tiene su alto real medible.
+    if (idPasoExpandido !== null || idMenuAbierto !== null) {
+      const idPasoParaScroll =
+        idPasoExpandido ?? idMenuAbierto!.replace(/^tipo:/, "");
+
+      requestAnimationFrame(() => {
+        const filaExpandida = lista.querySelector<HTMLElement>(
+          `[data-paso-id="${idPasoParaScroll}"]`,
+        );
+
+        if (!filaExpandida) {
+          return;
+        }
+
+        const rectLista = lista.getBoundingClientRect();
+
+        const rectFila = filaExpandida.getBoundingClientRect();
+
+        if (rectFila.bottom > rectLista.bottom) {
+          lista.scrollTop += rectFila.bottom - rectLista.bottom;
+        } else if (rectFila.top < rectLista.top) {
+          lista.scrollTop -= rectLista.top - rectFila.top;
+        }
+      });
+    }
+
     // Encabezado y filas son grids SEPARADOS (ver comentario en
     // crearEncabezadoColumnas): el ancho "max-content" de Opciones
     // expandida se calcula por separado en cada uno, y el encabezado
@@ -2010,7 +2055,27 @@ function montarEditor(
           ".popup-lista, .popup-macro-editor-detalle, .popup-macro-grabacion-grupo[data-abierto='true']",
         );
 
-        if (menuAbierto && !menuAbierto.contains(evento.target as Node)) {
+        const objetivo = evento.target as Node;
+
+        // El propio botón que abrió el menú (Tipo/Extra,
+        // data-abierto="true" mientras está expandido) NO cuenta como "afuera":
+        // sin este chequeo, este listener corre en fase CAPTURE y se
+        // adelanta al listener de click del botón (que hace el
+        // toggle real, en fase bubble) — cierra el menú acá, redibuja
+        // y reemplaza el botón por uno nuevo ANTES de que el click
+        // original llegue a dispararlo, así que el segundo clic sobre
+        // un Tipo/Extra ya abierto lo cerraba pero nunca lo volvía a
+        // abrir (el toggle real de idMenuAbierto/idPasoExpandido en
+        // dibujar() nunca llegaba a ejecutarse con este click).
+        const botonDisparador = (objetivo as HTMLElement)?.closest?.(
+          ".popup-macro-editor-tipo[data-abierto='true'], .popup-macro-editor-accion[data-abierto='true']",
+        );
+
+        if (
+          menuAbierto &&
+          !menuAbierto.contains(objetivo) &&
+          !botonDisparador
+        ) {
           cerrarCajasAnidadas();
         }
       };

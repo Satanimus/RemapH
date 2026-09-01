@@ -1000,7 +1000,7 @@
 }
 
 .popup-macro-barra-nombre {
-  flex: 1;
+  flex: 0 1 auto;
   min-width: 0;
   color: var(--text);
   font-weight: 600;
@@ -1008,6 +1008,11 @@
   overflow: hidden;
   text-overflow: ellipsis;
   cursor: default;
+}
+
+.popup-macro-barra-spacer {
+  flex: 1;
+  min-width: var(--gap8);
 }
 
 .popup-macro-barra-boton {
