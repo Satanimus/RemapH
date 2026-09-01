@@ -2348,7 +2348,18 @@ function crearFilaPaso(
     alternarMenu(`tipo:${idPaso}`);
   });
 
-  filaPrincipal.append(botonTipo);
+  // Envoltorio de Tipo (Etapa I): el separador Tipo|Extra necesita un
+  // borde a TODA la altura de la fila, pero botonTipo (.ui-btn) trae
+  // su propia altura fija (28px) — igual que celdaOpciones envuelve
+  // a asa/X/⧉/⊙ para poder darle border-right de fila completa (ver
+  // .popup-macro-editor-opciones), acá celdaTipo envuelve a botonTipo
+  // con el mismo fin.
+  const celdaTipo = document.createElement("div");
+
+  celdaTipo.className = "popup-macro-editor-celda-tipo";
+  celdaTipo.append(botonTipo);
+
+  filaPrincipal.append(celdaTipo);
 
   // Extra — sin el listado de Tipos (spec punto 11): el resumen de
   // una línea del paso (cerrado) o "editando" mientras está

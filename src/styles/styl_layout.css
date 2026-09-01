@@ -1268,6 +1268,18 @@
   justify-self: start;
 }
 
+/* El icono ⁝ debía quedar centrado dentro del botón (28x28), pero
+   quedaba pegado a la izquierda: util_texto_boton.ts le agrega
+   .ui-btn--desborda (justify-content:flex-start) en cuanto detecta
+   scrollWidth > clientWidth — con justify-self:start el botón mide
+   exactamente su min-content y el glifo ⁝ alcanza a desbordar ese
+   ancho por debajo del pixel. Se reafirma el centrado acá con más
+   especificidad que .ui-btn--desborda (1 clase) para que ese caso
+   puntual no lo pise. */
+.ui-btn.popup-macro-editor-asa.popup-macro-col-header {
+  justify-content: center;
+}
+
 /* H12: hitbox invisible (8px, mismo footprint que antes: 4px +
    2px de margen a cada lado) con una línea fina de 1px centrada
    por ::before — mismo criterio que .divisor-columna en
@@ -1388,8 +1400,9 @@
    por celda, contraste exagerado). Acá el cebreado se pinta UNA sola
    vez, en .popup-macro-editor-paso, y las celdas quedan transparentes
    — igual que <tr>/<td> en una tabla real. La columna Nota no lleva
-   línea a su derecha (es la última) y Tipo la trae de fábrica por
-   ser un .ui-btn con borde propio, así que no se repite acá.
+   línea a su derecha (es la última) y Tipo lleva la suya propia en
+   .popup-macro-editor-celda-tipo (ver más abajo) por no ser un hijo
+   directo estirable como estos tres.
    Los botones (asa/tipo/X/⧉/⊙/acción) no entran en la lista */
 .popup-macro-editor-paso-fila>.popup-macro-editor-numero,
 .popup-macro-editor-paso-fila>.popup-macro-editor-opciones,
@@ -1488,6 +1501,13 @@
    así que solo hace falta vencer el reposo. */
 .ui-btn.popup-macro-editor-tipo {
   background: transparent;
+  /* Mismo caso que el ⁝ del encabezado: padding:0 + font-size mayor
+     (--fs16) hace que el glifo del ícono de Tipo alcance a desbordar
+     el min-content del botón por debajo del pixel, y
+     util_texto_boton.ts le agrega .ui-btn--desborda (justify-
+     content:flex-start), pegando el ícono a la izquierda. Se
+     reafirma el centrado acá con más especificidad. */
+  justify-content: center;
 }
 
 .popup-macro-editor-tipo {
@@ -1495,14 +1515,18 @@
   font-size: var(--fs16);
 }
 
-.popup-macro-editor-tipo::after {
-  content: "";
-  position: absolute;
-  top: 0;
-  right: calc(var(--gap8) / -2 - 0.5px);
-  width: 1px;
-  height: 100%;
-  background: var(--border-light);
+/* Envoltorio de Tipo (Etapa I): igual que .popup-macro-editor-opciones
+   con asa/X/⧉/⊙, este div SÍ se estira a toda la altura de la fila
+   (a diferencia de botonTipo, que trae altura fija de .ui-btn), así
+   que es él quien lleva el separador Tipo|Extra — un ::after de
+   botonTipo quedaba recortado por el overflow:hidden propio de
+   .ui-btn (y, aunque no lo estuviera, sólo habría alcanzado los
+   28px del botón, no el alto real de la fila). */
+.popup-macro-editor-celda-tipo {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-right: 1px solid var(--border-light);
 }
 
 .popup-macro-editor-extra {
@@ -1573,8 +1597,13 @@
 }
 
 .ui-btn.popup-macro-editor-eliminar:hover {
-  background: transparent;
-  border-color: var(--text-red);
+  /* !important: mismo motivo que .popup-extra-eliminar.ui-btn:hover
+     (ver arriba) — .popup-capa .ui-btn:hover (styl_botones.css, se
+     importa después de esta hoja) tiene la misma especificidad
+     (0,3,0) y, al ganar por orden de cascada, pisaba este borde rojo
+     con el cyan genérico de hover. */
+  background: transparent !important;
+  border-color: var(--text-red) !important;
   color: var(--text-red);
 }
 
