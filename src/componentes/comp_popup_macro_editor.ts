@@ -1344,7 +1344,27 @@ function montarEditor(
       redibujar();
     });
 
-    barra.append(nombre, botonRenombrar);
+    // Cancelar (Etapa J): esquina superior derecha de la barra,
+    // separado de nombre/Renombrar por el spacer de abajo para que
+    // no se confunda con ellos ni se toque sin querer. Ícono ✕ solo
+    // (mismo criterio que el ✕ Eliminar de cada fila): rojo en
+    // hover, ver .popup-macro-barra-cancelar en styl_layout.css.
+    const botonCancelar = crearBoton({
+      texto: "✕",
+      titulo: "Cancelar cambios y cerrar",
+    });
+
+    botonCancelar.classList.add("popup-macro-barra-cancelar");
+
+    botonCancelar.addEventListener("click", () => {
+      invoke("macro_cancelar", { nombre: nombreCache }).catch((error) => {
+        console.error("❌ No se pudo cancelar la edición de la macro:", error);
+      });
+
+      cerrarEditor();
+    });
+
+    barra.append(nombre, botonRenombrar, botonCancelar);
 
     barra.addEventListener("mousedown", (eventoDown) => {
       // Ignora el mousedown que empieza en el botón [...] — ese
@@ -1360,7 +1380,7 @@ function montarEditor(
   }
 
   // ----------------------------------
-  // 🔚 ZONA INFERIOR (Cancelar / Guardar como / Guardar)
+  // 🔚 ZONA INFERIOR (Guardar como / Guardar)
   // ----------------------------------
 
   function crearPieBotones(): HTMLElement {
@@ -1369,16 +1389,6 @@ function montarEditor(
     pie.className = "popup-macro-editor-pie";
 
     pie.dataset.ayudaId = "macro-editor-pie-botones";
-
-    const botonCancelar = crearBoton({ texto: "Cancelar" });
-
-    botonCancelar.addEventListener("click", () => {
-      invoke("macro_cancelar", { nombre: nombreCache }).catch((error) => {
-        console.error("❌ No se pudo cancelar la edición de la macro:", error);
-      });
-
-      cerrarEditor();
-    });
 
     const botonGuardarComo = crearBoton({ texto: "Guardar como" });
 
@@ -1414,7 +1424,7 @@ function montarEditor(
       cerrarEditor();
     });
 
-    pie.append(botonCancelar, botonGuardarComo, botonGuardar);
+    pie.append(botonGuardarComo, botonGuardar);
 
     return pie;
   }

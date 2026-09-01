@@ -1407,7 +1407,10 @@
 .popup-macro-editor-paso-fila>.popup-macro-editor-numero,
 .popup-macro-editor-paso-fila>.popup-macro-editor-opciones,
 .popup-macro-editor-paso-fila>.popup-macro-editor-extra {
-  border-right: 1px solid var(--border-light);
+  /* --border (oscuro), no --border-light: mismo criterio que la
+     tabla principal (.celda:not(:last-child), styl_tabla.css) y el
+     gestor de coordenadas (.coordenadas-tabla tbody td). */
+  border-right: 1px solid var(--border);
 }
 
 .popup-macro-editor-asa {
@@ -1526,7 +1529,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  border-right: 1px solid var(--border-light);
+  border-right: 1px solid var(--border);
 }
 
 .popup-macro-editor-extra {

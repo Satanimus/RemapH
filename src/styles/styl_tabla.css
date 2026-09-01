@@ -489,7 +489,10 @@
 
 .celda:not(:last-child) {
 
-    border-right: 1px solid var(--border-light);
+    /* --border (oscuro), no --border-light: mismo tono que ya usa
+       .divisor-columna::before más abajo, para que los separadores
+       de esta tabla sean consistentes entre sí. */
+    border-right: 1px solid var(--border);
 }
 
 .celda.nota-separador {

@@ -229,7 +229,7 @@
   font-weight: 600;
   padding: var(--gap8);
   border-bottom: 1px solid var(--border);
-  border-right: 1px solid var(--border-light);
+  border-right: 1px solid var(--border);
 }
 
 .coordenadas-tabla thead th:last-child {
@@ -239,7 +239,9 @@
 .coordenadas-tabla tbody td {
   padding: var(--gap8);
   vertical-align: middle;
-  border-right: 1px solid var(--border-light);
+  /* --border (oscuro), no --border-light: mismo tono que ya usa el
+     thead de esta misma tabla (border-bottom, arriba). */
+  border-right: 1px solid var(--border);
 }
 
 .coordenadas-tabla tbody td:last-child {

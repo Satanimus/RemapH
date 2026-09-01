@@ -233,6 +233,9 @@ Muestra el nombre de la macro.
 `[...]`
 Renombra sin salir del editor.
 
+`Cancelar`
+Cierra el editor sin aplicar los cambios hechos en esta sesión.
+
 Arrastrando esta barra se mueve toda la ventana del editor por la pantalla.
 
 ## macro-editor-panel-funciones
@@ -254,10 +257,7 @@ Se pueden expandir para editar su detalle.
 El ancho de sus columnas se ajusta arrastrando el encabezado.
 
 ## macro-editor-pie-botones
-🧩 **Editor de Macro — Cancelar / Guardar**
-
-`Cancelar`
-Cierra el editor sin aplicar los cambios hechos en esta sesión.
+🧩 **Editor de Macro — Guardar**
 
 `Guardar` (o `Guardar como`)
 Confirma la secuencia de pasos y la deja lista para usarse en esta fila.
