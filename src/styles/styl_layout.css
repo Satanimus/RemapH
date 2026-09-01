@@ -1081,7 +1081,21 @@
   display: flex;
   flex-direction: column;
   gap: var(--gap4);
-  --grid-columnas: auto auto auto 1fr var(--col-nota-width);
+  /* numero/asa/tipo eran "auto": el encabezado y cada fila son
+     grids SEPARADOS (uno por .popup-macro-editor-header, uno por
+     cada .popup-macro-editor-paso-fila) y Grid no sincroniza anchos
+     auto entre instancias distintas — cada uno mide su propio
+     contenido (el header solo tiene texto plano, las filas botones
+     reales de 28px, y Opciones además crece al expandirse), así que
+     terminaban con anchos ligeramente distintos entre sí, desalineando
+     todo lo que viene después en cada fila/el header. Ancho fijo vía
+     variable (mismo patrón que --col-nota-width) para que todos usen
+     el mismo número siempre. --col-asa-width cubre el caso expandido
+     (4 botones de 28px + 3 gaps de --gap4: asa/X/⧉/⊙). */
+  --col-numero-width: 32px;
+  --col-asa-width: 128px;
+  --col-tipo-width: 32px;
+  --grid-columnas: var(--col-numero-width) var(--col-asa-width) var(--col-tipo-width) 1fr var(--col-nota-width);
 }
 
 .popup-macro-funciones {
@@ -1459,6 +1473,7 @@
 
 .popup-macro-editor-extra {
   min-width: 26px;
+  overflow: hidden;
   display: flex;
   align-items: center;
   gap: var(--gap4);
