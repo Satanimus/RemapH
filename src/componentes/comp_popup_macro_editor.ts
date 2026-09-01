@@ -1673,6 +1673,15 @@ function montarEditor(
         .slice(indice + 1)
         .some((paso) => paso.tipo === "bucle");
 
+    // hayVistaPrevia: si existe al menos un paso Coordenada, todas las
+    // filas (tengan o no ese botón) reservan el mismo ancho para ⊙ en
+    // la columna Opciones expandida — mismo criterio que hayBucle con
+    // Marcador, para que ninguna fila quede más angosta que las demás
+    // y la pista de Grid (max-content) sea igual en todas.
+    const hayVistaPrevia = macroArchivo.pasos.some(
+      (paso) => paso.tipo === "coordenada",
+    );
+
     // ----------------------------------
     // 🏷️ BARRA DE TÍTULO ARRASTRABLE
     // ----------------------------------
@@ -1748,6 +1757,7 @@ function montarEditor(
           macroArchivo,
           hayBucle,
           hayBucleDespuesDe(indice),
+          hayVistaPrevia,
           programaFiltroApp,
           idPasoExpandido,
           idMenuAbierto,
@@ -1842,6 +1852,34 @@ function montarEditor(
     // descarta la asignación.
     if (scrollTopGuardado) {
       lista.scrollTop = scrollTopGuardado;
+    }
+
+    // Encabezado y filas son grids SEPARADOS (ver comentario en
+    // crearEncabezadoColumnas): el ancho "max-content" de Opciones
+    // expandida se calcula por separado en cada uno, y el encabezado
+    // (sin los botones ⁝/X/⧉/⊙ reales) da un número más chico que las
+    // filas — Tipo/Extra quedaban centrados en una columna angosta
+    // que no correspondía a donde realmente caen esas columnas en las
+    // filas. Se mide el ancho ya renderizado de una fila (todas miden
+    // igual, ver hayVistaPrevia más arriba) y se aplica ese mismo
+    // número en px al encabezado.
+    if (opcionesExpandido) {
+      const celdaOpcionesReferencia = lista.querySelector<HTMLElement>(
+        ".popup-macro-editor-opciones",
+      );
+      const encabezado = columnaDerecha.querySelector<HTMLElement>(
+        ".popup-macro-editor-header",
+      );
+
+      if (celdaOpcionesReferencia && encabezado) {
+        const anchoOpciones =
+          celdaOpcionesReferencia.getBoundingClientRect().width;
+
+        encabezado.style.setProperty(
+          "grid-template-columns",
+          `var(--col-numero-width) ${anchoOpciones}px var(--col-tipo-width) 1fr var(--col-nota-width)`,
+        );
+      }
     }
 
     // El componente de arrastre necesita el contenedor YA en el DOM
@@ -2129,6 +2167,7 @@ function crearFilaPaso(
   macroArchivo: MacroArchivo,
   hayBucle: boolean,
   elegiblePorMarcador: boolean,
+  hayVistaPrevia: boolean,
   programaFiltroApp: string | null,
   idPasoExpandido: string | null,
   idMenuAbierto: string | null,
@@ -2217,9 +2256,11 @@ function crearFilaPaso(
     celdaOpciones.append(botonDuplicarRapido);
 
     // ⊙ Previsualizar — Etapa C: solo en filas Tipo === "coordenada".
-    // No afecta a las demás filas ni al header: el ancho de Opciones
-    // se pisa a max-content solo en ESTA fila vía
-    // data-opciones-expandido (ver styl_layout.css).
+    // hayVistaPrevia reserva el mismo espacio (vacío) en las demás
+    // filas cuando exista al menos una Coordenada en la macro, mismo
+    // criterio que la columna Marcador con hayBucle, para que la
+    // pista de Grid (max-content) sea igual en todas las filas y no
+    // queden desalineadas entre sí.
     if (paso.tipo === "coordenada") {
       const botonPreviewRapido = document.createElement("button");
 
@@ -2239,6 +2280,12 @@ function crearFilaPaso(
       });
 
       celdaOpciones.append(botonPreviewRapido);
+    } else if (hayVistaPrevia) {
+      const espacioPreview = document.createElement("span");
+
+      espacioPreview.className = "popup-macro-editor-previsualizar-espacio";
+
+      celdaOpciones.append(espacioPreview);
     }
   }
 

@@ -1089,15 +1089,16 @@
      grids SEPARADOS (uno por .popup-macro-editor-header, uno por
      cada .popup-macro-editor-paso-fila) y Grid no sincroniza anchos
      auto entre instancias distintas — cada uno mide su propio
-     contenido (el header solo tiene texto plano, las filas botones
-     reales de 28px, y Opciones además crece al expandirse), así que
-     terminaban con anchos ligeramente distintos entre sí, desalineando
-     todo lo que viene después en cada fila/el header. Ancho fijo vía
-     variable (mismo patrón que --col-nota-width) para que todos usen
-     el mismo número siempre. --col-asa-width cubre el caso expandido
-     (4 botones de 28px + 3 gaps de --gap4: asa/X/⧉/⊙). */
+     contenido, así que terminaban con anchos ligeramente distintos
+     entre sí, desalineando todo lo que viene después en cada
+     fila/el header. Ancho fijo vía variable (mismo patrón que
+     --col-nota-width) para que todos usen el mismo número siempre.
+     --col-asa-width es el ancho COLAPSADO (1 botón, ⁝); cuando una
+     fila puntual tiene Opciones expandida, esa fila (y solo esa)
+     pisa esta variable localmente con max-content — ver
+     [data-opciones-expandido="true"] más abajo. */
   --col-numero-width: 32px;
-  --col-asa-width: 128px;
+  --col-asa-width: 32px;
   --col-tipo-width: 32px;
   --grid-columnas: var(--col-numero-width) var(--col-asa-width) var(--col-tipo-width) 1fr var(--col-nota-width);
 }
@@ -1358,6 +1359,22 @@
   position: relative;
 }
 
+/* Opciones flexible por fila: cuando esta fila puntual tiene sus
+   botones expandidos (asa/X/⧉/⊙), su columna Opciones crece a
+   max-content (justo lo que ocupen esos íconos) y el resto de las
+   columnas se corre, absorbiendo la diferencia la columna Extra
+   (1fr). Solo pisa esta fila — el header y las demás filas
+   colapsadas siguen en 32px.
+   Pisa grid-template-columns directo (no --col-asa-width): --col-
+   asa-width es leída por --grid-columnas en un nivel de indirección
+   aparte (.popup-macro-editor-columna-derecha) y esa sustitución
+   anidada de var() dentro de var() no estaba tomando el valor local
+   de esta fila — la pista quedaba en 32px y los botones nuevos se
+   dibujaban por encima de Tipo/Extra en vez de correrlas. */
+.popup-macro-editor-paso-fila[data-opciones-expandido="true"] {
+  grid-template-columns: var(--col-numero-width) max-content var(--col-tipo-width) 1fr var(--col-nota-width);
+}
+
 /* Bug 2/3: líneas divisorias entre columnas, mismo mecanismo que la
    tabla del gestor de coordenadas (border-right en cada celda, ver
    .coordenadas-tabla tbody td en styl_coordenadas.css) — en vez del
@@ -1527,10 +1544,24 @@
    de los @import.
    ====================================================== */
 
-.ui-btn.popup-macro-editor-asa[data-abierto="true"],
+/* Opciones (asa) no abre un popup anidado real — solo expande sus
+   botones inline — así que no debe quedar con el borde cyan
+   "pegado" mientras dure expandida, solo al pasar el mouse (hover
+   genérico de .ui-btn en styl_botones.css). Tipo/Extra sí abren un
+   popup real y conservan el borde mientras esté abierto. */
 .ui-btn.popup-macro-editor-tipo[data-abierto="true"],
 .ui-btn.popup-macro-editor-accion[data-abierto="true"] {
   border-color: var(--highlight);
+}
+
+/* Reserva el mismo espacio que ocupa el botón ⊙ real (.ui-btn:
+   height/min-width 28px, ver styl_botones.css) en las filas que no
+   son Coordenada, cuando hayVistaPrevia — para que la columna
+   Opciones expandida mida siempre lo mismo en todas las filas. */
+.popup-macro-editor-previsualizar-espacio {
+  display: inline-block;
+  width: 28px;
+  height: 28px;
 }
 
 .popup-macro-editor-eliminar {
