@@ -200,6 +200,15 @@ interface GrupoAbierto {
 
   ventana: [number, number, number, number] | null;
 
+  // Posición/ventana en el momento del Up del gatillo (botón de
+  // mouse), si trajo una — null hasta que ese Up llega. Solo se
+  // usa para detectar arrastre (Regla nueva: Down en un punto, Up
+  // en otro distinto ⇒ el grupo emite Down/Up diferido en vez de
+  // colapsar en un único paso Tecla/Mouse).
+  posicionAlSoltar: [number, number] | null;
+
+  ventanaAlSoltar: [number, number, number, number] | null;
+
   momentoApertura: number;
 
   momentoUltimo: number;
@@ -211,6 +220,15 @@ interface GrupoAbierto {
 // Devuelve, en orden: Espera (si > 0 y no es el primer grupo de
 // la sesión) + Coordenada (si hubo posición capturada Y difiere
 // de la última posición ya emitida) + Tecla/Mouse (Regla 7).
+//
+// Arrastre (Down en un punto, Up en otro): si el gatillo es de
+// tipo Mouse y posicionAlSoltar difiere de la posición de
+// apertura, un único paso "Tecla/Mouse" simple perdería el
+// traslado — en vez de eso se emiten DOS pasos encadenados con
+// teclaRetencion "down"/"up" (mismo mecanismo que el arrastre
+// diferido editable a mano, ver core_macro.ts), cada uno con su
+// propia Coordenada, igual que si el usuario lo hubiera armado
+// manualmente en el editor.
 // ======================================================
 
 function cerrarGrupo(
@@ -236,6 +254,13 @@ function cerrarGrupo(
     }
   }
 
+  const esArrastre =
+    grupo.gatillo.tipo === "Mouse" &&
+    !!grupo.posicion &&
+    !!grupo.posicionAlSoltar &&
+    (grupo.posicion[0] !== grupo.posicionAlSoltar[0] ||
+      grupo.posicion[1] !== grupo.posicionAlSoltar[1]);
+
   // omitirCoordenada: la posición del mouse es la misma que la del
   // último paso Coordenada ya agregado — no hace falta repetirla.
   if (grupo.posicion && !omitirCoordenada) {
@@ -254,13 +279,53 @@ function cerrarGrupo(
     pasos.push(pasoCoordenada);
   }
 
-  const pasoTecla = crearPasoMacro("tecla_mouse");
   const trigger = crearTrigger();
   trigger.modificadores = grupo.modificadores;
   trigger.gatillo = grupo.gatillo;
   trigger.condicion = "simple";
-  pasoTecla.teclaAccion = trigger;
-  pasos.push(pasoTecla);
+
+  if (!esArrastre) {
+    const pasoTecla = crearPasoMacro("tecla_mouse");
+    pasoTecla.teclaAccion = trigger;
+    pasos.push(pasoTecla);
+
+    return pasos;
+  }
+
+  // Arrastre: paso Down (reusa el trigger + Coordenada ya
+  // agregados arriba, que corresponden al punto de apertura).
+  const pasoDown = crearPasoMacro("tecla_mouse");
+  pasoDown.teclaAccion = trigger;
+  pasoDown.teclaRetencion = "down";
+  pasos.push(pasoDown);
+
+  // Coordenada del punto de soltado, siempre presente (es la
+  // razón de ser de la rama de arrastre).
+  const coordenadaSoltar = posicionACoordenada(
+    grupo.posicionAlSoltar as [number, number],
+    grupo.ventanaAlSoltar,
+    config,
+  );
+
+  const pasoCoordenadaSoltar = crearPasoMacro("coordenada");
+  pasoCoordenadaSoltar.coordUbicacion = coordenadaSoltar.coordUbicacion;
+  pasoCoordenadaSoltar.coordModoVentana = coordenadaSoltar.coordModoVentana;
+  pasoCoordenadaSoltar.coordPuntoReferencia =
+    coordenadaSoltar.coordPuntoReferencia;
+  pasoCoordenadaSoltar.coordX = coordenadaSoltar.coordX;
+  pasoCoordenadaSoltar.coordY = coordenadaSoltar.coordY;
+  pasos.push(pasoCoordenadaSoltar);
+
+  const pasoUp = crearPasoMacro("tecla_mouse");
+  // Mismo trigger (secuencia idéntica) — es lo que
+  // validarRetencionMacro exige para emparejar down/up.
+  const triggerUp = crearTrigger();
+  triggerUp.modificadores = grupo.modificadores;
+  triggerUp.gatillo = grupo.gatillo;
+  triggerUp.condicion = "simple";
+  pasoUp.teclaAccion = triggerUp;
+  pasoUp.teclaRetencion = "up";
+  pasos.push(pasoUp);
 
   return pasos;
 }
@@ -316,7 +381,8 @@ export function analizarGrabacion(
     );
 
     if (grupoACerrar.posicion) {
-      ultimaPosicionEmitida = grupoACerrar.posicion;
+      ultimaPosicionEmitida =
+        grupoACerrar.posicionAlSoltar ?? grupoACerrar.posicion;
     }
 
     momentoCierreAnterior = momentoCierre;
@@ -354,6 +420,8 @@ export function analizarGrabacion(
           teclasVivas: [evento.entrada.codigo],
           posicion: evento.posicion,
           ventana: evento.ventana,
+          posicionAlSoltar: null,
+          ventanaAlSoltar: null,
           momentoApertura: evento.momentoMs,
           momentoUltimo: evento.momentoMs,
         };
@@ -375,6 +443,8 @@ export function analizarGrabacion(
         teclasVivas: [evento.entrada.codigo],
         posicion: evento.posicion,
         ventana: evento.ventana,
+        posicionAlSoltar: null,
+        ventanaAlSoltar: null,
         momentoApertura: evento.momentoMs,
         momentoUltimo: evento.momentoMs,
       };
@@ -384,6 +454,16 @@ export function analizarGrabacion(
     if (evento.state === "Up") {
       if (!grupo) {
         continue;
+      }
+
+      // Posición al soltar el GATILLO (el botón de mouse que
+      // manda la acción, no un modificador que se suelta antes) —
+      // es la que se compara contra la de apertura para detectar
+      // arrastre. Se toma del propio evento Up, que trae su
+      // posición/ventana actual del back-end.
+      if (evento.entrada.codigo === grupo.gatillo.codigo) {
+        grupo.posicionAlSoltar = evento.posicion;
+        grupo.ventanaAlSoltar = evento.ventana;
       }
 
       grupo.teclasVivas = grupo.teclasVivas.filter(
@@ -408,6 +488,8 @@ export function analizarGrabacion(
           teclasVivas: [],
           posicion: grupo.posicion ?? evento.posicion,
           ventana: grupo.ventana ?? evento.ventana,
+          posicionAlSoltar: null,
+          ventanaAlSoltar: null,
           momentoApertura: grupo.momentoApertura,
           momentoUltimo: evento.momentoMs,
         },
@@ -427,6 +509,8 @@ export function analizarGrabacion(
         teclasVivas: [],
         posicion: evento.posicion,
         ventana: evento.ventana,
+        posicionAlSoltar: null,
+        ventanaAlSoltar: null,
         momentoApertura: evento.momentoMs,
         momentoUltimo: evento.momentoMs,
       },
