@@ -1164,7 +1164,6 @@
    ====================================================== */
 
 .popup-macro-editor-header {
-  flex: 0 0 auto;
   position: relative;
   display: grid;
   grid-template-columns: var(--grid-columnas);
@@ -1252,10 +1251,16 @@
    border-radius se pintaba entero con --border-light, lo que se
    veía como una barra gruesa (fácil de confundir con una barra de
    scroll) en vez de una línea.
-   El resizer no es una columna del grid (solo la función de
-   redimensionar Nota para el usuario) — se saca del flujo con
-   position:absolute, anclado al borde entre Extra y Nota, así no
-   suma un ítem de más contra --grid-columnas. */
+   El resizer ya no es hijo del grid del encabezado (era un ítem más
+   del grid pese a position:absolute y desalineaba el auto-placement
+   de las celdas reales) — ahora es hermano de .popup-macro-editor-header
+   dentro de .popup-macro-editor-header-wrapper, y se posiciona sobre
+   ese wrapper, anclado al borde entre Extra y Nota. */
+.popup-macro-editor-header-wrapper {
+  flex: 0 0 auto;
+  position: relative;
+}
+
 .popup-macro-col-resizer {
   position: absolute;
   top: 0;

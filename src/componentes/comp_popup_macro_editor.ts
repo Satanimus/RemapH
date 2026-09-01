@@ -2006,6 +2006,10 @@ const COLUMNAS_ENCABEZADO: { nombre: string; etiqueta: string }[] = [
 ];
 
 function crearEncabezadoColumnas(columnaDerecha: HTMLElement): HTMLElement {
+  const wrapper = document.createElement("div");
+
+  wrapper.className = "popup-macro-editor-header-wrapper";
+
   const encabezado = document.createElement("div");
 
   encabezado.className = "popup-macro-editor-header";
@@ -2018,15 +2022,16 @@ function crearEncabezadoColumnas(columnaDerecha: HTMLElement): HTMLElement {
     celda.textContent = columna.etiqueta;
 
     encabezado.append(celda);
-
-    // Único separador visible: entre Extra y Nota (spec punto 7).
-    // El resto de las columnas tiene ancho fijo, sin resizer.
-    if (columna.nombre === "extra") {
-      encabezado.append(crearResizerColumna(columnaDerecha));
-    }
   });
 
-  return encabezado;
+  // El resizer vive fuera del grid del encabezado (hermano, no hijo):
+  // aunque sea position:absolute, como hijo del grid seguía consumiendo
+  // un turno del auto-placement de las celdas y desalineaba todo lo que
+  // viene después de él en el DOM. Como hermano, flota sobre el borde
+  // Extra|Nota sin participar del grid en absoluto.
+  wrapper.append(encabezado, crearResizerColumna(columnaDerecha));
+
+  return wrapper;
 }
 
 function crearResizerColumna(columnaDerecha: HTMLElement): HTMLElement {
