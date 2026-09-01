@@ -113,6 +113,7 @@ import {
 
 import { crearControladorArrastre } from "../util/util_arrastrable";
 import type { ControladorArrastre } from "../util/util_arrastrable";
+import { duplicarSeleccionComoBloque } from "../util/util_duplicar_seleccion";
 
 import {
   textoUbicacionCoordenada,
@@ -2965,42 +2966,33 @@ function duplicarPasoMacro(
 }
 
 // Versión en lote de duplicarPasoMacro — usada por "Duplicar
-// seleccionadas" de la cabecera de Opciones (spec punto 1). Respeta
-// el orden actual del arreglo: cada paso seleccionado se clona
-// inmediatamente después de sí mismo, igual que la versión
-// individual, ajustando el desplazamiento acumulado por cada
-// inserción previa del propio lote.
+// seleccionadas" de la cabecera de Opciones (spec punto 1). Las
+// copias se agrupan como bloque contiguo inmediatamente después de
+// la última fila seleccionada (ver util_duplicarSeleccionComoBloque,
+// genérica y reutilizable por cualquier otra tabla).
 function duplicarPasosSeleccionados(
   idsSeleccionados: string[],
   macroArchivo: MacroArchivo,
   guardarYRedibujar: () => void,
 ): void {
-  const idsASet = new Set(idsSeleccionados);
+  macroArchivo.pasos = duplicarSeleccionComoBloque(
+    macroArchivo.pasos,
+    idsSeleccionados,
+    idDePaso,
+    (paso) => {
+      const nuevoPaso = clonarPasoMacro(paso);
 
-  // Índices ORIGINALES (antes de insertar nada), en orden, de cada
-  // paso seleccionado — se recorren de atrás hacia adelante para
-  // que insertar en un índice no corra los índices ya calculados
-  // de los pasos anteriores en la lista.
-  const indices = macroArchivo.pasos
-    .map((paso, indice) => ({ paso, indice }))
-    .filter(({ paso }) => idsASet.has(idDePaso(paso)))
-    .map(({ indice }) => indice);
+      // Misma regla que duplicarPasoMacro (spec punto 4): Bucle
+      // duplicado nace limpio, con letra propia nueva — recalculada
+      // por cada copia para no repetir letra entre bucles
+      // duplicados dentro del mismo lote.
+      if (nuevoPaso.tipo === "bucle") {
+        nuevoPaso.bucleMarcadorDestino = letraBucleDisponible(macroArchivo.pasos);
+      }
 
-  for (let i = indices.length - 1; i >= 0; i--) {
-    const indiceOriginal = indices[i];
-
-    const nuevoPaso = clonarPasoMacro(macroArchivo.pasos[indiceOriginal]);
-
-    // Misma regla que duplicarPasoMacro (spec punto 4): Bucle
-    // duplicado nace limpio, con letra propia nueva — recalculada
-    // en cada iteración para no repetir letra entre bucles
-    // duplicados dentro del mismo lote.
-    if (nuevoPaso.tipo === "bucle") {
-      nuevoPaso.bucleMarcadorDestino = letraBucleDisponible(macroArchivo.pasos);
-    }
-
-    macroArchivo.pasos.splice(indiceOriginal + 1, 0, nuevoPaso);
-  }
+      return nuevoPaso;
+    },
+  );
 
   guardarYRedibujar();
 }
