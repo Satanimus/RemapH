@@ -1014,6 +1014,23 @@
   flex: 0 0 auto;
 }
 
+/* ✕ Cancelar cambios y cerrar (Etapa J, esquina de la barra):
+   mismo criterio que el ✕ Eliminar de cada fila
+   (.popup-macro-editor-eliminar) — en hover, sin el brillo cyan
+   genérico de .ui-btn:hover, fondo transparente y borde/texto en
+   rojo. !important por el mismo motivo que ese: .popup-capa
+   .ui-btn:hover tiene la misma especificidad y, por orden de
+   cascada, pisaría este rojo con el cyan si no se fuerza acá. */
+.popup-macro-barra-cancelar {
+  flex: 0 0 auto;
+}
+
+.popup-capa .ui-btn.popup-macro-barra-cancelar:hover {
+  background: transparent !important;
+  border-color: var(--text-red) !important;
+  color: var(--text-red);
+}
+
 .popup-macro-barra-input {
   flex: 1;
   min-width: 0;
@@ -1300,14 +1317,14 @@
 .popup-macro-col-resizer {
   position: absolute;
   top: 0;
-  /* El wrapper (containing block de este "right") no tiene padding
-     propio, pero .popup-macro-editor-header sí (0 calc(--gap4*2)) —
-     y ese padding es justamente el que compensa el padding
-     acumulado de .popup-macro-editor-lista + .popup-macro-editor-paso
-     del lado de las filas (ver comentario en
-     .popup-macro-editor-header). Sin sumarlo acá, el resizer quedaba
-     corrido ese mismo padding respecto al borde real Extra|Nota de
-     cada fila. */
+  /* Posición real (`left`) medida y sincronizada por JS contra el
+     borde Extra|Nota de una fila real — ver reposicionar() en
+     crearResizerColumna(). Un cálculo puramente en CSS (como el
+     `right: calc(...--col-nota-width...)` anterior) no tenía forma
+     de saber cuándo Extra ya había tocado su ancho mínimo al achicar
+     el POPUP entero: el separador seguía corriéndose sin tope y
+     terminaba invadiendo la columna Extra. El valor de acá abajo es
+     solo el arranque, antes del primer requestAnimationFrame. */
   right: calc(var(--gap4) * 2 + var(--col-nota-width) - 4px);
   width: 8px;
   height: 100%;

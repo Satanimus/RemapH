@@ -2112,12 +2112,17 @@ function crearEncabezadoColumnas(
   // un turno del auto-placement de las celdas y desalineaba todo lo que
   // viene después de él en el DOM. Como hermano, flota sobre el borde
   // Extra|Nota sin participar del grid en absoluto.
-  wrapper.append(encabezado, crearResizerColumna(columnaDerecha));
+  const resizer = crearResizerColumna(wrapper, columnaDerecha);
+
+  wrapper.append(encabezado, resizer);
 
   return wrapper;
 }
 
-function crearResizerColumna(columnaDerecha: HTMLElement): HTMLElement {
+function crearResizerColumna(
+  wrapper: HTMLElement,
+  columnaDerecha: HTMLElement,
+): HTMLElement {
   const resizer = document.createElement("div");
 
   resizer.className = "popup-macro-col-resizer";
@@ -2125,6 +2130,71 @@ function crearResizerColumna(columnaDerecha: HTMLElement): HTMLElement {
   // Etapa D: el resizer ahora escribe --col-nota-width en vez de
   // --col-extra-width — Extra (1fr) se ajusta solo con lo que sobre.
   const variable = "--col-nota-width";
+
+  // Etapa K: el resizer ya NO se posiciona con un `right` fijo en CSS
+  // (calc(...--col-nota-width...) asumía que la fila siempre tenía
+  // ancho de sobra). Al achicar el POPUP desde el borde, Extra puede
+  // llegar a su --macro-funciones-min-width y comprimirse por debajo
+  // de lo que --col-nota-width "cree" — el separador visual seguía
+  // corriéndose hacia la izquierda sin tope, invadiendo Extra y
+  // desalineándose del separador real de cada fila (que sí respeta
+  // los mínimos porque nace de un grid-template-columns real).
+  // Ahora medimos la posición real del borde Extra|Nota en una fila
+  // (o el propio encabezado si aún no hay filas) y la re-sincronizamos
+  // en cada resize del popup — así el separador queda SIEMPRE pegado
+  // al límite real, sin traspasar Extra, y alineado con las filas.
+  const reposicionar = (): void => {
+    const filaEjemplo = columnaDerecha.querySelector<HTMLElement>(
+      ".popup-macro-editor-paso-fila",
+    );
+
+    const referencia =
+      filaEjemplo ??
+      wrapper.querySelector<HTMLElement>(".popup-macro-editor-header");
+
+    if (!referencia) {
+      return;
+    }
+
+    // Borde izquierdo real de la celda Nota (última columna del
+    // grid), medido contra el wrapper (containing block del resizer).
+    const celdas = referencia.children;
+
+    const celdaNota = celdas[celdas.length - 1] as HTMLElement | undefined;
+
+    if (!celdaNota) {
+      return;
+    }
+
+    const rectWrapper = wrapper.getBoundingClientRect();
+
+    const rectNota = celdaNota.getBoundingClientRect();
+
+    const posicion = rectNota.left - rectWrapper.left - 4;
+
+    resizer.style.left = `${Math.max(0, posicion)}px`;
+    resizer.style.right = "auto";
+  };
+
+  requestAnimationFrame(reposicionar);
+
+  // El encabezado se recrea entero en cada redibujar() del editor
+  // (no hay hook de "destruir" para esta pieza puntual, ver
+  // controladorArrastre.destruir() para el resto del popup) — así
+  // que el propio callback corta la observación en cuanto detecta
+  // que este wrapper ya no sigue en el DOM, en vez de acumular
+  // observers huérfanos en cada redibujado.
+  const observador = new ResizeObserver(() => {
+    if (!wrapper.isConnected) {
+      observador.disconnect();
+
+      return;
+    }
+
+    reposicionar();
+  });
+
+  observador.observe(wrapper);
 
   resizer.addEventListener("mousedown", (eventoInicial) => {
     eventoInicial.preventDefault();
@@ -2189,6 +2259,11 @@ function crearResizerColumna(columnaDerecha: HTMLElement): HTMLElement {
       );
 
       columnaDerecha.style.setProperty(variable, `${nuevoAncho}px`);
+
+      // --col-nota-width no cambia el tamaño de `wrapper` (el
+      // ResizeObserver de arriba no lo detecta), así que durante el
+      // propio arrastre hay que reposicionar a mano en cada frame.
+      reposicionar();
     };
 
     const alSoltar = (): void => {
