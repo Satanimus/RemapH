@@ -2155,6 +2155,7 @@ function crearFilaPaso(
   const filaPrincipal = document.createElement("div");
 
   filaPrincipal.className = "popup-macro-editor-paso-fila";
+  filaPrincipal.dataset.opcionesExpandido = String(opcionesExpandido);
 
   // # — fuera del elemento arrastrable (mismo patrón que el carril
   // de números de la tabla principal en ui_tabla.ts, spec punto
@@ -2215,9 +2216,10 @@ function crearFilaPaso(
 
     celdaOpciones.append(botonDuplicarRapido);
 
-    // ⊙ Previsualizar — Etapa C: solo en filas Tipo === "coordenada",
-    // sin afectar el ancho de columna en las demás (Grid ya reparte
-    // auto tomando el máximo real entre todas).
+    // ⊙ Previsualizar — Etapa C: solo en filas Tipo === "coordenada".
+    // No afecta a las demás filas ni al header: el ancho de Opciones
+    // se pisa a max-content solo en ESTA fila vía
+    // data-opciones-expandido (ver styl_layout.css).
     if (paso.tipo === "coordenada") {
       const botonPreviewRapido = document.createElement("button");
 
