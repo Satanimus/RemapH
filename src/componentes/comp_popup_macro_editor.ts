@@ -1615,6 +1615,28 @@ function montarEditor(
   }
 
   function dibujar(): void {
+    // Se lee ANTES de destruir la instancia — la llamada a
+    // crearEncabezadoColumnas más abajo ocurre antes de que se cree
+    // la instancia NUEVA de controladorArrastre (ver más abajo), así
+    // que sin esto el primer redibujado tras seleccionar filas no
+    // mostraría los botones de lote hasta el segundo redibujado.
+    // Mismo criterio que scrollTopGuardado/colNotaGuardado para
+    // preservar estado entre redibujados. Se filtra contra los ids
+    // vigentes en macroArchivo.pasos: el controlador viejo no se
+    // entera cuando "Eliminar seleccionadas" ya borró esos pasos del
+    // modelo, así que sin este filtro haySeleccion daría true un
+    // redibujado de más (con ids de filas que ya no existen).
+    // idsSeleccionadosGuardados se reutiliza más abajo para
+    // restaurar la selección en la instancia nueva de
+    // controladorArrastre.
+    const idsPasosVigentes = new Set(
+      macroArchivo.pasos.map((paso) => idDePaso(paso)),
+    );
+    const idsSeleccionadosGuardados = (
+      controladorArrastre?.obtenerSeleccionadas() ?? []
+    ).filter((id) => idsPasosVigentes.has(id));
+    const haySeleccion = idsSeleccionadosGuardados.length > 0;
+
     if (controladorArrastre) {
       controladorArrastre.destruir();
 
@@ -1753,13 +1775,26 @@ function montarEditor(
       colNotaGuardado ?? "160px",
     );
 
-    columnaDerecha.append(
-      crearEncabezadoColumnas(
-        columnaDerecha,
-        opcionesExpandido,
-        alternarOpciones,
-      ),
+    const encabezadoElemento = crearEncabezadoColumnas(
+      columnaDerecha,
+      opcionesExpandido,
+      alternarOpciones,
+      haySeleccion,
+      () =>
+        duplicarPasosSeleccionados(
+          controladorArrastre!.obtenerSeleccionadas(),
+          macroArchivo,
+          guardarYRedibujar,
+        ),
+      () =>
+        eliminarPasosSeleccionados(
+          controladorArrastre!.obtenerSeleccionadas(),
+          macroArchivo,
+          guardarYRedibujar,
+        ),
     );
+
+    columnaDerecha.append(encabezadoElemento);
 
     const lista = document.createElement("div");
 
@@ -1925,16 +1960,32 @@ function montarEditor(
     // igual, ver hayVistaPrevia más arriba) y se aplica ese mismo
     // número en px al encabezado.
     if (opcionesExpandido) {
-      const celdaOpcionesReferencia = lista.querySelector<HTMLElement>(
-        ".popup-macro-editor-opciones",
-      );
       const encabezado = columnaDerecha.querySelector<HTMLElement>(
         ".popup-macro-editor-header",
       );
 
-      if (celdaOpcionesReferencia && encabezado) {
-        const anchoOpciones =
-          celdaOpcionesReferencia.getBoundingClientRect().width;
+      // Con la columna de Opciones expandida, la cabecera agrega los
+      // botones X/⧉ de lote además del asa — visibles siempre que la
+      // columna esté expandida (deshabilitados sin selección), así
+      // que su ancho ya no depende de si hay selección activa. Se
+      // mide el máximo entre el ancho de una fila (que puede sumar un
+      // botón ⊙ de vista previa o su espaciador) y el ancho ya
+      // renderizado de la propia celda de Opciones del encabezado,
+      // para que ninguno de los dos quede recortado.
+      const celdaOpcionesFila = lista.querySelector<HTMLElement>(
+        ".popup-macro-editor-opciones",
+      );
+      const celdaOpcionesPropia = columnaDerecha.querySelector<HTMLElement>(
+        ".popup-macro-editor-header .popup-macro-editor-opciones",
+      );
+
+      const anchoFila =
+        celdaOpcionesFila?.getBoundingClientRect().width ?? 0;
+      const anchoPropio =
+        celdaOpcionesPropia?.getBoundingClientRect().width ?? 0;
+
+      if (encabezado && (celdaOpcionesFila || celdaOpcionesPropia)) {
+        const anchoOpciones = Math.max(anchoFila, anchoPropio);
 
         encabezado.style.setProperty(
           "grid-template-columns",
@@ -2011,6 +2062,18 @@ function montarEditor(
           redibujar();
         }, 0);
       },
+      onSeleccionCambio: () => {
+        // Mismo motivo que el setTimeout de onReordenar arriba: este
+        // callback puede correr en medio de manejarPointerUpArrastre
+        // (util_arrastrable.ts) — p.ej. en el clic mantenido sobre el
+        // asa que activa modo Mover sin llegar a arrastrar, o cuando
+        // dibujar() llama a destruir() y este mismo controlador todavía
+        // tiene un arrastre a medio cerrar. Un redibujar() síncrono
+        // ahí destruye la instancia actual a mitad de su propia
+        // limpieza. Se difiere con setTimeout 0 para dejarla terminar.
+        setTimeout(redibujar, 0);
+      },
+      elementosExentosClickAfuera: [encabezadoElemento],
     });
 
     lista.querySelectorAll<HTMLElement>("[data-paso-id]").forEach((fila) => {
@@ -2021,6 +2084,16 @@ function montarEditor(
       if (asa) {
         controladorArrastre!.registrarFila(idPaso, fila, asa);
       }
+    });
+
+    // Restaurar la selección de lote preservada al inicio de
+    // dibujar() (idsSeleccionadosGuardados) en la instancia NUEVA de
+    // controladorArrastre — cada redibujado destruye y recrea el
+    // controlador, que nace sin selección. seleccionarAdicional
+    // ignora por su cuenta los ids que ya no correspondan a ninguna
+    // fila registrada (paso eliminado en este mismo redibujado).
+    idsSeleccionadosGuardados.forEach((id) => {
+      controladorArrastre!.seleccionarAdicional(id);
     });
 
     // Cerrar el popup anidado abierto (Opción/Tipo/Extra/Grabación —
@@ -2127,6 +2200,9 @@ function crearEncabezadoColumnas(
   columnaDerecha: HTMLElement,
   opcionesExpandido: boolean,
   alAlternarOpciones: () => void,
+  haySeleccion: boolean,
+  alDuplicarSeleccionadas: () => void,
+  alEliminarSeleccionadas: () => void,
 ): HTMLElement {
   const wrapper = document.createElement("div");
 
@@ -2140,15 +2216,67 @@ function crearEncabezadoColumnas(
   // cada fila: alterna la misma columna Opciones para todo el editor.
   const botonAsa = document.createElement("button");
 
-  botonAsa.className = "ui-btn popup-macro-editor-asa popup-macro-col-header";
-  botonAsa.dataset.columna = "asa";
-  botonAsa.textContent = "⁝";
+  botonAsa.className = "ui-btn popup-macro-editor-asa";
   botonAsa.title = "Opciones";
+  botonAsa.textContent = "⁝";
   botonAsa.dataset.abierto = String(opcionesExpandido);
 
   botonAsa.addEventListener("click", () => {
     alAlternarOpciones();
   });
+
+  // Envoltorio de la columna Opciones del encabezado (mismo criterio
+  // que celdaOpciones en crearFilaPaso): sigue siendo UN solo hijo
+  // directo del grid (1 turno de auto-placement, ver comentario más
+  // abajo), pero ahora puede alojar botones adicionales (Duplicar/
+  // Eliminar seleccionadas) junto al asa sin agregar hijos sueltos
+  // al grid del encabezado. Las clases/atributos que antes vivían en
+  // botonAsa (popup-macro-col-header, data-columna="asa") se mueven
+  // acá: son los que dependen de ser hijo DIRECTO del grid del
+  // encabezado (grid-column, justify-self, la línea divisoria ::after
+  // — ver reglas [data-columna="asa"] en styl_layout.css) y dejarían
+  // de aplicar si quedaran en el botón, ahora anidado un nivel más.
+  const celdaOpcionesEncabezado = document.createElement("div");
+
+  celdaOpcionesEncabezado.className =
+    "popup-macro-editor-opciones popup-macro-col-header";
+  celdaOpcionesEncabezado.dataset.columna = "asa";
+
+  celdaOpcionesEncabezado.append(botonAsa);
+
+  // Botones de lote: mismo orden/íconos que la celda de Opciones de
+  // cada fila (crearFilaPaso) — asa, X (Eliminar), ⧉ (Duplicar).
+  // Visibles siempre que la columna Opciones esté expandida (para dar
+  // a conocer que la función existe, aun sin selección activa);
+  // habilitados solo con al menos 1 fila seleccionada (Regla 2).
+  if (opcionesExpandido) {
+    const botonEliminarSeleccionadas = document.createElement("button");
+
+    botonEliminarSeleccionadas.className =
+      "ui-btn popup-macro-editor-eliminar";
+    botonEliminarSeleccionadas.textContent = "X";
+    botonEliminarSeleccionadas.title = "Eliminar seleccionadas";
+    botonEliminarSeleccionadas.disabled = !haySeleccion;
+
+    botonEliminarSeleccionadas.addEventListener("click", () => {
+      alEliminarSeleccionadas();
+    });
+
+    celdaOpcionesEncabezado.append(botonEliminarSeleccionadas);
+
+    const botonDuplicarSeleccionadas = document.createElement("button");
+
+    botonDuplicarSeleccionadas.className = "ui-btn";
+    botonDuplicarSeleccionadas.textContent = "⧉";
+    botonDuplicarSeleccionadas.title = "Duplicar seleccionadas";
+    botonDuplicarSeleccionadas.disabled = !haySeleccion;
+
+    botonDuplicarSeleccionadas.addEventListener("click", () => {
+      alDuplicarSeleccionadas();
+    });
+
+    celdaOpcionesEncabezado.append(botonDuplicarSeleccionadas);
+  }
 
   // Orden de inserción = orden de columna (1 numero, 2 asa, 3 tipo...):
   // el auto-placement de Grid usa un cursor que solo avanza de
@@ -2160,7 +2288,7 @@ function crearEncabezadoColumnas(
   // reportado: "encabezado mide como dos filas de alto").
   COLUMNAS_ENCABEZADO.forEach((columna) => {
     if (columna.nombre === "tipo") {
-      encabezado.append(botonAsa);
+      encabezado.append(celdaOpcionesEncabezado);
     }
 
     const celda = document.createElement("div");
@@ -2824,6 +2952,47 @@ function duplicarPasoMacro(
   guardarYRedibujar();
 }
 
+// Versión en lote de duplicarPasoMacro — usada por "Duplicar
+// seleccionadas" de la cabecera de Opciones (spec punto 1). Respeta
+// el orden actual del arreglo: cada paso seleccionado se clona
+// inmediatamente después de sí mismo, igual que la versión
+// individual, ajustando el desplazamiento acumulado por cada
+// inserción previa del propio lote.
+function duplicarPasosSeleccionados(
+  idsSeleccionados: string[],
+  macroArchivo: MacroArchivo,
+  guardarYRedibujar: () => void,
+): void {
+  const idsASet = new Set(idsSeleccionados);
+
+  // Índices ORIGINALES (antes de insertar nada), en orden, de cada
+  // paso seleccionado — se recorren de atrás hacia adelante para
+  // que insertar en un índice no corra los índices ya calculados
+  // de los pasos anteriores en la lista.
+  const indices = macroArchivo.pasos
+    .map((paso, indice) => ({ paso, indice }))
+    .filter(({ paso }) => idsASet.has(idDePaso(paso)))
+    .map(({ indice }) => indice);
+
+  for (let i = indices.length - 1; i >= 0; i--) {
+    const indiceOriginal = indices[i];
+
+    const nuevoPaso = clonarPasoMacro(macroArchivo.pasos[indiceOriginal]);
+
+    // Misma regla que duplicarPasoMacro (spec punto 4): Bucle
+    // duplicado nace limpio, con letra propia nueva — recalculada
+    // en cada iteración para no repetir letra entre bucles
+    // duplicados dentro del mismo lote.
+    if (nuevoPaso.tipo === "bucle") {
+      nuevoPaso.bucleMarcadorDestino = letraBucleDisponible(macroArchivo.pasos);
+    }
+
+    macroArchivo.pasos.splice(indiceOriginal + 1, 0, nuevoPaso);
+  }
+
+  guardarYRedibujar();
+}
+
 function eliminarPasoMacro(
   paso: PasoMacro,
   indice: number,
@@ -2844,6 +3013,48 @@ function eliminarPasoMacro(
   }
 
   macroArchivo.pasos.splice(indice, 1);
+
+  guardarYRedibujar();
+}
+
+// Versión en lote de eliminarPasoMacro — usada por "Eliminar
+// seleccionadas" de la cabecera de Opciones (spec punto 1).
+// Reglas de marcador (acordadas para el lote):
+// - Si se elimina la fila NO-Bucle que tenía una letra asignada,
+//   esa letra queda libre: el Bucle vuelve a mostrar los círculos
+//   ciclables (comportamiento ya cubierto por el cálculo de letras
+//   necesitadas/disponibles al redibujar — no requiere limpieza acá).
+// - Si se elimina la fila Bucle, se limpia únicamente la letra
+//   (marcador) en su fila destino — esa fila destino NO se elimina,
+//   solo pierde el marcador.
+function eliminarPasosSeleccionados(
+  idsSeleccionados: string[],
+  macroArchivo: MacroArchivo,
+  guardarYRedibujar: () => void,
+): void {
+  const idsASet = new Set(idsSeleccionados);
+
+  const pasosAEliminar = macroArchivo.pasos.filter((paso) =>
+    idsASet.has(idDePaso(paso)),
+  );
+
+  // Bucles del lote que se eliminan: limpiar su letra en la fila
+  // destino que la tenía asignada (la fila destino se conserva).
+  pasosAEliminar.forEach((paso) => {
+    if (paso.tipo === "bucle" && paso.bucleMarcadorDestino) {
+      const letra = paso.bucleMarcadorDestino;
+
+      macroArchivo.pasos.forEach((p) => {
+        if (p.marcador === letra) {
+          p.marcador = null;
+        }
+      });
+    }
+  });
+
+  macroArchivo.pasos = macroArchivo.pasos.filter(
+    (paso) => !idsASet.has(idDePaso(paso)),
+  );
 
   guardarYRedibujar();
 }

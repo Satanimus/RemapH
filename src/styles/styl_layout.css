@@ -1460,6 +1460,18 @@
   background: transparent;
 }
 
+/* Botones de lote de la cabecera (Duplicar/Eliminar seleccionadas):
+   visibles siempre que Opciones esté expandida, deshabilitados sin
+   selección — para dar a conocer que la función existe. Las filas
+   individuales nunca tienen botones disabled hoy, así que esta regla
+   solo afecta a la cabecera. */
+.popup-macro-editor-opciones .ui-btn:disabled {
+  color: var(--text-disabled);
+  cursor: not-allowed;
+  opacity: 0.5;
+  pointer-events: none;
+}
+
 .popup-macro-editor-numero {
   font-size: var(--fs11);
   color: var(--text-disabled);

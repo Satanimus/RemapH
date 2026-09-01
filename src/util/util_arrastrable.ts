@@ -146,6 +146,21 @@ export interface OpcionesArrastrable {
 
   onSalirModoMover?: () => void;
 
+  // Etapa D: notifica cualquier cambio de la selección que NO pasa
+  // por onReordenar (Shift/Ctrl+clic sin arrastre, y salirModoMover)
+  // — el editor de Macros lo usa para redibujar el popup entero y
+  // así reflejar de inmediato los botones de lote de la cabecera.
+  onSeleccionCambio?: () => void;
+
+  // Etapa (fix): elementos que NO deben tratarse como "click afuera"
+  // aunque no sean una fila registrada — ej. la cabecera de un editor
+  // que agrega sus propios botones de acción sobre la selección
+  // (Duplicar/Eliminar seleccionadas). Sin esto, cualquier pointerdown
+  // sobre esos botones dispara salirModoMover() en fase de captura
+  // ANTES de que el click del botón llegue a ejecutarse, vaciando la
+  // selección antes de que la acción pueda leerla.
+  elementosExentosClickAfuera?: HTMLElement[];
+
   obtenerIdsSeparadores?: () => string[];
 
   // Regla 11: consulta si `id` es un separador contraído. El
@@ -170,8 +185,6 @@ export interface ControladorArrastre {
   // Usado por el editor de Macros para capturar la selección completa
   // antes de un redibujo (que destruye y recrea el controlador).
   obtenerSeleccionadas(): string[];
-
-  estaEnModoMover(): boolean;
 
   salirModoMover(): void;
 
@@ -212,6 +225,8 @@ export function crearControladorArrastre(
     obtenerOrdenIds,
     onReordenar,
     onSalirModoMover,
+    onSeleccionCambio,
+    elementosExentosClickAfuera,
     obtenerIdsSeparadores,
     esSeparadorContraido,
   } = opciones;
@@ -227,6 +242,11 @@ export function crearControladorArrastre(
   const idPorElemento = new WeakMap<HTMLElement, string>();
 
   const seleccionadas = new Set<string>();
+
+  // Último id usado como referencia de una selección simple o
+  // Ctrl+click (no Shift) — punto de partida para extender el
+  // rango con el próximo Shift+click, estilo selector de archivos.
+  let anclaSeleccion: string | null = null;
 
   // ------------------------------------------------------
   // Estado de una "presión" en curso sobre el botón ⟫
@@ -318,6 +338,27 @@ export function crearControladorArrastre(
     refrescarClaseFila(id);
   }
 
+  // Selecciona todo el tramo entre idDesde e idHasta (inclusive),
+  // en el orden actual de la tabla — Shift+click estilo selector
+  // de archivos. No limpia la selección previa: suma al tramo.
+  function seleccionarRango(idDesde: string, idHasta: string): void {
+    const orden = obtenerOrdenIds();
+
+    const indiceDesde = orden.indexOf(idDesde);
+
+    const indiceHasta = orden.indexOf(idHasta);
+
+    if (indiceDesde === -1 || indiceHasta === -1) return;
+
+    const inicio = Math.min(indiceDesde, indiceHasta);
+
+    const fin = Math.max(indiceDesde, indiceHasta);
+
+    for (let i = inicio; i <= fin; i++) {
+      seleccionar(orden[i]);
+    }
+  }
+
   // ======================================================
   // 🚪 SALIR DEL MODO MOVER
   // ======================================================
@@ -329,9 +370,12 @@ export function crearControladorArrastre(
 
     seleccionadas.clear();
 
+    anclaSeleccion = null;
+
     idsAfectados.forEach(refrescarClaseFila);
 
     onSalirModoMover?.();
+    onSeleccionCambio?.();
   }
 
   // ======================================================
@@ -912,6 +956,8 @@ export function crearControladorArrastre(
         }
       }
 
+      anclaSeleccion = id;
+
       // Ya estamos en modo Mover: si el puntero se sigue
       // moviendo a partir de ahora, se convierte en arrastre.
       iniciarArrastre(grupoParaArrastrarDesde(id), evento);
@@ -975,6 +1021,28 @@ export function crearControladorArrastre(
     presionAsaActual = null;
 
     if (!convertidaEnMover) {
+      // Shift+click simple sobre el asa con modo Mover ya activo:
+      // selecciona el tramo entre la última ancla y esta fila
+      // (estilo selector de archivos), sin mover el ancla — así
+      // se puede seguir extendiendo el rango con más Shift+click.
+      if (evento.shiftKey && seleccionadas.size > 0) {
+        const asa = filas.get(id)?.asa;
+
+        if (asa) asasASuprimirClick.add(asa);
+
+        if (anclaSeleccion) {
+          seleccionarRango(anclaSeleccion, id);
+        } else {
+          reemplazarSeleccionPor(id);
+
+          anclaSeleccion = id;
+        }
+
+        onSeleccionCambio?.();
+
+        return;
+      }
+
       // Ctrl+click simple sobre el asa con modo Mover ya activo:
       // alterna la selección de esta fila (igual que Ctrl+click sobre
       // el fondo) y suprime el click para que no abra el popup de
@@ -990,6 +1058,10 @@ export function crearControladorArrastre(
         } else {
           seleccionar(id);
         }
+
+        anclaSeleccion = id;
+
+        onSeleccionCambio?.();
       }
 
       return;
@@ -1000,14 +1072,13 @@ export function crearControladorArrastre(
     if (asa) asasASuprimirClick.add(asa);
 
     if (arrastreActual && !arrastreActual.seMovio) {
-      // Se mantuvo pero nunca se movió: no hay nada que
-      // reordenar — se limpia el estado visual (fantasma,
-      // placeholder, clases) sin llamar a onReordenar ni a
-      // aplicarNuevoOrden. Esto es importante en el editor de
-      // Macros, donde onReordenar dispara un redibujar() completo
-      // (con setTimeout 0) que destruiría el controlador y borraría
-      // la selección recién activada, haciendo que al soltar el
-      // botón la fila quedara deseleccionada en vez de en modo Mover.
+      // Se mantuvo pero nunca se movió: no hay nada que reordenar, así
+      // que no se llama a aplicarNuevoOrden/onReordenar — pero la
+      // selección SÍ cambió (reemplazarSeleccionPor/seleccionar ya se
+      // ejecutó en manejarAsaPointerDown al activar modo Mover), así
+      // que se notifica igual vía onSeleccionCambio para que la
+      // cabecera del editor de Macros refleje la nueva selección sin
+      // esperar a una segunda fila.
       const { idsGrupo, fantasma, contador, placeholder } = arrastreActual;
 
       document.removeEventListener("pointermove", manejarPointerMoveArrastre);
@@ -1024,6 +1095,8 @@ export function crearControladorArrastre(
       });
 
       arrastreActual = null;
+
+      onSeleccionCambio?.();
     }
   }
 
@@ -1048,8 +1121,10 @@ export function crearControladorArrastre(
 
     const conCtrl = evento.ctrlKey;
 
-    if (!conCtrl && !seleccionadas.has(id)) {
-      // Fondo de fila sin Ctrl y sin selección previa: fuera
+    const conShift = evento.shiftKey;
+
+    if (!conCtrl && !conShift && !seleccionadas.has(id)) {
+      // Fondo de fila sin Ctrl/Shift y sin selección previa: fuera
       // del alcance de este componente (spec no lo define).
       return;
     }
@@ -1077,11 +1152,16 @@ export function crearControladorArrastre(
     document.removeEventListener("pointermove", manejarFilaPointerMove);
     document.removeEventListener("pointerup", manejarFilaPointerUp);
 
+    presionFilaActual = null;
+
+    // Shift + fila sin seleccionar + movimiento: Shift es para
+    // seleccionar rango, no para arrastrar — se cancela el gesto
+    // sin iniciar arrastre ni tocar la selección.
+    if (evento.shiftKey && !seleccionadas.has(id)) return;
+
     // Ctrl + fila sin seleccionar + arrastre → se agrega al
     // grupo antes de largar el arrastre (spec, sección 4).
     if (!seleccionadas.has(id)) seleccionar(id);
-
-    presionFilaActual = null;
 
     iniciarArrastre(grupoParaArrastrarDesde(id), evento);
   }
@@ -1096,6 +1176,23 @@ export function crearControladorArrastre(
 
     presionFilaActual = null;
 
+    if (evento.shiftKey) {
+      // Shift+clic sin arrastre sobre el fondo: mismo criterio que
+      // en el asa — selecciona el tramo entre la última ancla y
+      // esta fila, sin mover el ancla.
+      if (anclaSeleccion) {
+        seleccionarRango(anclaSeleccion, id);
+      } else {
+        reemplazarSeleccionPor(id);
+
+        anclaSeleccion = id;
+      }
+
+      onSeleccionCambio?.();
+
+      return;
+    }
+
     if (!evento.ctrlKey) return; // clic simple sobre fila ya seleccionada: no hace nada (spec no lo define).
 
     // Ctrl+clic sin arrastre: alterna la selección según el
@@ -1106,6 +1203,10 @@ export function crearControladorArrastre(
     } else {
       seleccionar(id);
     }
+
+    anclaSeleccion = id;
+
+    onSeleccionCambio?.();
   }
 
   // ======================================================
@@ -1126,6 +1227,10 @@ export function crearControladorArrastre(
       ) {
         return; // el clic fue sobre alguna fila registrada: no es "afuera".
       }
+    }
+
+    if (elementosExentosClickAfuera?.some((el) => el.contains(objetivo))) {
+      return; // el clic fue sobre un elemento exento (ej. cabecera con botones de lote).
     }
 
     salirModoMover();
@@ -1207,7 +1312,6 @@ export function crearControladorArrastre(
     registrarFila,
     estaSeleccionada: (id: string) => seleccionadas.has(id),
     obtenerSeleccionadas: () => [...seleccionadas],
-    estaEnModoMover: () => seleccionadas.size > 0,
     salirModoMover,
     activarModoMoverPara,
     seleccionarAdicional: (id: string) => {
