@@ -1188,6 +1188,33 @@
   text-overflow: ellipsis;
 }
 
+/* Correlación explícita celda↔columna por nombre (en vez de depender
+   del orden de aparición en el DOM): el resizer que se inserta entre
+   "extra" y "nota" (ver crearEncabezadoColumnas) es un hijo real más
+   del grid y, aunque sea position:absolute, sigue consumiendo un
+   turno del auto-placement — desincronizando todo lo que viene
+   después de él. Fijar grid-column por dato en cada celda nombrada
+   las hace inmunes a ese o cualquier otro hijo extra. */
+.popup-macro-col-header[data-columna="numero"] {
+  grid-column: 1;
+}
+
+.popup-macro-col-header[data-columna="asa"] {
+  grid-column: 2;
+}
+
+.popup-macro-col-header[data-columna="tipo"] {
+  grid-column: 3;
+}
+
+.popup-macro-col-header[data-columna="extra"] {
+  grid-column: 4;
+}
+
+.popup-macro-col-header[data-columna="nota"] {
+  grid-column: 5;
+}
+
 /* Líneas finas verticales entre columnas (numero|asa, asa|tipo,
    tipo|extra) — mismo trazo que .popup-macro-col-resizer::before,
    pero fijo (sin arrastre) y centrado en el gap de --gap8 entre
@@ -1211,19 +1238,10 @@
   background: var(--border-light);
 }
 
-.popup-macro-col-header[data-columna="extra"] {
-  text-align: left;
-  /* Compensa el ancho del marcador (22px, ver
-     .popup-macro-editor-marcador/-espacio) + su gap4, para que el
-     título "Extra" arranque en la misma X que el texto del botón
-     de acción real de cada fila (spec punto 11 original). Antes
-     esto lo lograba una celda fantasma extra en el DOM del
-     encabezado — incompatible con Grid (desincroniza el conteo de
-     columnas de --grid-columnas), reemplazada por este padding. */
-  padding-left: calc(22px + var(--gap4));
-}
-
-.popup-macro-col-header[data-columna="nota"] {
+/* Opciones: anclado al borde izquierdo de su columna para que el
+   símbolo ⁝ no se mueva cuando la celda se ensancha al expandirse
+   (aparecen X/⧉/⊙ junto a él en el cuerpo). */
+.popup-macro-col-header[data-columna="asa"] {
   text-align: left;
 }
 
