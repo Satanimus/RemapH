@@ -1045,6 +1045,19 @@ pub async fn abrir_ventana_indicador_macro(
     abrir_ventana_indicador_macro_interno(&app, url)
 }
 
+/// Modo "ubicar" — ventana Indicador_Macro con texto fijo
+/// "Arrastrame" (sin polling), para reposicionarla a mano desde el
+/// popup Extra de Macro cuando en modo Play el mouse está en
+/// movimiento y no es viable arrastrarla ahí. Al arrastrarla ya
+/// persiste sola su posición (mismo mecanismo que Grabación/Play);
+/// "Guardar" en el popup solo llama a cerrar_ventana_indicador_macro.
+/// Mismo motivo que abrir_ventana_indicador_macro para ser async
+/// (deadlock en Windows si es síncrono).
+#[tauri::command]
+pub async fn abrir_ventana_indicador_macro_ubicacion(app: tauri::AppHandle) -> Result<(), String> {
+    abrir_ventana_indicador_macro_interno(&app, "indicador_macro.html?modo=ubicar".to_string())
+}
+
 // pub(crate), sin #[tauri::command]: la Etapa E la invoca
 // directamente desde runt_macro.rs para el modo "play" (que no
 // tiene el parámetro `tecla`, específico de grabación).

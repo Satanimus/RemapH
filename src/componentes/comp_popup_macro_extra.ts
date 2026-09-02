@@ -15,6 +15,8 @@
 // (eso vive ahora en Acción, ver comp_popup_macro_accion.ts).
 // ======================================================
 
+import { invoke } from "@tauri-apps/api/core";
+
 import { mostrarPopup } from "./comp_popup_contenedor";
 
 import { reconstruirFila } from "../ui/ui_tabla_control";
@@ -38,6 +40,33 @@ export function abrirPopupExtraMacro(
   alModificar: () => void,
 ): void {
   const macroExtra = filaPerfil.macroExtra;
+
+  // Toggle "Ubicación" — no es un campo persistido de macroExtra: solo
+  // muestra/oculta la ventana Indicador_Macro en modo "ubicar" (texto
+  // fijo "Arrastrame") para que el usuario la arrastre a mano sin
+  // depender del mouse en movimiento de una ejecución real. Al
+  // arrastrarla ya se persiste la posición sola (mismo mecanismo que
+  // Grabación/Play, ver vent_indicador_macro_main.ts) — "Guardar" solo
+  // cierra la ventana.
+  let ubicacionActiva = false;
+
+  const alternarUbicacion = async (): Promise<void> => {
+    ubicacionActiva = !ubicacionActiva;
+
+    try {
+      if (ubicacionActiva) {
+        await invoke("abrir_ventana_indicador_macro_ubicacion");
+      } else {
+        await invoke("cerrar_ventana_indicador_macro");
+      }
+    } catch (error) {
+      console.error("❌ No se pudo alternar la ventana de ubicación:", error);
+
+      ubicacionActiva = !ubicacionActiva;
+    }
+
+    dibujar();
+  };
 
   const dibujar = (): void => {
     const popup = document.createElement("div");
@@ -65,18 +94,46 @@ export function abrirPopupExtraMacro(
       ),
     );
 
-    popup.append(
-      crearFilaPopup(
-        "Indicador de ejecución",
-        crearInterruptor("Si", macroExtra.indicadorEjecucion, () => {
-          macroExtra.indicadorEjecucion = !macroExtra.indicadorEjecucion;
+    const interruptorIndicador = crearInterruptor(
+      "Si",
+      macroExtra.indicadorEjecucion,
+      () => {
+        macroExtra.indicadorEjecucion = !macroExtra.indicadorEjecucion;
 
-          reconstruirFila(contexto.id);
-          alModificar();
-          dibujar();
-        }),
-      ),
+        if (!macroExtra.indicadorEjecucion && ubicacionActiva) {
+          ubicacionActiva = false;
+
+          invoke("cerrar_ventana_indicador_macro").catch((error) => {
+            console.error("❌ No se pudo cerrar la ventana de ubicación:", error);
+          });
+        }
+
+        reconstruirFila(contexto.id);
+        alModificar();
+        dibujar();
+      },
     );
+
+    const contenedorIndicador = document.createElement("div");
+
+    contenedorIndicador.className = "popup-fila-switch-boton";
+    contenedorIndicador.append(interruptorIndicador);
+
+    if (macroExtra.indicadorEjecucion) {
+      const botonUbicacion = document.createElement("button");
+
+      botonUbicacion.className = "ui-btn popup-macro-boton-ubicacion";
+      botonUbicacion.dataset.activo = ubicacionActiva ? "true" : "false";
+      botonUbicacion.textContent = ubicacionActiva ? "Guardar" : "Ubicación";
+
+      botonUbicacion.addEventListener("click", () => {
+        void alternarUbicacion();
+      });
+
+      contenedorIndicador.append(botonUbicacion);
+    }
+
+    popup.append(crearFilaPopup("Indicador de ejecución", contenedorIndicador));
 
     mostrarPopup(popup, evento.clientX, evento.clientY);
   };

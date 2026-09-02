@@ -180,6 +180,7 @@ pub fn run() {
             comandos::obtener_tecla_grabar_macro,
             comandos::establecer_tecla_grabar_macro,
             comandos::abrir_ventana_indicador_macro,
+            comandos::abrir_ventana_indicador_macro_ubicacion,
             comandos::cerrar_ventana_indicador_macro,
             comandos::guardar_posicion_indicador_macro,
             comandos::obtener_posicion_indicador_macro,

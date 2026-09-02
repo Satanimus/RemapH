@@ -20,10 +20,20 @@
 // "paso_actual / total_pasos". El progreso se consulta por
 // polling corto sobre obtener_progreso_indicador_macro
 // (runt_macro.rs).
+//
+// Modo "ubicar" (?modo=ubicar): texto fijo "Arrastrame", sin
+// polling — se abre/cierra desde el popup Extra de Macro
+// (comp_popup_macro_extra.ts) para reposicionar la ventana a mano
+// cuando no hay una ejecución real en curso (en Play el mouse está
+// en movimiento y no es viable arrastrarla ahí).
 // ======================================================
 
 import { invoke } from "@tauri-apps/api/core";
-import { getCurrentWindow, PhysicalPosition } from "@tauri-apps/api/window";
+import {
+  getCurrentWindow,
+  LogicalSize,
+  PhysicalPosition,
+} from "@tauri-apps/api/window";
 
 import { aplicarOverridesApariencia } from "../core/core_apariencia";
 import type { EstadoGrabacionMacro } from "../core/core_grabacion_macro";
@@ -33,7 +43,12 @@ import "../styles/styl_indicador_macro.css";
 
 void aplicarOverridesApariencia();
 
-type ModoIndicadorMacro = "grabacion" | "play";
+// Espejo de ALTO_INDICADOR_MACRO_LOGICO en comandos.rs — el ancho se
+// ajusta al contenido (ver ajustarAnchoAlContenido), el alto queda
+// fijo.
+const ALTO_INDICADOR_MACRO_LOGICO = 40;
+
+type ModoIndicadorMacro = "grabacion" | "play" | "ubicar";
 
 interface ProgresoIndicadorMacro {
   pasoActual: number;
@@ -161,6 +176,30 @@ async function guardarPosicionTrasArrastre(
 }
 
 // ======================================================
+// 📏 ANCHO AL CONTENIDO
+// ------------------------------------------------------
+// La ventana nace con un ancho fijo (comandos.rs, solo para el
+// primer instante antes de que haya contenido que medir). Acá se
+// ajusta al ancho real del contenido (punto + texto + padding) cada
+// vez que el texto cambia, para que "🟢 03 / 15" no quede tan ancho
+// como "Presione Control Izquierdo + F1 para grabar" ni viceversa.
+// raiz tiene width:100% por CSS (llena la ventana) — se fuerza a
+// max-content un instante para medir su ancho natural y se revierte.
+// ======================================================
+
+function ajustarAnchoAlContenido(raiz: HTMLElement): void {
+  raiz.style.width = "max-content";
+  const ancho = Math.ceil(raiz.getBoundingClientRect().width);
+  raiz.style.width = "";
+
+  void getCurrentWindow()
+    .setSize(new LogicalSize(ancho, ALTO_INDICADOR_MACRO_LOGICO))
+    .catch(() => {
+      // Ventana en cierre — nada que hacer.
+    });
+}
+
+// ======================================================
 // 🔴 MODO GRABACIÓN
 // ======================================================
 
@@ -174,6 +213,7 @@ function iniciarModoGrabacion(raiz: HTMLElement, tecla: string): void {
   texto.textContent = textoEstadoGrabacion(tecla, "armada");
 
   raiz.append(punto, texto);
+  ajustarAnchoAlContenido(raiz);
 
   let estadoActual: EstadoGrabacionMacro = "armada";
 
@@ -191,6 +231,7 @@ function iniciarModoGrabacion(raiz: HTMLElement, tecla: string): void {
         estadoActual = nuevoEstado;
         punto.dataset.estado = nuevoEstado;
         texto.textContent = textoEstadoGrabacion(tecla, nuevoEstado);
+        ajustarAnchoAlContenido(raiz);
       })
       .catch(() => {
         // Ventana huérfana/en cierre — nada que hacer.
@@ -216,16 +257,38 @@ function iniciarModoPlay(raiz: HTMLElement): void {
   texto.textContent = "00 / 00";
 
   raiz.append(punto, texto);
+  ajustarAnchoAlContenido(raiz);
 
   setInterval(() => {
     invoke<ProgresoIndicadorMacro>("obtener_progreso_indicador_macro")
       .then((progreso) => {
         texto.textContent = textoProgresoPlay(progreso);
+        ajustarAnchoAlContenido(raiz);
       })
       .catch(() => {
         // Ventana en cierre — nada que hacer.
       });
   }, 200);
+}
+
+// ======================================================
+// 📍 MODO UBICAR
+// ------------------------------------------------------
+// Texto fijo, sin polling — el arrastre y el guardado de posición
+// son los mismos de siempre (activarArrastre/guardarPosicionTrasArrastre).
+// ======================================================
+
+function iniciarModoUbicar(raiz: HTMLElement): void {
+  const punto = document.createElement("span");
+  punto.className = "indicador-macro-punto";
+  punto.dataset.estado = "play";
+
+  const texto = document.createElement("span");
+  texto.className = "indicador-macro-texto";
+  texto.textContent = "Arrastrame";
+
+  raiz.append(punto, texto);
+  ajustarAnchoAlContenido(raiz);
 }
 
 function iniciar(): void {
@@ -239,6 +302,11 @@ function iniciar(): void {
 
   if (modo === "play") {
     iniciarModoPlay(raiz);
+    return;
+  }
+
+  if (modo === "ubicar") {
+    iniciarModoUbicar(raiz);
     return;
   }
 

@@ -698,6 +698,26 @@
 }
 
 /* ======================================================
+   Fila "Indicador de ejecución" del popup Extra de Macro:
+   switch + botón "Ubicación"/"Guardar" en la misma línea
+   (el botón solo se agrega al DOM si el switch está en "Si").
+   ====================================================== */
+
+.popup-fila-switch-boton {
+  display: flex;
+  align-items: center;
+  gap: var(--gap8);
+}
+
+.popup-fila-switch-boton .popup-switch {
+  width: auto;
+}
+
+.ui-btn.popup-macro-boton-ubicacion[data-activo="true"] {
+  border-color: var(--highlight);
+}
+
+/* ======================================================
    🧱 CAJA INTERNA (otro nivel dentro del mismo popup)
    ------------------------------------------------------
    Mismo tono de borde que el popup, fondo un poco más
