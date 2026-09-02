@@ -334,6 +334,14 @@
   border-color: color-mix(in srgb, var(--green-dark) 85%, transparent);
 }
 
+/* Hover: mismo círculo verde que el estado activo, pero solo el
+   borde (sin relleno) — señal de que el número es clickeable/
+   seleccionable. No se aplica si ya está activo (ya tiene su propio
+   círculo relleno). */
+.coordenadas-numero-toggle:not(.coordenadas-numero-toggle-activo):hover {
+  border-color: color-mix(in srgb, var(--green-dark) 85%, transparent);
+}
+
 /* ======================================================
    ✅ TOAST "Enviado" — Regla 9
    ====================================================== */

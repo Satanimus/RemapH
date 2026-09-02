@@ -97,13 +97,6 @@ body {
   font-weight: 600;
 }
 
-.captura-guardado {
-  color: var(--text-highlight);
-  font-weight: 600;
-  text-align: center;
-  font-size: var(--fs13);
-}
-
 .captura-marcador-preview {
   position: relative;
   width: 100%;
@@ -111,11 +104,11 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  /* Opacidad configurable (pestaña Apariencia de Configuración,
-     catálogo apariencia.tsv) — "Fondo" del marcador de preview.
-     Antes transparent fijo, sin ningún valor visible detrás del
-     ícono. */
-  background: color-mix(in srgb, var(--overlay-contraste) var(--indicador-coordenada-fondo-opacidad), transparent);
+  /* Sin fondo: antes tenía un color-mix de cuadrado completo (se
+     veía como un brillo/gris parejo tapando toda la ventana). El
+     único brillo ahora es el drop-shadow del SVG de abajo, pegado
+     al borde del círculo. */
+  background: transparent;
 }
 
 .captura-marcador-preview svg {
@@ -137,6 +130,21 @@ body {
 .captura-marcador-preview .captura-marcador-punto {
   fill: var(--text-highlight);
   stroke: none;
+}
+
+/* Flash de confirmación al guardar con F1 (guardarYcerrar) — mismo
+   marcador ⊙, pero en verde en vez de cyan para distinguirlo de una
+   Previsualización en curso. */
+.captura-marcador-confirmacion circle {
+  stroke: var(--green-dark);
+}
+
+.captura-marcador-confirmacion .captura-marcador-punto {
+  fill: var(--green-dark);
+}
+
+.captura-marcador-confirmacion svg {
+  filter: drop-shadow(0 0 4px color-mix(in srgb, var(--green-dark) 70%, transparent));
 }
 
 /* Zona de arrastre — único punto de la ventana que agarra el mouse
@@ -173,7 +181,16 @@ body {
   transform: translate(-50%, 8px);
   font-size: var(--fs11);
   font-weight: 600;
-  color: var(--text-highlight);
-  text-shadow: 0 0 3px color-mix(in srgb, var(--overlay-contraste) 80%, transparent);
+  color: #fff;
+  /* Contorno negro (no un blur difuso) para que se lea encima de
+     cualquier fondo — 4 sombras duras alrededor simulan el trazo,
+     más compatible entre motores que -webkit-text-stroke solo. */
+  text-shadow:
+    -1px -1px 0 #000,
+    1px -1px 0 #000,
+    -1px 1px 0 #000,
+    1px 1px 0 #000;
+  -webkit-text-stroke: 0.5px #000;
   pointer-events: none;
+  z-index: 1;
 }

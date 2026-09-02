@@ -163,6 +163,8 @@ pub fn run() {
             comandos::cerrar_ventana_captura_coordenada,
             comandos::abrir_ventana_preview_coordenada,
             comandos::cerrar_ventana_preview_coordenada,
+            comandos::abrir_ventana_origen_cursor,
+            comandos::cerrar_ventana_origen_cursor,
             comandos::obtener_destino_preview_coordenada,
             comandos::obtener_xy_preview_coordenada,
             comandos::actualizar_xy_preview_en_vivo,

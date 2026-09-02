@@ -17,7 +17,12 @@
 // ======================================================
 
 import { invoke } from "@tauri-apps/api/core";
-import { getCurrentWindow, PhysicalPosition } from "@tauri-apps/api/window";
+import {
+  getCurrentWindow,
+  LogicalSize,
+  PhysicalPosition,
+} from "@tauri-apps/api/window";
+
 
 import type { Entrada } from "../core/core_entrada";
 import { aplicarOverridesApariencia } from "../core/core_apariencia";
@@ -150,6 +155,11 @@ document.addEventListener("keydown", (evento) => {
 function cerrar(): void {
   detenerPolling();
 
+  // No-op si no se llegó a marcar un origen (modo relativa_cursor,
+  // paso 1) — cerrar_ventana_origen_cursor no falla si la ventana
+  // no existe.
+  invoke("cerrar_ventana_origen_cursor").catch(() => {});
+
   invoke("cerrar_ventana_captura_coordenada")
     .then(() =>
       mostrarDiagnostico("cerrar_ventana_captura_coordenada resolvió OK."),
@@ -252,22 +262,71 @@ let teclaGuardar = "F1";
 
 // ======================================================
 // 💾 GUARDAR RESULTADO Y CERRAR
+// ------------------------------------------------------
+// Confirmación visual: en vez del cartel de texto "✅ Guardado" en
+// la posición del card (que no necesariamente coincide con el punto
+// capturado en modos relativos/porcentaje), la ventana se reduce a
+// un círculo (mismo marcador ⊙ del modo Previsualización) y se
+// reposiciona centrada EXACTO sobre el cursor físico en el instante
+// del guardado — ese cursor es siempre el punto real capturado,
+// más allá de qué valor (absoluto/offset/porcentaje) se haya
+// guardado. Se muestra 1 segundo y se cierra sola.
 // ======================================================
 
-function guardarYcerrar(x: number, y: number): void {
+const LADO_CONFIRMACION_LOGICO = 56;
+
+function guardarYcerrar(
+  valorX: number,
+  valorY: number,
+  cursorFisicoX: number,
+  cursorFisicoY: number,
+): void {
   detenerPolling();
 
-  invoke("guardar_resultado_coordenada", { x, y }).catch(() => {});
+  invoke("guardar_resultado_coordenada", { x: valorX, y: valorY }).catch(() => {});
 
-  cuerpo.innerHTML = "";
-  const feedback = document.createElement("div");
-  feedback.className = "captura-guardado";
-  feedback.textContent = "✅ Guardado";
-  cuerpo.append(feedback);
+  void mostrarFlashConfirmacion(cursorFisicoX, cursorFisicoY);
+}
 
-  setTimeout(() => {
-    invoke("cerrar_ventana_captura_coordenada").catch(() => {});
-  }, 500);
+async function mostrarFlashConfirmacion(
+  cursorFisicoX: number,
+  cursorFisicoY: number,
+): Promise<void> {
+  const ventana = getCurrentWindow();
+
+  raiz.innerHTML = "";
+
+  const marcador = document.createElement("div");
+  marcador.className = "captura-marcador-preview captura-marcador-confirmacion";
+  marcador.innerHTML =
+    '<svg viewBox="0 0 24 24" width="48" height="48"><circle cx="12" cy="12" r="9" /><circle class="captura-marcador-punto" cx="12" cy="12" r="1.6" /></svg>';
+  raiz.append(marcador);
+
+  try {
+    const escala = await ventana.scaleFactor();
+    const mitadFisica = (LADO_CONFIRMACION_LOGICO / 2) * escala;
+
+    await ventana.setSize(
+      new LogicalSize(LADO_CONFIRMACION_LOGICO, LADO_CONFIRMACION_LOGICO),
+    );
+    await ventana.setPosition(
+      new PhysicalPosition(
+        cursorFisicoX - mitadFisica,
+        cursorFisicoY - mitadFisica,
+      ),
+    );
+  } catch {
+    // Sin resize/reposición no queda centrado en el punto exacto,
+    // pero igual se muestra y se cierra — mejor que dejar la ventana
+    // de captura colgada sin cerrar.
+  }
+
+  await new Promise((resolve) => setTimeout(resolve, 1000));
+
+  // Cierra junto con el marcador de origen del modo relativa_cursor
+  // (paso 1), si llegó a abrirse — no-op en los demás modos.
+  invoke("cerrar_ventana_origen_cursor").catch(() => {});
+  invoke("cerrar_ventana_captura_coordenada").catch(() => {});
 }
 
 // ======================================================
@@ -599,16 +658,43 @@ function activarArrastreMarcador(
 }
 
 // ======================================================
+// 📍 MARCADOR ESTÁTICO DE ORIGEN (modo "Relativa a cursor")
+// ------------------------------------------------------
+// Ventana propia (abrir_ventana_origen_cursor en comandos.rs) ya
+// creada centrada y del tamaño final — acá solo dibuja el círculo,
+// sin polling ni arrastre: es un punto fijo que marca dónde se
+// presionó el primer F1, hasta que el segundo F1 cierra esta
+// ventana junto con la de captura (ver cerrar_ventana_origen_cursor
+// llamado desde mostrarFlashConfirmacion/cerrar en este archivo).
+// ======================================================
+
+function iniciarOrigenCursor(): void {
+  raiz.innerHTML = "";
+
+  const marcador = document.createElement("div");
+  marcador.className = "captura-marcador-preview";
+  marcador.innerHTML =
+    '<svg viewBox="0 0 24 24" width="48" height="48"><circle cx="12" cy="12" r="9" /><circle class="captura-marcador-punto" cx="12" cy="12" r="1.6" /></svg>';
+  raiz.append(marcador);
+}
+
+// ======================================================
 // 🏁 INICIAR
 // ======================================================
 
 async function iniciar(): Promise<void> {
   const parametros = new URLSearchParams(location.search);
   const idPreview = parametros.get("id");
+  const modo = parametros.get("modo");
 
   if (idPreview !== null) {
     const numero = Number(parametros.get("numero") ?? "0");
     await iniciarPreview(idPreview, numero);
+    return;
+  }
+
+  if (modo === "origen_cursor") {
+    iniciarOrigenCursor();
     return;
   }
 
@@ -717,7 +803,7 @@ async function actualizar(config: ConfigCaptura): Promise<void> {
       dibujarLinea(`X: ${cursorX}  Y: ${cursorY}`, true);
 
       if (guardar) {
-        guardarYcerrar(cursorX, cursorY);
+        guardarYcerrar(cursorX, cursorY, cursorX, cursorY);
       }
 
       break;
@@ -731,6 +817,11 @@ async function actualizar(config: ConfigCaptura): Promise<void> {
         if (guardar) {
           origenRelativaCursor = { x: cursorX, y: cursorY };
           pasoRelativaCursor = 2;
+
+          invoke("abrir_ventana_origen_cursor", {
+            x: cursorX,
+            y: cursorY,
+          }).catch(() => {});
         }
       } else {
         const origen = origenRelativaCursor!;
@@ -744,7 +835,7 @@ async function actualizar(config: ConfigCaptura): Promise<void> {
         );
 
         if (guardar) {
-          guardarYcerrar(offsetX, offsetY);
+          guardarYcerrar(offsetX, offsetY, cursorX, cursorY);
         }
       }
 
@@ -768,7 +859,7 @@ async function actualizar(config: ConfigCaptura): Promise<void> {
         dibujarLinea(`H: ${h.toFixed(1)}%  V: ${v.toFixed(1)}%`, true);
 
         if (guardar) {
-          guardarYcerrar(h, v);
+          guardarYcerrar(h, v, cursorX, cursorY);
         }
       } else {
         dibujarLinea(
@@ -782,7 +873,7 @@ async function actualizar(config: ConfigCaptura): Promise<void> {
         dibujarLinea(`X: ${offsetX}  Y: ${offsetY}`, true);
 
         if (guardar) {
-          guardarYcerrar(offsetX, offsetY);
+          guardarYcerrar(offsetX, offsetY, cursorX, cursorY);
         }
       }
 

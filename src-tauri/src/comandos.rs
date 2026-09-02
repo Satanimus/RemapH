@@ -964,6 +964,99 @@ pub fn cerrar_ventana_preview_coordenada(app: tauri::AppHandle, id: String) {
     captura_coordenada::desactivar_preview(&id);
 }
 
+// ======================================================
+// 📍 MARCADOR ESTÁTICO DE ORIGEN — modo "Relativa a cursor"
+// ------------------------------------------------------
+// Confirmación visual del PRIMER F1 (marca el origen) en modo
+// relativa_cursor: mismo círculo ⊙ que la previsualización, pero
+// sin id/polling/arrastre — se crea una vez, fijo, sobre el punto
+// físico exacto del cursor en ese instante, y queda en pantalla
+// hasta que el segundo F1 (destino) cierra ambas ventanas juntas
+// (ver mostrarFlashConfirmacion en vent_captura_main.ts, que llama
+// a cerrar_ventana_origen_cursor sin importar el modo — no-op si
+// esta ventana no existe). Label bajo el mismo prefijo que las
+// previews normales (PREFIJO_VENTANA_PREVIEW) para no tener que
+// sumar una entrada nueva a capabilities/captura_coordenada.json
+// (ya cubre "captura_coordenada_preview_*").
+// ======================================================
+
+const LABEL_VENTANA_ORIGEN_CURSOR: &str = "captura_coordenada_preview_origen_cursor";
+
+#[tauri::command]
+pub async fn abrir_ventana_origen_cursor(app: tauri::AppHandle, x: f64, y: f64) -> Result<(), String> {
+    if let Some(existente) = app.get_webview_window(LABEL_VENTANA_ORIGEN_CURSOR) {
+        let _ = existente.close();
+
+        for _ in 0..50 {
+            if app.get_webview_window(LABEL_VENTANA_ORIGEN_CURSOR).is_none() {
+                break;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(20));
+        }
+    }
+
+    // x/y llegan en físicas (mismo sistema que obtener_cursor_captura
+    // — GetCursorPos). Mismo cálculo de escala por monitor que
+    // abrir_ventana_preview_coordenada.
+    let escala = app
+        .available_monitors()
+        .ok()
+        .and_then(|monitores| {
+            monitores.into_iter().find(|monitor| {
+                let pos = monitor.position();
+                let size = monitor.size();
+                x >= pos.x as f64
+                    && x < pos.x as f64 + size.width as f64
+                    && y >= pos.y as f64
+                    && y < pos.y as f64 + size.height as f64
+            })
+        })
+        .map(|monitor| monitor.scale_factor())
+        .unwrap_or(1.0);
+
+    let posicion_x = (x / escala) - MITAD_LADO_PREVIEW_LOGICO;
+    let posicion_y = (y / escala) - MITAD_LADO_PREVIEW_LOGICO;
+
+    let ventana = WebviewWindowBuilder::new(
+        &app,
+        LABEL_VENTANA_ORIGEN_CURSOR,
+        WebviewUrl::App("captura.html?modo=origen_cursor".into()),
+    )
+    .title("RemapH — Captura")
+    .inner_size(56.0, 56.0)
+    .position(posicion_x, posicion_y)
+    .resizable(false)
+    .decorations(false)
+    .transparent(true)
+    .shadow(false)
+    .always_on_top(true)
+    .skip_taskbar(true)
+    .focused(false)
+    .build()
+    .map_err(|error| error.to_string())?;
+
+    // Mismo fix de ancho mínimo en Windows que abrir_ventana_preview_coordenada.
+    let _ = ventana.set_size(tauri::Size::Logical(tauri::LogicalSize {
+        width: 56.0,
+        height: 56.0,
+    }));
+    let _ = ventana.set_position(tauri::Position::Logical(tauri::LogicalPosition {
+        x: posicion_x,
+        y: posicion_y,
+    }));
+
+    crate::back_menu_express::desactivar_activacion(&ventana);
+
+    Ok(())
+}
+
+#[tauri::command]
+pub fn cerrar_ventana_origen_cursor(app: tauri::AppHandle) {
+    if let Some(ventana) = app.get_webview_window(LABEL_VENTANA_ORIGEN_CURSOR) {
+        let _ = ventana.close();
+    }
+}
+
 #[tauri::command]
 pub fn obtener_destino_preview_coordenada(id: String) -> Option<(i32, i32)> {
     let config = captura_coordenada::obtener_config_preview(&id)?;

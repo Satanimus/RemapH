@@ -373,11 +373,8 @@
    --indicador-macro-texto-opacidad: 100%;
 
    /* Marcador de preview de la ventana de captura de coordenada
-      (.captura-marcador-preview en styl_captura.css) — "Fondo" es el
-      fondo detrás del ícono (antes transparent sin variable propia);
-      "Texto" es la opacidad del propio ícono SVG (este marcador no
-      tiene texto). */
-   --indicador-coordenada-fondo-opacidad: 40%;
-
+      (.captura-marcador-preview en styl_captura.css) — "Texto" es la
+      opacidad del propio ícono SVG (este marcador no tiene texto).
+      Ya no tiene "Fondo": el marcador quedó sin relleno de fondo. */
    --indicador-coordenada-texto-opacidad: 40%;
 }

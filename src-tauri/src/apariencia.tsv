@@ -168,5 +168,4 @@ nivel	id	nombre_ui	valor_defecto	tipo
 0	indicador-macro-fondo-opacidad	Fondo	55%	porcentaje
 0	indicador-macro-texto-opacidad	Texto	100%	porcentaje
 2	indicador-coordenada	Indicador Coordenada		
-0	indicador-coordenada-fondo-opacidad	Fondo	40%	porcentaje
 0	indicador-coordenada-texto-opacidad	Texto	40%	porcentaje
