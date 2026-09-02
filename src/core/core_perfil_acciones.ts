@@ -46,6 +46,24 @@ export function clonarFilaPorId(id: string): void {
 }
 
 // ======================================================
+// 🎨 COLOREAR FILA POR ID
+// ======================================================
+
+export function colorearFilaPorId(id: string, color: string): void {
+  const perfil = obtenerPerfilUi();
+
+  const fila = perfil.filas.find(
+    (item): item is FilaPerfil => !esSeparador(item) && item.id === id,
+  );
+
+  if (!fila) {
+    return;
+  }
+
+  fila.color = color;
+}
+
+// ======================================================
 // 🗑️ ELIMINAR FILA POR ID
 // ------------------------------------------------------
 // Si la fila eliminada era la única del perfil, se crea
@@ -127,63 +145,6 @@ export function clonarSeparadoresPorId(id: string): void {
   const finTramo = indice + 1 + tramo.length;
 
   perfil.filas.splice(finTramo, 0, separadorClonado, ...filasClonadas);
-}
-
-// ======================================================
-// 🗑️ ELIMINAR SEPARADORES CON FILAS
-// ------------------------------------------------------
-// Elimina el separador y todas las filas de su tramo (Regla
-// 6). Igual que eliminarFilaPorId: si perfil.filas queda
-// vacío después, se empuja una fila nueva para que la tabla
-// nunca quede sin ninguna.
-// ======================================================
-
-export function eliminarSeparadoresConFilas(id: string): void {
-  const perfil = obtenerPerfilUi();
-
-  const indice = perfil.filas.findIndex(
-    (item) => esSeparador(item) && item.id === id,
-  );
-
-  if (indice < 0) {
-    return;
-  }
-
-  const tramo = obtenerTramoDeSeparador(perfil.filas, indice);
-
-  perfil.filas.splice(indice, 1 + tramo.length);
-
-  if (perfil.filas.length === 0) {
-    perfil.filas.push(crearFila());
-  }
-}
-
-// ======================================================
-// 📤 MOVER SEPARADORES FUERA
-// ------------------------------------------------------
-// Las filas del tramo (Regla 6) quedan sueltas al final
-// absoluto de perfil.filas; el separador se elimina. El resto
-// de los separadores no cambia de cantidad de filas ni de
-// orden relativo, así que su pertenencia (derivada por
-// posición, Regla 3) sigue siendo correcta sola.
-// ======================================================
-
-export function moverSeparadoresFuera(id: string): void {
-  const perfil = obtenerPerfilUi();
-
-  const indice = perfil.filas.findIndex(
-    (item) => esSeparador(item) && item.id === id,
-  );
-
-  if (indice < 0) {
-    return;
-  }
-
-  const tramo = obtenerTramoDeSeparador(perfil.filas, indice);
-
-  perfil.filas.splice(indice, 1 + tramo.length);
-
-  perfil.filas.push(...tramo);
 }
 
 // ======================================================

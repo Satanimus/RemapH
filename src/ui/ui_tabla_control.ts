@@ -233,24 +233,46 @@ export function salirModoMoverTabla(): void {
 }
 
 // ======================================================
-// ↕️ ACTIVAR MODO MOVER PARA UNA FILA (ítem "Mover" del
-// popup de Opciones, ver comp_popup_abrir.ts)
+// ⁝ OBTENER SELECCIONADAS (tabla principal)
 // ------------------------------------------------------
-// Mismo puente que registrarSalirModoMover/salirModoMoverTabla,
-// en la dirección contraria: comp_popup_abrir.ts no conoce el
-// controlador de arrastre (vive dentro de ui_tabla.ts), así
-// que pide acá y ui_tabla.ts resuelve contra el controlador
-// real al registrarse.
+// Mismo puente que registrarSalirModoMover/salirModoMoverTabla:
+// el estado de selección vive dentro del controlador de
+// util_arrastrable.ts (crearControladorArrastre), creado adentro
+// de ui_tabla.ts. Este registro permite que comp_opciones.ts pida
+// la lista de ids seleccionados sin importar ui_tabla.ts
+// directamente.
 // ======================================================
 
-let activarModoMoverCallback: ((id: string) => void) | null = null;
+let obtenerSeleccionadasCallback: (() => string[]) | null = null;
 
-export function registrarActivarModoMover(
-  callback: (id: string) => void,
+export function registrarObtenerSeleccionadas(
+  callback: () => string[],
 ): void {
-  activarModoMoverCallback = callback;
+  obtenerSeleccionadasCallback = callback;
 }
 
-export function activarModoMoverTabla(id: string): void {
-  activarModoMoverCallback?.(id);
+export function obtenerSeleccionadasTabla(): string[] {
+  return obtenerSeleccionadasCallback?.() ?? [];
+}
+
+// ======================================================
+// ⁝ COLUMNA OPCIONES — expandir/contraer (toggle global)
+// ------------------------------------------------------
+// Estado compartido por encabezado, filas y separadores:
+// cualquier botón Opciones alterna esta misma bandera para
+// toda la tabla (ver comp_opciones.ts::crearBotonesOpcionesExtra
+// y ui_separador.ts). Redibuja la tabla entera para que todas
+// las celdas reflejen el nuevo estado.
+// ======================================================
+
+let opcionesColumnaExpandida = false;
+
+export function opcionesColumnaEstaExpandida(): boolean {
+  return opcionesColumnaExpandida;
+}
+
+export function alternarOpcionesColumna(): void {
+  opcionesColumnaExpandida = !opcionesColumnaExpandida;
+
+  reconstruirTabla();
 }

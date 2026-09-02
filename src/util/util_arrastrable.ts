@@ -16,7 +16,12 @@
 //    config::tiempo_mantenido() → activa el modo "Mover" y
 //    selecciona esa fila (borde cyan + indicador ⁝⁝ junto
 //    al botón). Un clic CORTO no se toca acá — lo maneja el
-//    llamador con su propio listener "click" (abre menú).
+//    llamador con su propio listener "click".
+// 1b. Dos formas rápidas de entrar a modo Mover sin esperar el
+//    mantenido, ambas sobre el mismo botón ⟫ (asa): a) clic y
+//    arrastre directo (se detecta apenas el puntero supera el
+//    umbral de arrastre); b) Ctrl o Shift mantenido + clic (entra
+//    al instante, sin necesidad de arrastrar ni de esperar).
 // 2. Ctrl + clic sobre el fondo de una fila → agrega/saca
 //    esa fila de la selección. La decisión (agregar vs
 //    sacar) se toma según el estado ANTES del clic, para
@@ -272,6 +277,12 @@ export function crearControladorArrastre(
     inicioY: number;
     cancelada: boolean;
     convertidaEnMover: boolean;
+    // Ctrl o Shift presionado al iniciar la presión — determina si
+    // esta fila se agrega a la selección (seleccionar) o la
+    // reemplaza (reemplazarSeleccionPor) al entrar a modo Mover,
+    // sea cual sea la vía de entrada (mantenido, Ctrl/Shift+clic
+    // instantáneo, o arrastre antes del mantenido).
+    conCtrl: boolean;
   }
 
   let presionAsaActual: PresionAsa | null = null;
@@ -953,26 +964,12 @@ export function crearControladorArrastre(
 
     cancelarPresionAsa();
 
-    const conCtrl = evento.ctrlKey;
+    const conCtrl = evento.ctrlKey || evento.shiftKey;
 
     const timerId = setTimeout(() => {
       if (!presionAsaActual || presionAsaActual.cancelada) return;
 
-      presionAsaActual.convertidaEnMover = true;
-
-      if (!seleccionadas.has(id)) {
-        if (conCtrl) {
-          seleccionar(id);
-        } else {
-          reemplazarSeleccionPor(id);
-        }
-      }
-
-      anclaSeleccion = id;
-
-      // Ya estamos en modo Mover: si el puntero se sigue
-      // moviendo a partir de ahora, se convierte en arrastre.
-      iniciarArrastre(grupoParaArrastrarDesde(id), evento);
+      activarMoverDesdeAsa(evento);
     }, tiempoMantenidoActualMs());
 
     presionAsaActual = {
@@ -982,10 +979,44 @@ export function crearControladorArrastre(
       inicioY: evento.clientY,
       cancelada: false,
       convertidaEnMover: false,
+      conCtrl,
     };
+
+    // Ctrl/Shift + clic sobre el asa: entra a modo Mover al
+    // instante (selecciona esta fila y arranca el arrastre), sin
+    // esperar el mantenido.
+    if (conCtrl) {
+      clearTimeout(timerId);
+
+      activarMoverDesdeAsa(evento);
+    }
 
     document.addEventListener("pointermove", manejarAsaPointerMove);
     document.addEventListener("pointerup", manejarAsaPointerUp);
+  }
+
+  // Selecciona (si hace falta) y arranca el arrastre. Punto único
+  // usado por las tres vías de entrada a modo Mover: mantenido
+  // vencido, Ctrl/Shift+clic instantáneo, y arrastre detectado antes
+  // de que venza el mantenido (ver manejarAsaPointerMove).
+  function activarMoverDesdeAsa(evento: PointerEvent): void {
+    if (!presionAsaActual) return;
+
+    const { id, conCtrl } = presionAsaActual;
+
+    presionAsaActual.convertidaEnMover = true;
+
+    if (!seleccionadas.has(id)) {
+      if (conCtrl) {
+        seleccionar(id);
+      } else {
+        reemplazarSeleccionPor(id);
+      }
+    }
+
+    anclaSeleccion = id;
+
+    iniciarArrastre(grupoParaArrastrarDesde(id), evento);
   }
 
   function cancelarPresionAsa(): void {
@@ -1011,14 +1042,12 @@ export function crearControladorArrastre(
     const dy = evento.clientY - presionAsaActual.inicioY;
 
     if (Math.hypot(dx, dy) > UMBRAL_ARRASTRE_PX) {
-      // Se movió antes de completar el mantenido: se cancela
-      // el gesto entero (no selecciona, no arrastra). El clic
-      // corto tampoco debería llegar a disparar el menú porque
-      // el mouseup terminará fuera del botón en la mayoría de
-      // los casos — y si no, es un clic legítimo.
-      presionAsaActual.cancelada = true;
+      // Arrastre directo antes de completar el mantenido: entra a
+      // modo Mover al instante en vez de cancelar el gesto (forma
+      // rápida de arrancar el arrastre sin esperar el mantenido).
+      clearTimeout(presionAsaActual.timerId);
 
-      cancelarPresionAsa();
+      activarMoverDesdeAsa(evento);
     }
   }
 

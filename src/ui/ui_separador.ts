@@ -8,6 +8,14 @@
 // On/Off viven en el carril, lado a lado (ver
 // comp_separador_expandir.ts).
 //
+// Opciones usa el mismo botón "⁝" toggle y los mismos 3
+// botones (crearBotonesOpcionesExtra) que la fila normal
+// (ver comp_opciones.ts). Eliminar un separador solo elimina
+// el separador (mismo criterio/alcance que eliminarFilaPorId
+// para una fila): las filas que contenía quedan donde están,
+// sin doble confirmación (los separadores no tienen "acción"
+// configurable que proteger).
+//
 // [FIX] Nota funciona como Nombre del separador: ocupa
 // desde donde arrancaría la columna App hasta el borde
 // derecho de la fila (antes quedaba un tramo vacío
@@ -24,7 +32,17 @@ import type { SeparadorPerfil } from "../core/core_perfil";
 
 import { crearBoton } from "../componentes/comp_boton";
 import { crearNota } from "../componentes/comp_controles";
-import { abrirPopupSeparadores } from "../componentes/comp_popup_separadores";
+import { crearBotonesOpcionesExtra } from "../componentes/comp_opciones";
+import { abrirPopupColorSeparador } from "../componentes/comp_popup_separadores";
+import {
+  clonarSeparadoresPorId,
+  eliminarFilaPorId,
+} from "../core/core_perfil_acciones";
+import {
+  reconstruirTabla,
+  opcionesColumnaEstaExpandida,
+  alternarOpcionesColumna,
+} from "./ui_tabla_control";
 import { COLUMNAS } from "./ui_columnas";
 
 // Ancho de Opciones tomado de la misma fuente única de verdad
@@ -58,17 +76,44 @@ export function crearSeparadorHeader(
   celdaOpciones.style.width = anchoOpciones;
   celdaOpciones.style.flexBasis = anchoOpciones;
 
+  const contenedorOpciones = document.createElement("div");
+
+  contenedorOpciones.className = "opciones-celda";
+
   const botonOpciones = crearBoton({
     texto: "⁝",
     titulo: "Opciones de separador",
     clase: "opciones-asa",
   });
 
-  botonOpciones.addEventListener("click", (evento) => {
-    abrirPopupSeparadores(evento, separador, alModificar);
+  botonOpciones.addEventListener("click", () => {
+    alternarOpcionesColumna();
   });
 
-  celdaOpciones.append(botonOpciones);
+  contenedorOpciones.append(botonOpciones);
+
+  if (opcionesColumnaEstaExpandida()) {
+    contenedorOpciones.append(
+      crearBotonesOpcionesExtra({
+        onAbrirColor: (evento) => {
+          abrirPopupColorSeparador(evento, separador);
+        },
+        onDuplicar: () => {
+          clonarSeparadoresPorId(separador.id);
+          alModificar();
+          reconstruirTabla();
+        },
+        onEliminar: () => {
+          eliminarFilaPorId(separador.id);
+          alModificar();
+          reconstruirTabla();
+        },
+        requiereConfirmacion: false,
+      }),
+    );
+  }
+
+  celdaOpciones.append(contenedorOpciones);
 
   const celdaNota = document.createElement("div");
 

@@ -5,29 +5,14 @@
 import { mostrarPopup, ocultarPopup } from "./comp_popup_contenedor";
 
 import type { ContextoFila } from "../core/core_contexto_fila";
-import {
-  clonarFilaPorId,
-  eliminarFilaPorId,
-  filaTieneAccion,
-} from "../core/core_perfil_acciones";
+import { clonarFilaPorId } from "../core/core_perfil_acciones";
 import type { FilaPerfil } from "../core/core_perfil";
 import { crearEntrada } from "../core/core_entrada";
 import { crearTrigger } from "../core/core_trigger";
 import { reconstruirFila } from "../ui/ui_tabla_control";
 import { reconstruirTabla } from "../ui/ui_tabla_control";
-import { activarModoMoverTabla } from "../ui/ui_tabla_control";
 
-// ======================================================
-// ➖ SEPARADOR (mismo estilo que el resto de los popups)
-// ======================================================
-
-function crearSeparador(): HTMLElement {
-  const separador = document.createElement("div");
-
-  separador.className = "app-popup-separador";
-
-  return separador;
-}
+import { colorearFilaPorId } from "../core/core_perfil_acciones";
 
 function crearLista(
   opciones: string[],
@@ -250,75 +235,6 @@ export function abrirPopupEstado(
 }
 
 // ======================================================
-// 🔢 POPUP NÚMERO DE FILA
-// ------------------------------------------------------
-// Clonar / Eliminar. "Mover" no es una opción de este menú
-// — se activa con clic MANTENIDO sobre el mismo botón,
-// resuelto enteramente por util_arrastrable.ts (ver
-// registrarFila en ui_tabla.ts). Acá solo se atiende el
-// clic CORTO. No usa abrirLista porque Eliminar necesita
-// doble confirmación in-place, y ambas acciones modifican
-// el perfil (marcan editado).
-// ======================================================
-
-export function abrirPopupNumero(
-  evento: MouseEvent,
-  contexto: ContextoFila,
-  filaPerfil: FilaPerfil,
-  alModificar: () => void,
-): void {
-  const lista = document.createElement("div");
-
-  lista.className = "popup-lista";
-
-  // ----------------------------------
-  // 📋 CLONAR
-  // ----------------------------------
-
-  const botonClonar = document.createElement("button");
-
-  botonClonar.className = "ui-btn";
-  botonClonar.textContent = "Clonar";
-
-  botonClonar.addEventListener("click", () => {
-    clonarFilaPorId(contexto.id);
-    alModificar();
-    reconstruirTabla();
-    ocultarPopup();
-  });
-
-  // ----------------------------------
-  // 🗑️ ELIMINAR
-  // ----------------------------------
-
-  const botonEliminar = document.createElement("button");
-
-  botonEliminar.className = "ui-btn popup-perfil-eliminar";
-  botonEliminar.textContent = "Eliminar";
-
-  let confirmando = false;
-
-  botonEliminar.addEventListener("click", () => {
-    if (filaTieneAccion(filaPerfil) && !confirmando) {
-      confirmando = true;
-
-      botonEliminar.textContent = "⚠️ Confirmar eliminación";
-
-      return;
-    }
-
-    eliminarFilaPorId(contexto.id);
-    alModificar();
-    reconstruirTabla();
-    ocultarPopup();
-  });
-
-  lista.append(botonClonar, botonEliminar);
-
-  mostrarPopup(lista, evento.clientX, evento.clientY);
-}
-
-// ======================================================
 // 🎨 PALETA DE COLORES DE FILA (lista reutilizable)
 // ------------------------------------------------------
 // El valor guardado (`valor`) es la clave usada para armar
@@ -327,9 +243,7 @@ export function abrirPopupNumero(
 // desde un solo lugar sin tocar este archivo. Se usa tanto
 // en el popup de Color "suelto" (abrirPopupColor, hoy sin
 // uso desde que la columna Color se sacó de la tabla) como
-// dentro del popup de Opciones (abrirPopupOpciones), donde
-// se muestra expandida en el mismo popup en vez de abrir
-// uno nuevo.
+// en la columna Opciones inline (comp_opciones.ts).
 // ======================================================
 
 export const COLOR_OPCIONES: { texto: string; valor: string }[] = [
@@ -416,157 +330,64 @@ export function abrirPopupColor(
 }
 
 // ======================================================
-// ⁝ POPUP OPCIONES DE FILA
+// 🎨 POPUP COLOR — SELECCIONADAS (Regla 12)
 // ------------------------------------------------------
-// Reemplaza a abrirPopupNumero como menú principal de la
-// fila (ver comp_opciones.ts, Etapa D del plan). "Color" no
-// abre un popup nuevo: expande una caja interna (misma clase
-// popup-caja-interna que usa, por ejemplo, "Relativa a
-// Ventana" dentro del popup Extra de Coordenada) justo debajo
-// del botón, dentro de ESTE MISMO popup — nunca crea un
-// elemento de popup aparte, así conserva el position:fixed +
-// left/top que mostrarPopup ya le puso inline según el click
-// original, y el popup no salta de lugar. dibujar() se llama
-// a sí misma en cada redibujado para que colorExpandido
-// sobreviva mientras el popup sigue abierto (mismo patrón que
-// abrirConExpandido en comp_popup_abrir_extra.ts). "Mover"
-// activa el modo mover del componente de arrastre
-// (util_arrastrable.ts).
+// Misma paleta (COLOR_OPCIONES) que abrirPopupColor, pero
+// aplica el color elegido a todas las filas de `ids` en vez
+// de una sola fila — usado por el botón 🎨 del encabezado
+// de la tabla principal (ver ui_tabla.ts).
 // ======================================================
 
-export function abrirPopupOpciones(
+export function abrirPopupColorSeleccionadas(
   evento: MouseEvent,
-  contexto: ContextoFila,
-  filaPerfil: FilaPerfil,
-  alModificar: () => void,
+  ids: string[],
+  alSeleccionar: () => void,
 ): void {
-  let colorExpandido = false;
+  const lista = document.createElement("div");
 
-  const dibujar = (): void => {
-    const lista = document.createElement("div");
+  lista.className = "popup-lista";
 
-    lista.className = "popup-lista";
+  const botonLimpiar = document.createElement("button");
 
-    lista.dataset.ayudaId = "popup-opciones-fila";
+  botonLimpiar.className = "ui-btn";
+  botonLimpiar.textContent = "🎨 Limpiar";
 
-    // ----------------------------------
-    // 🎨 COLOR (se expande en una caja interna)
-    // ----------------------------------
+  botonLimpiar.addEventListener("click", () => {
+    ids.forEach((id) => colorearFilaPorId(id, ""));
 
-    const botonColor = document.createElement("button");
+    ocultarPopup();
+    alSeleccionar();
+  });
 
-    botonColor.className = "ui-btn";
+  lista.append(botonLimpiar);
 
-    if (filaPerfil.color) {
-      botonColor.classList.add("popup-color-item");
+  COLOR_OPCIONES.forEach((opcion) => {
+    const boton = document.createElement("button");
 
-      const opcion = COLOR_OPCIONES.find((o) => o.valor === filaPerfil.color);
+    boton.className = "ui-btn popup-color-item";
 
-      const muestra = document.createElement("span");
+    const muestra = document.createElement("span");
 
-      muestra.className = "popup-color-muestra";
-      muestra.style.background = `var(--tag-${filaPerfil.color})`;
+    muestra.className = "popup-color-muestra";
+    muestra.style.background = `var(--tag-${opcion.valor})`;
 
-      const texto = document.createElement("span");
+    const texto = document.createElement("span");
 
-      texto.textContent = `Color ${opcion?.texto ?? filaPerfil.color}`;
+    texto.textContent = opcion.texto;
 
-      botonColor.append(muestra, texto);
-    } else {
-      botonColor.textContent = "🎨 Color";
-    }
+    boton.append(muestra, texto);
 
-    botonColor.addEventListener("click", () => {
-      colorExpandido = !colorExpandido;
-      dibujar();
-    });
+    boton.addEventListener("click", () => {
+      ids.forEach((id) => colorearFilaPorId(id, opcion.valor));
 
-    lista.append(botonColor);
-
-    if (colorExpandido) {
-      const caja = document.createElement("div");
-
-      caja.className = "popup-caja-interna";
-
-      llenarListaColor(caja, contexto, filaPerfil, () => {
-        alModificar();
-        ocultarPopup();
-      });
-
-      lista.append(caja);
-    }
-
-    lista.append(crearSeparador());
-
-    // ----------------------------------
-    // 📋 CLONAR
-    // ----------------------------------
-
-    const botonClonar = document.createElement("button");
-
-    botonClonar.className = "ui-btn";
-    botonClonar.textContent = "Clonar";
-
-    botonClonar.addEventListener("click", () => {
-      clonarFilaPorId(contexto.id);
-      alModificar();
-      reconstruirTabla();
       ocultarPopup();
+      alSeleccionar();
     });
 
-    // ----------------------------------
-    // ⁝⁝ MOVER
-    // ------------------------------------------------------
-    // Activa el modo mover del controlador de arrastre para
-    // esta fila (ver activarModoMoverTabla en ui_tabla_control.ts
-    // → registrarActivarModoMover en ui_tabla.ts → activarModoMoverPara
-    // en util_arrastrable.ts). A partir de acá el usuario arrastra
-    // con el mouse o mueve con las flechas, igual que con el
-    // clic mantenido sobre el asa.
-    // ----------------------------------
+    lista.append(boton);
+  });
 
-    const botonMover = document.createElement("button");
-
-    botonMover.className = "ui-btn";
-    botonMover.textContent = "Mover";
-
-    botonMover.addEventListener("click", () => {
-      activarModoMoverTabla(contexto.id);
-      ocultarPopup();
-    });
-
-    // ----------------------------------
-    // 🗑️ ELIMINAR
-    // ----------------------------------
-
-    const botonEliminar = document.createElement("button");
-
-    botonEliminar.className = "ui-btn popup-perfil-eliminar";
-    botonEliminar.textContent = "Eliminar";
-
-    let confirmando = false;
-
-    botonEliminar.addEventListener("click", () => {
-      if (filaTieneAccion(filaPerfil) && !confirmando) {
-        confirmando = true;
-
-        botonEliminar.textContent = "⚠️ Confirmar eliminación";
-
-        return;
-      }
-
-      eliminarFilaPorId(contexto.id);
-      alModificar();
-      reconstruirTabla();
-      ocultarPopup();
-    });
-
-    lista.append(botonClonar, botonMover, botonEliminar);
-
-    mostrarPopup(lista, evento.clientX, evento.clientY);
-  };
-
-  dibujar();
+  mostrarPopup(lista, evento.clientX, evento.clientY);
 }
 
 export function abrirPopupExtra(
@@ -589,7 +410,7 @@ export function abrirPopupExtra(
 // ------------------------------------------------------
 // No usa abrirLista() porque "Eliminar Captura" necesita su propio
 // estilo (rojo, ver .popup-perfil-eliminar) distinto del resto de
-// las opciones — mismo motivo que abrirPopupNumero más abajo.
+// las opciones.
 // ======================================================
 
 export function abrirPopupModificador(

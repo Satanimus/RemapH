@@ -29,8 +29,22 @@ import type { ItemFilaPerfil, SeparadorPerfil } from "../core/core_perfil";
 import {
   registrarReconstruccion,
   registrarSalirModoMover,
-  registrarActivarModoMover,
+  registrarObtenerSeleccionadas,
+  obtenerSeleccionadasTabla,
+  alternarOpcionesColumna,
+  opcionesColumnaEstaExpandida,
 } from "./ui_tabla_control";
+
+import { crearBoton } from "../componentes/comp_boton";
+
+import { crearBotonesOpcionesExtra } from "../componentes/comp_opciones";
+
+import { abrirPopupColorSeleccionadas } from "../componentes/comp_popup_abrir";
+
+import {
+  clonarFilaPorId,
+  eliminarFilaPorId,
+} from "../core/core_perfil_acciones";
 
 import {
   activarRedimensionColumnas,
@@ -96,6 +110,8 @@ export function crearTabla(alModificar: () => void): HTMLElement {
     nota: "nota-columna",
   };
 
+  let celdaOpcionesCabecera: HTMLElement | null = null;
+
   COLUMNAS.forEach((col) => {
     const celda = document.createElement("div");
 
@@ -107,9 +123,67 @@ export function crearTabla(alModificar: () => void): HTMLElement {
 
     celda.style.flexBasis = col.ancho;
 
-    celda.textContent = col.titulo;
+    if (col.id === "opciones") {
+      const boton = crearBoton({
+        texto: "⁝",
+        titulo: "Opciones",
+        clase: "opciones-asa",
+      });
 
-    celda.title = col.titulo;
+      boton.addEventListener("click", () => {
+        alternarOpcionesColumna();
+      });
+
+      celda.append(boton);
+
+      celdaOpcionesCabecera = celda;
+
+      if (opcionesColumnaEstaExpandida()) {
+        const seleccionadas = obtenerSeleccionadasTabla();
+
+        const extra = crearBotonesOpcionesExtra({
+          onAbrirColor: (evento) => {
+            abrirPopupColorSeleccionadas(
+              evento,
+              obtenerSeleccionadasTabla(),
+              () => {
+                alModificar();
+                reconstruirTabla();
+              },
+            );
+          },
+          onDuplicar: () => {
+            obtenerSeleccionadasTabla().forEach((id) => {
+              clonarFilaPorId(id);
+            });
+
+            alModificar();
+            reconstruirTabla();
+          },
+          onEliminar: () => {
+            obtenerSeleccionadasTabla().forEach((id) => {
+              eliminarFilaPorId(id);
+            });
+
+            alModificar();
+            reconstruirTabla();
+          },
+          requiereConfirmacion: false,
+        });
+
+        extra
+          .querySelectorAll<HTMLButtonElement>(".ui-btn")
+          .forEach((botonExtra) => {
+            botonExtra.disabled = seleccionadas.length === 0;
+          });
+
+        celda.append(extra);
+      }
+    } else {
+      celda.textContent = col.titulo;
+
+      celda.title = col.titulo;
+    }
 
     const idAyuda = IDS_AYUDA_COLUMNA[col.id];
 
@@ -269,12 +343,24 @@ export function crearTabla(alModificar: () => void): HTMLElement {
 
       return true;
     },
+
+    onSeleccionCambio: () => {
+      // Mismo motivo que en el editor de Macros (comp_popup_macro_editor.ts):
+      // este callback puede correr en medio de manejarPointerUpArrastre
+      // (util_arrastrable.ts). Se difiere con setTimeout 0 para dejar
+      // terminar la limpieza en curso antes de reconstruir la tabla.
+      setTimeout(() => reconstruirTabla(), 0);
+    },
+
+    elementosExentosClickAfuera: celdaOpcionesCabecera
+      ? [celdaOpcionesCabecera]
+      : [],
   });
 
   registrarSalirModoMover(() => controladorArrastre.salirModoMover());
 
-  registrarActivarModoMover((id) =>
-    controladorArrastre.activarModoMoverPara(id),
+  registrarObtenerSeleccionadas(() =>
+    controladorArrastre.obtenerSeleccionadas(),
   );
 
   // Registra una fila ya insertada en el DOM (asa = botón

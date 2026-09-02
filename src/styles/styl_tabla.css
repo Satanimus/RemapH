@@ -559,6 +559,112 @@
     border-color: var(--highlight);
 }
 
+/* ======================================================
+   ⋮ COLUMNA OPCIONES — botón toggle + extra inline
+   (fila, separador y cabecera — Etapa B/C/D, ver comp_*)
+   ====================================================== */
+
+/* E.1 — contenedor del botón ⁝/Opciones + botones extra.
+   width: fit-content, igual criterio que .celda.separador-opciones
+   .ui-btn, para que no se estire con el ancho de la columna. */
+.opciones-celda {
+
+    display: flex;
+
+    align-items: center;
+
+    gap: var(--gap4);
+
+    width: fit-content;
+}
+
+/* Contenedor de los 3 botones (🎨 ⧉ X). La transición de
+   ancho/opacidad es la animación de expansión de la columna
+   (Regla 3 / Regla 9). */
+.opciones-extra {
+
+    display: flex;
+
+    align-items: center;
+
+    gap: var(--gap4);
+
+    overflow: hidden;
+
+    transition: width var(--speed), opacity var(--speed);
+}
+
+/* E.2 — botones ícono-solo, mismo tamaño que .ui-btn.icono. */
+.opciones-boton-color,
+.opciones-boton-duplicar,
+.opciones-boton-eliminar {
+
+    width: 28px;
+
+    min-width: 28px;
+
+    padding: 0;
+}
+
+/* E.3 — deshabilitado por defecto (Regla 13), mismo patrón que
+   .popup-capa .popup-extra-probar:disabled. */
+.opciones-extra .ui-btn:disabled {
+
+    opacity: 0.4;
+
+    cursor: not-allowed;
+}
+
+.opciones-extra .ui-btn:disabled:hover {
+
+    background: transparent !important;
+
+    border-color: transparent;
+}
+
+/* E.4 — Regla 14: el title nativo ya se ve sobre botones
+   disabled sin CSS adicional; no usar pointer-events: none acá
+   porque taparía el tooltip nativo del navegador. */
+
+/* E.5 — Regla 10: ícono "X" blanco en reposo (ya lo da el color
+   base de .ui-btn, sin regla aparte); hover rojo solo si no está
+   deshabilitado. */
+.opciones-boton-eliminar:not(:disabled):hover {
+
+    color: var(--text-red);
+
+    border-color: var(--highlight-red);
+}
+
+/* E.6 — Regla 9: confirmación expandida de Eliminar. */
+.opciones-boton-eliminar--confirmando {
+
+    width: auto;
+
+    padding: 0 var(--gap8);
+
+    background: color-mix(in srgb, var(--red-dark) 20%, transparent);
+
+    border-color: var(--highlight-red);
+
+    color: var(--text-red);
+
+    transition: width var(--speed), background var(--speed), border-color var(--speed);
+}
+
+/* E.7 — la celda "opciones" (cabecera y fila) se ensancha cuando
+   la columna extra está expandida (Regla 3, Regla 9). min-width
+   en vez de width/flex-basis: el ancho base de la columna llega
+   por estilo inline (redimensionable via .divisor-columna), y
+   min-width actúa como piso sin pisarlo. 150px ≈ botón toggle
+   (28px) + gap4 + 3 botones extra (3×28px + 2×gap4) + padding
+   horizontal de la celda (2×gap8). */
+.cabecera-celda[data-columna="opciones"]:has(.opciones-extra),
+.celda[data-columna="opciones"]:has(.opciones-extra) {
+
+    min-width: 150px;
+}
+
 .nota {
 
     width: 100%;
