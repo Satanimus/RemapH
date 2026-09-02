@@ -2590,7 +2590,7 @@ function crearFilaPaso(
     if (paso.tipo === "coordenada") {
       const botonPreviewRapido = document.createElement("button");
 
-      botonPreviewRapido.className = "ui-btn";
+      botonPreviewRapido.className = "ui-btn popup-macro-editor-previsualizar";
       botonPreviewRapido.textContent = "⊙";
       botonPreviewRapido.title = "Previsualizar";
       botonPreviewRapido.dataset.activo = String(idsPreviosMacro.has(idPaso));

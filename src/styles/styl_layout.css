@@ -1492,6 +1492,12 @@
   pointer-events: none;
 }
 
+/* ⊙ Previsualizar activo: borde cyan, sin relleno (a diferencia
+   del Marcador de arriba, que sí lleva fondo sólido). */
+.ui-btn.popup-macro-editor-previsualizar[data-activo="true"] {
+  border-color: var(--highlight);
+}
+
 .popup-macro-editor-numero {
   font-size: var(--fs11);
   color: var(--text-disabled);
