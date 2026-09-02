@@ -715,3 +715,74 @@ fn enviar_rueda(ict: &Interception, device: Device, cantidad: i16) {
 
     ict.send(device, &[stroke]);
 }
+
+// ======================================================
+// 🚚 MOVER CURSOR (interpolado)
+// ------------------------------------------------------
+// Mismo objetivo y mismo criterio que
+// back_windows::mover_cursor: reemplaza el SetCursorPos que
+// usaba back_coordenada directo (teleporta sin generar
+// eventos de movimiento intermedios; varias apps —
+// Explorer/drag, selección de texto, el cuadro selector del
+// escritorio, Paint— no reconocen el arrastre si no ven el
+// recorrido). Se manda en pasos cortos, x/y RELATIVOS
+// (MouseFlags::MOVE_RELATIVE, que además es el valor 0 por
+// defecto de la flag) en píxeles reales de pantalla, con una
+// pausa mínima entre cada uno.
+// ======================================================
+
+const PASO_MOVIMIENTO_PX: i32 = 12;
+const PAUSA_ENTRE_PASOS_MS: u64 = 4;
+
+pub fn mover_cursor(x: i32, y: i32) {
+    let Some(device) = mouse_primario() else {
+        return;
+    };
+
+    con_sesion_salida(|ict| loop {
+        // Se relee la posición REAL en cada paso — no se acumula
+        // actual_x/actual_y a mano. Mismo motivo que
+        // back_windows::mover_cursor: el deltas relativo pasa por
+        // la misma pila de Windows (aceleración de puntero /
+        // pointer ballistics) una vez que Interception lo inyecta,
+        // así que un dx/dy "crudo" no garantiza ese desplazamiento
+        // exacto en pantalla. Acumular a mano hacía que el error se
+        // sumara paso a paso y el cursor terminara mucho más lejos
+        // del destino que lo calculado.
+        let (actual_x, actual_y) = crate::back_coordenada::obtener_cursor();
+
+        let restante_x = x - actual_x;
+        let restante_y = y - actual_y;
+
+        if restante_x == 0 && restante_y == 0 {
+            break;
+        }
+
+        let distancia = (restante_x.abs()).max(restante_y.abs());
+        let paso = PASO_MOVIMIENTO_PX.min(distancia).max(1);
+
+        let dx = if restante_x == 0 {
+            0
+        } else {
+            (restante_x.signum()) * paso.min(restante_x.abs())
+        };
+        let dy = if restante_y == 0 {
+            0
+        } else {
+            (restante_y.signum()) * paso.min(restante_y.abs())
+        };
+
+        let stroke = Stroke::Mouse {
+            state: MouseFilter::empty(),
+            flags: interception::MouseFlags::MOVE_RELATIVE,
+            rolling: 0,
+            x: dx,
+            y: dy,
+            information: 0,
+        };
+
+        ict.send(device, &[stroke]);
+
+        std::thread::sleep(std::time::Duration::from_millis(PAUSA_ENTRE_PASOS_MS));
+    });
+}

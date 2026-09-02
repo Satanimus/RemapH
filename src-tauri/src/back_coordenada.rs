@@ -45,7 +45,8 @@
 //     None si no hay ventana en foreground (caso raro, ej.
 //     el escritorio).
 // mover_cursor(x, y)
-//     SetCursorPos.
+//     Delega al motor activo (Interception o Portable);
+//     movimiento interpolado, no SetCursorPos.
 // calcular_destino(ubicacion)
 //     Resuelve Absoluta / RelativaCursor / RelativaVentana
 //     (Porcentaje o Píxeles) a una coordenada de pantalla.
@@ -61,7 +62,7 @@ use crate::perfil_cache::{PuntoReferenciaCache, UbicacionCache};
 
 use windows_sys::Win32::Foundation::{POINT, RECT};
 use windows_sys::Win32::UI::WindowsAndMessaging::{
-    GetCursorPos, GetForegroundWindow, GetWindowRect, GetWindowTextW, SetCursorPos,
+    GetCursorPos, GetForegroundWindow, GetWindowRect, GetWindowTextW,
 };
 
 // ======================================================
@@ -132,11 +133,20 @@ pub fn obtener_ventana_activa() -> Option<VentanaActiva> {
 
 // ======================================================
 // 🚚 MOVER CURSOR
+// ------------------------------------------------------
+// Delega al motor activo (mismo patrón que
+// motor::emitir_evento) para que el movimiento se emita por
+// el mismo canal que clicks/teclas — interpolado en pasos
+// cortos con WM_MOUSEMOVE reales, no SetCursorPos (que
+// teleporta sin generar movimiento intermedio y varias apps
+// no reconocen como arrastre: Explorer/drag, selección de
+// texto, cuadro selector del escritorio, Paint).
 // ======================================================
 
 pub fn mover_cursor(x: i32, y: i32) {
-    unsafe {
-        SetCursorPos(x, y);
+    match crate::motor::modo_activo() {
+        crate::motor::Modo::Interception => crate::back_interception::mover_cursor(x, y),
+        crate::motor::Modo::Portable => crate::back_windows::mover_cursor(x, y),
     }
 }
 

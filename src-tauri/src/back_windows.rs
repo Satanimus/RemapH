@@ -154,6 +154,7 @@
 // SendInput (KEYBDINPUT / MOUSEINPUT)
 // ======================================================
 
+use crate::back_coordenada;
 use crate::eventos::InputEvent;
 use crate::pulsadores;
 use std::cell::RefCell;
@@ -165,17 +166,19 @@ use windows_sys::Win32::Foundation::{LPARAM, LRESULT, WPARAM};
 
 use windows_sys::Win32::UI::Input::KeyboardAndMouse::{
     SendInput, INPUT, INPUT_0, INPUT_KEYBOARD, INPUT_MOUSE, KEYBDINPUT, KEYEVENTF_EXTENDEDKEY,
-    KEYEVENTF_KEYUP, KEYEVENTF_SCANCODE, MOUSEEVENTF_LEFTDOWN, MOUSEEVENTF_LEFTUP,
-    MOUSEEVENTF_MIDDLEDOWN, MOUSEEVENTF_MIDDLEUP, MOUSEEVENTF_RIGHTDOWN, MOUSEEVENTF_RIGHTUP,
-    MOUSEEVENTF_WHEEL, MOUSEEVENTF_XDOWN, MOUSEEVENTF_XUP, MOUSEINPUT,
+    KEYEVENTF_KEYUP, KEYEVENTF_SCANCODE, MOUSEEVENTF_ABSOLUTE, MOUSEEVENTF_LEFTDOWN,
+    MOUSEEVENTF_LEFTUP, MOUSEEVENTF_MIDDLEDOWN, MOUSEEVENTF_MIDDLEUP, MOUSEEVENTF_MOVE,
+    MOUSEEVENTF_RIGHTDOWN, MOUSEEVENTF_RIGHTUP, MOUSEEVENTF_VIRTUALDESK, MOUSEEVENTF_WHEEL,
+    MOUSEEVENTF_XDOWN, MOUSEEVENTF_XUP, MOUSEINPUT,
 };
 
 use windows_sys::Win32::UI::WindowsAndMessaging::{
-    CallNextHookEx, GetMessageW, PostThreadMessageW, SetWindowsHookExW, UnhookWindowsHookEx,
-    KBDLLHOOKSTRUCT, MSG, MSLLHOOKSTRUCT, WH_KEYBOARD_LL, WH_MOUSE_LL, WM_KEYDOWN, WM_KEYUP,
-    WM_LBUTTONDOWN, WM_LBUTTONUP, WM_MBUTTONDOWN, WM_MBUTTONUP, WM_MOUSEMOVE, WM_MOUSEWHEEL,
-    WM_QUIT, WM_RBUTTONDOWN, WM_RBUTTONUP, WM_SYSKEYDOWN, WM_SYSKEYUP, WM_XBUTTONDOWN,
-    WM_XBUTTONUP,
+    CallNextHookEx, GetMessageW, GetSystemMetrics, PostThreadMessageW, SetWindowsHookExW,
+    UnhookWindowsHookEx, KBDLLHOOKSTRUCT, MSG, MSLLHOOKSTRUCT, SM_CXVIRTUALSCREEN,
+    SM_CYVIRTUALSCREEN, SM_XVIRTUALSCREEN, SM_YVIRTUALSCREEN, WH_KEYBOARD_LL, WH_MOUSE_LL,
+    WM_KEYDOWN, WM_KEYUP, WM_LBUTTONDOWN, WM_LBUTTONUP, WM_MBUTTONDOWN, WM_MBUTTONUP, WM_MOUSEMOVE,
+    WM_MOUSEWHEEL, WM_QUIT, WM_RBUTTONDOWN, WM_RBUTTONUP, WM_SYSKEYDOWN, WM_SYSKEYUP,
+    WM_XBUTTONDOWN, WM_XBUTTONUP,
 };
 
 use crate::eventos::{InputId, InputState};
@@ -760,6 +763,102 @@ fn enviar_rueda(cantidad: i32) {
     };
 
     enviar(input);
+}
+
+// ======================================================
+// 🚚 MOVER CURSOR (interpolado, absoluto)
+// ------------------------------------------------------
+// Reemplaza al SetCursorPos que usaba back_coordenada
+// directo: SetCursorPos teleporta el cursor sin generar
+// WM_MOUSEMOVE intermedios, y varias apps (Explorer/drag de
+// archivos, selección de texto por arrastre, el cuadro
+// selector del escritorio, Paint) no reconocen un arrastre
+// que salta directo de un punto a otro — necesitan ver el
+// recorrido.
+//
+// [FIX] Movimiento ABSOLUTO, no relativo. La primera versión
+// mandaba MOUSEEVENTF_MOVE relativo (dx/dy) y releía la
+// posición real entre pasos para no acumular error — pero
+// Windows aplica aceleración de puntero (pointer ballistics)
+// a los deltas relativos por defecto, y esa aceleración podía
+// mantenerse activa/errática entre pasos sucesivos incluso
+// releyendo la posición, dando un recorrido mucho más amplio
+// que el pedido (llegaba hasta el borde de pantalla). El
+// modo absoluto (MOUSEEVENTF_ABSOLUTE) no pasa por pointer
+// ballistics — es un porcentaje 0..65535 del escritorio
+// virtual completo (todos los monitores, ver
+// MOUSEEVENTF_VIRTUALDESK), documentado por Microsoft como
+// posición directa, no delta. Se sigue interpolando en pasos
+// cortos (ahora cada uno es una posición absoluta intermedia,
+// no un delta) para que el destino siga viendo varios
+// WM_MOUSEMOVE en el trayecto.
+// ======================================================
+
+const PASO_MOVIMIENTO_PX: i32 = 12;
+const PAUSA_ENTRE_PASOS_MS: u64 = 4;
+
+pub fn mover_cursor(x: i32, y: i32) {
+    loop {
+        let (actual_x, actual_y) = back_coordenada::obtener_cursor();
+
+        let restante_x = x - actual_x;
+        let restante_y = y - actual_y;
+
+        if restante_x == 0 && restante_y == 0 {
+            break;
+        }
+
+        let distancia = (restante_x.abs()).max(restante_y.abs());
+        let paso = PASO_MOVIMIENTO_PX.min(distancia).max(1);
+
+        let dx = if restante_x == 0 {
+            0
+        } else {
+            (restante_x.signum()) * paso.min(restante_x.abs())
+        };
+        let dy = if restante_y == 0 {
+            0
+        } else {
+            (restante_y.signum()) * paso.min(restante_y.abs())
+        };
+
+        enviar_movimiento_absoluto(actual_x + dx, actual_y + dy);
+
+        std::thread::sleep(std::time::Duration::from_millis(PAUSA_ENTRE_PASOS_MS));
+    }
+}
+
+fn enviar_movimiento_absoluto(x: i32, y: i32) {
+    // MOUSEEVENTF_ABSOLUTE + VIRTUALDESK: dx/dy dejan de ser delta y
+    // pasan a ser un porcentaje 0..65535 del escritorio virtual
+    // completo (todos los monitores) — no del monitor primario, que
+    // es lo que se obtendría sin VIRTUALDESK en un setup multi-
+    // monitor.
+    unsafe {
+        let origen_x = GetSystemMetrics(SM_XVIRTUALSCREEN);
+        let origen_y = GetSystemMetrics(SM_YVIRTUALSCREEN);
+        let ancho = GetSystemMetrics(SM_CXVIRTUALSCREEN).max(1);
+        let alto = GetSystemMetrics(SM_CYVIRTUALSCREEN).max(1);
+
+        let escala_x = (((x - origen_x) as i64 * 65536) / ancho as i64) as i32;
+        let escala_y = (((y - origen_y) as i64 * 65536) / alto as i64) as i32;
+
+        let input = INPUT {
+            r#type: INPUT_MOUSE,
+            Anonymous: INPUT_0 {
+                mi: MOUSEINPUT {
+                    dx: escala_x,
+                    dy: escala_y,
+                    mouseData: 0,
+                    dwFlags: MOUSEEVENTF_MOVE | MOUSEEVENTF_ABSOLUTE | MOUSEEVENTF_VIRTUALDESK,
+                    time: 0,
+                    dwExtraInfo: 0,
+                },
+            },
+        };
+
+        enviar(input);
+    }
 }
 
 // ======================================================
