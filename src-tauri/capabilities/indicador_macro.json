@@ -1,0 +1,11 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "indicador-macro",
+  "description": "Capability for the Indicador_Macro overlay window (modes Grabación/Play; manual drag via setPosition/outerPosition, see activarArrastre en vent_indicador_macro_main.ts)",
+  "windows": ["indicador_macro"],
+  "permissions": [
+    "core:default",
+    "core:window:allow-set-position",
+    "core:window:allow-outer-position"
+  ]
+}

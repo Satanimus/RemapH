@@ -163,3 +163,10 @@ nivel	id	nombre_ui	valor_defecto	tipo
 0	guardar-opacidad	Opacidad	100%	porcentaje
 2	portapapeles-boton-fijar	Botón Fijar (Portapapeles)		
 0	portapapeles-boton-fijar-opacidad	Opacidad	70%	porcentaje
+1	opacidad-indicadores	Opacidad		
+2	indicador-macro	Indicador Macro		
+0	indicador-macro-fondo-opacidad	Fondo	55%	porcentaje
+0	indicador-macro-texto-opacidad	Texto	100%	porcentaje
+2	indicador-coordenada	Indicador Coordenada		
+0	indicador-coordenada-fondo-opacidad	Fondo	40%	porcentaje
+0	indicador-coordenada-texto-opacidad	Texto	40%	porcentaje

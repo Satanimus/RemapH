@@ -486,6 +486,48 @@ pub fn leer_visible_panel_ayuda() -> Result<Option<bool>, String> {
         .and_then(|valor| valor.trim().parse::<bool>().ok()))
 }
 
+// ======================================================
+// 📍 POSICIÓN VENTANA INDICADOR_MACRO
+// ------------------------------------------------------
+// Última posición (x, y lógicos) a la que el usuario arrastró
+// la ventana overlay Indicador_Macro — compartida entre sus
+// dos modos (Grabación y Play, misma ventana/label). Si no hay
+// ninguna guardada todavía (primera vez, o valor corrupto/no
+// parseable), comandos.rs cae en la posición fija de siempre
+// (esquina superior izquierda del monitor primario).
+// ======================================================
+
+const CLAVE_INDICADOR_MACRO_X: &str = "indicador_macro.x";
+const CLAVE_INDICADOR_MACRO_Y: &str = "indicador_macro.y";
+
+pub fn guardar_posicion_indicador_macro(x: f64, y: f64) -> Result<(), String> {
+    let mut mapa = leer_mapa_completo()?;
+
+    mapa.insert(CLAVE_INDICADOR_MACRO_X.to_string(), x.to_string());
+    mapa.insert(CLAVE_INDICADOR_MACRO_Y.to_string(), y.to_string());
+
+    escribir_mapa_completo(&mapa)
+}
+
+pub fn leer_posicion_indicador_macro() -> Result<Option<(f64, f64)>, String> {
+    let mapa = leer_mapa_completo()?;
+
+    let x = mapa
+        .get(CLAVE_INDICADOR_MACRO_X)
+        .and_then(|valor| valor.trim().parse::<f64>().ok());
+
+    let y = mapa
+        .get(CLAVE_INDICADOR_MACRO_Y)
+        .and_then(|valor| valor.trim().parse::<f64>().ok());
+
+    // Ambas claves deben estar presentes y ser válidas — una sola
+    // coordenada sin la otra no es una posición usable.
+    Ok(match (x, y) {
+        (Some(x), Some(y)) => Some((x, y)),
+        _ => None,
+    })
+}
+
 pub fn primer_inicio() -> bool {
     match ruta_archivo() {
         Ok(ruta) => !ruta.exists(),

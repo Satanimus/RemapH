@@ -364,4 +364,20 @@
       "Fijar" de Portapapeles (.portapapeles-boton-fijar en
       styl_portapapeles.css). */
    --portapapeles-boton-fijar-opacidad: 70%;
+
+   /* Ventana overlay Indicador_Macro (styl_indicador_macro.css) —
+      Fondo del cartel y color del texto, ambas comparten valor entre
+      sus dos modos (Grabación/Play, misma ventana). */
+   --indicador-macro-fondo-opacidad: 55%;
+
+   --indicador-macro-texto-opacidad: 100%;
+
+   /* Marcador de preview de la ventana de captura de coordenada
+      (.captura-marcador-preview en styl_captura.css) — "Fondo" es el
+      fondo detrás del ícono (antes transparent sin variable propia);
+      "Texto" es la opacidad del propio ícono SVG (este marcador no
+      tiene texto). */
+   --indicador-coordenada-fondo-opacidad: 40%;
+
+   --indicador-coordenada-texto-opacidad: 40%;
 }

@@ -1,0 +1,73 @@
+/* ======================================================
+   🟢🔴 styl_indicador_macro.css
+   ------------------------------------------------------
+   Estilos propios de la ventana overlay Indicador_Macro
+   (modos Grabación y Play). NO importa styl_general.css:
+   esa hoja fija html/body con fondo sólido (var(--bg)), que
+   rompería la transparencia de esta ventana
+   (WebviewWindowBuilder .transparent(true) en comandos.rs).
+   Reutiliza solo las variables de color/tipografía
+   centralizadas en styl_variables.css.
+   ====================================================== */
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html,
+body {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: transparent;
+  font-family: var(--font);
+  font-size: var(--fs13);
+  color: var(--text);
+  user-select: none;
+}
+
+#indicador-macro {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 10px;
+  /* Fondo cyan semi-transparente — llama la atención sobre el
+     escritorio sin tapar del todo lo que hay detrás. La ventana en
+     sí ya es del tamaño exacto del cartel (200x40, ver comandos.rs),
+     así que esto cubre toda la ventana. Opacidad configurable
+     (pestaña Apariencia de Configuración, catálogo apariencia.tsv). */
+  background: color-mix(in srgb, var(--tag-cyan) var(--indicador-macro-fondo-opacidad), transparent);
+}
+
+.indicador-macro-punto {
+  flex-shrink: 0;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--tag-yellow);
+  filter: drop-shadow(0 0 4px color-mix(in srgb, var(--tag-yellow) 70%, transparent));
+}
+
+.indicador-macro-punto[data-estado="activa"] {
+  background: var(--tag-red);
+  filter: drop-shadow(0 0 4px color-mix(in srgb, var(--tag-red) 70%, transparent));
+}
+
+/* Modo Play: punto verde fijo, sin variación de estado (a
+   diferencia del punto de Grabación, que alterna
+   armada/activa). */
+.indicador-macro-punto[data-estado="play"] {
+  background: var(--tag-green);
+  filter: drop-shadow(0 0 4px color-mix(in srgb, var(--tag-green) 70%, transparent));
+}
+
+.indicador-macro-texto {
+  font-weight: 600;
+  white-space: nowrap;
+  color: color-mix(in srgb, var(--text) var(--indicador-macro-texto-opacidad), transparent);
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.7);
+}

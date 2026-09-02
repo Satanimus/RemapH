@@ -615,8 +615,9 @@ fn ejecutar_accion(
             nombre,
             programa,
             comportamiento,
+            indicador_ejecucion,
         } => {
-            crate::runt_macro::iniciar(id, nombre, programa, comportamiento);
+            crate::runt_macro::iniciar(id, nombre, programa, comportamiento, indicador_ejecucion);
         }
 
         AccionCache::AbrirArchivo {

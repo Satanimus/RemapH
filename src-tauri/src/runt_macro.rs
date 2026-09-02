@@ -163,9 +163,11 @@ use crate::runtime;
 
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, Condvar, LazyLock, Mutex};
+use std::sync::{Arc, Condvar, LazyLock, Mutex, OnceLock};
 use std::thread;
 use std::time::{Duration, Instant};
+
+use tauri::AppHandle;
 
 // ======================================================
 // 🗂️ ACTIVAS — registro propio de Una ejecución/Toggle
@@ -176,6 +178,58 @@ use std::time::{Duration, Instant};
 
 static ACTIVAS: LazyLock<Mutex<HashMap<String, Arc<AtomicBool>>>> =
     LazyLock::new(|| Mutex::new(HashMap::new()));
+
+// ======================================================
+// 🟢 PROGRESO — Indicador de ejecución (overlay play)
+// ------------------------------------------------------
+// Estado en memoria de la ejecución EN CURSO, mismo patrón que
+// ACTIVA/ARMADA de grabacion_macro.rs. total_pasos es la
+// cantidad de pasos NO-bucle del array (calculada una sola vez
+// al arrancar, ver iniciar_progreso_indicador_macro) —
+// paso_actual cuenta ejecuciones reales de esos pasos, así que
+// con un bucle activo puede seguir subiendo más allá de
+// total_pasos (el contador no se "resetea" ni se recorta en
+// cada vuelta; el indicador visual, Etapa E/F, decide cómo
+// mostrar eso si ocurre). Solo una ejecución de macro puede
+// estar "en curso" para el overlay a la vez — coincide con que
+// solo puede haber una ventana Indicador_Macro abierta (mismo
+// label, ver comandos.rs).
+// ======================================================
+
+static PASO_ACTUAL_INDICADOR: Mutex<u32> = Mutex::new(0);
+static TOTAL_PASOS_INDICADOR: Mutex<u32> = Mutex::new(0);
+
+pub fn progreso_indicador_macro() -> (u32, u32) {
+    (
+        *PASO_ACTUAL_INDICADOR.lock().unwrap(),
+        *TOTAL_PASOS_INDICADOR.lock().unwrap(),
+    )
+}
+
+pub(crate) fn iniciar_progreso_indicador_macro(total: u32) {
+    *TOTAL_PASOS_INDICADOR.lock().unwrap() = total;
+    *PASO_ACTUAL_INDICADOR.lock().unwrap() = 0;
+}
+
+// ======================================================
+// 🟢 APPHANDLE GLOBAL — overlay del indicador (modo play)
+// ------------------------------------------------------
+// Mismo patrón que back_menu_express::inicializar/app_handle: el
+// trigger que ejecuta una macro llega desde el hilo de entrada
+// física (ver runtime.rs), no desde un comando Tauri, así que no
+// hay forma de recibirlo como parámetro en ese momento. Se fija
+// una única vez, apenas Tauri termina de inicializar (lib.rs).
+// ======================================================
+
+static APP: OnceLock<AppHandle> = OnceLock::new();
+
+pub fn inicializar(app: AppHandle) {
+    let _ = APP.set(app);
+}
+
+fn app_handle() -> Option<&'static AppHandle> {
+    APP.get()
+}
 
 // ======================================================
 // 🔔 NOTIFICADOR — espera interrumpible compartida
@@ -250,14 +304,15 @@ pub fn iniciar(
     nombre: String,
     programa: Option<String>,
     comportamiento: ComportamientoMacro,
+    indicador_ejecucion: bool,
 ) {
     match comportamiento {
         ComportamientoMacro::UnaEjecucion | ComportamientoMacro::Toggle => {
-            iniciar_una_ejecucion_o_toggle(id_fila, nombre, programa);
+            iniciar_una_ejecucion_o_toggle(id_fila, nombre, programa, indicador_ejecucion);
         }
 
         ComportamientoMacro::TeclaMantenida => {
-            iniciar_tecla_mantenida(id_fila, nombre, programa);
+            iniciar_tecla_mantenida(id_fila, nombre, programa, indicador_ejecucion);
         }
     }
 }
@@ -266,7 +321,12 @@ pub fn iniciar(
 // 🔁 UNA EJECUCIÓN / TOGGLE
 // ======================================================
 
-fn iniciar_una_ejecucion_o_toggle(id_fila: String, nombre: String, programa: Option<String>) {
+fn iniciar_una_ejecucion_o_toggle(
+    id_fila: String,
+    nombre: String,
+    programa: Option<String>,
+    indicador_ejecucion: bool,
+) {
     let mut activas = ACTIVAS.lock().unwrap();
 
     if let Some(bandera) = activas.remove(&id_fila) {
@@ -287,7 +347,7 @@ fn iniciar_una_ejecucion_o_toggle(id_fila: String, nombre: String, programa: Opt
         let bandera_hilo = bandera.clone();
         let debe_detenerse = move || bandera_hilo.load(Ordering::SeqCst);
 
-        ejecutar_macro_completa(&nombre, &programa, &debe_detenerse);
+        ejecutar_macro_completa(&nombre, &programa, &debe_detenerse, indicador_ejecucion);
 
         // Limpieza al terminar naturalmente — solo si nadie volvió a
         // arrancar/reemplazar esta fila mientras corría (Arc::ptr_eq
@@ -310,7 +370,12 @@ fn iniciar_una_ejecucion_o_toggle(id_fila: String, nombre: String, programa: Opt
 // real (runtime::detener_ejecucion, vía runtime::detener) la corte.
 // ======================================================
 
-fn iniciar_tecla_mantenida(id_fila: String, nombre: String, programa: Option<String>) {
+fn iniciar_tecla_mantenida(
+    id_fila: String,
+    nombre: String,
+    programa: Option<String>,
+    indicador_ejecucion: bool,
+) {
     let id_ejecucion = runtime::nueva_id_ejecucion(&id_fila);
 
     thread::spawn(move || {
@@ -323,7 +388,7 @@ fn iniciar_tecla_mantenida(id_fila: String, nombre: String, programa: Option<Str
         let id_para_chequeo = id_ejecucion.clone();
         let debe_detenerse = move || runtime::debe_detenerse(&id_para_chequeo);
 
-        ejecutar_macro_completa(&nombre, &programa, &debe_detenerse);
+        ejecutar_macro_completa(&nombre, &programa, &debe_detenerse, indicador_ejecucion);
 
         runtime::limpiar_instancia(id_ejecucion);
     });
@@ -344,6 +409,7 @@ fn ejecutar_macro_completa(
     nombre: &str,
     programa: &Option<String>,
     debe_detenerse: &dyn Fn() -> bool,
+    indicador_ejecucion: bool,
 ) {
     let Ok(macro_archivo) = macros::abrir_macro(nombre.to_string()) else {
         return;
@@ -363,6 +429,11 @@ fn ejecutar_macro_completa(
     // en el editor).
     let mut retenidos: Vec<InputId> = Vec::new();
 
+    // Overlay del indicador de ejecución (modo play): solo si
+    // indicadorEjecucion está activo (Regla 11); sin AppHandle
+    // disponible se omite igual y la macro corre normalmente (E5).
+    let overlay_abierto = indicador_ejecucion && abrir_overlay_indicador_play(&macro_archivo.pasos);
+
     ejecutar_pasos(
         &macro_archivo.pasos,
         programa,
@@ -374,6 +445,64 @@ fn ejecutar_macro_completa(
     for input in retenidos.into_iter().rev() {
         runtime::emitir_up_input(input);
     }
+
+    if overlay_abierto {
+        cerrar_overlay_indicador_play();
+    }
+}
+
+// ======================================================
+// 🟢 OVERLAY INDICADOR (modo play) — abrir/cerrar
+// ------------------------------------------------------
+// abrir_overlay_indicador_play calcula total_pasos (pasos NO-bucle
+// del array), arranca el contador en 0 (iniciar_progreso_indicador_
+// macro, Etapa D) y abre la ventana Indicador_Macro en modo play
+// vía comandos::abrir_ventana_indicador_macro_interno (misma función
+// interna que ya usa el modo grabación, Etapa B) — corriendo en el
+// hilo principal de la UI (AppHandle::run_on_main_thread), porque
+// WebviewWindowBuilder::build() lo exige en Windows y esta función
+// se llama desde el hilo propio de la macro (thread::spawn en
+// iniciar_una_ejecucion_o_toggle/iniciar_tecla_mantenida), nunca
+// desde el hilo principal directamente.
+// ======================================================
+
+fn abrir_overlay_indicador_play(pasos: &[PasoMacroJson]) -> bool {
+    let Some(app) = app_handle() else {
+        return false;
+    };
+
+    let total_pasos = pasos.iter().filter(|paso| paso.tipo != "bucle").count() as u32;
+
+    iniciar_progreso_indicador_macro(total_pasos);
+
+    let app = app.clone();
+
+    // run_on_main_thread encola el closure y devuelve de inmediato —
+    // no bloquea este hilo esperando a que la ventana termine de
+    // crearse. Igual que back_menu_express::crear_ventana, se acepta
+    // esa carrera: la ventana puede tardar unos ms en aparecer tras
+    // el primer paso, no es crítico para un indicador visual.
+    let resultado = app.clone().run_on_main_thread(move || {
+        let url = "indicador_macro.html?modo=play".to_string();
+
+        if let Err(error) = crate::comandos::abrir_ventana_indicador_macro_interno(&app, url) {
+            eprintln!("⚠️ No se pudo abrir el indicador de ejecución: {}", error);
+        }
+    });
+
+    resultado.is_ok()
+}
+
+fn cerrar_overlay_indicador_play() {
+    let Some(app) = app_handle() else {
+        return;
+    };
+
+    let app = app.clone();
+
+    let _ = app.clone().run_on_main_thread(move || {
+        crate::comandos::cerrar_ventana_indicador_macro(app);
+    });
 }
 
 // ======================================================
@@ -425,6 +554,8 @@ fn ejecutar_pasos(
         }
 
         ejecutar_paso(paso, programa, posicion_inicial, debe_detenerse, retenidos);
+
+        *PASO_ACTUAL_INDICADOR.lock().unwrap() += 1;
 
         i += 1;
     }

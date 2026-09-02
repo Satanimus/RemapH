@@ -721,6 +721,7 @@ fn convertir_macro(
         nombre,
         programa: remapeo.app.programa.clone(),
         comportamiento: convertir_comportamiento_macro(&remapeo.macro_extra.comportamiento),
+        indicador_ejecucion: remapeo.macro_extra.indicador_ejecucion,
     })
 }
 

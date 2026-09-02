@@ -111,12 +111,20 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: transparent;
-  opacity: 0.4;
+  /* Opacidad configurable (pestaña Apariencia de Configuración,
+     catálogo apariencia.tsv) — "Fondo" del marcador de preview.
+     Antes transparent fijo, sin ningún valor visible detrás del
+     ícono. */
+  background: color-mix(in srgb, var(--overlay-contraste) var(--indicador-coordenada-fondo-opacidad), transparent);
 }
 
 .captura-marcador-preview svg {
   overflow: visible;
+  /* "Texto" (catálogo apariencia.tsv) controla la opacidad del
+     propio ícono — este marcador no tiene texto propio, así que
+     ese rol pasa al SVG. Reemplaza el opacity: 0.4 fijo que antes
+     tenía el contenedor .captura-marcador-preview entero. */
+  opacity: var(--indicador-coordenada-texto-opacidad);
   filter: drop-shadow(0 0 4px color-mix(in srgb, var(--overlay-contraste) 70%, transparent));
 }
 

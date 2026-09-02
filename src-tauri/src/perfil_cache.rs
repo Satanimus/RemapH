@@ -241,6 +241,7 @@ pub enum AccionCache {
         nombre: String,
         programa: Option<String>,
         comportamiento: ComportamientoMacro,
+        indicador_ejecucion: bool,
     },
 
     // Acción tipo "Abrir Archivo/App". ruta es siempre absoluta y ya

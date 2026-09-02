@@ -978,22 +978,27 @@ pub fn obtener_destino_preview_coordenada(id: String) -> Option<(i32, i32)> {
 }
 
 // ======================================================
-// 🔴 INDICADOR DE GRABACIÓN DE MACRO
+// 🟢🔴 INDICADOR DE MACRO (Grabación / Play)
 // ------------------------------------------------------
-// Ventana overlay fija (label único "grabacion_macro", no
-// glob) con un punto rojo + el nombre de la tecla toggle de
-// Grabar Macro (config::tecla_grabar_macro / Etapa A) — mismo
-// patrón de creación (decorations/transparent/always_on_top/
+// Ventana overlay fija (label único "indicador_macro", no
+// glob) — soporta dos modos:
+// • "grabacion": punto rojo/amarillo + el nombre de la tecla
+//   toggle de Grabar Macro (config::tecla_grabar_macro /
+//   Etapa A). Abierta/cerrada por el editor (TypeScript).
+// • "play": punto verde + contador de paso actual/total.
+//   Abierta/actualizada/cerrada por runt_macro.rs durante la
+//   ejecución real de una macro (Etapa E).
+// Mismo patrón de creación (decorations/transparent/always_on_top/
 // skip_taskbar/focused(false)) que abrir_ventana_preview_
-// coordenada, pero sin posicionamiento por punto de pantalla
-// ni polling: se posiciona una sola vez en la esquina superior
-// derecha del monitor primario y el contenido es estático.
+// coordenada. Ambos modos comparten label — no pueden estar
+// abiertos a la vez (abrir uno cierra cualquier instancia
+// previa, igual que ya hacía la ventana de grabación sola).
 // ======================================================
 
-const LABEL_VENTANA_GRABACION_MACRO: &str = "grabacion_macro";
-const MARGEN_GRABACION_MACRO_LOGICO: f64 = 16.0;
-const ANCHO_GRABACION_MACRO_LOGICO: f64 = 200.0;
-const ALTO_GRABACION_MACRO_LOGICO: f64 = 40.0;
+const LABEL_VENTANA_INDICADOR_MACRO: &str = "indicador_macro";
+const MARGEN_INDICADOR_MACRO_LOGICO: f64 = 16.0;
+const ANCHO_INDICADOR_MACRO_LOGICO: f64 = 200.0;
+const ALTO_INDICADOR_MACRO_LOGICO: f64 = 40.0;
 
 /// Percent-encoding mínimo para el query param `tecla` (texto libre
 /// tipo "Control Izquierdo + F1") — sin esto, espacios y "+" rompen
@@ -1015,20 +1020,55 @@ fn codificar_query(texto: &str) -> String {
     salida
 }
 
+/// Modo Grabación. La posición SIEMPRE se calcula (Etapa C agrega
+/// la lectura de la última posición guardada) — este comando sigue
+/// siendo invocado desde el editor (TypeScript), como hoy.
+///
+/// ⚠️ Tiene que ser `async fn`: mismo motivo que
+/// abrir_ventana_captura_coordenada/abrir_ventana_configuracion —
+/// en Windows, WebviewWindowBuilder::build() (dentro de
+/// abrir_ventana_indicador_macro_interno) hace DEADLOCK si se lo
+/// llama desde un comando síncrono. abrir_ventana_indicador_macro_interno
+/// en sí queda sync porque runt_macro.rs también la invoca directo
+/// desde AppHandle::run_on_main_thread (closure síncrono, sin este
+/// problema).
 #[tauri::command]
-pub async fn abrir_ventana_grabacion_macro(
+pub async fn abrir_ventana_indicador_macro(
     app: tauri::AppHandle,
     tecla: String,
+) -> Result<(), String> {
+    let url = format!(
+        "indicador_macro.html?modo=grabacion&tecla={}",
+        codificar_query(&tecla)
+    );
+
+    abrir_ventana_indicador_macro_interno(&app, url)
+}
+
+// pub(crate), sin #[tauri::command]: la Etapa E la invoca
+// directamente desde runt_macro.rs para el modo "play" (que no
+// tiene el parámetro `tecla`, específico de grabación).
+//
+// [Corrección Etapa E] Síncrona, no async: no tiene ningún .await
+// real en su cuerpo (usa std::thread::sleep bloqueante, no async).
+// Se mantiene sync para que runt_macro.rs pueda invocarla directo
+// dentro de AppHandle::run_on_main_thread (que toma un closure
+// síncrono FnOnce) sin tener que bloquear un Future a mano. Su
+// wrapper #[tauri::command] (abrir_ventana_indicador_macro, arriba)
+// sí debe ser async — ver nota ahí (deadlock en Windows).
+pub(crate) fn abrir_ventana_indicador_macro_interno(
+    app: &tauri::AppHandle,
+    url: String,
 ) -> Result<(), String> {
     // Mismo motivo que abrir_ventana_captura_coordenada/abrir_ventana_
     // preview_coordenada: hay que esperar a que una ventana previa con
     // el mismo label termine de cerrarse antes de crear la nueva.
-    if let Some(existente) = app.get_webview_window(LABEL_VENTANA_GRABACION_MACRO) {
+    if let Some(existente) = app.get_webview_window(LABEL_VENTANA_INDICADOR_MACRO) {
         let _ = existente.close();
 
         for _ in 0..50 {
             if app
-                .get_webview_window(LABEL_VENTANA_GRABACION_MACRO)
+                .get_webview_window(LABEL_VENTANA_INDICADOR_MACRO)
                 .is_none()
             {
                 break;
@@ -1046,19 +1086,27 @@ pub async fn abrir_ventana_grabacion_macro(
     let escala = monitor.scale_factor();
     let pos_monitor = monitor.position();
 
-    // Esquina superior IZQUIERDA (spec revisada) — antes iba a la derecha.
-    let posicion_x = pos_monitor.x as f64 / escala + MARGEN_GRABACION_MACRO_LOGICO;
-    let posicion_y = pos_monitor.y as f64 / escala + MARGEN_GRABACION_MACRO_LOGICO;
+    // Última posición guardada (arrastre previo del usuario, ver
+    // configuracion_usuario::leer_posicion_indicador_macro) tiene
+    // prioridad — compartida entre ambos modos, misma ventana. Si
+    // no hay ninguna guardada todavía (primera vez o valor
+    // corrupto), cae en la esquina superior izquierda del monitor
+    // primario, como siempre.
+    let (posicion_x, posicion_y) = crate::configuracion_usuario::leer_posicion_indicador_macro()
+        .ok()
+        .flatten()
+        .unwrap_or((
+            pos_monitor.x as f64 / escala + MARGEN_INDICADOR_MACRO_LOGICO,
+            pos_monitor.y as f64 / escala + MARGEN_INDICADOR_MACRO_LOGICO,
+        ));
 
-    let url = format!("grabacion_macro.html?tecla={}", codificar_query(&tecla));
-
-    let ventana_grabacion = WebviewWindowBuilder::new(
-        &app,
-        LABEL_VENTANA_GRABACION_MACRO,
+    let ventana_indicador = WebviewWindowBuilder::new(
+        app,
+        LABEL_VENTANA_INDICADOR_MACRO,
         WebviewUrl::App(url.into()),
     )
-    .title("RemapH — Grabando Macro")
-    .inner_size(ANCHO_GRABACION_MACRO_LOGICO, ALTO_GRABACION_MACRO_LOGICO)
+    .title("RemapH — Indicador Macro")
+    .inner_size(ANCHO_INDICADOR_MACRO_LOGICO, ALTO_INDICADOR_MACRO_LOGICO)
     .position(posicion_x, posicion_y)
     .resizable(false)
     .decorations(false)
@@ -1075,21 +1123,50 @@ pub async fn abrir_ventana_grabacion_macro(
     // ventana en cuanto se hace mousedown sobre ella para arrastrarla
     // — y ese primer click se consume para activar la ventana en vez
     // de llegar como mousedown normal al webview, por eso el arrastre
-    // manual (mousemove/mouseup en vent_grabacion_macro_main.ts)
+    // manual (mousemove/mouseup en vent_indicador_macro_main.ts)
     // nunca arrancaba. WS_EX_NOACTIVATE evita que el click la active.
     // Se aplica sobre la ventana devuelta por el builder (no una
     // rebúsqueda por label vía get_webview_window) — mismo patrón que
     // preview_coordenada, sin depender de que el label ya esté
     // resuelto en el AppHandle en este instante.
-    crate::back_menu_express::desactivar_activacion(&ventana_grabacion);
+    crate::back_menu_express::desactivar_activacion(&ventana_indicador);
 
     Ok(())
 }
 
 #[tauri::command]
-pub fn cerrar_ventana_grabacion_macro(app: tauri::AppHandle) {
-    if let Some(ventana) = app.get_webview_window(LABEL_VENTANA_GRABACION_MACRO) {
+pub fn cerrar_ventana_indicador_macro(app: tauri::AppHandle) {
+    if let Some(ventana) = app.get_webview_window(LABEL_VENTANA_INDICADOR_MACRO) {
         let _ = ventana.close();
+    }
+}
+
+#[tauri::command]
+pub fn guardar_posicion_indicador_macro(x: f64, y: f64) -> Result<(), String> {
+    crate::configuracion_usuario::guardar_posicion_indicador_macro(x, y)
+}
+
+#[tauri::command]
+pub fn obtener_posicion_indicador_macro() -> Option<(f64, f64)> {
+    crate::configuracion_usuario::leer_posicion_indicador_macro()
+        .ok()
+        .flatten()
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProgresoIndicadorMacroUI {
+    pub paso_actual: u32,
+    pub total_pasos: u32,
+}
+
+#[tauri::command]
+pub fn obtener_progreso_indicador_macro() -> ProgresoIndicadorMacroUI {
+    let (paso_actual, total_pasos) = crate::runt_macro::progreso_indicador_macro();
+
+    ProgresoIndicadorMacroUI {
+        paso_actual,
+        total_pasos,
     }
 }
 

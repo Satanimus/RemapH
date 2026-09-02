@@ -25,7 +25,7 @@ import type { FilaPerfil } from "../core/core_perfil";
 
 import type { ComportamientoMacro } from "../core/core_macro";
 
-import { crearGrupoOpciones, crearFilaPopup } from "./comp_popup_grupo";
+import { crearGrupoOpciones, crearFilaPopup, crearInterruptor } from "./comp_popup_grupo";
 
 // ======================================================
 // 🧩🎛️ ABRIR POPUP EXTRA "MACRO"
@@ -57,6 +57,19 @@ export function abrirPopupExtraMacro(
         "Comportamiento",
         crearGrupoOpciones(opciones, macroExtra.comportamiento, (valor) => {
           macroExtra.comportamiento = valor;
+
+          reconstruirFila(contexto.id);
+          alModificar();
+          dibujar();
+        }),
+      ),
+    );
+
+    popup.append(
+      crearFilaPopup(
+        "Indicador de ejecución",
+        crearInterruptor("Si", macroExtra.indicadorEjecucion, () => {
+          macroExtra.indicadorEjecucion = !macroExtra.indicadorEjecucion;
 
           reconstruirFila(contexto.id);
           alModificar();

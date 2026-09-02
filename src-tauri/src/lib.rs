@@ -86,6 +86,12 @@ pub fn run() {
             // comando Tauri.
             back_portapapeles::inicializar(app.handle().clone());
 
+            // Mismo motivo/momento — runt_macro.rs necesita el
+            // AppHandle para abrir la ventana overlay Indicador_Macro
+            // (modo play) desde el hilo de ejecución de la macro, que
+            // tampoco es un comando Tauri.
+            runt_macro::inicializar(app.handle().clone());
+
             // Aplica sobre config.rs los overrides guardados en
             // Configuracion_Usuario.txt (pestaña General de la
             // Ventana de Configuración). Debe ir después de que
@@ -173,8 +179,11 @@ pub fn run() {
             comandos::establecer_tecla_guardar_coordenada,
             comandos::obtener_tecla_grabar_macro,
             comandos::establecer_tecla_grabar_macro,
-            comandos::abrir_ventana_grabacion_macro,
-            comandos::cerrar_ventana_grabacion_macro,
+            comandos::abrir_ventana_indicador_macro,
+            comandos::cerrar_ventana_indicador_macro,
+            comandos::guardar_posicion_indicador_macro,
+            comandos::obtener_posicion_indicador_macro,
+            comandos::obtener_progreso_indicador_macro,
             comandos::armar_grabacion_macro,
             comandos::obtener_estado_grabacion_macro,
             comandos::detener_grabacion_macro,

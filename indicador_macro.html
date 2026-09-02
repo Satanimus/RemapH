@@ -1,11 +1,11 @@
 <!-- ======================================================
-🔴 grabacion_macro.html
+🟢🔴 indicador_macro.html
 ------------------------------------------------------
 Segunda página independiente (ver vite.config.ts). Ventana
-overlay del indicador de grabación de Macro: transparente,
-siempre encima, sin foco — ver comandos.rs
-(abrir_ventana_grabacion_macro) para las propiedades de la
-ventana en sí.
+overlay del Indicador de Macro: transparente, siempre
+encima, sin foco — soporta dos modos, Grabación y Play (ver
+comandos.rs, abrir_ventana_indicador_macro, para las
+propiedades de la ventana en sí).
 ====================================================== -->
 
 <!doctype html>
@@ -14,12 +14,12 @@ ventana en sí.
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>RemapH — Grabando Macro</title>
+    <title>RemapH — Indicador Macro</title>
 </head>
 
 <body>
-    <main id="grabacion"></main>
-    <script type="module" src="/src/ventanas/vent_grabacion_macro_main.ts"></script>
+    <main id="indicador-macro"></main>
+    <script type="module" src="/src/ventanas/vent_indicador_macro_main.ts"></script>
 </body>
 
 </html>

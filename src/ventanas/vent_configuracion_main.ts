@@ -1249,7 +1249,7 @@ const pestanaApariencia = crearPestanaApariencia(
   panelApariencia,
   refrescarTrasCambioApariencia,
   {
-    grupos: ["texto", "dimensiones"],
+    grupos: ["texto", "dimensiones", "opacidad-indicadores"],
     incluirSelectorTema: false,
     incluirEscala: true,
     textoConfirmacionRestablecer:

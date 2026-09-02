@@ -95,11 +95,16 @@ export type ComportamientoMacro =
 
 export interface MacroExtraPerfil {
   comportamiento: ComportamientoMacro;
+  // Muestra el overlay Indicador_Macro (🟢 paso/total) mientras esta
+  // macro se ejecuta — ver vent_indicador_macro_main.ts, modo play.
+  // Por defecto apagado.
+  indicadorEjecucion: boolean;
 }
 
 export function crearMacroExtra(): MacroExtraPerfil {
   return {
     comportamiento: "una_ejecucion",
+    indicadorEjecucion: false,
   };
 }
 

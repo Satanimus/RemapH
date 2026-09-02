@@ -547,7 +547,7 @@ function crearBotonGrabarMacro(
   boton.dataset.grabando = estadoGrabacion === "activa" ? "true" : "false";
   boton.dataset.armada = estadoGrabacion === "armada" ? "true" : "false";
 
-  // Espejo de la ventana overlay (vent_grabacion_macro_main.ts,
+  // Espejo de la ventana overlay (vent_indicador_macro_main.ts,
   // textoEstado): Armada → 🟡 "Presione <tecla> para grabar",
   // Activa → 🔴 "Presione <tecla> para detener". textoTecla es null
   // hasta que armarGrabacion() resuelve obtener_tecla_grabar_macro,
@@ -842,7 +842,7 @@ function montarEditor(
   // Texto de la tecla toggle configurada (ej. "F9"), obtenido una
   // vez en armarGrabacion() vía obtener_tecla_grabar_macro — se usa
   // para que el botón "Grabar Macro" refleje el mismo texto que la
-  // ventana overlay (vent_grabacion_macro_main.ts). null hasta que
+  // ventana overlay (vent_indicador_macro_main.ts). null hasta que
   // esa consulta resuelve, o tras terminar/cancelar la sesión.
   let textoTeclaGrabacion: string | null = null;
 
@@ -944,7 +944,7 @@ function montarEditor(
     } catch (error) {
       console.error("❌ No se pudo analizar la grabación de macro:", error);
     } finally {
-      invoke("cerrar_ventana_grabacion_macro").catch((error) => {
+      invoke("cerrar_ventana_indicador_macro").catch((error) => {
         console.error("❌ No se pudo cerrar el indicador de grabación:", error);
       });
 
@@ -966,7 +966,7 @@ function montarEditor(
       console.error("❌ No se pudo cancelar la grabación armada:", error);
     });
 
-    invoke("cerrar_ventana_grabacion_macro").catch((error) => {
+    invoke("cerrar_ventana_indicador_macro").catch((error) => {
       console.error("❌ No se pudo cerrar el indicador de grabación:", error);
     });
 
@@ -1027,7 +1027,7 @@ function montarEditor(
 
       textoTeclaGrabacion = atajoCapturaATexto(atajo);
 
-      await invoke("abrir_ventana_grabacion_macro", {
+      await invoke("abrir_ventana_indicador_macro", {
         tecla: textoTeclaGrabacion,
       });
 
@@ -1607,7 +1607,7 @@ function montarEditor(
 
     if (estadoGrabacion !== "inactiva") {
       invoke("detener_grabacion_macro").catch(() => {});
-      invoke("cerrar_ventana_grabacion_macro").catch(() => {});
+      invoke("cerrar_ventana_indicador_macro").catch(() => {});
     }
 
     ocultarPopup();

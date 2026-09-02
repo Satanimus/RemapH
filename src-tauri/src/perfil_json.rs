@@ -559,18 +559,25 @@ impl Default for AbrirExtraJson {
 //   • "tecla_mantenida" es mecánicamente distinta: depende de
 //     Down/Up físico real (cache.rs::resolver_match la trata como
 //     "diferida", igual que Mantener/ClickSostenido).
+//
+// indicador_ejecucion: muestra el overlay Indicador_Macro (🟢
+//   paso/total) mientras esta macro corre — ver runt_macro.rs,
+//   ejecutar_macro_completa. Default false (apagado).
 // ======================================================
 
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct MacroExtraJson {
     pub comportamiento: String,
+    pub indicador_ejecucion: bool,
 }
 
 impl Default for MacroExtraJson {
     fn default() -> Self {
         Self {
             comportamiento: "una_ejecucion".to_string(),
+            indicador_ejecucion: false,
         }
     }
 }
+
