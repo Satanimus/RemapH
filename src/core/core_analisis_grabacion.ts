@@ -381,8 +381,7 @@ export function analizarGrabacion(
     );
 
     if (grupoACerrar.posicion) {
-      ultimaPosicionEmitida =
-        grupoACerrar.posicionAlSoltar ?? grupoACerrar.posicion;
+      ultimaPosicionEmitida = grupoACerrar.posicionAlSoltar ?? grupoACerrar.posicion;
     }
 
     momentoCierreAnterior = momentoCierre;

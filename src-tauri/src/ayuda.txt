@@ -85,8 +85,11 @@ Aca se puede elegir modo del motor: Portable o Driver (Interception).
 
 Configuraciones puntuales de esa Fila o Separador.
 
-Si mantienes presionado el botón `⁝` de una fila entras a modo *Mover*.
-Permite selección multiple (*Ctrl+click*), arrastrar y mover con teclado.
+Usos del botón `⁝` de una fila (para cualquier tabla del programa):
+*Click mantenido*: entras a modo *Mover*. 
+-Ahora puedes seleccionar filas, arrastrarlas o mover con teclado.
+*Ctrl+click*: Selección multiple individual.
+*Shift+click*: Selección grupal entre dos filas.
 ---
 
 **Color**
@@ -181,6 +184,98 @@ Con 🔴 la fila queda inactiva: no dispara nada aunque el perfil esté activo.
 
 Si ves [red:⚠️] en vez del ícono, la fila está apagada automáticamente por un conflicto con otra fila o por un aviso de la última compilación — el motivo puntual se explica en la barra de estado, abajo de la ventana.
 
+## popup-macro-accion
+🧩 **Acción — Macro**
+
+Permite crear/editar/eliminar archivos de `Macro`.
+
+Una Macro es un listado de pasos en orden (presionar teclas, clicks, mover mouse, esperar, etc).
+
+Permite automatizar tareas repetitivas y largas con una sola tecla.
+
+Cada Macro se guarda en un archivo independiente en tu disco.
+
+## menu-express-editor
+⚡ **Acción — Menú Express**
+
+El nombre de arriba es el título del menú.
+
+`Botones Seleccionado`
+Filas ya agregadas a este menú, cada una con un nombre personalizado editable — quitalas con su botón de eliminar.
+
+`Botones Disponibles`
+Resto de las filas del perfil, listas para agregarse con un click.
+
+## portapapeles-editor
+📋 **Acción — Portapapeles**
+
+`Nombre de la ventana`
+Título que va a mostrar la ventana de Portapapeles cuando se abra desde esta fila.
+
+Puedes crear varios portapapeles. Cada uno con sus propios textos o imagenes fijadas.
+
+## popup-extra-tecla-mouse
+🔠 **Extra — Tecla/Mouse**
+
+**Repetición**
+
+`Ninguno`
+El Trigger dispara una sola vez.
+
+`Normal`
+El Trigger dispara una vez y luego de un breve tiempo comienza a repetirse.
+
+`Turbo`
+Se repite mientras se mantiene presionado.
+
+**Coordenada**
+Genera la Acción en un lugar específico de la pantalla o ventana activa. 
+
+`📌 Seleccionar`
+Abre la ventana del `Gestor de Coordenadas`.
+
+`Finalizar en:`
+Indica dónde queda el mouse luego de realizar la acción. Si se queda allá o regresa donde estaba. 
+
+--------------
+
+**📌 Ventana Gestor de Coordenadas**
+Abre una ventana para marcar el punto en pantalla.
+
+`✓`: Click en el número de fila envía los datos de la coordenada para usarla donde la solicitaste.
+
+` ⁝ `: Botón de opciones. Permite mover y seleccionar como en ventana principal.
+
+`Grupo`: Para que puedas filtrar y organizar tus coordenadas.
+
+`Nombre`: Identificador que quieras ponerle.
+
+`Tipo`: Marco de referencia para la coordenada.  
+-[green:Absoluta]: La coordenada es en relación a toda la pantalla (uso general).
+-[green:Cursor]: La coordenada es en relación a la posición actual del cursor (útil para seleccionar dentro de menú emergente).
+-[green:Ventana]: La coordenada está en relación a la ventana activa (útil si la ventana cambia de tamaño o posición).
+
+`X,Y`: Guarda la coordenada. 
+
+## popup-extra-multimedia
+🎵 **Extra — Multimedia**
+
+Ajustes propios de la acción multimedia elegida (volumen, reproducción, etc.), según el tipo de control multimedia que tenga esta fila.
+
+## popup-extra-menu-express
+⚡ **Extra — Menú Express**
+
+Configura cómo se ve y se comporta el Menú Express que abre esta fila: forma del menú y demás ajustes visuales/funcionales propios de ese menú.
+
+
+
+## popup-extra-portapapeles
+📋 **Extra — Portapapeles**
+
+Ajustes de cómo se pega el contenido guardado en el portapapeles de esta fila: modo de pegado, formato, etc.
+
+
+
 ## popup-extra-abrir
 📂 **Extra — Abrir Archivo/App**
 
@@ -196,6 +291,7 @@ Programa alternativo para abrir el archivo, en vez del asociado por Windows — 
 `Argumento`
 Línea de comandos, en vez de `Abrir con`, cuando la ruta sí es un ejecutable.
 
+
 ## popup-extra-macro
 🧩 **Extra — Macro**
 
@@ -210,20 +306,6 @@ La inicia con una pulsación y la corta con la siguiente.
 `Tecla mantenida`
 La repite en bucle mientras el Trigger sigue presionado.
 
-## popup-extra-multimedia
-🎵 **Extra — Multimedia**
-
-Ajustes propios de la acción multimedia elegida (volumen, reproducción, etc.), según el tipo de control multimedia que tenga esta fila.
-
-## popup-extra-menu-express
-⚡ **Extra — Menú Express**
-
-Configura cómo se ve y se comporta el Menú Express que abre esta fila: forma del menú y demás ajustes visuales/funcionales propios de ese menú.
-
-## popup-extra-portapapeles
-📋 **Extra — Portapapeles**
-
-Ajustes de cómo se pega el contenido guardado en el portapapeles de esta fila: modo de pegado, formato, etc.
 
 ## macro-editor-barra-titulo
 🧩 **Editor de Macro — Barra de título**
@@ -261,65 +343,3 @@ El ancho de sus columnas se ajusta arrastrando el encabezado.
 
 `Guardar` (o `Guardar como`)
 Confirma la secuencia de pasos y la deja lista para usarse en esta fila.
-
-## popup-extra-tecla-mouse
-🔠 **Extra — Tecla/Mouse**
-
-`Repetición`
-
-`Normal`
-El Trigger dispara una sola vez.
-
-`Turbo`
-Se repite mientras se mantiene presionado.
-
-`Repetición`
-Modo especial de rueda.
-
-`Coordenada`
-Agrega un click en una posición fija de la pantalla. Activado, se puede elegir en relación a qué (posición absoluta, cursor o ventana), en qué unidad se mide, y si el click ocurre al iniciar o al finalizar el gatillo.
-
-`📌 Capturar Coordenada`
-Abre una ventana para marcar el punto en pantalla.
-
-## popup-macro-accion
-🧩 **Acción — Macro**
-
-`Nueva`
-Crea una macro vacía y abre directo su editor.
-
-`Editar`
-Abre el editor de la macro ya asignada a esta fila.
-
-`Abrir`
-Despliega el listado de macros guardadas para asignar una existente.
-
-`Eliminar`
-Borra la macro asignada a esta fila — no afecta a otras filas que la usen.
-
-## menu-express-editor
-⚡ **Acción — Menú Express**
-
-El nombre de arriba es el título del menú.
-
-`Botones Seleccionado`
-Filas ya agregadas a este menú, cada una con un nombre personalizado editable — quitalas con su botón de eliminar.
-
-`Botones Disponibles`
-Resto de las filas del perfil, listas para agregarse con un click.
-
-## portapapeles-editor
-📋 **Acción — Portapapeles**
-
-`Nombre de la ventana`
-Título que va a mostrar la ventana de Portapapeles cuando se abra desde esta fila.
-
-Se guarda solo, sin botón de confirmar.
-
-## popup-accion-multimedia
-🎵 **Acción — Multimedia**
-
-`Comando multimedia`
-Elegí qué control dispara esta fila: volumen, reproducción u otro de los comandos listados.
-
-Cada categoría agrupa las acciones relacionadas.

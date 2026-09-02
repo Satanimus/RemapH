@@ -32,12 +32,13 @@ pub struct EventoGrabado {
 
     pub momento_ms: u64,
 
-    /// Cursor absoluto de pantalla en el momento del evento. Solo se
-    /// completa en Down/Pulse — None en Up.
+    /// Cursor absoluto de pantalla en el momento del evento. Se
+    /// completa en Down/Pulse/Up (Up incluido: es lo que permite
+    /// detectar arrastre — Down en un punto, Up en otro distinto).
     pub posicion: Option<(i32, i32)>,
 
     /// Rect de la ventana activa (x, y, ancho, alto) en el momento
-    /// del evento. Solo se completa en Down/Pulse — None en Up.
+    /// del evento. Se completa en Down/Pulse/Up, igual que posicion.
     pub ventana: Option<(i32, i32, i32, i32)>,
 }
 
@@ -178,16 +179,16 @@ pub fn observar_evento(evento: &InputEvent) {
         .map(|inicio| inicio.elapsed().as_millis() as u64)
         .unwrap_or(0);
 
-    let (posicion, ventana) = match evento.state {
-        InputState::Down | InputState::Pulse => {
-            let cursor = back_coordenada::obtener_cursor();
-            let ventana_activa = back_coordenada::obtener_ventana_activa()
-                .map(|v| (v.x, v.y, v.ancho, v.alto));
+    // Cursor/ventana activa se leen para TODO evento (Down/Pulse/Up)
+    // — el Up necesita su propia posición para que el análisis
+    // (core_analisis_grabacion.ts) pueda comparar contra la de
+    // apertura del grupo y detectar arrastre (Down en un punto, Up
+    // en otro).
+    let cursor = back_coordenada::obtener_cursor();
+    let ventana_activa =
+        back_coordenada::obtener_ventana_activa().map(|v| (v.x, v.y, v.ancho, v.alto));
 
-            (Some(cursor), ventana_activa)
-        }
-        InputState::Up => (None, None),
-    };
+    let (posicion, ventana) = (Some(cursor), ventana_activa);
 
     EVENTOS.lock().unwrap().push(EventoGrabado {
         input: evento.input.clone(),
