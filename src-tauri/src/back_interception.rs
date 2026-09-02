@@ -734,55 +734,70 @@ fn enviar_rueda(ict: &Interception, device: Device, cantidad: i16) {
 const PASO_MOVIMIENTO_PX: i32 = 12;
 const PAUSA_ENTRE_PASOS_MS: u64 = 4;
 
-pub fn mover_cursor(x: i32, y: i32) {
+// Mismo criterio que back_windows::mover_cursor: tolerancia de
+// llegada en vez de igualdad exacta (por si el driver no aplica el
+// delta exacto pedido — aceleración, redondeo interno, etc.) y
+// límite duro de pasos como salvaguarda, para que este loop nunca
+// pueda quedar corriendo para siempre en el hilo de la macro (bug
+// visto: cursor "temblando" sin llegar nunca a destino, con varios
+// hilos acumulándose si se reintentaba la macro).
+const TOLERANCIA_LLEGADA_PX: i32 = 2;
+const MAX_PASOS_MOVIMIENTO: u32 = 2000;
+
+pub fn mover_cursor(x: i32, y: i32, debe_detenerse: &dyn Fn() -> bool) {
     let Some(device) = mouse_primario() else {
         return;
     };
 
-    con_sesion_salida(|ict| loop {
-        // Se relee la posición REAL en cada paso — no se acumula
-        // actual_x/actual_y a mano. Mismo motivo que
-        // back_windows::mover_cursor: el deltas relativo pasa por
-        // la misma pila de Windows (aceleración de puntero /
-        // pointer ballistics) una vez que Interception lo inyecta,
-        // así que un dx/dy "crudo" no garantiza ese desplazamiento
-        // exacto en pantalla. Acumular a mano hacía que el error se
-        // sumara paso a paso y el cursor terminara mucho más lejos
-        // del destino que lo calculado.
-        let (actual_x, actual_y) = crate::back_coordenada::obtener_cursor();
+    con_sesion_salida(|ict| {
+        for _ in 0..MAX_PASOS_MOVIMIENTO {
+            if debe_detenerse() {
+                return;
+            }
 
-        let restante_x = x - actual_x;
-        let restante_y = y - actual_y;
+            // Se relee la posición REAL en cada paso — no se acumula
+            // actual_x/actual_y a mano. El delta relativo pasa por
+            // la misma pila de Windows (aceleración de puntero /
+            // pointer ballistics) una vez que Interception lo
+            // inyecta, así que un dx/dy "crudo" no garantiza ese
+            // desplazamiento exacto en pantalla.
+            let (actual_x, actual_y) = crate::back_coordenada::obtener_cursor();
 
-        if restante_x == 0 && restante_y == 0 {
-            break;
+            let restante_x = x - actual_x;
+            let restante_y = y - actual_y;
+
+            if restante_x.abs() <= TOLERANCIA_LLEGADA_PX
+                && restante_y.abs() <= TOLERANCIA_LLEGADA_PX
+            {
+                return;
+            }
+
+            let distancia = (restante_x.abs()).max(restante_y.abs());
+            let paso = PASO_MOVIMIENTO_PX.min(distancia).max(1);
+
+            let dx = if restante_x == 0 {
+                0
+            } else {
+                (restante_x.signum()) * paso.min(restante_x.abs())
+            };
+            let dy = if restante_y == 0 {
+                0
+            } else {
+                (restante_y.signum()) * paso.min(restante_y.abs())
+            };
+
+            let stroke = Stroke::Mouse {
+                state: MouseFilter::empty(),
+                flags: interception::MouseFlags::MOVE_RELATIVE,
+                rolling: 0,
+                x: dx,
+                y: dy,
+                information: 0,
+            };
+
+            ict.send(device, &[stroke]);
+
+            std::thread::sleep(std::time::Duration::from_millis(PAUSA_ENTRE_PASOS_MS));
         }
-
-        let distancia = (restante_x.abs()).max(restante_y.abs());
-        let paso = PASO_MOVIMIENTO_PX.min(distancia).max(1);
-
-        let dx = if restante_x == 0 {
-            0
-        } else {
-            (restante_x.signum()) * paso.min(restante_x.abs())
-        };
-        let dy = if restante_y == 0 {
-            0
-        } else {
-            (restante_y.signum()) * paso.min(restante_y.abs())
-        };
-
-        let stroke = Stroke::Mouse {
-            state: MouseFilter::empty(),
-            flags: interception::MouseFlags::MOVE_RELATIVE,
-            rolling: 0,
-            x: dx,
-            y: dy,
-            information: 0,
-        };
-
-        ict.send(device, &[stroke]);
-
-        std::thread::sleep(std::time::Duration::from_millis(PAUSA_ENTRE_PASOS_MS));
     });
 }

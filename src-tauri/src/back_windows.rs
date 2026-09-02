@@ -176,9 +176,9 @@ use windows_sys::Win32::UI::WindowsAndMessaging::{
     CallNextHookEx, GetMessageW, GetSystemMetrics, PostThreadMessageW, SetWindowsHookExW,
     UnhookWindowsHookEx, KBDLLHOOKSTRUCT, MSG, MSLLHOOKSTRUCT, SM_CXVIRTUALSCREEN,
     SM_CYVIRTUALSCREEN, SM_XVIRTUALSCREEN, SM_YVIRTUALSCREEN, WH_KEYBOARD_LL, WH_MOUSE_LL,
-    WM_KEYDOWN, WM_KEYUP, WM_LBUTTONDOWN, WM_LBUTTONUP, WM_MBUTTONDOWN, WM_MBUTTONUP, WM_MOUSEMOVE,
-    WM_MOUSEWHEEL, WM_QUIT, WM_RBUTTONDOWN, WM_RBUTTONUP, WM_SYSKEYDOWN, WM_SYSKEYUP,
-    WM_XBUTTONDOWN, WM_XBUTTONUP,
+    WM_KEYDOWN, WM_KEYUP, WM_LBUTTONDOWN, WM_LBUTTONUP, WM_MBUTTONDOWN, WM_MBUTTONUP,
+    WM_MOUSEMOVE, WM_MOUSEWHEEL, WM_QUIT, WM_RBUTTONDOWN, WM_RBUTTONUP, WM_SYSKEYDOWN,
+    WM_SYSKEYUP, WM_XBUTTONDOWN, WM_XBUTTONUP,
 };
 
 use crate::eventos::{InputId, InputState};
@@ -791,21 +791,55 @@ fn enviar_rueda(cantidad: i32) {
 // posición directa, no delta. Se sigue interpolando en pasos
 // cortos (ahora cada uno es una posición absoluta intermedia,
 // no un delta) para que el destino siga viendo varios
-// WM_MOUSEMOVE en el trayecto.
+// WM_MOUSEMOVE en el trayecto. `debe_detenerse` se consulta en
+// cada paso (mismo mecanismo que el resto de runt_macro.rs) para
+// que el toggle/detener pueda cortar un movimiento largo en curso
+// en vez de esperar a que termine — y MAX_PASOS_MOVIMIENTO es la
+// salvaguarda dura para call sites que no tienen forma real de
+// cancelar (pasan &|| false: nunca antes eran cancelables tampoco,
+// pero ahora igual quedan protegidos por el límite de pasos).
 // ======================================================
 
 const PASO_MOVIMIENTO_PX: i32 = 12;
 const PAUSA_ENTRE_PASOS_MS: u64 = 4;
 
-pub fn mover_cursor(x: i32, y: i32) {
-    loop {
+// Tolerancia de llegada: el redondeo de ida y vuelta al escalar a
+// 0..65536 (MOUSEEVENTF_ABSOLUTE) y que Windows lo vuelva a
+// convertir a píxel no es perfectamente reversible — el cursor
+// puede terminar 1-2px del destino exacto. Sin esta tolerancia, la
+// comparación por igualdad exacta contra el destino nunca se
+// cumplía y el loop no terminaba nunca (bug: cursor "temblando" en
+// el destino, hilo de la macro bloqueado para siempre — y si se
+// reintentaba la macro, se acumulaban varios de estos hilos vivos a
+// la vez, cada uno moviendo el cursor a su propio destino).
+const TOLERANCIA_LLEGADA_PX: i32 = 2;
+
+// Salvaguarda dura: aunque la tolerancia de arriba cubre el caso
+// normal, ningún movimiento debe poder quedar vivo para siempre por
+// una condición imprevista (destino fuera del escritorio virtual,
+// métricas en 0, etc.) — a este ritmo de paso/pausa, 2000 pasos son
+// varios segundos de sobra para cualquier distancia real en
+// pantalla.
+const MAX_PASOS_MOVIMIENTO: u32 = 2000;
+
+pub fn mover_cursor(x: i32, y: i32, debe_detenerse: &dyn Fn() -> bool) {
+    for _ in 0..MAX_PASOS_MOVIMIENTO {
+        if debe_detenerse() {
+            return;
+        }
+
         let (actual_x, actual_y) = back_coordenada::obtener_cursor();
 
         let restante_x = x - actual_x;
         let restante_y = y - actual_y;
 
-        if restante_x == 0 && restante_y == 0 {
-            break;
+        if restante_x.abs() <= TOLERANCIA_LLEGADA_PX && restante_y.abs() <= TOLERANCIA_LLEGADA_PX
+        {
+            // Último ajuste fino: un movimiento absoluto directo al
+            // destino exacto, sin interpolar (la distancia restante
+            // ya es mínima, no hace falta trayecto intermedio).
+            enviar_movimiento_absoluto(x, y);
+            return;
         }
 
         let distancia = (restante_x.abs()).max(restante_y.abs());

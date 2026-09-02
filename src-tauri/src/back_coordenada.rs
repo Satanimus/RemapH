@@ -24,7 +24,8 @@
 // 3. ¿Qué información recibe?
 //
 // obtener_cursor() / obtener_ventana_activa(): nada.
-// mover_cursor(x, y): coordenada absoluta de pantalla.
+// mover_cursor(x, y, debe_detenerse): coordenada absoluta de
+//     pantalla + callback para cortar el movimiento en curso.
 // calcular_destino(ubicacion): una UbicacionCache ya
 //     compilada (ver perfil_cache.rs).
 // ------------------------------------------------------
@@ -44,9 +45,10 @@
 //     GetForegroundWindow + GetWindowRect + GetWindowTextW.
 //     None si no hay ventana en foreground (caso raro, ej.
 //     el escritorio).
-// mover_cursor(x, y)
+// mover_cursor(x, y, debe_detenerse)
 //     Delega al motor activo (Interception o Portable);
-//     movimiento interpolado, no SetCursorPos.
+//     movimiento interpolado, no SetCursorPos. Corta antes
+//     si debe_detenerse() da true.
 // calcular_destino(ubicacion)
 //     Resuelve Absoluta / RelativaCursor / RelativaVentana
 //     (Porcentaje o Píxeles) a una coordenada de pantalla.
@@ -143,10 +145,12 @@ pub fn obtener_ventana_activa() -> Option<VentanaActiva> {
 // texto, cuadro selector del escritorio, Paint).
 // ======================================================
 
-pub fn mover_cursor(x: i32, y: i32) {
+pub fn mover_cursor(x: i32, y: i32, debe_detenerse: &dyn Fn() -> bool) {
     match crate::motor::modo_activo() {
-        crate::motor::Modo::Interception => crate::back_interception::mover_cursor(x, y),
-        crate::motor::Modo::Portable => crate::back_windows::mover_cursor(x, y),
+        crate::motor::Modo::Interception => {
+            crate::back_interception::mover_cursor(x, y, debe_detenerse)
+        }
+        crate::motor::Modo::Portable => crate::back_windows::mover_cursor(x, y, debe_detenerse),
     }
 }
 

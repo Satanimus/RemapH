@@ -442,7 +442,7 @@ fn ejecutar_paso(
 
         "espera" => esperar_interrumpible(paso.espera_ms, debe_detenerse),
 
-        "coordenada" => ejecutar_paso_coordenada(paso, posicion_inicial),
+        "coordenada" => ejecutar_paso_coordenada(paso, posicion_inicial, debe_detenerse),
 
         "pegar" => ejecutar_paso_pegar(paso),
 
@@ -602,9 +602,13 @@ fn ejecutar_repeticion(
 // resuelta antes de entrar acá (ver decisión E).
 // ======================================================
 
-fn ejecutar_paso_coordenada(paso: &PasoMacroJson, posicion_inicial: (i32, i32)) {
+fn ejecutar_paso_coordenada(
+    paso: &PasoMacroJson,
+    posicion_inicial: (i32, i32),
+    debe_detenerse: &dyn Fn() -> bool,
+) {
     if paso.coord_posicion_inicial {
-        back_coordenada::mover_cursor(posicion_inicial.0, posicion_inicial.1);
+        back_coordenada::mover_cursor(posicion_inicial.0, posicion_inicial.1, debe_detenerse);
         return;
     }
 
@@ -622,7 +626,7 @@ fn ejecutar_paso_coordenada(paso: &PasoMacroJson, posicion_inicial: (i32, i32)) 
 
     let destino = back_coordenada::calcular_destino(&coordenada.ubicacion);
 
-    back_coordenada::mover_cursor(destino.0, destino.1);
+    back_coordenada::mover_cursor(destino.0, destino.1, debe_detenerse);
 }
 
 fn convertir_ubicacion_paso(paso: &PasoMacroJson) -> Option<UbicacionCache> {

@@ -758,7 +758,7 @@ fn ejecutar_click_coordenada(
         };
 
         let destino = back_coordenada::calcular_destino(&coordenada.ubicacion);
-        back_coordenada::mover_cursor(destino.0, destino.1);
+        back_coordenada::mover_cursor(destino.0, destino.1, &|| false);
 
         match extra {
             Some(extra) => {
@@ -778,7 +778,7 @@ fn ejecutar_click_coordenada(
         }
 
         if let Some((x, y)) = origen {
-            back_coordenada::mover_cursor(x, y);
+            back_coordenada::mover_cursor(x, y, &|| false);
         }
     });
 }

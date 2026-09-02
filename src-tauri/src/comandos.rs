@@ -1261,7 +1261,7 @@ pub fn probar_coordenada(
         y,
     );
 
-    back_coordenada::mover_cursor(destino_x, destino_y);
+    back_coordenada::mover_cursor(destino_x, destino_y, &|| false);
 }
 
 #[tauri::command]
