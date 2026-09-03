@@ -72,6 +72,19 @@ interface NodoArbol {
 // modo) puede producir.
 const SENTINEL_BORRAR = "__borrar__";
 
+// Un hijo solo cuenta como "con Valor Personalizado" si difiere del
+// Valor por Defecto — si coincide, es equivalente a no tener override
+// (Regla: Personalizado es un diff disperso, no una tabla completa a
+// reemplazar) y debe mostrarse como vacío/lápiz en vez de repetir el
+// mismo valor que ya se ve en la columna de al lado.
+function esPersonalizadoReal(hijo: FilaCssCruda): boolean {
+  return (
+    hijo.valor_personalizado !== null &&
+    hijo.valor_personalizado.length > 0 &&
+    hijo.valor_personalizado !== hijo.valor_defecto
+  );
+}
+
 // Fila ya montada en el DOM, guardada en orden (Etapa E8) para que el
 // botón Expandir/Contraer de una fila de nivel 1 pueda ocultar/mostrar
 // el tramo de filas que le siguen hasta el próximo nivel 1 (o el final
@@ -151,7 +164,7 @@ function construirMapaColoresTema(arbol: NodoArbol[]): Map<string, string> {
 
     for (const hijo of nodo.hijos) {
       if (hijo.tipo === "color" && hijo.valor_defecto) {
-        mapa.set(hijo.valor_defecto.toLowerCase(), nodo.entrada.nombre_ui);
+        mapa.set(hijo.valor_defecto.toLowerCase(), hijo.id);
       }
     }
   }
@@ -393,7 +406,9 @@ function crearPopupEditar(
 
   nodo.hijos.forEach((hijo) => {
     const campo = crearCampoValor(hijo, (valorFormateado) => {
-      hijo.valor_personalizado = valorFormateado;
+      hijo.valor_personalizado =
+        valorFormateado === hijo.valor_defecto ? null : valorFormateado;
+
       actualizarColumnas();
     });
 
@@ -416,9 +431,7 @@ function renderizarValorPersonalizado(
 ): DocumentFragment {
   const fragmento = document.createDocumentFragment();
 
-  const conValor = hijos.filter(
-    (hijo) => hijo.valor_personalizado && hijo.valor_personalizado.length > 0,
-  );
+  const conValor = hijos.filter(esPersonalizadoReal);
 
   conValor.forEach((hijo, indice) => {
     const valor = hijo.valor_personalizado as string;
@@ -519,9 +532,7 @@ function crearFilaArbol(
   const actualizarColumnas = (): void => {
     tdDefecto.replaceChildren(renderizarValorDefecto(nodo.hijos, coloresTema));
 
-    const hayValorPersonalizado = nodo.hijos.some(
-      (hijo) => hijo.valor_personalizado && hijo.valor_personalizado.length > 0,
-    );
+    const hayValorPersonalizado = nodo.hijos.some(esPersonalizadoReal);
 
     if (hayValorPersonalizado) {
       botonPersonalizado.replaceChildren(
@@ -688,7 +699,7 @@ export function crearPestanaApariencia(
   // pendientes/aplicados (nivel 0 con valor_personalizado no nulo).
   function actualizarBotonSelectorTema(filas: FilaCssCruda[]): void {
     const hayPersonalizados = filas.some(
-      (f) => f.nivel === 0 && f.valor_personalizado !== null,
+      (f) => f.nivel === 0 && esPersonalizadoReal(f),
     );
 
     hayPersonalizadosSesion = hayPersonalizados;
@@ -962,7 +973,8 @@ export function crearPestanaApariencia(
         const hijo = fm.nodo.hijos.find((h) => h.id === id);
 
         if (hijo) {
-          hijo.valor_personalizado = valor;
+          hijo.valor_personalizado =
+            valor === hijo.valor_defecto ? null : valor;
           filasConCambio.add(fm.nodo);
           fm.tr.classList.add("configuracion-arbol-editando");
         }
@@ -1085,9 +1097,12 @@ export function crearPestanaApariencia(
 
     for (const nodo of filasConCambio) {
       for (const hijo of nodo.hijos) {
-        if (hijo.valor_personalizado !== null) {
-          cambios.push({ clave: hijo.id, valor: hijo.valor_personalizado });
-        } else if (valoresOriginales.get(hijo.id) !== null) {
+        if (esPersonalizadoReal(hijo)) {
+          cambios.push({ clave: hijo.id, valor: hijo.valor_personalizado! });
+        } else if (
+          hijo.valor_personalizado === null &&
+          valoresOriginales.get(hijo.id) !== null
+        ) {
           cambios.push({ clave: hijo.id, valor: SENTINEL_BORRAR });
         }
       }
@@ -1176,22 +1191,25 @@ export function crearPestanaApariencia(
     await despuesDeAplicar();
   }
 
-  // Restablecer esta pestaña. La pestaña "Tema" (incluirSelectorTema)
-  // reinicia la sesión completa (cargar()) y vuelve a mostrar el tema
-  // realmente aplicado — no borra los overrides "css." persistidos,
-  // esos SON los valores del tema aplicado. La pestaña "Apariencia"
-  // (Texto+Dimensiones) no es dueña de esa sesión compartida: solo
-  // descarta sus propias ediciones sin guardar releyendo el estado
-  // actual (recargarTablaApariencia), sin tocar la sesión de tema que
-  // pueda estar en preview desde la otra pestaña.
+  // Restablecer esta pestaña: recarga el mismo tema que hay en sesión
+  // (idéntico a pulsar "Cargar" sobre ese tema) y luego ejecuta el
+  // flujo completo de "Aplicar cambios" — validar → guardar → limpiar.
   async function restablecerPestana(): Promise<void> {
-    if (opciones.incluirSelectorTema) {
-      await cargar();
-    } else {
-      await recargarTablaApariencia();
-    }
+    await invoke("configuracion_tema_cargar", {
+      nombre: nombreTemaSesion,
+      origen: origenTemaSesion,
+    });
 
-    await despuesDeAplicar();
+    huboCargaDeTema = true;
+
+    await recargarTablaApariencia();
+
+    const { cambios } = validarYRecolectar();
+    const resultado = await aplicarGuardado(cambios);
+
+    if (resultado.errores.length === 0) {
+      await limpiarEstadoTrasGuardado();
+    }
   }
 
   // Refresco liviano al entrar a esta pestaña (ver activarTab en

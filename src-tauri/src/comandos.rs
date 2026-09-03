@@ -2297,6 +2297,12 @@ pub async fn configuracion_restablecer_claves_css(claves: Vec<String>) -> Result
     configuracion_usuario::restablecer_claves_css(&claves)
 }
 
+#[tauri::command]
+pub async fn configuracion_restablecer_apariencia() -> Result<(), String> {
+    let (nombre, origen, _) = configuracion_usuario::sesion_apariencia_actual()?;
+    configuracion_usuario::tema_sesion_cargar(&nombre, &origen).map(|_| ())
+}
+
 // ======================================================
 // 🖼️ APARIENCIA — TEMAS (.theme)
 // ------------------------------------------------------
@@ -2391,6 +2397,12 @@ pub async fn configuracion_tema_renombrar(
 #[tauri::command]
 pub async fn configuracion_tema_eliminar(nombre: String) -> Result<(), String> {
     configuracion_usuario::eliminar_tema(&nombre)
+}
+
+#[tauri::command]
+pub async fn configuracion_apariencia_sesion_actual() -> Result<TemaListadoUI, String> {
+    let (nombre, origen, _) = configuracion_usuario::sesion_apariencia_actual()?;
+    Ok(TemaListadoUI { nombre, origen })
 }
 
 #[tauri::command]
