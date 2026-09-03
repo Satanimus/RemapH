@@ -141,8 +141,10 @@ const SANGRIA_POR_NIVEL: Record<number, string> = {
 // ----------------------------------------------------
 // Recorre el arreglo plano en busca de la sección "Color de tema"
 // (nivel 1) y junta, de cada nodo dentro de ese tramo, sus hijos de
-// tipo "color" en un mapa hex -> nombre_ui del nodo contenedor —
-// usado para mostrar el NOMBRE del color en vez de su hex (Regla 33).
+// tipo "color" en un mapa hex -> id del hijo — usado como lookup
+// cuando un color de otra sección referencia un token de color-tema
+// por valor hex (ej. text-highlight comparte hex con highlight).
+// Para los demás colores se muestra hijo.id directamente en el render.
 
 function construirMapaColoresTema(arbol: NodoArbol[]): Map<string, string> {
   const mapa = new Map<string, string>();
@@ -323,7 +325,7 @@ function renderizarValorDefecto(
       swatch.style.backgroundColor = valor;
 
       const nombre = document.createElement("span");
-      nombre.textContent = coloresTema.get(valor.toLowerCase()) ?? valor;
+      nombre.textContent = coloresTema.get(valor.toLowerCase()) ?? hijo.id;
 
       fragmento.append(swatch, nombre);
     } else {
@@ -442,7 +444,7 @@ function renderizarValorPersonalizado(
       swatch.style.backgroundColor = valor;
 
       const nombre = document.createElement("span");
-      nombre.textContent = coloresTema.get(valor.toLowerCase()) ?? valor;
+      nombre.textContent = coloresTema.get(valor.toLowerCase()) ?? hijo.id;
 
       fragmento.append(swatch, nombre);
     } else {
