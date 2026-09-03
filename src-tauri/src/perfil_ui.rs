@@ -63,9 +63,6 @@
 //     Versión mínima de ResultadoPerfil para el arranque de la app
 //     (main.ts::iniciarApp): perfil + advertencias, nada más.
 //
-// EstadoCachePerfil
-//     Estado de cache de un perfil.
-//
 //
 //
 // Funciones:
@@ -318,17 +315,6 @@ pub struct ResultadoPerfilInicial {
     pub perfil: perfil_json,
 
     pub advertencias: Vec<AdvertenciaCompilacion>,
-}
-
-// ======================================================
-// 🟢🔴 ESTADO CACHE PERFIL
-// ======================================================
-
-#[derive(Serialize)]
-pub struct EstadoCachePerfil {
-    pub nombre: String,
-
-    pub cache_activo: bool,
 }
 
 // ======================================================

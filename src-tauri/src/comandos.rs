@@ -81,9 +81,6 @@
 // ResultadoPerfil
 //     Respuesta de perfil hacia UI.
 //
-// EstadoCachePerfil
-//     Estado visual de cache de perfil.
-//
 // IconoJson
 //     Modelo serializable de icono.
 //
@@ -995,12 +992,19 @@ pub fn cerrar_ventana_preview_coordenada(app: tauri::AppHandle, id: String) {
 const LABEL_VENTANA_ORIGEN_CURSOR: &str = "captura_coordenada_preview_origen_cursor";
 
 #[tauri::command]
-pub async fn abrir_ventana_origen_cursor(app: tauri::AppHandle, x: f64, y: f64) -> Result<(), String> {
+pub async fn abrir_ventana_origen_cursor(
+    app: tauri::AppHandle,
+    x: f64,
+    y: f64,
+) -> Result<(), String> {
     if let Some(existente) = app.get_webview_window(LABEL_VENTANA_ORIGEN_CURSOR) {
         let _ = existente.close();
 
         for _ in 0..50 {
-            if app.get_webview_window(LABEL_VENTANA_ORIGEN_CURSOR).is_none() {
+            if app
+                .get_webview_window(LABEL_VENTANA_ORIGEN_CURSOR)
+                .is_none()
+            {
                 break;
             }
             std::thread::sleep(std::time::Duration::from_millis(20));

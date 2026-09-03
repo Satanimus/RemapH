@@ -417,17 +417,6 @@ pub struct AtajoSimple {
 }
 
 impl AtajoSimple {
-    pub fn a_texto(&self) -> String {
-        let mods = self
-            .modificadores
-            .iter()
-            .map(|input| input.to_string())
-            .collect::<Vec<_>>()
-            .join(",");
-
-        format!("{}|{}", mods, self.gatillo)
-    }
-
     /// None si el texto no respeta el formato "mod,mod|gatillo"
     /// (separador '|' ausente, o alguna entrada sin "fuente:control").
     pub fn desde_texto(texto: &str) -> Option<Self> {
