@@ -293,6 +293,10 @@ function llenarListaColor(
 
     boton.className = "ui-btn popup-color-item";
 
+    if (opcion.valor === filaPerfil.color) {
+      boton.dataset.seleccionado = "true";
+    }
+
     const muestra = document.createElement("span");
 
     muestra.className = "popup-color-muestra";

@@ -17,11 +17,14 @@
 //    selecciona esa fila (borde cyan + indicador ⁝⁝ junto
 //    al botón). Un clic CORTO no se toca acá — lo maneja el
 //    llamador con su propio listener "click".
-// 1b. Dos formas rápidas de entrar a modo Mover sin esperar el
-//    mantenido, ambas sobre el mismo botón ⟫ (asa): a) clic y
-//    arrastre directo (se detecta apenas el puntero supera el
-//    umbral de arrastre); b) Ctrl o Shift mantenido + clic (entra
-//    al instante, sin necesidad de arrastrar ni de esperar).
+// 1b. Arrastre directo sobre el asa antes de vencer el mantenido
+//    (se detecta apenas el puntero supera el umbral de arrastre)
+//    también entra a modo Mover al instante, sin esperar.
+//    Ctrl/Shift + clic sobre el asa SIN arrastrar NO entra a modo
+//    Mover: solo agrega/saca esa fila de la selección (mismo
+//    criterio que el punto 2) y las filas quedan donde están —
+//    agrupar y mover requiere un arrastre real, sea desde el asa
+//    o desde el fondo de una fila ya seleccionada.
 // 2. Ctrl + clic sobre el fondo de una fila → agrega/saca
 //    esa fila de la selección. La decisión (agregar vs
 //    sacar) se toma según el estado ANTES del clic, para
@@ -982,23 +985,16 @@ export function crearControladorArrastre(
       conCtrl,
     };
 
-    // Ctrl/Shift + clic sobre el asa: entra a modo Mover al
-    // instante (selecciona esta fila y arranca el arrastre), sin
-    // esperar el mantenido.
-    if (conCtrl) {
-      clearTimeout(timerId);
-
-      activarMoverDesdeAsa(evento);
-    }
-
     document.addEventListener("pointermove", manejarAsaPointerMove);
     document.addEventListener("pointerup", manejarAsaPointerUp);
   }
 
   // Selecciona (si hace falta) y arranca el arrastre. Punto único
-  // usado por las tres vías de entrada a modo Mover: mantenido
-  // vencido, Ctrl/Shift+clic instantáneo, y arrastre detectado antes
-  // de que venza el mantenido (ver manejarAsaPointerMove).
+  // usado por las dos vías de entrada a modo Mover: mantenido
+  // vencido, y arrastre detectado antes de que venza el mantenido
+  // (ver manejarAsaPointerMove). Ctrl/Shift+clic SIN arrastre ya no
+  // entra acá — ver manejarAsaPointerUp: agrega/saca de la
+  // selección y las filas quedan en su lugar, sin agruparse.
   function activarMoverDesdeAsa(evento: PointerEvent): void {
     if (!presionAsaActual) return;
 
@@ -1062,11 +1058,12 @@ export function crearControladorArrastre(
     presionAsaActual = null;
 
     if (!convertidaEnMover) {
-      // Shift+click simple sobre el asa con modo Mover ya activo:
-      // selecciona el tramo entre la última ancla y esta fila
-      // (estilo selector de archivos), sin mover el ancla — así
-      // se puede seguir extendiendo el rango con más Shift+click.
-      if (evento.shiftKey && seleccionadas.size > 0) {
+      // Shift+click simple sobre el asa (con o sin selección previa):
+      // selecciona el tramo entre la última ancla y esta fila (estilo
+      // selector de archivos), sin mover el ancla — así se puede
+      // seguir extendiendo el rango con más Shift+click. No entra a
+      // modo Mover ni agrupa: las filas quedan donde están.
+      if (evento.shiftKey) {
         const asa = filas.get(id)?.asa;
 
         if (asa) asasASuprimirClick.add(asa);
@@ -1084,12 +1081,13 @@ export function crearControladorArrastre(
         return;
       }
 
-      // Ctrl+click simple sobre el asa con modo Mover ya activo:
-      // alterna la selección de esta fila (igual que Ctrl+click sobre
-      // el fondo) y suprime el click para que no abra el popup de
-      // opciones. Sin modo Mover activo, Ctrl no cambia nada — el
-      // click pasa normal y abre el popup.
-      if (evento.ctrlKey && seleccionadas.size > 0) {
+      // Ctrl+click simple sobre el asa: alterna la selección de esta
+      // fila (igual que Ctrl+click sobre el fondo) y suprime el click
+      // para que no abra el popup de opciones. No entra a modo Mover:
+      // la fila se agrega/saca de la selección sin agruparse ni
+      // moverse — solo un arrastre real (ver manejarAsaPointerMove/
+      // el mantenido) agrupa y mueve.
+      if (evento.ctrlKey) {
         const asa = filas.get(id)?.asa;
 
         if (asa) asasASuprimirClick.add(asa);

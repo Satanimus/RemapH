@@ -1198,6 +1198,39 @@
   box-sizing: border-box;
 }
 
+/* ======================================================
+   📥 GRUPO "Importar Macro" (panel Funciones, debajo de
+   "Grabar Macro")
+   ------------------------------------------------------
+   Mismo layout que .popup-macro-grabacion-grupo (botón +
+   caja anidada apilados). El botón toma el mismo look base
+   que .popup-macro-boton-grabar (ancho completo, texto a la
+   izquierda) — sin los estados de grabando/armada, que no
+   aplican acá. Borde cian en el botón Y en la caja de lista
+   mientras está expandido (data-abierto="true"), mismo tono
+   --highlight que ya usa data-activo en el botón de Grabar.
+   ====================================================== */
+
+.popup-macro-importar-grupo {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap8);
+}
+
+.ui-btn.popup-macro-boton-importar {
+  width: 100%;
+  justify-content: flex-start;
+  text-align: left;
+}
+
+.ui-btn.popup-macro-boton-importar[data-activo="true"] {
+  border-color: var(--highlight);
+}
+
+.popup-macro-importar-grupo[data-abierto="true"] .popup-macro-importar-lista {
+  border-color: var(--highlight);
+}
+
 .popup-macro-funciones-titulo {
   color: var(--text-disabled);
   font-size: var(--fs11);

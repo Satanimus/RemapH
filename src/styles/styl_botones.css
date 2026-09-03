@@ -100,6 +100,50 @@
 }
 
 /* ======================================================
+   🗑️ FAMILIA "PELIGRO" — botones de acción destructiva
+   ------------------------------------------------------
+   Estilo compartido para CUALQUIER botón que borre/limpie algo
+   (Eliminar de fila, "Eliminar seleccionadas" del encabezado,
+   futuros botones similares): ghost igual que el resto (fondo/
+   borde transparentes, letra color principal) pero en hover el
+   acento es rojo (--highlight-red/--text-red) en vez de cyan
+   (--highlight). Para sumar un botón a la familia alcanza con
+   agregarle la clase .boton-peligro (además de .ui-btn) — no
+   hace falta reescribir colores en el archivo/contexto donde
+   vive el botón.
+   Se define completa (reposo + hover), sin depender de que el
+   botón esté dentro de .fila/.cabecera/.opciones-celda — así
+   funciona igual en cualquier contexto. Y va DESPUÉS de los
+   resets ghost de arriba con la MISMA especificidad
+   (.ui-btn + 1 clase) para poder pisarlos por orden en el
+   archivo — evita la pelea de especificidad/orden entre
+   archivos que motivó esta familia (antes vivía suelta en
+   styl_tabla.css y un reset ghost más específico o más tardío
+   la pisaba sin avisar). Cualquier reset ghost nuevo que se
+   agregue con MAYOR especificidad que esto también la pisaría —
+   si eso pasa, ese reset nuevo es el que está mal, no esta regla.
+   ====================================================== */
+
+.ui-btn.boton-peligro {
+
+    background: transparent;
+
+    border-color: transparent;
+
+    color: var(--text);
+}
+
+.ui-btn.boton-peligro:hover,
+.ui-btn.boton-peligro[data-abierto="true"] {
+
+    background: color-mix(in srgb, var(--highlight-red) var(--botones-ghost-opacidad-hover), transparent);
+
+    border-color: var(--highlight-red);
+
+    color: var(--text-red);
+}
+
+/* ======================================================
    🟢🟡🔴 ESTADO DEL PERFIL
    ------------------------------------------------------
    ÚNICA EXCEPCIÓN AL ESTILO GENERAL.
@@ -317,6 +361,11 @@
 
 /* ======================================================
    🎨 BOTÓN COLOR — MUESTRA
+   ------------------------------------------------------
+   Forma gota (no círculo: ese ya se usa para indicadores de
+   alerta/estado — ver .indicador y .estado-toggle). Cola hacia
+   arriba: esquina cuadrada arriba-izquierda + rotate(45deg),
+   receta estándar de "teardrop" en CSS.
    ====================================================== */
 
 .color-control-muestra {
@@ -325,7 +374,9 @@
 
     height: 14px;
 
-    border-radius: 50%;
+    border-radius: 0% 50% 50% 50%;
+
+    transform: rotate(45deg);
 
     display: inline-block;
 }
@@ -345,7 +396,9 @@
 
     height: 12px;
 
-    border-radius: 50%;
+    border-radius: 0% 50% 50% 50%;
+
+    transform: rotate(45deg);
 
     display: inline-block;
 
@@ -409,6 +462,17 @@
     background: color-mix(in srgb, var(--highlight) var(--botones-ghost-opacidad-hover), transparent) !important;
     border-color: var(--highlight);
     border-radius: var(--r4);
+}
+
+/* Ítem que ya está seleccionado (ej. color actual de la fila en
+   llenarListaColor, comp_popup_abrir.ts): borde cyan permanente,
+   no solo al pasar el mouse — misma especificidad (.popup-lista
+   .ui-btn) + atributo, así que gana por especificidad al reposo
+   transparente de arriba, y el hover (con !important) lo sigue
+   pisando igual si el mouse pasa por encima. */
+.popup-capa .ui-btn[data-seleccionado="true"],
+.popup-lista .ui-btn[data-seleccionado="true"] {
+    border-color: var(--highlight);
 }
 
 /* ======================================================

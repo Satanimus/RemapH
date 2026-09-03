@@ -117,6 +117,7 @@ export function crearSeparadorHeader(
           reconstruirTabla();
         },
         requiereConfirmacion: false,
+        colorActual: separador.color,
       }),
     );
   }

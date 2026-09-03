@@ -489,15 +489,30 @@
 
 .celda:not(:last-child) {
 
-    /* --border (oscuro), no --border-light: mismo tono que ya usa
-       .divisor-columna::before más abajo, para que los separadores
-       de esta tabla sean consistentes entre sí. */
+    /* --border (oscuro), no --border-light: mismo tono que usa
+       .divisor-columna::before de la cabecera, para que los
+       separadores de esta tabla sean consistentes entre sí. La
+       cabecera NO lleva este border-right: ahí el borde lo da
+       únicamente .divisor-columna::before (el arrastrable de
+       redimensión), para no duplicar la línea. */
     border-right: 1px solid var(--border);
 }
 
 .celda.nota-separador {
 
     flex: 1;
+}
+
+/* [FIX] La fila-separador solo tiene 2 celdas (Opciones y Nota) —
+   a diferencia de una fila normal, acá no hay más columnas después
+   que justifiquen un divisor visual, y la Nota funciona como
+   Nombre del separador (ocupa el resto de la fila). El
+   border-right heredado de .celda:not(:last-child) de arriba
+   quedaba entre Opciones y Nota como una línea suelta sin motivo.
+   Se anula puntualmente para esta celda. */
+.celda.separador-opciones {
+
+    border-right: none;
 }
 
 .celda.nota-separador .nota {
@@ -639,26 +654,12 @@
    disabled sin CSS adicional; no usar pointer-events: none acá
    porque taparía el tooltip nativo del navegador. */
 
-/* E.5 — Regla 10: ícono "X" blanco en reposo (ya lo da el color
-   base de .ui-btn, sin regla aparte); hover rojo solo si no está
-   deshabilitado. */
-/* [bug 2] Borde rojo por defecto (no solo en hover): Eliminar es una
-   acción destructiva y debe distinguirse de Color/Duplicar (borde
-   cyan --highlight) también en reposo. Mismo criterio para la fila,
-   el separador y "Eliminar seleccionadas" del encabezado — los tres
-   comparten esta clase vía crearBotonesOpcionesExtra. */
-.opciones-boton-eliminar {
-
-    border-color: var(--highlight-red);
-}
-
-.opciones-boton-eliminar:not(:disabled):hover {
-
-    color: var(--text-red);
-
-    border-color: var(--highlight-red);
-}
-
+/* E.5 — color de reposo/hover: lo da la familia .boton-peligro
+   (styl_botones.css), aplicada a botonEliminar en comp_opciones.ts.
+   No redefinir acá border-color/color: esas reglas vivían acá antes
+   y siempre perdían contra el reset ghost de .fila .ui-btn (misma
+   especificidad, pero ese reset carga después en otro archivo) —
+   ese era el bug del borde que no se ponía rojo. */
 /* E.6 — Regla 9: confirmación expandida de Eliminar. */
 .opciones-boton-eliminar--confirmando {
 
@@ -690,8 +691,13 @@
 
 /* [bug 1, vuelta 2] Mientras Eliminar pide confirmación:
    - se ocultan ⁝/Color/Duplicar de ESA celda (:has apuntando a
-     .opciones-celda) para que el ancho necesario sea solo el del
-     botón de confirmación, no los 4 juntos.
+     .opciones-celda para las filas/separadores, y a
+     .cabecera-celda[data-columna="opciones"] para el encabezado —
+     esta última no lleva la clase .opciones-celda, así que sin este
+     segundo selector "Eliminar seleccionadas" no ocultaba sus
+     hermanos y la columna se ensanchaba invadiendo "App") para que
+     el ancho necesario sea solo el del botón de confirmación, no
+     los 4 juntos.
    - :has(...) en .viewport (contiene .cabecera y .filas, ver
      ui_tabla.ts) detecta la confirmación esté donde esté y aplica
      el mismo ancho (--ancho-opciones-confirmando, seteado por JS
@@ -701,7 +707,10 @@
      fila que confirma hacia la derecha. */
 .opciones-celda:has(.opciones-boton-eliminar--confirmando) .opciones-asa,
 .opciones-celda:has(.opciones-boton-eliminar--confirmando) .opciones-boton-color,
-.opciones-celda:has(.opciones-boton-eliminar--confirmando) .opciones-boton-duplicar {
+.opciones-celda:has(.opciones-boton-eliminar--confirmando) .opciones-boton-duplicar,
+.cabecera-celda[data-columna="opciones"]:has(.opciones-boton-eliminar--confirmando) .opciones-asa,
+.cabecera-celda[data-columna="opciones"]:has(.opciones-boton-eliminar--confirmando) .opciones-boton-color,
+.cabecera-celda[data-columna="opciones"]:has(.opciones-boton-eliminar--confirmando) .opciones-boton-duplicar {
 
     display: none;
 }

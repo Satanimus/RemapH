@@ -552,7 +552,11 @@ function aplicarValorEnInputs(
 interface OpcionesPestana {
   panel: HTMLDivElement;
 
-  encabezados: readonly [string, string, string];
+  // Teclas no necesita la primera columna ("Tecla" — el nombre
+  // interno, ej. "Enie"): con Nombre de fábrica + Nombre
+  // personalizado alcanza para identificar la fila (ver
+  // pestanaTeclas). Con 2 elementos, tdNombre no se crea/monta.
+  encabezados: readonly [string, string] | readonly [string, string, string];
 
   cargarFilas: () => Promise<FilaConfiguracion[]>;
 
@@ -699,6 +703,11 @@ function crearPestanaEditable(opciones: OpcionesPestana): Pestana {
     tbody.append(tr);
   }
 
+  // Solo General/Apariencia usan la columna "Nombre" (primera de
+  // 3) — Teclas la omite (2 encabezados: Nombre de fábrica /
+  // Nombre personalizado, ver pestanaTeclas).
+  const mostrarColumnaNombre = encabezados.length === 3;
+
   function montarFila(fila: FilaConfiguracion): void {
     const tr = document.createElement("tr");
 
@@ -832,7 +841,11 @@ function crearPestanaEditable(opciones: OpcionesPestana): Pestana {
       aplicarValorEnInputs(montada, fila.valorDefecto, marcarEditando);
     });
 
-    tr.append(tdNombre, tdDefecto, tdPersonalizado);
+    if (mostrarColumnaNombre) {
+      tr.append(tdNombre);
+    }
+
+    tr.append(tdDefecto, tdPersonalizado);
     tbody.append(tr);
 
     filasMontadas.set(fila.clave, montada);
@@ -1137,7 +1150,10 @@ function categorizarTecla(interno: string, fuente: string): CategoriaTecla {
     return "Mouse";
   }
 
-  if (/^[A-Z]$/.test(interno)) {
+  // "Enie" (la Ñ) es la única letra cuyo interno no es una sola
+  // letra A-Z (ver pulsadores.tsv) — se suma acá a mano para que
+  // caiga en "Letras" junto a las demás en vez de "Símbolos".
+  if (/^[A-Z]$/.test(interno) || interno === "Enie") {
     return "Letras";
   }
 
@@ -1184,7 +1200,7 @@ interface FilaTeclaCruda {
 const pestanaTeclas = crearPestanaEditable({
   panel: panelTeclas,
 
-  encabezados: ["Tecla", "Nombre de fábrica", "Nombre personalizado"],
+  encabezados: ["Nombre de fábrica", "Nombre personalizado"],
 
   cargarFilas: async () => {
     const crudas = await invoke<FilaTeclaCruda[]>(

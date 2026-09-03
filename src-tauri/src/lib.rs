@@ -143,6 +143,7 @@ pub fn run() {
             comandos::macro_listar,
             comandos::macro_nueva,
             comandos::macro_abrir,
+            comandos::macro_leer,
             comandos::macro_guardar,
             comandos::macro_guardar_paso,
             comandos::macro_cancelar,

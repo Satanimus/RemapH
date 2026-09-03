@@ -267,6 +267,18 @@ pub fn macro_abrir(nombre: String) -> Result<MacroArchivoJson, String> {
     macros::abrir_macro_a_cache(nombre)
 }
 
+// Etapa "Importar Macro" (editor): trae los pasos de OTRA macro
+// para copiarlos dentro de la que se está editando. A diferencia
+// de macro_abrir, NO escribe en CACHE_MACROS — la macro de origen
+// solo se lee, nunca se abre para editarse, así que cachearla
+// dejaría una entrada residual en CACHE_MACROS que nada vuelve a
+// limpiar (ni macro_cancelar ni macro_guardar corren para ese
+// nombre desde este flujo).
+#[tauri::command]
+pub fn macro_leer(nombre: String) -> Result<MacroArchivoJson, String> {
+    macros::abrir_macro(nombre)
+}
+
 #[tauri::command]
 pub fn macro_guardar(nombre: String) -> Result<(), String> {
     macros::guardar_desde_cache(&nombre)

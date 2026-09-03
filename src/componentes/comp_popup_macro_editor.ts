@@ -70,6 +70,7 @@ import type {
 import {
   crearPasoMacro,
   clonarPasoMacro,
+  importarPasosMacro,
   textoTipoPasoMacro,
   iconoTipoPasoMacro,
   macroArchivoParaBackend,
@@ -831,6 +832,13 @@ function montarEditor(
   let estadoGrabacion: EstadoGrabacionMacro = "inactiva";
   let pollingGrabacionId: ReturnType<typeof setInterval> | null = null;
 
+  // 📥 Toggle "Importar Macro" (panel Funciones, debajo de "Grabar
+  // Macro") — mismo criterio "solo un desplegable a la vez" que
+  // grabacionInicioAbierto/idPasoExpandido/idMenuAbierto: abrir
+  // este cierra esos, y viceversa (ver alAlternarImportar /
+  // cerrarCajasAnidadas más abajo).
+  let importarAbierto = false;
+
   // Config elegida en el panel de inicio — vive desde que se abre
   // el panel (arma la grabación) hasta que termina la sesión
   // (cancelada estando armada, o finalizada tras Activa→Inactiva).
@@ -1065,11 +1073,70 @@ function montarEditor(
     estadoInicioGrabacion = configInicioGrabacionPorDefecto();
     idPasoExpandido = null;
     idMenuAbierto = null;
+    importarAbierto = false;
 
     redibujar();
 
     armarGrabacion(estadoInicioGrabacion);
   };
+
+  // ----------------------------------
+  // 📥 IMPORTAR MACRO — CONTROL
+  // ------------------------------------------------------
+  // alAlternarImportar: click en el botón "📥 Importar Macro".
+  // Igual patrón que alAlternarGrabacionInicio pero sin estado de
+  // grabación real detrás: solo abre/cierra el box anidado con la
+  // lista de macros (cierra cualquier otra caja abierta, mismo
+  // criterio "solo una a la vez").
+  //
+  // alImportarMacro: trae la macro elegida (macro_leer — a
+  // diferencia de macro_abrir, este comando NO la carga a
+  // CACHE_MACROS: la macro de origen solo se lee para copiar sus
+  // pasos, nunca se abre para editarse, así que cachearla dejaría
+  // una entrada residual que ningún Cancelar/Guardar de este flujo
+  // llega a limpiar) y pega sus pasos AL FINAL de
+  // macroArchivo.pasos vía importarPasosMacro (core_macro.ts), que
+  // remapea las letras de Bucle que colisionen con las ya usadas
+  // acá. Nunca se ofrece a sí misma en la lista (ver
+  // crearListaImportarMacro).
+  // ----------------------------------
+
+  const alAlternarImportar = (): void => {
+    importarAbierto = !importarAbierto;
+
+    if (importarAbierto) {
+      idPasoExpandido = null;
+      idMenuAbierto = null;
+      grabacionInicioAbierto = false;
+    }
+
+    redibujar();
+  };
+
+  async function alImportarMacro(nombreOrigen: string): Promise<void> {
+    try {
+      const macroArchivoBackend = await invoke("macro_leer", {
+        nombre: nombreOrigen,
+      });
+
+      const macroOrigen = await macroArchivoDesdeBackend(
+        macroArchivoBackend as Parameters<typeof macroArchivoDesdeBackend>[0],
+      );
+
+      const pasosImportados = importarPasosMacro(
+        macroOrigen.pasos,
+        macroArchivo.pasos,
+      );
+
+      macroArchivo.pasos.push(...pasosImportados);
+
+      importarAbierto = false;
+
+      guardarYRedibujar();
+    } catch (error) {
+      console.error("❌ No se pudo importar la macro:", error);
+    }
+  }
 
   // ----------------------------------
   // 🖱️ ARRASTRE DE LA BARRA DE TITULO
@@ -1558,6 +1625,7 @@ function montarEditor(
     idPasoExpandido = null;
     grabacionInicioAbierto = false;
     estadoInicioGrabacion = null;
+    importarAbierto = false;
 
     redibujar();
   }
@@ -1766,6 +1834,11 @@ function montarEditor(
         textoTeclaGrabacion,
         alAlternarGrabacionInicio,
         redibujar,
+        importarAbierto,
+        alAlternarImportar,
+        (nombreOrigen) => {
+          alImportarMacro(nombreOrigen);
+        },
       ),
     );
 
@@ -1846,6 +1919,7 @@ function montarEditor(
             idMenuAbierto = null;
             grabacionInicioAbierto = false;
             estadoInicioGrabacion = null;
+            importarAbierto = false;
 
             redibujar();
           },
@@ -1854,6 +1928,7 @@ function montarEditor(
             idPasoExpandido = null;
             grabacionInicioAbierto = false;
             estadoInicioGrabacion = null;
+            importarAbierto = false;
 
             redibujar();
           },
@@ -2122,7 +2197,12 @@ function montarEditor(
     limpiarClickAfueraActual?.();
     limpiarClickAfueraActual = null;
 
-    if (idMenuAbierto || idPasoExpandido || grabacionInicioAbierto) {
+    if (
+      idMenuAbierto ||
+      idPasoExpandido ||
+      grabacionInicioAbierto ||
+      importarAbierto
+    ) {
       const cerrarCajasAnidadas = (): void => {
         document.removeEventListener("click", cerrarAlClickFuera, true);
         document.removeEventListener("keydown", cerrarAlEsc, true);
@@ -2133,13 +2213,14 @@ function montarEditor(
         idPasoExpandido = null;
         grabacionInicioAbierto = false;
         estadoInicioGrabacion = null;
+        importarAbierto = false;
 
         redibujar();
       };
 
       const cerrarAlClickFuera = (evento: MouseEvent): void => {
         const menuAbierto = popup.querySelector<HTMLElement>(
-          ".popup-lista, .popup-macro-editor-detalle, .popup-macro-grabacion-grupo[data-abierto='true']",
+          ".popup-lista, .popup-macro-editor-detalle, .popup-macro-grabacion-grupo[data-abierto='true'], .popup-macro-importar-grupo[data-abierto='true']",
         );
 
         const objetivo = evento.target as Node;
@@ -3192,6 +3273,86 @@ function crearListaTipoPaso(
 }
 
 // ======================================================
+// 📥 LISTA DE MACROS PARA IMPORTAR (desplegada por "📥 Importar
+// Macro", panel Funciones)
+// ------------------------------------------------------
+// Mismo patrón que crearListaMacros (comp_popup_macro_accion.ts):
+// carga con invoke("macro_listar") y arma un botón por nombre.
+// Excluye SIEMPRE a la macro actualmente abierta en el editor —
+// importarse a sí misma no tiene sentido y además rompería el
+// remapeo de letras (origen y destino serían la misma macro).
+// Clic en un nombre dispara onSeleccionar(nombre); cerrar la caja
+// (colapsarla, no ocultar el popup entero — a diferencia del popup
+// de columna Acción, el editor es fijo, ver mostrarPopupFijo) es
+// responsabilidad del llamador tras importar.
+// ======================================================
+
+function crearListaImportarMacro(
+  nombreMacroActual: string,
+  onSeleccionar: (nombreOrigen: string) => void,
+): HTMLElement {
+  const caja = document.createElement("div");
+
+  caja.className = "popup-caja-interna popup-macro-importar-lista";
+
+  const cargando = document.createElement("div");
+
+  cargando.className = "popup-perfil-nombre";
+  cargando.textContent = "Cargando...";
+
+  caja.append(cargando);
+
+  invoke<string[]>("macro_listar")
+    .then((macros) => {
+      const disponibles = macros.filter(
+        (nombre) => nombre !== nombreMacroActual,
+      );
+
+      caja.innerHTML = "";
+
+      if (disponibles.length === 0) {
+        const vacio = document.createElement("div");
+
+        vacio.className = "popup-perfil-nombre";
+        vacio.textContent = "No hay otras macros guardadas";
+
+        caja.append(vacio);
+
+        return;
+      }
+
+      disponibles.forEach((nombre) => {
+        const boton = document.createElement("button");
+
+        boton.className = "ui-btn";
+        boton.textContent = nombre;
+
+        boton.addEventListener("click", (eventoClick) => {
+          eventoClick.stopPropagation();
+
+          onSeleccionar(nombre);
+        });
+
+        caja.append(boton);
+      });
+    })
+    .catch((error) => {
+      console.error("❌ No se pudo obtener la lista de macros:", error);
+
+      caja.innerHTML = "";
+
+      const fallo = document.createElement("div");
+
+      fallo.className = "popup-perfil-nombre";
+      fallo.textContent = "No se pudo cargar la lista";
+
+      caja.append(fallo);
+    });
+
+  return caja;
+}
+
+// ======================================================
 // 📌 PANEL "FUNCIONES" (columna izquierda fija, 7 tipos)
 // ------------------------------------------------------
 // Antes vivía al pie del popup (crearMenuAgregarPaso); desde la
@@ -3209,6 +3370,9 @@ function crearPanelFunciones(
   textoTeclaGrabacion: string | null,
   onAlternarGrabacionInicio: () => void,
   onCambiarEstadoInicio: () => void,
+  importarAbierto: boolean,
+  onAlternarImportar: () => void,
+  onImportarMacro: (nombreOrigen: string) => void,
 ): HTMLElement {
   const panel = document.createElement("div");
 
@@ -3254,6 +3418,43 @@ function crearPanelFunciones(
   }
 
   panel.append(grupoGrabar);
+
+  // ----------------------------------
+  // 📥 GRUPO "Importar Macro" — debajo de "Grabar Macro"
+  // ------------------------------------------------------
+  // Mismo criterio que grupoGrabar: botón + caja anidada en un
+  // mismo contenedor con data-abierto, para que el querySelector
+  // de "click afuera" (dibujar()) lo detecte como una unidad y el
+  // click en el propio botón (para cerrarlo) no se interprete como
+  // "afuera" antes de que corra su propio toggle.
+  // ----------------------------------
+  const grupoImportar = document.createElement("div");
+
+  grupoImportar.className = "popup-macro-importar-grupo";
+
+  grupoImportar.dataset.abierto = importarAbierto ? "true" : "false";
+
+  const botonImportar = document.createElement("button");
+
+  botonImportar.className = "ui-btn popup-macro-boton-importar";
+  botonImportar.dataset.activo = importarAbierto ? "true" : "false";
+  botonImportar.textContent = "📥 Importar Macro";
+
+  botonImportar.addEventListener("click", (eventoClick) => {
+    eventoClick.stopPropagation();
+
+    onAlternarImportar();
+  });
+
+  grupoImportar.append(botonImportar);
+
+  if (importarAbierto) {
+    grupoImportar.append(
+      crearListaImportarMacro(macroArchivo.nombre, onImportarMacro),
+    );
+  }
+
+  panel.append(grupoImportar);
 
   const subtitulo = document.createElement("span");
 

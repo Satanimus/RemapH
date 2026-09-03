@@ -44,6 +44,11 @@ export interface OpcionesExtraConfig {
   onDuplicar: () => void;
   onEliminar: () => void;
   requiereConfirmacion: boolean;
+  // Color ya asignado a la fila (clave de --tag-<valor>, ver
+  // COLOR_OPCIONES en comp_popup_abrir.ts). Si viene vacío/undefined
+  // (encabezado con selección múltiple, separador) el botón se queda
+  // con el ícono 🎨 genérico.
+  colorActual?: string;
 }
 
 export function crearBotonesOpcionesExtra(
@@ -58,6 +63,15 @@ export function crearBotonesOpcionesExtra(
     titulo: "Color",
     clase: "opciones-boton-color",
   });
+
+  if (config.colorActual) {
+    const muestra = document.createElement("span");
+
+    muestra.className = "color-control-muestra";
+    muestra.style.background = `var(--tag-${config.colorActual})`;
+
+    botonColor.replaceChildren(muestra);
+  }
 
   botonColor.addEventListener("click", (evento) => {
     config.onAbrirColor(evento);
@@ -78,6 +92,8 @@ export function crearBotonesOpcionesExtra(
     titulo: "Eliminar",
     clase: "opciones-boton-eliminar",
   });
+
+  botonEliminar.classList.add("boton-peligro");
 
   let confirmando = false;
 
@@ -188,6 +204,7 @@ export function crearOpciones(
           reconstruirTabla();
         },
         requiereConfirmacion: filaTieneAccion(filaPerfil),
+        colorActual: filaPerfil.color,
       }),
     );
   }

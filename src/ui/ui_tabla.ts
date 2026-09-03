@@ -125,7 +125,27 @@ export function crearTabla(alModificar: () => void): HTMLElement {
       return;
     }
 
+    // [FIX] replaceChildren() sin argumentos borraba TODOS los hijos,
+    // incluido el .divisor-columna que activarRedimensionColumnas()
+    // inserta una sola vez al montar la cabecera — por eso la celda
+    // Opciones se quedaba sin arrastrable para redimensionar (a
+    // diferencia de las demás columnas) apenas se llamaba esta
+    // función. Se preserva y se vuelve a anexar al final.
+    const divisorExistente = celdaOpcionesCabecera.querySelector(
+      ".divisor-columna",
+    );
+
     celdaOpcionesCabecera.replaceChildren();
+
+    // Mismo wrapper .opciones-celda que usan fila (comp_opciones.ts)
+    // y separador (ui_separador.ts): sin él, el toggle "⁝" y los 3
+    // extra quedaban como hijos directos de .cabecera-celda y
+    // perdían el gap/ancho que da .opciones-celda (styl_tabla.css)
+    // — los íconos del encabezado no quedaban alineados con los de
+    // las filas de abajo.
+    const contenedorOpciones = document.createElement("div");
+
+    contenedorOpciones.className = "opciones-celda";
 
     const boton = crearBoton({
       texto: "⁝",
@@ -137,7 +157,7 @@ export function crearTabla(alModificar: () => void): HTMLElement {
       alternarOpcionesColumna();
     });
 
-    celdaOpcionesCabecera.append(boton);
+    contenedorOpciones.append(boton);
 
     if (opcionesColumnaEstaExpandida()) {
       const seleccionadas = obtenerSeleccionadasTabla();
@@ -169,7 +189,7 @@ export function crearTabla(alModificar: () => void): HTMLElement {
           alModificar();
           reconstruirTabla();
         },
-        requiereConfirmacion: false,
+        requiereConfirmacion: true,
       });
 
       extra
@@ -178,7 +198,13 @@ export function crearTabla(alModificar: () => void): HTMLElement {
           botonExtra.disabled = seleccionadas.length === 0;
         });
 
-      celdaOpcionesCabecera.append(extra);
+      contenedorOpciones.append(extra);
+    }
+
+    celdaOpcionesCabecera.append(contenedorOpciones);
+
+    if (divisorExistente) {
+      celdaOpcionesCabecera.append(divisorExistente);
     }
   }
 

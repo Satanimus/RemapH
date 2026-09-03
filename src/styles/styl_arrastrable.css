@@ -17,18 +17,34 @@
 
 /* ==========================
    Indicador ⁝⁝ junto al botón ⟫
+   ------------------------------
+   Selector duplicado (.arr-asa--activa.arr-asa--activa) para subir
+   la especificidad a propósito: el botón asa de cada ventana trae
+   su propia clase con font-size propio (ej. .coordenadas-asa en el
+   gestor de coordenadas), misma especificidad que una clase simple
+   — sin este empate a favor, cuál gana depende del orden de carga
+   entre archivos CSS y el "⁝" propio del botón podía seguir
+   colándose ahí. justify-content: center + sin margin en el ::before
+   para que el indicador quede centrado en el botón (el "⁝" real
+   sigue ahí pero a font-size 0, no aporta ancho).
    ========================== */
 
-.arr-asa--activa {
+.arr-asa--activa.arr-asa--activa {
     display: inline-flex;
     align-items: center;
+    justify-content: center;
+    /* Oculta el "⁝" propio del botón (texto real, no se puede
+       vaciar por CSS) sin afectar layout/hit-testing — el ::before
+       de abajo restaura su propio tamaño para seguir mostrando
+       "⁝⁝" solo. */
+    font-size: 0;
 }
 
-.arr-asa--activa::before {
+.arr-asa--activa.arr-asa--activa::before {
     content: "⁝⁝";
-    margin-right: var(--gap4);
     color: var(--text-highlight);
     font-weight: bold;
+    font-size: var(--fs13);
     line-height: 1;
 }
 

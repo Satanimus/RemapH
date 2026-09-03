@@ -391,6 +391,119 @@ export function clonarPasoMacro(paso: PasoMacro): PasoMacro {
 }
 
 // ======================================================
+// 📥 IMPORTAR PASOS DE OTRA MACRO
+// ------------------------------------------------------
+// A diferencia de clonarPasoMacro (Duplicar), acá SÍ hay que
+// preservar la relación Bucle→Marcador de la macro de origen —
+// solo se renombran las letras que ya estén en uso en
+// pasosDestino, para no generar un choque de dos Bucles con la
+// misma letra al pegar los pasos importados al final. Se arma
+// un mapa letra-vieja→letra-nueva una sola vez (recorriendo los
+// Bucles de origen en orden) y se aplica tanto a
+// bucleMarcadorDestino (en el propio paso Bucle) como a
+// marcador (en la fila que ese Bucle señala como destino) —
+// ambos campos guardan la MISMA letra en la macro de origen.
+// Letras que no colisionan con pasosDestino se mantienen igual.
+// ======================================================
+
+export function importarPasosMacro(
+  pasosOrigen: PasoMacro[],
+  pasosDestino: PasoMacro[],
+): PasoMacro[] {
+  const usadasEnDestino = new Set(
+    pasosDestino
+      .filter((p) => p.tipo === "bucle")
+      .map((p) => p.bucleMarcadorDestino)
+      .filter((m): m is string => m !== null),
+  );
+
+  const mapaLetras = new Map<string, string>();
+
+  // pasosDestino + las letras ya reasignadas en esta misma
+  // importación cuentan como "en uso" para letraBucleDisponible,
+  // así dos Bucles importados con la misma letra de origen no
+  // reciben la misma letra nueva.
+  const letrasEnUso = [...pasosDestino];
+
+  pasosOrigen
+    .filter((p) => p.tipo === "bucle" && p.bucleMarcadorDestino !== null)
+    .forEach((p) => {
+      const letraVieja = p.bucleMarcadorDestino as string;
+
+      if (mapaLetras.has(letraVieja)) {
+        return;
+      }
+
+      if (!usadasEnDestino.has(letraVieja)) {
+        mapaLetras.set(letraVieja, letraVieja);
+
+        return;
+      }
+
+      const letraNueva = letraBucleDisponibleEntre(letrasEnUso);
+
+      mapaLetras.set(letraVieja, letraNueva);
+
+      // Reserva la letra nueva para el resto de esta importación
+      // (no es un Bucle real, solo ocupa el marcador para que
+      // letraBucleDisponibleEntre no la vuelva a ofrecer).
+      letrasEnUso.push({ ...crearPasoMacro("bucle"), bucleMarcadorDestino: letraNueva });
+    });
+
+  return pasosOrigen.map((paso) => {
+    const clonado = clonarPasoMacro(paso);
+
+    if (paso.marcador !== null && mapaLetras.has(paso.marcador)) {
+      clonado.marcador = mapaLetras.get(paso.marcador) as string;
+    } else {
+      clonado.marcador = paso.marcador;
+    }
+
+    if (paso.tipo === "bucle" && paso.bucleMarcadorDestino !== null) {
+      clonado.bucleMarcadorDestino =
+        mapaLetras.get(paso.bucleMarcadorDestino) ?? paso.bucleMarcadorDestino;
+    }
+
+    return clonado;
+  });
+}
+
+// Misma progresión A..Z, luego A1/B1... que letraBucleDisponible
+// (ui/comp_popup_macro_editor.ts) pero recibiendo la lista de
+// pasos "en uso" por parámetro en vez de un array fijo — se
+// duplica acá (en vez de importar desde el editor) porque
+// core_macro.ts es el módulo de más bajo nivel y no depende de
+// la capa de componentes.
+function letraBucleDisponibleEntre(pasos: PasoMacro[]): string {
+  const usadas = new Set(
+    pasos
+      .filter((p) => p.tipo === "bucle")
+      .map((p) => p.bucleMarcadorDestino)
+      .filter((m): m is string => m !== null),
+  );
+
+  const ALFABETO = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+
+  for (const letra of ALFABETO) {
+    if (!usadas.has(letra)) {
+      return letra;
+    }
+  }
+
+  let indice = 0;
+
+  while (true) {
+    const letra = `${ALFABETO[indice % 26]}${Math.floor(indice / 26) + 1}`;
+
+    if (!usadas.has(letra)) {
+      return letra;
+    }
+
+    indice++;
+  }
+}
+
+// ======================================================
 // 🏷️ TEXTO DE TIPO (panel Funciones, resúmenes)
 // ======================================================
 

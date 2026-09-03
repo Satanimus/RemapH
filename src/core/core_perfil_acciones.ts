@@ -47,20 +47,25 @@ export function clonarFilaPorId(id: string): void {
 
 // ======================================================
 // 🎨 COLOREAR FILA POR ID
+// ------------------------------------------------------
+// Sin filtrar por esSeparador: filas y separadores comparten
+// el campo color (ver FilaPerfil/SeparadorPerfil en
+// core_perfil.ts), así que un id de cualquiera de los dos
+// tipos se colorea igual — usado también por "colorear
+// seleccionadas" del encabezado (comp_popup_abrir.ts), que
+// puede traer ids mezclados.
 // ======================================================
 
 export function colorearFilaPorId(id: string, color: string): void {
   const perfil = obtenerPerfilUi();
 
-  const fila = perfil.filas.find(
-    (item): item is FilaPerfil => !esSeparador(item) && item.id === id,
-  );
+  const item = perfil.filas.find((item) => item.id === id);
 
-  if (!fila) {
+  if (!item) {
     return;
   }
 
-  fila.color = color;
+  item.color = color;
 }
 
 // ======================================================
