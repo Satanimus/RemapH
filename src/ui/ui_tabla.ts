@@ -112,6 +112,76 @@ export function crearTabla(alModificar: () => void): HTMLElement {
 
   let celdaOpcionesCabecera: HTMLElement | null = null;
 
+  // [FIX bug 2/3] Antes esta celda se poblaba una sola vez, acá
+  // mismo, al crear la cabecera — como la cabecera nunca se vuelve
+  // a tocar en reconstruirTabla() (solo se reconstruyen filas/
+  // carrilLista), togglear "⁝" nunca hacía aparecer los 3 botones
+  // "...seleccionados" (bug 2), y por lo tanto tampoco se activaba
+  // el min-width:150px de la celda (bug 3, parte encabezado). Se
+  // extrae a función reusable, llamada acá y de nuevo dentro de
+  // reconstruirTabla().
+  function actualizarCeldaOpcionesCabecera(): void {
+    if (!celdaOpcionesCabecera) {
+      return;
+    }
+
+    celdaOpcionesCabecera.replaceChildren();
+
+    const boton = crearBoton({
+      texto: "⁝",
+      titulo: "Opciones",
+      clase: "opciones-asa",
+    });
+
+    boton.addEventListener("click", () => {
+      alternarOpcionesColumna();
+    });
+
+    celdaOpcionesCabecera.append(boton);
+
+    if (opcionesColumnaEstaExpandida()) {
+      const seleccionadas = obtenerSeleccionadasTabla();
+
+      const extra = crearBotonesOpcionesExtra({
+        onAbrirColor: (evento) => {
+          abrirPopupColorSeleccionadas(
+            evento,
+            obtenerSeleccionadasTabla(),
+            () => {
+              alModificar();
+              reconstruirTabla();
+            },
+          );
+        },
+        onDuplicar: () => {
+          obtenerSeleccionadasTabla().forEach((id) => {
+            clonarFilaPorId(id);
+          });
+
+          alModificar();
+          reconstruirTabla();
+        },
+        onEliminar: () => {
+          obtenerSeleccionadasTabla().forEach((id) => {
+            eliminarFilaPorId(id);
+          });
+
+          alModificar();
+          reconstruirTabla();
+        },
+        requiereConfirmacion: false,
+      });
+
+      extra
+        .querySelectorAll<HTMLButtonElement>(".ui-btn")
+        .forEach((botonExtra) => {
+          botonExtra.disabled = seleccionadas.length === 0;
+        });
+
+      celdaOpcionesCabecera.append(extra);
+    }
+  }
+
   COLUMNAS.forEach((col) => {
     const celda = document.createElement("div");
 
@@ -124,61 +194,7 @@ export function crearTabla(alModificar: () => void): HTMLElement {
     celda.style.flexBasis = col.ancho;
 
     if (col.id === "opciones") {
-      const boton = crearBoton({
-        texto: "⁝",
-        titulo: "Opciones",
-        clase: "opciones-asa",
-      });
-
-      boton.addEventListener("click", () => {
-        alternarOpcionesColumna();
-      });
-
-      celda.append(boton);
-
       celdaOpcionesCabecera = celda;
-
-      if (opcionesColumnaEstaExpandida()) {
-        const seleccionadas = obtenerSeleccionadasTabla();
-
-        const extra = crearBotonesOpcionesExtra({
-          onAbrirColor: (evento) => {
-            abrirPopupColorSeleccionadas(
-              evento,
-              obtenerSeleccionadasTabla(),
-              () => {
-                alModificar();
-                reconstruirTabla();
-              },
-            );
-          },
-          onDuplicar: () => {
-            obtenerSeleccionadasTabla().forEach((id) => {
-              clonarFilaPorId(id);
-            });
-
-            alModificar();
-            reconstruirTabla();
-          },
-          onEliminar: () => {
-            obtenerSeleccionadasTabla().forEach((id) => {
-              eliminarFilaPorId(id);
-            });
-
-            alModificar();
-            reconstruirTabla();
-          },
-          requiereConfirmacion: false,
-        });
-
-        extra
-          .querySelectorAll<HTMLButtonElement>(".ui-btn")
-          .forEach((botonExtra) => {
-            botonExtra.disabled = seleccionadas.length === 0;
-          });
-
-        celda.append(extra);
-      }
     } else {
       celda.textContent = col.titulo;
 
@@ -476,6 +492,8 @@ export function crearTabla(alModificar: () => void): HTMLElement {
         }
       }
     });
+
+    actualizarCeldaOpcionesCabecera();
 
     actualizarRecorte();
   };

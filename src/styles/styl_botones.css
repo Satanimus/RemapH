@@ -55,13 +55,15 @@
 }
 
 /* ======================================================
-   🎨 BOTONES DENTRO DE FILA
+   🎨 BOTONES DENTRO DE FILA (y cabecera de tabla — mismo
+   criterio ghost para el botón Opciones del encabezado)
    ------------------------------------------------------
    En reposo: transparentes y sin borde visible.
    Hover / popup abierto / capturando: brillo tenue + borde cyan.
    ====================================================== */
 
-.fila .ui-btn:not(:where(.estado-toggle)) {
+.fila .ui-btn:not(:where(.estado-toggle)),
+.cabecera .ui-btn:not(:where(.estado-toggle)) {
 
     background: transparent;
 
@@ -74,7 +76,9 @@
 }
 
 .fila .ui-btn:not(:where(.estado-toggle)):hover,
-.fila .ui-btn:not(:where(.estado-toggle))[data-abierto="true"] {
+.fila .ui-btn:not(:where(.estado-toggle))[data-abierto="true"],
+.cabecera .ui-btn:not(:where(.estado-toggle)):hover,
+.cabecera .ui-btn:not(:where(.estado-toggle))[data-abierto="true"] {
 
     background: color-mix(in srgb, var(--highlight) var(--botones-ghost-opacidad-hover), transparent);
 

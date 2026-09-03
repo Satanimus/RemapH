@@ -81,6 +81,31 @@ export function crearBotonesOpcionesExtra(
 
   let confirmando = false;
 
+  // Cancela la doble confirmación: clic en cualquier otro lugar o
+  // cualquier tecla la descarta y el botón vuelve a su estado normal
+  // (no debe quedar "pegado" en confirmación tras otras acciones).
+  const cancelarConfirmacion = (): void => {
+    confirmando = false;
+
+    botonEliminar.textContent = "X";
+    botonEliminar.classList.remove("opciones-boton-eliminar--confirmando");
+
+    document.documentElement.style.removeProperty(
+      "--ancho-opciones-confirmando",
+    );
+
+    document.removeEventListener("pointerdown", alHacerClickFuera, true);
+    document.removeEventListener("keydown", cancelarConfirmacion, true);
+  };
+
+  const alHacerClickFuera = (evento: Event): void => {
+    if (evento.target instanceof Node && botonEliminar.contains(evento.target)) {
+      return;
+    }
+
+    cancelarConfirmacion();
+  };
+
   botonEliminar.addEventListener("click", () => {
     if (config.requiereConfirmacion && !confirmando) {
       confirmando = true;
@@ -88,7 +113,28 @@ export function crearBotonesOpcionesExtra(
       botonEliminar.textContent = "X Confirmar eliminación";
       botonEliminar.classList.add("opciones-boton-eliminar--confirmando");
 
+      // Mide el botón ya expandido (⁝/Color/Duplicar de esta celda
+      // quedan ocultos por CSS al agregar la clase de arriba, ver
+      // styl_tabla.css) y publica ese ancho + el padding horizontal
+      // de la celda (2 × var(--gap8) = 16px) para que TODA la
+      // columna Opciones (cabecera, filas, separadores) lo adopte
+      // por igual — ver selector .viewport:has(...) en
+      // styl_tabla.css.
+      const anchoBoton = botonEliminar.getBoundingClientRect().width;
+
+      document.documentElement.style.setProperty(
+        "--ancho-opciones-confirmando",
+        `${anchoBoton + 16}px`,
+      );
+
+      document.addEventListener("pointerdown", alHacerClickFuera, true);
+      document.addEventListener("keydown", cancelarConfirmacion, true);
+
       return;
+    }
+
+    if (confirmando) {
+      cancelarConfirmacion();
     }
 
     config.onEliminar();

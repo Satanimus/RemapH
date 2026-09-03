@@ -537,10 +537,16 @@
     max-width: 100%;
 }
 
-/* El botón Opciones del separador no debe estirarse con la columna:
-   el ancho lo da el contenido (igual que en la fila normal, donde
-   el div.opciones-celda actúa como contenedor que se contrae). */
-.celda.separador-opciones .ui-btn {
+/* Los botones dentro de la columna Opciones (toggle "⁝" + los 3
+   extra) no deben estirarse con el ancho de la celda: el ancho lo
+   da el contenido, ancla por igual a fila normal y separador (ambos
+   envuelven su contenido en div.opciones-celda, ver comp_opciones.ts/
+   ui_separador.ts) — antes esta regla solo cubría el separador
+   (.celda.separador-opciones .ui-btn), así que en la fila normal
+   .celda .ui-btn (arriba, width:100%) ganaba: el toggle se ensanchaba
+   al expandirse la columna y los 3 extra competían por el ancho
+   sobrante, dejando a Eliminar recortado por overflow:hidden. */
+.opciones-celda .ui-btn {
 
     width: fit-content;
 
@@ -551,8 +557,8 @@
     border-color: transparent;
 }
 
-.celda.separador-opciones .ui-btn:hover,
-.celda.separador-opciones .ui-btn[data-abierto="true"] {
+.opciones-celda .ui-btn:hover,
+.opciones-celda .ui-btn[data-abierto="true"] {
 
     background: color-mix(in srgb, var(--highlight) 8%, transparent);
 
@@ -565,8 +571,8 @@
    ====================================================== */
 
 /* E.1 — contenedor del botón ⁝/Opciones + botones extra.
-   width: fit-content, igual criterio que .celda.separador-opciones
-   .ui-btn, para que no se estire con el ancho de la columna. */
+   width: fit-content, igual criterio que .opciones-celda .ui-btn
+   más arriba, para que no se estire con el ancho de la columna. */
 .opciones-celda {
 
     display: flex;
@@ -590,6 +596,13 @@
     gap: var(--gap4);
 
     overflow: hidden;
+
+    /* flex-shrink: 0 — sin esto, al confirmar eliminación (más abajo)
+       este contenedor podía ser comprimido por el algoritmo de flexbox
+       (su overflow:hidden habilita ancho mínimo automático 0) y sus
+       botones quedaban recortados/invisibles en vez de mantenerse
+       enteros (bug 1). */
+    flex-shrink: 0;
 
     transition: width var(--speed), opacity var(--speed);
 }
@@ -629,6 +642,16 @@
 /* E.5 — Regla 10: ícono "X" blanco en reposo (ya lo da el color
    base de .ui-btn, sin regla aparte); hover rojo solo si no está
    deshabilitado. */
+/* [bug 2] Borde rojo por defecto (no solo en hover): Eliminar es una
+   acción destructiva y debe distinguirse de Color/Duplicar (borde
+   cyan --highlight) también en reposo. Mismo criterio para la fila,
+   el separador y "Eliminar seleccionadas" del encabezado — los tres
+   comparten esta clase vía crearBotonesOpcionesExtra. */
+.opciones-boton-eliminar {
+
+    border-color: var(--highlight-red);
+}
+
 .opciones-boton-eliminar:not(:disabled):hover {
 
     color: var(--text-red);
@@ -663,6 +686,32 @@
 .celda[data-columna="opciones"]:has(.opciones-extra) {
 
     min-width: 150px;
+}
+
+/* [bug 1, vuelta 2] Mientras Eliminar pide confirmación:
+   - se ocultan ⁝/Color/Duplicar de ESA celda (:has apuntando a
+     .opciones-celda) para que el ancho necesario sea solo el del
+     botón de confirmación, no los 4 juntos.
+   - :has(...) en .viewport (contiene .cabecera y .filas, ver
+     ui_tabla.ts) detecta la confirmación esté donde esté y aplica
+     el mismo ancho (--ancho-opciones-confirmando, seteado por JS
+     en comp_opciones.ts al medir el botón) a TODAS las celdas
+     Opciones — cabecera, todas las filas y separadores — para que
+     la columna completa mida siempre lo mismo y no empuje solo la
+     fila que confirma hacia la derecha. */
+.opciones-celda:has(.opciones-boton-eliminar--confirmando) .opciones-asa,
+.opciones-celda:has(.opciones-boton-eliminar--confirmando) .opciones-boton-color,
+.opciones-celda:has(.opciones-boton-eliminar--confirmando) .opciones-boton-duplicar {
+
+    display: none;
+}
+
+.viewport:has(.opciones-boton-eliminar--confirmando) .cabecera-celda[data-columna="opciones"],
+.viewport:has(.opciones-boton-eliminar--confirmando) .celda[data-columna="opciones"] {
+
+    flex-basis: var(--ancho-opciones-confirmando) !important;
+
+    min-width: var(--ancho-opciones-confirmando);
 }
 
 .nota {
