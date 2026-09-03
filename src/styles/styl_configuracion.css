@@ -297,13 +297,15 @@
   white-space: nowrap;
 }
 
+/* B: encabezado con fondo claro y letra oscura, para diferenciarse
+   de las filas de título (más abajo) y del resto de la tabla. */
 .configuracion-tabla-arbol thead th {
   position: sticky;
   top: 0;
   z-index: 1;
 
-  background: var(--panel2);
-  color: var(--text-disabled);
+  background: color-mix(in srgb, var(--text) 45%, var(--panel2) 55%);
+  color: var(--bg);
   text-align: left;
   font-size: var(--fs13);
   font-weight: 600;
@@ -327,6 +329,21 @@
 
 .configuracion-tabla-arbol tbody tr:hover {
   background: color-mix(in srgb, var(--tabla-fondo-color-hover) var(--tabla-fondo-opacidad-hover), transparent);
+}
+
+/* A1: fila de Título (nivel 1) con el mismo gris claro que usan los
+   subtítulos de la pestaña Teclas (.configuracion-subtitulo), para
+   que resalte como agrupador. Va después de nth-child/hover (misma
+   especificidad) a propósito, para ganarles en el orden de cascada. */
+.configuracion-tabla-arbol tbody tr.configuracion-arbol-titulo {
+  background: var(--panel2);
+}
+
+/* A4: separación extra antes de una fila hija (nivel 3) — refuerza
+   la jerarquía de árbol en filas de nivel 2 que agrupan un nivel 3
+   debajo (ej. "Separador" → "Fondo de sus filas"). */
+.configuracion-tabla-arbol tbody tr.configuracion-arbol-con-hijo td {
+  padding-bottom: calc(var(--gap8) * 2);
 }
 
 /* F6: cuadradito de color en la columna Valor por Defecto. */
@@ -372,15 +389,21 @@
 /* E9: botón ghost puro, mismo criterio que el resto de botones
    ghost del proyecto (sin fondo ni borde en reposo). */
 .configuracion-arbol-expandir {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
   background: transparent;
   border: 1px solid transparent;
   border-radius: var(--r4);
   color: var(--text-disabled);
   font-family: var(--font);
-  font-size: var(--fs13);
+  font-size: var(--fs16);
   cursor: pointer;
   padding: 0;
   margin-right: var(--gap8);
+  vertical-align: middle;
   transition:
     border-color .12s ease,
     color .12s ease;

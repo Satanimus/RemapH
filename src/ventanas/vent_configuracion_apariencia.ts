@@ -119,8 +119,8 @@ const ANCHOS_DEFAULT_ARBOL: Record<string, number> = {
 // sangría (Regla 32).
 const SANGRIA_POR_NIVEL: Record<number, string> = {
   1: "0",
-  2: "16px",
-  3: "32px",
+  2: "20px",
+  3: "40px",
 };
 
 // ----------------------------------------------------
@@ -459,11 +459,18 @@ function crearFilaArbol(
 
   const nivel = nodo.entrada.nivel;
 
-  const tdNombre = document.createElement("td");
-  tdNombre.classList.add(`configuracion-arbol-nivel-${nivel}`);
-  tdNombre.style.paddingLeft = SANGRIA_POR_NIVEL[nivel] ?? "0";
-
+  // A3/2-3: Título (nivel 1) no tiene valores propios (hijos siempre
+  // vacíos, ver construirArbol) — se arma como una sola celda que
+  // ocupa las 3 columnas (mismo patrón que montarFilaSubtitulo en
+  // Teclas), sin división de columnas: así el nombre tiene todo el
+  // ancho de la fila disponible antes de partirse en dos líneas.
   if (nivel === 1) {
+    tr.classList.add("configuracion-arbol-titulo");
+
+    const tdTitulo = document.createElement("td");
+    tdTitulo.className = "configuracion-arbol-nivel-1";
+    tdTitulo.colSpan = COLUMNAS_ARBOL.length;
+
     const botonExpandir = document.createElement("button");
     botonExpandir.type = "button";
     botonExpandir.className = "configuracion-arbol-expandir";
@@ -473,13 +480,20 @@ function crearFilaArbol(
       alternarExpandir(botonExpandir, tr, filasMontadas);
     });
 
-    tdNombre.append(
+    tdTitulo.append(
       botonExpandir,
       document.createTextNode(nodo.entrada.nombre_ui),
     );
-  } else {
-    tdNombre.textContent = nodo.entrada.nombre_ui;
+
+    tr.append(tdTitulo);
+
+    return { tr, actualizarColumnas: () => {} };
   }
+
+  const tdNombre = document.createElement("td");
+  tdNombre.classList.add(`configuracion-arbol-nivel-${nivel}`);
+  tdNombre.style.paddingLeft = SANGRIA_POR_NIVEL[nivel] ?? "0";
+  tdNombre.textContent = nodo.entrada.nombre_ui;
 
   // F4: swatches+nombre de tema en vez del join de texto plano
   // (poblado por actualizarColumnas() más abajo, junto con
@@ -496,7 +510,6 @@ function crearFilaArbol(
   const botonPersonalizado = document.createElement("button");
   botonPersonalizado.type = "button";
   botonPersonalizado.className = "configuracion-arbol-personalizado";
-
   tdPersonalizado.append(botonPersonalizado);
 
   // G5/H11: refresca Valor por Defecto y el botón fusionado tras un
@@ -1006,7 +1019,9 @@ export function crearPestanaApariencia(
 
     const filasMontadas: FilaMontada[] = [];
 
-    for (const nodo of arbol) {
+    for (let i = 0; i < arbol.length; i++) {
+      const nodo = arbol[i];
+
       const { tr, actualizarColumnas } = crearFilaArbol(
         nodo,
         filasMontadas,
@@ -1014,6 +1029,13 @@ export function crearPestanaApariencia(
         filasConCambio,
         valoresOriginales,
       );
+
+      // A4: separación extra para una fila de nivel 2 que tiene una
+      // fila hija de nivel 3 debajo (ej. "Separador" → "Fondo de sus
+      // filas"), para reforzar la jerarquía de árbol.
+      if (nodo.entrada.nivel === 2 && arbol[i + 1]?.entrada.nivel === 3) {
+        tr.classList.add("configuracion-arbol-con-hijo");
+      }
 
       filasMontadas.push({ nodo, tr, actualizarColumnas });
       trPorNodo.set(nodo, tr);
