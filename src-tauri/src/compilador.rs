@@ -181,7 +181,7 @@ use crate::perfil_cache::{
     TamanoBotonPortapapeles, TamanoMenu, TriggerCache, UbicacionMenu,
 };
 
-use crate::perfil_json::{perfil_json, AppJson, CoordenadaJson, ItemFilaJson, RemapeoJson};
+use crate::perfil_json::{PerfilJson, AppJson, CoordenadaJson, ItemFilaJson, RemapeoJson};
 
 use serde::Serialize;
 
@@ -226,7 +226,7 @@ pub struct ResultadoCompilacion {
 // ⚙️ COMPILAR
 // ======================================================
 
-pub fn compilar(perfil: &perfil_json) -> ResultadoCompilacion {
+pub fn compilar(perfil: &PerfilJson) -> ResultadoCompilacion {
     let (remapeos, advertencias) = compilar_perfil(perfil);
 
     cache::borrar_cache();
@@ -261,7 +261,7 @@ pub fn compilar(perfil: &perfil_json) -> ResultadoCompilacion {
 // actual del perfil.
 // ======================================================
 
-pub fn compilar_perfil(perfil: &perfil_json) -> (Vec<RemapeoCache>, Vec<AdvertenciaCompilacion>) {
+pub fn compilar_perfil(perfil: &PerfilJson) -> (Vec<RemapeoCache>, Vec<AdvertenciaCompilacion>) {
     let mut advertencias = Vec::new();
 
     let remapeos = perfil
@@ -287,7 +287,7 @@ pub fn compilar_perfil(perfil: &perfil_json) -> (Vec<RemapeoCache>, Vec<Adverten
 fn compilar_remapeo(
     numero_fila: usize,
     remapeo: &RemapeoJson,
-    perfil: &perfil_json,
+    perfil: &PerfilJson,
     advertencias: &mut Vec<AdvertenciaCompilacion>,
 ) -> Option<RemapeoCache> {
     if remapeo.estado != "ON" {
@@ -456,7 +456,7 @@ fn convertir_entrada(trigger: &crate::perfil_json::TriggerJson) -> Vec<InputId> 
 fn convertir_accion(
     numero_fila: usize,
     remapeo: &RemapeoJson,
-    perfil: &perfil_json,
+    perfil: &PerfilJson,
     advertencias: &mut Vec<AdvertenciaCompilacion>,
 ) -> Option<AccionCache> {
     match remapeo.tipo.as_str() {
@@ -519,7 +519,7 @@ fn convertir_accion(
 // descarta — un MenuExpress vacío no se puede abrir (ver spec).
 // ======================================================
 
-fn convertir_menu_express(remapeo: &RemapeoJson, perfil: &perfil_json) -> Option<AccionCache> {
+fn convertir_menu_express(remapeo: &RemapeoJson, perfil: &PerfilJson) -> Option<AccionCache> {
     // Solo filas normales son referenciables por fila_id (mismo
     // criterio de numero_fila en compilar_perfil, Regla 18: los
     // separadores no cuentan ni participan de esta posición).

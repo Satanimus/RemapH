@@ -121,30 +121,6 @@ pub fn obtener(extra: &ExtraCache) -> Vec<String> {
         ExtraCache::Toggle => vec!["TOGGLE [ACCION]".into()],
 
         // ==================================================
-        // 🖱️ DOBLE CLICK
-        // ==================================================
-        ExtraCache::DobleClick => vec!["[ACCION]".into(), "ESPERAR 50".into(), "[ACCION]".into()],
-
-        // ==================================================
-        // 🖱️ CLICK SOSTENIDO
-        // ==================================================
-        ExtraCache::ClickSostenido => vec![
-            "[ACCION_DOWN]".into(),
-            "ESPERAR DETENER".into(),
-            "[ACCION_UP]".into(),
-        ],
-
-        // ==================================================
-        // 📂 ABRIR MINIMIZADO
-        // ==================================================
-        ExtraCache::AbrirMinimizado => vec!["OPEN MINIMIZED".into()],
-
-        // ==================================================
-        // 🪟 POPUP TOGGLE
-        // ==================================================
-        ExtraCache::PopupToggle => vec!["TOGGLE POPUP".into()],
-
-        // ==================================================
         // 🔁 REPETICIÓN DE RUEDA
         // ------------------------------------------------------
         // Este brazo existe únicamente para que el `match` sea

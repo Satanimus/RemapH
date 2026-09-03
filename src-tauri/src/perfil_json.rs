@@ -112,7 +112,7 @@ impl Input {
 // ======================================================
 
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
-pub struct perfil_json {
+pub struct PerfilJson {
     pub filas: Vec<ItemFilaJson>,
 }
 
@@ -215,7 +215,7 @@ pub struct TriggerJson {
 // 🚀 CREAR PERFIL JSON
 // ======================================================
 
-impl perfil_json {
+impl PerfilJson {
     pub fn nuevo() -> Self {
         Self { filas: Vec::new() }
     }
@@ -307,20 +307,6 @@ pub struct CoordenadaJson {
     pub x: Option<f64>,
 
     pub y: Option<f64>,
-}
-
-impl CoordenadaJson {
-    pub fn nueva() -> Self {
-        Self {
-            activa: false,
-            ubicacion: "absoluta".to_string(),
-            modo_ventana: "pixeles".to_string(),
-            punto_referencia: "sup_izq".to_string(),
-            post_accion: "final".to_string(),
-            x: None,
-            y: None,
-        }
-    }
 }
 
 // ======================================================

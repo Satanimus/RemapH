@@ -112,7 +112,7 @@
 
 use crate::cache;
 use crate::compilador;
-use crate::perfil_json::{perfil_json, ItemFilaJson};
+use crate::perfil_json::{PerfilJson, ItemFilaJson};
 use crate::runtime;
 use crate::usuario;
 use std::collections::HashMap;
@@ -166,7 +166,7 @@ pub fn obtener_perfil_actual() -> Result<ResultadoPerfilInicial, String> {
     let ruta = usuario::perfil_actual()?;
 
     if !ruta.exists() {
-        let perfil = perfil_json::nuevo();
+        let perfil = PerfilJson::nuevo();
 
         guardar_en_disco(&perfil, &ruta)?;
 
@@ -192,7 +192,7 @@ pub fn obtener_perfil_actual() -> Result<ResultadoPerfilInicial, String> {
 // 💾 GUARDAR PERFIL
 // ======================================================
 
-pub fn guardar_perfil(perfil: perfil_json) -> Result<ResultadoCompilacion, String> {
+pub fn guardar_perfil(perfil: PerfilJson) -> Result<ResultadoCompilacion, String> {
     let ruta = usuario::perfil_actual()?;
 
     guardar_en_disco(&perfil, &ruta)?;
@@ -242,7 +242,7 @@ pub fn restaurar_perfil_actual() -> Result<ResultadoPerfil, String> {
     let ruta = usuario::perfil_actual()?;
 
     if !ruta.exists() {
-        let perfil = perfil_json::nuevo();
+        let perfil = PerfilJson::nuevo();
 
         guardar_en_disco(&perfil, &ruta)?;
     }
@@ -264,7 +264,7 @@ pub fn restaurar_perfil_actual() -> Result<ResultadoPerfil, String> {
 // colisiones igual que en renombrar_perfil().
 // ======================================================
 
-pub fn guardar_perfil_como(nombre: String, perfil: perfil_json) -> Result<ResultadoPerfil, String> {
+pub fn guardar_perfil_como(nombre: String, perfil: PerfilJson) -> Result<ResultadoPerfil, String> {
     let nombre = nombre.trim();
 
     if nombre.is_empty() {
@@ -377,7 +377,7 @@ pub fn crear_perfil_nuevo() -> Result<ResultadoPerfil, String> {
 
     let nombre = siguiente_nombre("Default")?;
 
-    let perfil = perfil_json::nuevo();
+    let perfil = PerfilJson::nuevo();
 
     let ruta = usuario::ruta_perfil(&nombre)?;
 
@@ -427,7 +427,7 @@ pub fn seleccionar_perfil(nombre: String) -> Result<ResultadoPerfil, String> {
 // ======================================================
 
 fn resultado_perfil(
-    perfil: perfil_json,
+    perfil: PerfilJson,
     nombre: String,
     advertencias: Option<Vec<AdvertenciaCompilacion>>,
 ) -> Result<ResultadoPerfil, String> {
@@ -473,7 +473,7 @@ fn siguiente_nombre(base: &str) -> Result<String, String> {
 // ======================================================
 // 💾 GUARDAR EN DISCO
 // ======================================================
-fn guardar_en_disco(perfil: &perfil_json, ruta: &Path) -> Result<(), String> {
+fn guardar_en_disco(perfil: &PerfilJson, ruta: &Path) -> Result<(), String> {
     let json = serde_json::to_string_pretty(perfil).map_err(|error| error.to_string())?;
 
     fs::write(ruta, json).map_err(|error| error.to_string())?;
@@ -484,7 +484,7 @@ fn guardar_en_disco(perfil: &perfil_json, ruta: &Path) -> Result<(), String> {
 // ======================================================
 // 📂 CARGAR DESDE DISCO
 // ======================================================
-fn cargar_desde_disco(ruta: &Path) -> Result<perfil_json, String> {
+fn cargar_desde_disco(ruta: &Path) -> Result<PerfilJson, String> {
     let json = fs::read_to_string(ruta).map_err(|error| error.to_string())?;
 
     serde_json::from_str(&json).map_err(|error| error.to_string())

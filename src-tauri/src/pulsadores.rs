@@ -361,24 +361,8 @@ pub fn todos() -> &'static [Pulsador] {
 // 🔄 CONVERSIONES
 // ======================================================
 
-pub fn nativo_a_interno(nativo: &str) -> Option<&'static str> {
-    por_nativo(nativo).map(|p| p.interno.as_str())
-}
-
-pub fn interno_a_nativo(interno: &str) -> Option<&'static str> {
-    por_interno(interno).map(|p| p.nativo.as_str())
-}
-
 pub fn interno_a_interception(interno: &str) -> Option<&'static str> {
     por_interno(interno).map(|p| p.interception.as_str())
-}
-
-pub fn interno_a_fuente(interno: &str) -> Option<&'static str> {
-    por_interno(interno).map(|p| p.fuente.as_str())
-}
-
-pub fn interno_a_ui(interno: &str) -> Option<&'static str> {
-    por_interno(interno).map(|p| p.ui.as_str())
 }
 
 pub fn interception_a_interno(interception: &str) -> Option<&'static str> {
@@ -387,10 +371,6 @@ pub fn interception_a_interno(interception: &str) -> Option<&'static str> {
 
 pub fn scancode_a_interno(scancode: u16, extendida: bool) -> Option<&'static str> {
     por_scancode(scancode, extendida).map(|p| p.interno.as_str())
-}
-
-pub fn ui_a_interno(ui: &str) -> Option<&'static str> {
-    por_ui(ui).map(|p| p.interno.as_str())
 }
 
 // ======================================================

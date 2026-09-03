@@ -544,29 +544,10 @@ pub enum IniciarVentana {
     Maximizado,
 }
 
-impl IniciarVentana {
-    pub fn como_str(&self) -> &'static str {
-        match self {
-            IniciarVentana::Ventana => "ventana",
-            IniciarVentana::Minimizado => "minimizado",
-            IniciarVentana::Maximizado => "maximizado",
-        }
-    }
-}
-
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum InstanciasAbrir {
     Unica,
     Multiple,
-}
-
-impl InstanciasAbrir {
-    pub fn como_str(&self) -> &'static str {
-        match self {
-            InstanciasAbrir::Unica => "unica",
-            InstanciasAbrir::Multiple => "multiple",
-        }
-    }
 }
 
 // ======================================================
@@ -587,25 +568,6 @@ pub enum ComportamientoMacro {
     UnaEjecucion,
     Toggle,
     TeclaMantenida,
-}
-
-impl ComportamientoMacro {
-    pub fn como_str(&self) -> &'static str {
-        match self {
-            ComportamientoMacro::UnaEjecucion => "una_ejecucion",
-            ComportamientoMacro::Toggle => "toggle",
-            ComportamientoMacro::TeclaMantenida => "tecla_mantenida",
-        }
-    }
-
-    /// true si este Comportamiento necesita que cache.rs::
-    /// resolver_match trate la fila como "diferida" (Iniciar en el
-    /// Down real, Detener en el Up real) — ver ExtraCache::
-    /// requiere_up_real(), mismo concepto aplicado a Macro en vez de
-    /// a un ExtraCache (una fila Macro nunca tiene ExtraCache propio).
-    pub fn requiere_up_real(&self) -> bool {
-        matches!(self, ComportamientoMacro::TeclaMantenida)
-    }
 }
 
 // ======================================================
@@ -630,17 +592,6 @@ pub enum ExtraCache {
 
     Toggle,
 
-    // Mouse
-    DobleClick,
-
-    ClickSostenido,
-
-    // Windows
-    AbrirMinimizado,
-
-    // UI
-    PopupToggle,
-
     // Exclusivo de gatillo Rueda — ver PLAN_RUEDA_REPETICION.md.
     // Cada pulso de rueda dispara su propia salida en cola (no
     // espera ningún timer de silencio ni mira la Condición del
@@ -663,10 +614,7 @@ impl ExtraCache {
     pub fn requiere_up_real(&self) -> bool {
         matches!(
             self,
-            ExtraCache::Normal
-                | ExtraCache::Turbo
-                | ExtraCache::Mantener
-                | ExtraCache::ClickSostenido
+            ExtraCache::Normal | ExtraCache::Turbo | ExtraCache::Mantener
         )
     }
 }

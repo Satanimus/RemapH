@@ -124,7 +124,7 @@ use serde::{Deserialize, Serialize};
 use crate::compilador::AdvertenciaCompilacion;
 
 use crate::perfil_json::{
-    perfil_json, AbrirAccionJson, AbrirExtraJson, AppJson, CoordenadaJson, ItemFilaJson,
+    PerfilJson, AbrirAccionJson, AbrirExtraJson, AppJson, CoordenadaJson, ItemFilaJson,
     MacroExtraJson, MenuAccionJson, MenuExpressExtraJson, PortapapelesAccionJson,
     PortapapelesExtraJson, RemapeoJson, SeparadorJson, TriggerJson,
 };
@@ -289,7 +289,7 @@ pub struct TriggerCapturaUI {
 
 #[derive(Serialize)]
 pub struct ResultadoPerfil {
-    pub perfil: perfil_json,
+    pub perfil: PerfilJson,
 
     pub nombre: String,
 
@@ -312,7 +312,7 @@ pub struct ResultadoPerfil {
 
 #[derive(Serialize)]
 pub struct ResultadoPerfilInicial {
-    pub perfil: perfil_json,
+    pub perfil: PerfilJson,
 
     pub advertencias: Vec<AdvertenciaCompilacion>,
 }
@@ -353,7 +353,7 @@ pub enum ItemFilaUI {
 // 🔄 CONVERTIR PERFIL
 // ======================================================
 
-pub fn convertir_perfil(filas: Vec<ItemFilaUI>) -> perfil_json {
+pub fn convertir_perfil(filas: Vec<ItemFilaUI>) -> PerfilJson {
     let filas = filas
         .into_iter()
         .map(|item| match item {
@@ -364,7 +364,7 @@ pub fn convertir_perfil(filas: Vec<ItemFilaUI>) -> perfil_json {
         })
         .collect();
 
-    perfil_json { filas }
+    PerfilJson { filas }
 }
 
 // ======================================================
