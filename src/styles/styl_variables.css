@@ -19,298 +19,285 @@
    ====================================================== */
 
 :root {
-
-   /* ==========================
+  /* ==========================
        Tipografía
        ========================== */
 
-   --font: "Segoe UI", sans-serif;
+  --font: "Segoe UI", sans-serif;
 
-   --fs11: 11px;
-   --fs13: 13px;
-   --fs16: 16px;
+  --fs11: 11px;
+  --fs13: 13px;
+  --fs16: 16px;
 
-   /* ==========================
+  /* ==========================
       Colores interactivos
       ========================== */
 
-   --highlight: #03A9F4;
-   /* Antes color propio (#C62828) editable en el catálogo de
+  --highlight: #03a9f4;
+  /* Antes color propio (#C62828) editable en el catálogo de
       Apariencia; ahora derivado de --red-dark + un aumento de brillo
       (mezcla con blanco), así queda un solo rojo configurable. */
-   --highlight-red: color-mix(in srgb, var(--red-dark) 80%, white 20%);
-   --cyan-dark: #0B7285;
+  --highlight-red: color-mix(in srgb, var(--red-dark) 80%, white 20%);
+  --cyan-dark: #0b7285;
 
-   /* ==========================
+  /* ==========================
          Estados de perfil
          ========================== */
 
-   --green-dark: #2E7D32;
-   --red-dark: #8F2525;
+  --green-dark: #2e7d32;
+  --red-dark: #8f2525;
 
-   /* ==========================
+  /* ==========================
        Fondos
        ========================== */
 
-   --bg: #181818;
+  --bg: #181818;
 
-   --fondo-general-color2: #181818;
+  --fondo-general-color2: #181818;
 
-   /* Fallback estático (modo plano): si el JS de overrides
+  /* Fallback estático (modo plano): si el JS de overrides
       (core_apariencia.ts) todavía no corrió, esta variable ya
       resuelve a un valor válido. Cuando el modo es "degradado",
       core_apariencia.ts la reemplaza en caliente por un
       linear-gradient(--bg, --fondo-general-color2). */
-   --fondo-general: var(--bg);
+  --fondo-general: var(--bg);
 
-   --panel: #222222;
+  --panel: #222222;
 
-   --panel2: #2B2B2B;
+  --panel2: #2b2b2b;
 
-   /* Fondo detrás de tabla/barras (.app/.layout, ver styl_layout.css).
+  /* Fondo detrás de tabla/barras (.app/.layout, ver styl_layout.css).
       Mismo patrón que --fondo-general: --fondo-app resuelve a color
       plano por defecto y core_apariencia.ts lo reemplaza en caliente
       por un gradient cuando el modo es "degradado". */
-   --fondo-app-color1: #0d1117;
+  --fondo-app-color1: #0d1117;
 
-   --fondo-app-color2: #05070a;
+  --fondo-app-color2: #05070a;
 
-   --fondo-app: var(--fondo-app-color1);
+  --fondo-app: var(--fondo-app-color1);
 
-
-   /* ==========================
+  /* ==========================
        Fondo de tabla
        ========================== */
 
-   --tabla-fondo-color-impar: #202020;
+  --tabla-color-impar: #202020;
 
-   --tabla-fondo-color-par: #141414;
+  --tabla-color-par: #141414;
 
-   --tabla-fondo-color-hover: #03A9F4;
+  --tabla-color-hover: #03a9f4;
 
-   --tabla-fondo-opacidad: 50%;
+  --tabla-fondo-opacidad: 50%;
 
-   --tabla-fondo-opacidad-hover: 24%;
+  --tabla-fondo-opacidad-hover: 24%;
 
-
-   /* ==========================
+  /* ==========================
        Color y opacidad de elementos
        (catálogo apariencia.tsv, Etapa I)
        ========================== */
 
-   --barra-superior-color: #222222;
+  --barra-superior-color: #222222;
 
-   --barra-superior-opacidad: 60%;
+  --barra-superior-opacidad: 60%;
 
-   --barra-lateral-color: #222222;
+  --barra-lateral-color: #222222;
 
-   --barra-lateral-opacidad: 60%;
+  --barra-lateral-opacidad: 60%;
 
-   --barra-inferior-color: #222222;
+  --barra-inferior-color: #222222;
 
-   --barra-inferior-opacidad: 60%;
+  --barra-inferior-opacidad: 60%;
 
-   --cabecera-tabla-color: #181818;
+  --cabecera-tabla-color: #181818;
 
-   --cabecera-tabla-opacidad: 65%;
+  --cabecera-tabla-opacidad: 65%;
 
-   --botones-ghost-opacidad-hover: 8%;
+  --botones-ghost-opacidad-hover: 8%;
 
-   --boton-off-opacidad: 55%;
+  --boton-off-opacidad: 55%;
 
-   --perfil-activo-opacidad: 100%;
+  --perfil-activo-opacidad: 100%;
 
-   --perfil-inactivo-opacidad: 10%;
+  --perfil-inactivo-opacidad: 10%;
 
-   --panel-lateral-item-actual-opacidad: 15%;
+  --panel-lateral-item-actual-opacidad: 15%;
 
-   --panel-lateral-eliminar-opacidad: 15%;
+  --panel-lateral-eliminar-opacidad: 15%;
 
-   --guardar-opacidad: 100%;
+  --guardar-opacidad: 100%;
 
-
-   /* ==========================
+  /* ==========================
        Bordes
        ========================== */
 
-   --border: #404040;
+  --border: #404040;
 
-   --border-light: #555555;
+  --border-light: #555555;
 
-
-   /* ==========================
+  /* ==========================
        Texto
        ========================== */
 
-   --text: #F2F2F2;
+  --text: #f2f2f2;
 
-   --text-disabled: #9e9e9e;
+  --text-disabled: #9e9e9e;
 
-   --text-highlight: #03A9F4;
+  --text-highlight: #03a9f4;
 
-   --text-red: #C62828;
+  --text-red: #c62828;
 
-   /* Texto oscuro sobre fondo --highlight (ej. btn-guardar-cambios,
+  /* Texto oscuro sobre fondo --highlight (ej. btn-guardar-cambios,
       badge de arrastre múltiple, marcador de macro activo) — no
       comparte token con --text, que es claro sobre fondo oscuro. */
-   --text-highdark: #05202a;
+  --text-highdark: #05202a;
 
-
-   /* ==========================
+  /* ==========================
        Colores principales
        ========================== */
 
-   /* Antes color propio (#388E3C) editable en el catálogo de
+  /* Antes color propio (#388E3C) editable en el catálogo de
       Apariencia; ahora derivado de --green-dark + un aumento de
       brillo (mezcla con blanco), así queda un solo verde configurable. */
-   --green: color-mix(in srgb, var(--green-dark) 80%, white 20%);
+  --green: color-mix(in srgb, var(--green-dark) 80%, white 20%);
 
-
-   /* ==========================
+  /* ==========================
        🎨 Color fila y fila resaltada
        ========================== */
 
-   --row-hover-bg: #0400ff3c;
+  --row-hover-bg: #0400ff3c;
 
-   /* ==========================
+  /* ==========================
        Colores de filas
        ========================== */
 
-   --tag-none: transparent;
+  --tag-none: transparent;
 
-   --tag-red: #D32F2F;
+  --tag-red: #d32f2f;
 
-   --tag-orange: #F57C00;
+  --tag-orange: #f57c00;
 
-   --tag-yellow: #FBC02D;
+  --tag-yellow: #fbc02d;
 
-   --tag-green: #388E3C;
+  --tag-green: #388e3c;
 
-   --tag-cyan: #03A9F4;
+  --tag-cyan: #03a9f4;
 
-   --tag-blue: #1976D2;
+  --tag-blue: #1976d2;
 
-   --tag-purple: #7B1FA2;
+  --tag-purple: #7b1fa2;
 
-   --tag-pink: #C2185B;
+  --tag-pink: #c2185b;
 
-   --tag-gray: #616161;
+  --tag-gray: #616161;
 
-
-   /* ==========================
+  /* ==========================
        Radios
        ========================== */
 
-   --r4: 4px;
+  --r4: 4px;
 
-   --r6: 6px;
+  --r6: 6px;
 
-   --r8: 8px;
+  --r8: 8px;
 
-
-   /* ==========================
+  /* ==========================
        Espaciados
        ========================== */
 
-   --gap4: 4px;
+  --gap4: 4px;
 
-   --gap8: 8px;
+  --gap8: 8px;
 
-   --gap12: 12px;
+  --gap12: 12px;
 
-   --gap16: 16px;
+  --gap16: 16px;
 
-   --gap24: 24px;
+  --gap24: 24px;
 
-
-   /* ==========================
+  /* ==========================
        Alturas
        ========================== */
 
-   --toolbar-height: 48px;
+  --toolbar-height: 48px;
 
-   --header-height: 34px;
+  --header-height: 34px;
 
-   --row-height: 40px;
+  --row-height: 40px;
 
-   --status-height: 26px;
+  --status-height: 26px;
 
-
-   /* ==========================
+  /* ==========================
        Columnas
        ========================== */
 
-   --col-min-width: 52px;
+  --col-min-width: 52px;
 
-   --col-num: 42px;
+  --col-num: 42px;
 
-   /* Ancho fijo del carril de números (fuera de la tabla,
+  /* Ancho fijo del carril de números (fuera de la tabla,
        ver .carril-numeros en styl_tabla.css). Antes compartía
        --col-num con la columna "#" de la tabla y cambiaba de
        tamaño junto a ella; ahora es independiente. Se elimina
        cuando la columna "#" desaparezca (Etapa B). */
-   --col-carril-numeros: 28px;
+  --col-carril-numeros: 28px;
 
-   /* Espacio extra que suma el carril de números cuando el
+  /* Espacio extra que suma el carril de números cuando el
        perfil tiene al menos un separador (botón Expandir/Contraer,
        ver .carril-numeros.tiene-separadores en styl_tabla.css). */
-   --carril-expandir-ancho: 22px;
+  --carril-expandir-ancho: 22px;
 
-   --carril-expandir-margen: 6px;
+  --carril-expandir-margen: 6px;
 
-   --col-app: 52px;
+  --col-app: 52px;
 
-   --col-trigger: 150px;
+  --col-trigger: 150px;
 
-   --col-type: 60px;
+  --col-type: 60px;
 
-   --col-action: 150px;
+  --col-action: 150px;
 
-   /* Antes 150px: la columna Extra mostraba el texto de la
+  /* Antes 150px: la columna Extra mostraba el texto de la
        opción elegida. Ahora es un botón solo-ícono (∴, ver
        .extra-control en styl_botones.css) — mismo ancho que
        --col-type. */
-   --col-behavior: 60px;
+  --col-behavior: 60px;
 
-   --col-color: 52px;
+  --col-color: 52px;
 
-   /* Ancho de la futura columna "Opciones" (⁝), Etapa C/D.
+  /* Ancho de la futura columna "Opciones" (⁝), Etapa C/D.
        Se define ya para no volver a tocar este archivo en
        esa etapa. --col-color se elimina cuando la columna
        Color desaparezca de la tabla (Etapa B). */
-   --col-options: 42px;
+  --col-options: 42px;
 
-   --col-note: 220px;
+  --col-note: 220px;
 
-   /* Tabla en árbol de Apariencia (ventana Configuración,
+  /* Tabla en árbol de Apariencia (ventana Configuración,
        ver vent_configuracion_apariencia.ts, Etapa E). */
-   --col-config-nombre: 220px;
+  --col-config-nombre: 220px;
 
-   --col-config-defecto: 260px;
+  --col-config-defecto: 260px;
 
-   /* H11: columna Editar/Valor Personalizado fusionada en una sola
+  /* H11: columna Editar/Valor Personalizado fusionada en una sola
       (antes 40px + 220px separadas). */
-   --col-config-personalizado: 260px;
+  --col-config-personalizado: 260px;
 
-
-   /* ==========================
+  /* ==========================
        Mínimos columnas
        ========================== */
 
-   --col-min: 52px;
+  --col-min: 52px;
 
-
-   /* ==========================
+  /* ==========================
        Animaciones
        ========================== */
 
-   --speed: .15s;
+  --speed: 0.15s;
 
-   /* ==========================
+  /* ==========================
        Separador
        ========================== */
 
-   /* [FIX] Opacidad del tinte de color del separador — misma
+  /* [FIX] Opacidad del tinte de color del separador — misma
        técnica (color-mix contra transparent) en la cabecera del
        separador y en el fondo que genera sobre las filas de abajo,
        así ambas se comportan igual (tiñen el fondo real en vez de
@@ -318,17 +305,17 @@
        - --separador-opacidad-header: cabecera del separador (.fila-separador)
        - --separador-opacidad-fila: filas debajo, en reposo (.celda.en-separador)
        - --separador-opacidad-fila-hover: filas debajo, al pasar el mouse */
-   --separador-opacidad-header: 18%;
+  --separador-opacidad-header: 18%;
 
-   --separador-opacidad-fila: 5%;
+  --separador-opacidad-fila: 5%;
 
-   --separador-opacidad-fila-hover: 10%;
+  --separador-opacidad-fila-hover: 10%;
 
-   /* ==========================
+  /* ==========================
        Overlays flotantes
        ========================== */
 
-   /* Paleta propia de las ventanas overlay/flotantes (Captura,
+  /* Paleta propia de las ventanas overlay/flotantes (Captura,
       Portapapeles, Menú Express) — fondos oscuros translúcidos +
       contraste blanco para bordes/hover, independientes de
       --panel/--panel2/--border-light porque estas ventanas no
@@ -344,37 +331,37 @@
       "Opacidad de objetos" más abajo (ver
       reglas_opacidad_apariencia.txt: la opacidad es del
       objeto/contenedor, no del color). */
-   --overlay-superficie: #14141e;
+  --overlay-superficie: #14141e;
 
-   --overlay-popup: #191920;
+  --overlay-popup: #191920;
 
-   --overlay-tooltip: #0f0f14;
+  --overlay-tooltip: #0f0f14;
 
-   --overlay-contraste: #ffffff;
+  --overlay-contraste: #ffffff;
 
-   /* ==========================
+  /* ==========================
        Opacidad de objetos
        ========================== */
 
-   /* Cada variable de acá es la opacidad de UN objeto/contenedor
+  /* Cada variable de acá es la opacidad de UN objeto/contenedor
       concreto, no de un color — dos objetos que usan el mismo color
       base (ej. --overlay-superficie) pueden tener cada uno su propia
       opacidad, sin compartir variable entre sí (ver
       reglas_opacidad_apariencia.txt, reglas 2-4). Piloto: botón
       "Fijar" de Portapapeles (.portapapeles-boton-fijar en
       styl_portapapeles.css). */
-   --portapapeles-boton-fijar-opacidad: 70%;
+  --portapapeles-boton-fijar-opacidad: 70%;
 
-   /* Ventana overlay Indicador_Macro (styl_indicador_macro.css) —
+  /* Ventana overlay Indicador_Macro (styl_indicador_macro.css) —
       Fondo del cartel y color del texto, ambas comparten valor entre
       sus dos modos (Grabación/Play, misma ventana). */
-   --indicador-macro-fondo-opacidad: 55%;
+  --indicador-macro-fondo-opacidad: 55%;
 
-   --indicador-macro-texto-opacidad: 100%;
+  --indicador-macro-texto-opacidad: 100%;
 
-   /* Marcador de preview de la ventana de captura de coordenada
+  /* Marcador de preview de la ventana de captura de coordenada
       (.captura-marcador-preview en styl_captura.css) — "Texto" es la
       opacidad del propio ícono SVG (este marcador no tiene texto).
       Ya no tiene "Fondo": el marcador quedó sin relleno de fondo. */
-   --indicador-coordenada-texto-opacidad: 40%;
+  --indicador-coordenada-texto-opacidad: 40%;
 }

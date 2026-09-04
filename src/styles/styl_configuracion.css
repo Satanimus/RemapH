@@ -65,8 +65,8 @@
   cursor: pointer;
   padding: var(--gap4) var(--gap8);
   transition:
-    border-color .12s ease,
-    color .12s ease;
+    border-color 0.12s ease,
+    color 0.12s ease;
 }
 
 .configuracion-boton-carpeta:hover {
@@ -91,8 +91,8 @@
   margin-right: auto;
   cursor: pointer;
   transition:
-    border-color .12s ease,
-    color .12s ease;
+    border-color 0.12s ease,
+    color 0.12s ease;
 }
 
 .configuracion-selector-tema.oculto {
@@ -200,16 +200,28 @@
 }
 
 .configuracion-tabla tbody tr {
-  background: color-mix(in srgb, var(--tabla-fondo-color-impar) var(--tabla-fondo-opacidad), transparent);
+  background: color-mix(
+    in srgb,
+    var(--tabla-color-impar) var(--tabla-fondo-opacidad),
+    transparent
+  );
   transition: background var(--speed);
 }
 
 .configuracion-tabla tbody tr:nth-child(even) {
-  background: color-mix(in srgb, var(--tabla-fondo-color-par) var(--tabla-fondo-opacidad), transparent);
+  background: color-mix(
+    in srgb,
+    var(--tabla-color-par) var(--tabla-fondo-opacidad),
+    transparent
+  );
 }
 
 .configuracion-tabla tbody tr:hover {
-  background: color-mix(in srgb, var(--tabla-fondo-color-hover) var(--tabla-fondo-opacidad-hover), transparent);
+  background: color-mix(
+    in srgb,
+    var(--tabla-color-hover) var(--tabla-fondo-opacidad-hover),
+    transparent
+  );
 }
 
 .configuracion-valor-defecto {
@@ -319,16 +331,28 @@
 }
 
 .configuracion-tabla-arbol tbody tr {
-  background: color-mix(in srgb, var(--tabla-fondo-color-impar) var(--tabla-fondo-opacidad), transparent);
+  background: color-mix(
+    in srgb,
+    var(--tabla-color-impar) var(--tabla-fondo-opacidad),
+    transparent
+  );
   transition: background var(--speed);
 }
 
 .configuracion-tabla-arbol tbody tr:nth-child(even) {
-  background: color-mix(in srgb, var(--tabla-fondo-color-par) var(--tabla-fondo-opacidad), transparent);
+  background: color-mix(
+    in srgb,
+    var(--tabla-color-par) var(--tabla-fondo-opacidad),
+    transparent
+  );
 }
 
 .configuracion-tabla-arbol tbody tr:hover {
-  background: color-mix(in srgb, var(--tabla-fondo-color-hover) var(--tabla-fondo-opacidad-hover), transparent);
+  background: color-mix(
+    in srgb,
+    var(--tabla-color-hover) var(--tabla-fondo-opacidad-hover),
+    transparent
+  );
 }
 
 /* A1: fila de Título (nivel 1) con el mismo gris claro que usan los
@@ -405,8 +429,8 @@
   margin-right: var(--gap8);
   vertical-align: middle;
   transition:
-    border-color .12s ease,
-    color .12s ease;
+    border-color 0.12s ease,
+    color 0.12s ease;
 }
 
 .configuracion-arbol-expandir:hover {
@@ -443,8 +467,8 @@
   cursor: pointer;
   padding: var(--gap8);
   transition:
-    border-color .12s ease,
-    color .12s ease;
+    border-color 0.12s ease,
+    color 0.12s ease;
 }
 
 .configuracion-arbol-personalizado:hover {

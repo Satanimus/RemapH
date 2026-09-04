@@ -4,35 +4,32 @@
    ====================================================== */
 
 .tabla {
+  display: flex;
 
-    display: flex;
+  flex: 1;
 
-    flex: 1;
-
-    overflow: hidden;
+  overflow: hidden;
 }
 
 .viewport {
+  flex: 1;
 
-    flex: 1;
+  min-width: 0;
 
-    min-width: 0;
+  height: 100%;
 
-    height: 100%;
-
-    /* Reserva justa para el scrollbar real (10px, ver
+  /* Reserva justa para el scrollbar real (10px, ver
        ::-webkit-scrollbar en styl_general.css) — antes eran 20px
        fijos, el doble de lo necesario, que además quedaban sin
        ningún fondo de fila pintado encima (se veían como un
        hueco vacío al hacer scroll horizontal en ventanas
        angostas). */
-    padding-right: 10px;
+  padding-right: 10px;
 
-    box-sizing: border-box;
+  box-sizing: border-box;
 
-    overflow: auto;
+  overflow: auto;
 }
-
 
 /* ======================================================
    🔢 CARRIL DE NÚMEROS (Etapa 9B)
@@ -48,20 +45,19 @@
    ====================================================== */
 
 .carril-numeros {
+  width: var(--col-carril-numeros);
 
-    width: var(--col-carril-numeros);
+  flex-shrink: 0;
 
-    flex-shrink: 0;
+  overflow: hidden;
 
-    overflow: hidden;
+  background: transparent;
 
-    background: transparent;
-
-    /* Separación del borde de la barra lateral — antes el carril
+  /* Separación del borde de la barra lateral — antes el carril
        quedaba pegado directamente contra ella. */
-    margin-left: var(--gap8);
+  margin-left: var(--gap8);
 
-    transition: width var(--speed);
+  transition: width var(--speed);
 }
 
 /* Perfil con al menos un separador: el carril se ensancha lo
@@ -71,48 +67,47 @@
    número sigue centrado en los --col-carril-numeros de siempre,
    el ancho de más queda vacío a la derecha. */
 .carril-numeros.tiene-separadores {
-
-    width: calc(var(--col-carril-numeros) + var(--carril-expandir-ancho) + var(--carril-expandir-margen));
+  width: calc(
+    var(--col-carril-numeros) + var(--carril-expandir-ancho) +
+      var(--carril-expandir-margen)
+  );
 }
 
 .carril-numeros-espaciador {
-
-    height: var(--header-height);
+  height: var(--header-height);
 }
 
 .carril-numero {
+  position: relative;
 
-    position: relative;
+  height: var(--row-height);
 
-    height: var(--row-height);
+  width: var(--col-carril-numeros);
 
-    width: var(--col-carril-numeros);
+  display: flex;
 
-    display: flex;
+  align-items: center;
 
-    align-items: center;
+  justify-content: center;
 
-    justify-content: center;
+  box-sizing: border-box;
 
-    box-sizing: border-box;
+  color: var(--text-disabled);
 
-    color: var(--text-disabled);
-
-    font-size: var(--fs13);
+  font-size: var(--fs13);
 }
 
 /* Etapa C: botón On/Off (.estado-toggle, ver styl_botones.css)
    superpuesto y centrado sobre el número — la fila-normal ya no
    tiene celda "estado" propia. */
 .carril-numero .estado-toggle {
+  position: absolute;
 
-    position: absolute;
+  top: 50%;
 
-    top: 50%;
+  left: 50%;
 
-    left: 50%;
-
-    transform: translate(-50%, -50%);
+  transform: translate(-50%, -50%);
 }
 
 /* [FIX] .ui-btn:active pisa el transform de centrado de arriba
@@ -120,21 +115,19 @@
    al hacer click (perdía el translate(-50%,-50%)). Se conserva
    el centrado y se anula el desplazamiento de :active acá. */
 .carril-numero .estado-toggle:active {
-
-    transform: translate(-50%, -50%);
+  transform: translate(-50%, -50%);
 }
 
 .carril-expandir-slot {
+  height: var(--row-height);
 
-    height: var(--row-height);
+  width: 100%;
 
-    width: 100%;
+  display: flex;
 
-    display: flex;
+  align-items: center;
 
-    align-items: center;
-
-    /* [FIX] Etapa D: On/Off del separador debe caer en el mismo
+  /* [FIX] Etapa D: On/Off del separador debe caer en el mismo
        eje horizontal que el On/Off superpuesto de una fila normal
        (centrado en los --col-carril-numeros de siempre) — con
        justify-content: space-between el botón quedaba pegado al
@@ -145,74 +138,69 @@
        [FIX] gap entre ambos botones = mismo margen que separa
        Expandir de la tabla (--carril-expandir-margen), en vez del
        hueco variable que dejaba margin-left:auto en .carril-expandir. */
-    gap: var(--carril-expandir-margen);
+  gap: var(--carril-expandir-margen);
 
-    box-sizing: border-box;
+  box-sizing: border-box;
 }
 
 .carril-expandir-slot .estado-toggle {
-
-    /* [FIX] flex-basis en --col-carril-numeros (28px) forzaba el
+  /* [FIX] flex-basis en --col-carril-numeros (28px) forzaba el
        ANCHO del botón a 28px manteniendo su alto de 20px — salía
        ovalado en vez de circular. flex-shrink/grow en 0 alcanza
        para que no lo estire el flex del slot; el centrado dentro
        de los 28px reservados para el número lo da el wrapper de
        abajo (.carril-expandir-slot-numero), no el botón mismo. */
-    flex: 0 0 auto;
+  flex: 0 0 auto;
 
-    margin: 0;
+  margin: 0;
 }
 
 .carril-expandir-slot-numero {
+  flex: 0 0 var(--col-carril-numeros);
 
-    flex: 0 0 var(--col-carril-numeros);
+  display: flex;
 
-    display: flex;
+  align-items: center;
 
-    align-items: center;
-
-    justify-content: center;
+  justify-content: center;
 }
 
 .carril-expandir-slot .carril-expandir {
-
-    /* [FIX] margin-left:auto empujaba este botón al extremo derecho
+  /* [FIX] margin-left:auto empujaba este botón al extremo derecho
        del slot, dejando todo el espacio libre entre él y el On/Off
        (el gap del slot no alcanzaba a compensarlo). Sin el auto, el
        gap fijo de arriba es la única separación entre ambos. */
-    margin-right: var(--carril-expandir-margen);
+  margin-right: var(--carril-expandir-margen);
 }
 
 /* [FIX] mismo problema que el On/Off de fila normal: .ui-btn:active
    corre el botón con translateY(1px), acá visible como un salto
    leve al click. Se anula para mantenerlo fijo en su lugar. */
 .carril-expandir-slot .estado-toggle:active {
-
-    transform: none;
+  transform: none;
 }
 
 .ui-btn.carril-expandir {
+  min-width: 0;
 
-    min-width: 0;
+  padding: 0;
 
-    padding: 0;
+  background: transparent;
 
-    background: transparent;
+  border: 1px solid var(--separador-color, var(--border-light));
 
-    border: 1px solid var(--separador-color, var(--border-light));
+  color: var(--text-disabled);
 
-    color: var(--text-disabled);
+  cursor: pointer;
 
-    cursor: pointer;
-
-    transition: color var(--speed), border-color var(--speed);
+  transition:
+    color var(--speed),
+    border-color var(--speed);
 }
 
 .carril-expandir:hover {
-
-    color: var(--text-highlight);
+  color: var(--text-highlight);
 }
-
 
 /* ======================================================
    CABECERA Y FILAS
@@ -220,10 +208,9 @@
 
 .cabecera,
 .fila {
+  display: flex;
 
-    display: flex;
-
-    /* [FIX] Bug (líneas verticales entre columnas): esto era
+  /* [FIX] Bug (líneas verticales entre columnas): esto era
        align-items: center. Con "center" el eje transversal de un
        flex container NO estira a los hijos — cada .cabecera-celda/
        .celda quedaba con la altura de SU PROPIO contenido (el
@@ -238,18 +225,18 @@
        vertical del CONTENIDO de cada celda no depende de esto —
        .cabecera-celda/.celda ya tienen su propio align-items:center
        para eso. */
-    align-items: stretch;
+  align-items: stretch;
 
-    /* calc, no 100%: el margin-right de respiro (ver abajo) debe
+  /* calc, no 100%: el margin-right de respiro (ver abajo) debe
        restarse del ancho, no sumarse afuera — con solo 100% el
        elemento terminaba igual de ancho + el margin, empujando
        el borde de color otra vez hasta el límite real (el mismo
        bug, solo que ahora por overflow en vez de por padding). */
-    width: calc(100% - var(--gap8));
+  width: calc(100% - var(--gap8));
 
-    margin-right: var(--gap8);
+  margin-right: var(--gap8);
 
-    box-sizing: border-box;
+  box-sizing: border-box;
 }
 
 /* [FIX] bug: al angostar la ventana, Nota (única celda flexible)
@@ -271,50 +258,62 @@
 .viewport.recortado .cabecera,
 .viewport.recortado .fila,
 .viewport.recortado .fila-separador {
+  width: 100%;
 
-    width: 100%;
-
-    margin-right: 0;
+  margin-right: 0;
 }
 
 .cabecera {
+  height: var(--header-height);
 
-    height: var(--header-height);
+  background: color-mix(
+    in srgb,
+    var(--cabecera-tabla-color) var(--cabecera-tabla-opacidad),
+    transparent
+  );
 
-    background: color-mix(in srgb, var(--cabecera-tabla-color) var(--cabecera-tabla-opacidad), transparent);
+  backdrop-filter: blur(8px);
 
-    backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
 
-    -webkit-backdrop-filter: blur(8px);
+  border-bottom: 1px solid
+    color-mix(in srgb, var(--overlay-contraste) 6%, transparent);
 
-    border-bottom: 1px solid color-mix(in srgb, var(--overlay-contraste) 6%, transparent);
+  font-size: var(--fs13);
 
-    font-size: var(--fs13);
+  font-weight: 500;
 
-    font-weight: 500;
+  color: var(--text-disabled);
 
-    color: var(--text-disabled);
-
-    letter-spacing: 0.04em;
+  letter-spacing: 0.04em;
 }
 
 .fila {
+  height: var(--row-height);
 
-    height: var(--row-height);
+  background: color-mix(
+    in srgb,
+    var(--tabla-color-impar) var(--tabla-fondo-opacidad),
+    transparent
+  );
 
-    background: color-mix(in srgb, var(--tabla-fondo-color-impar) var(--tabla-fondo-opacidad), transparent);
-
-    transition: background var(--speed);
+  transition: background var(--speed);
 }
 
 .fila:nth-child(even) {
-
-    background: color-mix(in srgb, var(--tabla-fondo-color-par) var(--tabla-fondo-opacidad), transparent);
+  background: color-mix(
+    in srgb,
+    var(--tabla-color-par) var(--tabla-fondo-opacidad),
+    transparent
+  );
 }
 
 .fila:hover {
-
-    background: color-mix(in srgb, var(--tabla-fondo-color-hover) var(--tabla-fondo-opacidad-hover), transparent);
+  background: color-mix(
+    in srgb,
+    var(--tabla-color-hover) var(--tabla-fondo-opacidad-hover),
+    transparent
+  );
 }
 
 /* Etapa E: el tinte de separador se acota a las celdas
@@ -329,10 +328,13 @@
    la opacidad queda controlada por una sola variable, igual
    técnica que usa .fila-separador (mismo criterio, ver abajo). */
 .celda.en-separador {
+  background: color-mix(
+    in srgb,
+    var(--separador-color) var(--separador-opacidad-fila),
+    transparent
+  );
 
-    background: color-mix(in srgb, var(--separador-color) var(--separador-opacidad-fila), transparent);
-
-    box-sizing: border-box;
+  box-sizing: border-box;
 }
 
 /* [FIX] regla aparte con `.fila` de por medio, para que gane
@@ -343,18 +345,19 @@
    continua: solo llevan borde propio los bordes de acento
    (inicio/fin, ver más abajo). */
 .fila .celda.en-separador {
-
-    border-right: none;
+  border-right: none;
 }
 
 .fila:hover .celda.en-separador {
-
-    background: color-mix(in srgb, var(--separador-color) var(--separador-opacidad-fila-hover), transparent);
+  background: color-mix(
+    in srgb,
+    var(--separador-color) var(--separador-opacidad-fila-hover),
+    transparent
+  );
 }
 
 .celda.en-separador-inicio {
-
-    border-left: 1px solid var(--separador-color);
+  border-left: 1px solid var(--separador-color);
 }
 
 /* [FIX] simétrico con en-separador-inicio (borde izquierdo): usa
@@ -365,23 +368,19 @@
    borde derecho en separadores sin color. Con `.fila` de por
    medio para ganarle en especificidad al divisor genérico. */
 .fila .celda.en-separador-fin {
-
-    border-right: 1px solid var(--separador-color);
+  border-right: 1px solid var(--separador-color);
 }
 
 .celda.en-separador.primera-del-separador {
-
-    border-top: 1px solid var(--separador-color);
+  border-top: 1px solid var(--separador-color);
 }
 
 .celda.en-separador.ultima-del-separador {
-
-    border-bottom: 1px solid var(--separador-color);
+  border-bottom: 1px solid var(--separador-color);
 }
 
 .celda.en-separador-inicio.primera-del-separador {
-
-    border-top-left-radius: var(--r8);
+  border-top-left-radius: var(--r8);
 }
 
 /* [FIX] la esquina redondeada del lado derecho ya no depende de
@@ -389,18 +388,15 @@
    agregaba con color real) — ahora se aplica siempre que la
    celda sea el final del tinte, tenga o no borde de acento. */
 .celda.en-separador-fin.primera-del-separador {
-
-    border-top-right-radius: var(--r8);
+  border-top-right-radius: var(--r8);
 }
 
 .celda.en-separador-inicio.ultima-del-separador {
-
-    border-bottom-left-radius: var(--r8);
+  border-bottom-left-radius: var(--r8);
 }
 
 .celda.en-separador-fin.ultima-del-separador {
-
-    border-bottom-right-radius: var(--r8);
+  border-bottom-right-radius: var(--r8);
 }
 
 /* [FIX] El tinte/fondo/border-radius del separador ahora se pinta
@@ -411,43 +407,44 @@
    desde donde arrancaría la columna App, así que el color debe
    llegar hasta el borde derecho también. */
 .fila-separador {
+  display: flex;
 
-    display: flex;
+  align-items: center;
 
-    align-items: center;
+  width: calc(100% - var(--gap8));
 
-    width: calc(100% - var(--gap8));
+  margin-right: var(--gap8);
 
-    margin-right: var(--gap8);
+  height: var(--row-height);
 
-    height: var(--row-height);
+  box-sizing: border-box;
 
-    box-sizing: border-box;
+  background: color-mix(
+    in srgb,
+    var(--separador-color, var(--panel2)) var(--separador-opacidad-header),
+    transparent
+  );
 
-    background: color-mix(in srgb, var(--separador-color, var(--panel2)) var(--separador-opacidad-header), transparent);
-
-    border-radius: var(--r8);
+  border-radius: var(--r8);
 }
 
 .fila-separador-placeholder {
+  display: flex;
 
-    display: flex;
+  align-items: center;
 
-    align-items: center;
+  justify-content: center;
 
-    justify-content: center;
+  width: 100%;
 
-    width: 100%;
+  height: var(--row-height);
 
-    height: var(--row-height);
+  box-sizing: border-box;
 
-    box-sizing: border-box;
+  border: 1px dashed var(--border-light);
 
-    border: 1px dashed var(--border-light);
-
-    color: var(--text-disabled);
+  color: var(--text-disabled);
 }
-
 
 /* ======================================================
    CELDAS
@@ -455,52 +452,47 @@
 
 .cabecera-celda,
 .celda {
+  display: flex;
 
-    display: flex;
+  align-items: center;
 
-    align-items: center;
+  justify-content: center;
 
-    justify-content: center;
+  height: 100%;
 
-    height: 100%;
+  box-sizing: border-box;
 
-    box-sizing: border-box;
-
-    flex-shrink: 0;
+  flex-shrink: 0;
 }
 
 .cabecera-celda {
+  position: relative;
 
-    position: relative;
+  padding: 0 var(--gap8);
 
-    padding: 0 var(--gap8);
-
-    white-space: nowrap;
+  white-space: nowrap;
 }
 
 .celda {
+  flex: 0 0 auto;
 
-    flex: 0 0 auto;
+  padding: 0 var(--gap8);
 
-    padding: 0 var(--gap8);
-
-    overflow: hidden;
+  overflow: hidden;
 }
 
 .celda:not(:last-child) {
-
-    /* --border (oscuro), no --border-light: mismo tono que usa
+  /* --border (oscuro), no --border-light: mismo tono que usa
        .divisor-columna::before de la cabecera, para que los
        separadores de esta tabla sean consistentes entre sí. La
        cabecera NO lleva este border-right: ahí el borde lo da
        únicamente .divisor-columna::before (el arrastrable de
        redimensión), para no duplicar la línea. */
-    border-right: 1px solid var(--border);
+  border-right: 1px solid var(--border);
 }
 
 .celda.nota-separador {
-
-    flex: 1;
+  flex: 1;
 }
 
 /* [FIX] La fila-separador solo tiene 2 celdas (Opciones y Nota) —
@@ -511,45 +503,38 @@
    quedaba entre Opciones y Nota como una línea suelta sin motivo.
    Se anula puntualmente para esta celda. */
 .celda.separador-opciones {
-
-    border-right: none;
+  border-right: none;
 }
 
 .celda.nota-separador .nota {
-
-    font-size: var(--fs13);
+  font-size: var(--fs13);
 }
 
 /* Permite que el botón "+" de agregar fila sobresalga
    por debajo del botón de Opciones, sin quedar recortado. */
 .celda[data-columna="opciones"] {
-
-    overflow: visible;
+  overflow: visible;
 }
 
 .celda:first-child {
+  font-weight: bold;
 
-    font-weight: bold;
-
-    color: var(--text-disabled);
+  color: var(--text-disabled);
 }
 
 .celda:last-child,
 .cabecera-celda:last-child {
-
-    flex: 1;
+  flex: 1;
 }
-
 
 /* ======================================================
    CONTROLES
    ====================================================== */
 
 .celda .ui-btn {
+  width: 100%;
 
-    width: 100%;
-
-    max-width: 100%;
+  max-width: 100%;
 }
 
 /* Los botones dentro de la columna Opciones (toggle "⁝" + los 3
@@ -562,22 +547,20 @@
    al expandirse la columna y los 3 extra competían por el ancho
    sobrante, dejando a Eliminar recortado por overflow:hidden. */
 .opciones-celda .ui-btn {
+  width: fit-content;
 
-    width: fit-content;
+  flex-shrink: 0;
 
-    flex-shrink: 0;
+  background: transparent;
 
-    background: transparent;
-
-    border-color: transparent;
+  border-color: transparent;
 }
 
 .opciones-celda .ui-btn:hover,
 .opciones-celda .ui-btn[data-abierto="true"] {
+  background: color-mix(in srgb, var(--highlight) 8%, transparent);
 
-    background: color-mix(in srgb, var(--highlight) 8%, transparent);
-
-    border-color: var(--highlight);
+  border-color: var(--highlight);
 }
 
 /* ======================================================
@@ -589,65 +572,62 @@
    width: fit-content, igual criterio que .opciones-celda .ui-btn
    más arriba, para que no se estire con el ancho de la columna. */
 .opciones-celda {
+  display: flex;
 
-    display: flex;
+  align-items: center;
 
-    align-items: center;
+  gap: var(--gap4);
 
-    gap: var(--gap4);
-
-    width: fit-content;
+  width: fit-content;
 }
 
 /* Contenedor de los 3 botones (🎨 ⧉ X). La transición de
    ancho/opacidad es la animación de expansión de la columna
    (Regla 3 / Regla 9). */
 .opciones-extra {
+  display: flex;
 
-    display: flex;
+  align-items: center;
 
-    align-items: center;
+  gap: var(--gap4);
 
-    gap: var(--gap4);
+  overflow: hidden;
 
-    overflow: hidden;
-
-    /* flex-shrink: 0 — sin esto, al confirmar eliminación (más abajo)
+  /* flex-shrink: 0 — sin esto, al confirmar eliminación (más abajo)
        este contenedor podía ser comprimido por el algoritmo de flexbox
        (su overflow:hidden habilita ancho mínimo automático 0) y sus
        botones quedaban recortados/invisibles en vez de mantenerse
        enteros (bug 1). */
-    flex-shrink: 0;
+  flex-shrink: 0;
 
-    transition: width var(--speed), opacity var(--speed);
+  transition:
+    width var(--speed),
+    opacity var(--speed);
 }
 
 /* E.2 — botones ícono-solo, mismo tamaño que .ui-btn.icono. */
 .opciones-boton-color,
 .opciones-boton-duplicar,
 .opciones-boton-eliminar {
+  width: 28px;
 
-    width: 28px;
+  min-width: 28px;
 
-    min-width: 28px;
-
-    padding: 0;
+  padding: 0;
 }
 
 /* E.3 — deshabilitado por defecto (Regla 13), mismo patrón que
    .popup-capa .popup-extra-probar:disabled. */
 .opciones-extra .ui-btn:disabled {
+  opacity: 0.4;
 
-    opacity: 0.4;
-
-    cursor: not-allowed;
+  cursor: not-allowed;
 }
 
 .opciones-extra .ui-btn:disabled:hover {
+  background: transparent !important;
 
-    background: transparent !important;
-
-    border-color: transparent;
+  border-color: transparent;
 }
 
 /* E.4 — Regla 14: el title nativo ya se ve sobre botones
@@ -662,18 +642,20 @@
    ese era el bug del borde que no se ponía rojo. */
 /* E.6 — Regla 9: confirmación expandida de Eliminar. */
 .opciones-boton-eliminar--confirmando {
+  width: auto;
 
-    width: auto;
+  padding: 0 var(--gap8);
 
-    padding: 0 var(--gap8);
+  background: color-mix(in srgb, var(--red-dark) 20%, transparent);
 
-    background: color-mix(in srgb, var(--red-dark) 20%, transparent);
+  border-color: var(--highlight-red);
 
-    border-color: var(--highlight-red);
+  color: var(--text-red);
 
-    color: var(--text-red);
-
-    transition: width var(--speed), background var(--speed), border-color var(--speed);
+  transition:
+    width var(--speed),
+    background var(--speed),
+    border-color var(--speed);
 }
 
 /* E.7 — la celda "opciones" (cabecera y fila) se ensancha cuando
@@ -685,8 +667,7 @@
    horizontal de la celda (2×gap8). */
 .cabecera-celda[data-columna="opciones"]:has(.opciones-extra),
 .celda[data-columna="opciones"]:has(.opciones-extra) {
-
-    min-width: 150px;
+  min-width: 150px;
 }
 
 /* [bug 1, vuelta 2] Mientras Eliminar pide confirmación:
@@ -706,199 +687,187 @@
      la columna completa mida siempre lo mismo y no empuje solo la
      fila que confirma hacia la derecha. */
 .opciones-celda:has(.opciones-boton-eliminar--confirmando) .opciones-asa,
-.opciones-celda:has(.opciones-boton-eliminar--confirmando) .opciones-boton-color,
-.opciones-celda:has(.opciones-boton-eliminar--confirmando) .opciones-boton-duplicar,
-.cabecera-celda[data-columna="opciones"]:has(.opciones-boton-eliminar--confirmando) .opciones-asa,
-.cabecera-celda[data-columna="opciones"]:has(.opciones-boton-eliminar--confirmando) .opciones-boton-color,
-.cabecera-celda[data-columna="opciones"]:has(.opciones-boton-eliminar--confirmando) .opciones-boton-duplicar {
-
-    display: none;
+.opciones-celda:has(.opciones-boton-eliminar--confirmando)
+  .opciones-boton-color,
+.opciones-celda:has(.opciones-boton-eliminar--confirmando)
+  .opciones-boton-duplicar,
+.cabecera-celda[data-columna="opciones"]:has(
+    .opciones-boton-eliminar--confirmando
+  )
+  .opciones-asa,
+.cabecera-celda[data-columna="opciones"]:has(
+    .opciones-boton-eliminar--confirmando
+  )
+  .opciones-boton-color,
+.cabecera-celda[data-columna="opciones"]:has(
+    .opciones-boton-eliminar--confirmando
+  )
+  .opciones-boton-duplicar {
+  display: none;
 }
 
-.viewport:has(.opciones-boton-eliminar--confirmando) .cabecera-celda[data-columna="opciones"],
-.viewport:has(.opciones-boton-eliminar--confirmando) .celda[data-columna="opciones"] {
+.viewport:has(.opciones-boton-eliminar--confirmando)
+  .cabecera-celda[data-columna="opciones"],
+.viewport:has(.opciones-boton-eliminar--confirmando)
+  .celda[data-columna="opciones"] {
+  flex-basis: var(--ancho-opciones-confirmando) !important;
 
-    flex-basis: var(--ancho-opciones-confirmando) !important;
-
-    min-width: var(--ancho-opciones-confirmando);
+  min-width: var(--ancho-opciones-confirmando);
 }
 
 .nota {
+  width: 100%;
 
-    width: 100%;
+  flex: 1;
 
-    flex: 1;
+  background: transparent;
 
-    background: transparent;
-
-    border: none;
+  border: none;
 }
 
 .nota::placeholder {
-
-    color: transparent;
+  color: transparent;
 }
 
 .nota-contenedor:focus-within .nota::placeholder,
 .nota-contenedor:hover .nota::placeholder {
-
-    color: var(--text-disabled);
+  color: var(--text-disabled);
 }
-
 
 /* ======================================================
    COLORES CABECERA
    ====================================================== */
 
 .cabecera-celda.grupo-general {
-
-    color: var(--text-disabled);
+  color: var(--text-disabled);
 }
 
 .cabecera-celda.grupo-input {
-
-    color: var(--text-disabled);
+  color: var(--text-disabled);
 }
 
 .cabecera-celda.grupo-respuesta {
-
-    color: var(--text-disabled);
+  color: var(--text-disabled);
 }
 
 .cabecera-celda.grupo-personalizacion {
-
-    color: var(--text-disabled);
+  color: var(--text-disabled);
 }
-
 
 /* ======================================================
    DIVISOR COLUMNAS
    ====================================================== */
 
 .divisor-columna {
+  position: absolute;
 
-    position: absolute;
+  right: -8px;
 
-    right: -8px;
+  top: 0;
 
-    top: 0;
+  width: 16px;
 
-    width: 16px;
+  height: 100%;
 
-    height: 100%;
-
-    cursor: col-resize;
+  cursor: col-resize;
 }
 
 .divisor-columna::before {
+  content: "";
 
-    content: "";
+  position: absolute;
 
-    position: absolute;
+  left: 7px;
 
-    left: 7px;
+  top: 0;
 
-    top: 0;
+  width: 1px;
 
-    width: 1px;
+  height: 100%;
 
-    height: 100%;
-
-    background: var(--border);
+  background: var(--border);
 }
-
 
 /* ======================================================
    TEXTO LARGO
    ====================================================== */
 
 .ui-btn {
+  max-width: 100%;
 
-    max-width: 100%;
+  overflow: hidden;
 
-    overflow: hidden;
+  text-overflow: ellipsis;
 
-    text-overflow: ellipsis;
-
-    white-space: nowrap;
+  white-space: nowrap;
 }
 
 .nota-contenedor {
-    position: relative;
-    width: 100%;
-    border: 1px solid transparent;
-    border-radius: var(--r4);
-    padding-left: var(--gap4);
-    transition: border-color var(--speed);
+  position: relative;
+  width: 100%;
+  border: 1px solid transparent;
+  border-radius: var(--r4);
+  padding-left: var(--gap4);
+  transition: border-color var(--speed);
 }
 
 .nota-contenedor:focus-within {
-    border-color: var(--highlight);
+  border-color: var(--highlight);
 }
 
 .nota-contenedor .nota {
-
-    flex: 1;
-
+  flex: 1;
 }
 
 .btn-emoji {
+  position: absolute;
 
-    position: absolute;
+  right: 6px;
+  top: 50%;
 
-    right: 6px;
-    top: 50%;
+  transform: translateY(-50%);
 
-    transform: translateY(-50%);
+  width: 22px;
+  height: 22px;
 
-    width: 22px;
-    height: 22px;
+  padding: 0;
+  margin: 0;
 
-    padding: 0;
-    margin: 0;
+  border: none;
+  background: none;
+  outline: none;
 
-    border: none;
-    background: none;
-    outline: none;
+  font-family: var(--font);
+  font-size: var(--fs16);
+  color: var(--text-disabled);
 
-    font-family: var(--font);
-    font-size: var(--fs16);
-    color: var(--text-disabled);
+  line-height: 22px;
 
-    line-height: 22px;
+  cursor: pointer;
 
-    cursor: pointer;
+  font-style: normal;
 
-    font-style: normal;
+  opacity: 0;
 
-    opacity: 0;
+  pointer-events: none;
 
-    pointer-events: none;
-
-    transition: opacity .12s;
-
+  transition: opacity 0.12s;
 }
 
 .nota-contenedor:focus-within .btn-emoji,
 .nota-contenedor:hover .btn-emoji {
+  opacity: 1;
 
-    opacity: 1;
-
-    pointer-events: auto;
-
+  pointer-events: auto;
 }
 
 .nota-contenedor:focus-within .nota,
 .nota-contenedor:hover .nota {
-
-    padding-right: 26px;
-
+  padding-right: 26px;
 }
 
 .btn-emoji:hover {
-
-    color: var(--text-highlight);
-
+  color: var(--text-highlight);
 }
 
 /* ==========================
@@ -907,26 +876,26 @@
    ========================== */
 
 .extra-tooltip {
-    position: fixed;
-    z-index: 20;
-    max-width: 260px;
-    padding: 8px 10px;
-    background: color-mix(in srgb, var(--overlay-tooltip) 97%, transparent);
-    border: 1px solid var(--border-light);
-    border-radius: 6px;
-    color: var(--text);
-    font-size: var(--fs13);
-    line-height: 1.4;
-    white-space: pre-wrap;
-    word-break: break-word;
-    pointer-events: none;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  position: fixed;
+  z-index: 20;
+  max-width: 260px;
+  padding: 8px 10px;
+  background: color-mix(in srgb, var(--overlay-tooltip) 97%, transparent);
+  border: 1px solid var(--border-light);
+  border-radius: 6px;
+  color: var(--text);
+  font-size: var(--fs13);
+  line-height: 1.4;
+  white-space: pre-wrap;
+  word-break: break-word;
+  pointer-events: none;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
 }
 
-.extra-tooltip-linea+.extra-tooltip-linea {
-    margin-top: 2px;
+.extra-tooltip-linea + .extra-tooltip-linea {
+  margin-top: 2px;
 }
 
 .extra-tooltip-subtitulo {
-    color: var(--text-disabled);
+  color: var(--text-disabled);
 }

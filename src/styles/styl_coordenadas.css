@@ -35,8 +35,8 @@
   padding: var(--gap4) var(--gap8);
   cursor: pointer;
   transition:
-    border-color .12s ease,
-    color .12s ease;
+    border-color 0.12s ease,
+    color 0.12s ease;
 }
 
 .coordenadas-boton-filtro:hover {
@@ -137,8 +137,8 @@
   cursor: pointer;
   padding: var(--gap4) var(--gap8);
   transition:
-    border-color .12s ease,
-    color .12s ease;
+    border-color 0.12s ease,
+    color 0.12s ease;
 }
 
 .coordenadas-boton-icono:hover:not(:disabled) {
@@ -249,16 +249,28 @@
 }
 
 .coordenadas-tabla tbody tr {
-  background: color-mix(in srgb, var(--tabla-fondo-color-impar) var(--tabla-fondo-opacidad), transparent);
+  background: color-mix(
+    in srgb,
+    var(--tabla-color-impar) var(--tabla-fondo-opacidad),
+    transparent
+  );
   transition: background var(--speed);
 }
 
 .coordenadas-tabla tbody tr:nth-child(even) {
-  background: color-mix(in srgb, var(--tabla-fondo-color-par) var(--tabla-fondo-opacidad), transparent);
+  background: color-mix(
+    in srgb,
+    var(--tabla-color-par) var(--tabla-fondo-opacidad),
+    transparent
+  );
 }
 
 .coordenadas-tabla tbody tr:hover {
-  background: color-mix(in srgb, var(--tabla-fondo-color-hover) var(--tabla-fondo-opacidad-hover), transparent);
+  background: color-mix(
+    in srgb,
+    var(--tabla-color-hover) var(--tabla-fondo-opacidad-hover),
+    transparent
+  );
 }
 
 .coordenadas-celda-opciones {
@@ -330,7 +342,11 @@
 }
 
 .coordenadas-numero-toggle-activo {
-  background: color-mix(in srgb, var(--green-dark) var(--boton-off-opacidad), transparent);
+  background: color-mix(
+    in srgb,
+    var(--green-dark) var(--boton-off-opacidad),
+    transparent
+  );
   border-color: color-mix(in srgb, var(--green-dark) 85%, transparent);
 }
 

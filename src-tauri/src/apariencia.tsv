@@ -120,7 +120,7 @@ nivel	id	nombre_ui	valor_defecto	tipo
 2	fondo-general	Fondo general		
 0	fondo-general-modo	Modo	plano	modo
 0	fondo-general-color2	Color 2	#181818	color
-2	fondo-app	Fondo tras tabla y barras		
+2	fondo-app	Fondo Ventana Principal		
 0	fondo-app-modo	Modo	degradado	modo
 0	fondo-app-color1	Color 1	#0d1117	color
 0	fondo-app-color2	Color 2	#05070a	color
@@ -137,9 +137,9 @@ nivel	id	nombre_ui	valor_defecto	tipo
 0	cabecera-tabla-color	Color	#181818	color
 0	cabecera-tabla-opacidad	Opacidad	65%	porcentaje
 2	fondo-tabla	Fondo de tabla		
-0	tabla-fondo-color-impar	Color impar	#202020	color
-0	tabla-fondo-color-par	Color par	#141414	color
-0	tabla-fondo-color-hover	Color hover	#03A9F4	color
+0	tabla-color-impar	Color impar	#202020	color
+0	tabla-color-par	Color par	#141414	color
+0	tabla-color-hover	Color hover	#03A9F4	color
 0	tabla-fondo-opacidad	Opacidad	50%	porcentaje
 0	tabla-fondo-opacidad-hover	Opacidad hover	24%	porcentaje
 2	botones-ghost	Botones		
