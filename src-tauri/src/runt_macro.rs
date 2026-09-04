@@ -612,10 +612,8 @@ fn ejecutar_paso_tecla_mouse(
     // tecla_extra/condicion normales.
     match paso.tecla_retencion.as_deref() {
         Some("down") => {
-            for modificador in &mods {
-                runtime::emitir_down_input(modificador.clone());
-                retenidos.push(modificador.clone());
-            }
+            runtime::emitir_mods_abajo(&mods);
+            retenidos.extend(mods.iter().cloned());
 
             runtime::emitir_down_input(gatillo.clone());
             retenidos.push(gatillo);
@@ -654,9 +652,7 @@ fn ejecutar_paso_tecla_mouse(
             CondicionTrigger::Triple => runtime::emitir_multiples_toques(&mods, &gatillo, 3),
 
             CondicionTrigger::Mantenido => {
-                for modificador in &mods {
-                    runtime::emitir_down_input(modificador.clone());
-                }
+                runtime::emitir_mods_abajo(&mods);
 
                 runtime::emitir_down_input(gatillo.clone());
 

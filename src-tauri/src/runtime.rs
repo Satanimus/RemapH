@@ -1226,6 +1226,33 @@ fn ejecutar_emitir(inputs: &[InputId], condicion: &CondicionTrigger) {
 // → UP gatillo → UP mods en orden inverso.
 // ======================================================
 
+// ======================================================
+// 🔁 EMITIR MODIFICADORES ABAJO (soporta duplicados)
+// ------------------------------------------------------
+// `mods` puede traer el mismo código repetido consecutivo
+// (multi-tap aplanado por el grabador de macro, ver
+// core_analisis_grabacion.ts: "1+2+2+2+2"). Un DOWN sobre una
+// tecla que ya está abajo es un no-op físico — para que cada
+// repetición produzca un toque real, cuando el código se repite
+// se cierra primero con un UP y recién ahí se manda el DOWN de
+// nuevo. pub(crate): usada también desde runt_macro.rs en las
+// ramas Down/Mantenido de "Simular teclas".
+// ======================================================
+
+pub(crate) fn emitir_mods_abajo(mods: &[InputId]) {
+    let mut anterior: Option<&InputId> = None;
+
+    for modificador in mods {
+        if anterior == Some(modificador) {
+            emitir_up_input(modificador.clone());
+            thread::sleep(Duration::from_millis(config::delay_entre_salida_doble()));
+        }
+
+        emitir_down_input(modificador.clone());
+        anterior = Some(modificador);
+    }
+}
+
 // pub(crate) desde la Etapa 8B: runt_macro.rs las usa directo para
 // el paso "Simular teclas" (Simple/Doble/Triple ya cubiertos por
 // estas dos; Mantenido y Normal/Turbo se arman a mano en
@@ -1233,9 +1260,7 @@ fn ejecutar_emitir(inputs: &[InputId], condicion: &CondicionTrigger) {
 // ahí). Antes privadas, hoy visibles en todo el crate — ninguna
 // cambia de firma ni de comportamiento.
 pub(crate) fn emitir_un_toque(mods: &[InputId], gatillo: &InputId) {
-    for modificador in mods {
-        emitir_down_input(modificador.clone());
-    }
+    emitir_mods_abajo(mods);
 
     emitir_down_input(gatillo.clone());
 
@@ -1260,9 +1285,7 @@ pub(crate) fn emitir_un_toque(mods: &[InputId], gatillo: &InputId) {
 // ======================================================
 
 pub(crate) fn emitir_multiples_toques(mods: &[InputId], gatillo: &InputId, n: u8) {
-    for modificador in mods {
-        emitir_down_input(modificador.clone());
-    }
+    emitir_mods_abajo(mods);
 
     for indice in 0..n {
         if indice > 0 {
@@ -1378,9 +1401,7 @@ fn emitir_combo_abajo(inputs: &[InputId]) {
         return;
     };
 
-    for modificador in mods {
-        emitir_down_input(modificador.clone());
-    }
+    emitir_mods_abajo(mods);
 
     emitir_down_input(gatillo.clone());
 }
