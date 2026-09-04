@@ -50,17 +50,11 @@
 //
 // tiempo_doble()
 // establecer_tiempo_doble()
-//     Tiempo máximo para detectar Doble.
-//     También define cuánto espera AnalizadorTrigger antes de decidir que una secuencia terminó.
-//
-// tiempo_triple()
-// establecer_tiempo_triple()
-//     Tiempo máximo, contado desde el Up del primer toque, para
-//     detectar Triple. Reemplaza a tiempo_doble en ese rol cuando
-//     existe al menos un binding Triple candidato para la entrada
-//     (ver analizador_trigger.rs, fase Triple) — es una ventana más
-//     larga porque tiene que alcanzar a entrar un tercer toque, no
-//     solo un segundo.
+//     Tiempo máximo entre toques consecutivos del gatillo para
+//     seguir contando repeticiones (Simple→Doble, Doble→Triple).
+//     Se reinicia en cada toque nuevo — no es una ventana única para
+//     todo el gesto. También define cuánto espera AnalizadorTrigger
+//     antes de decidir que una secuencia terminó.
 //
 // tiempo_mantenido()
 // establecer_tiempo_mantenido()
@@ -215,14 +209,11 @@ pub const NOMBRE_APP: &str = "RemapH";
 // ======================================================
 // ⏱️ TIEMPO DOBLE
 // ======================================================
+// Única ventana de repetición: se usa igual entre toque 1→2 y entre
+// toque 2→3 (Doble y Triple comparten el mismo número — ver
+// comentario de la función tiempo_doble() más abajo).
 
 static TIEMPO_DOBLE: AtomicU64 = AtomicU64::new(250);
-
-// ======================================================
-// ⏱️ TIEMPO TRIPLE
-// ======================================================
-
-static TIEMPO_TRIPLE: AtomicU64 = AtomicU64::new(380);
 
 // ======================================================
 // ⏳ TIEMPO MANTENIDO
@@ -239,6 +230,12 @@ static SENSIBILIDAD_RUEDA: AtomicU64 = AtomicU64::new(5);
 // ======================================================
 // 📥 LEER TIEMPO DOBLE
 // ======================================================
+// Ventana de repetición entre toques consecutivos del gatillo,
+// contada desde el Up del toque anterior. Se reutiliza igual para
+// distinguir Simple/Doble (toque 1→2) que para Doble/Triple (toque
+// 2→3): si un segundo toque no llegó a tiempo, un tercero tampoco
+// podría haber ocurrido, así que no hace falta un número más largo
+// para Triple — se descarta más rápido y con un solo timer.
 
 pub fn tiempo_doble() -> u64 {
     TIEMPO_DOBLE.load(Ordering::Relaxed)
@@ -250,22 +247,6 @@ pub fn tiempo_doble() -> u64 {
 
 pub fn establecer_tiempo_doble(valor: u64) {
     TIEMPO_DOBLE.store(valor, Ordering::Relaxed);
-}
-
-// ======================================================
-// 📥 LEER TIEMPO TRIPLE
-// ======================================================
-
-pub fn tiempo_triple() -> u64 {
-    TIEMPO_TRIPLE.load(Ordering::Relaxed)
-}
-
-// ======================================================
-// 📤 ESCRIBIR TIEMPO TRIPLE
-// ======================================================
-
-pub fn establecer_tiempo_triple(valor: u64) {
-    TIEMPO_TRIPLE.store(valor, Ordering::Relaxed);
 }
 
 // ======================================================

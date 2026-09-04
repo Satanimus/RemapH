@@ -268,26 +268,25 @@ function gatilloActual(grupo: GrupoAbierto): Entrada {
 // 🔁 CONDICIÓN DE MULTI-TAP (Regla 3)
 // ------------------------------------------------------
 // Decide si un nuevo toque del MISMO código que el gatillo actual
-// colapsa como doble/triple (mismas ventanas que cache.rs:
-// tiempo_doble/tiempo_triple, medidas desde el Up del toque
-// anterior) o si hay que aplanar: ventana superada, o ya se
-// alcanzó triple (tapsPrevios >= 3, tope de CondicionTrigger).
+// colapsa como doble/triple (misma ventana que cache.rs:
+// tiempo_doble, medida desde el Up del toque anterior — se
+// reutiliza igual entre toque 1→2 y 2→3) o si hay que aplanar:
+// ventana superada, o ya se alcanzó triple (tapsPrevios >= 3, tope
+// de CondicionTrigger).
 // ======================================================
 
 function condicionMultiTap(
   ultimoUp: number | undefined,
   momentoMs: number,
   tiempoDoble: number,
-  tiempoTriple: number,
   tapsPrevios: number,
 ): "doble" | "triple" | "aplanar" {
   if (tapsPrevios >= 2) {
     return "aplanar";
   }
 
-  const ventana = tapsPrevios === 0 ? tiempoDoble : tiempoTriple;
   const dentroDeVentana =
-    ultimoUp !== undefined && momentoMs - ultimoUp <= ventana;
+    ultimoUp !== undefined && momentoMs - ultimoUp <= tiempoDoble;
 
   if (!dentroDeVentana) {
     return "aplanar";
@@ -534,7 +533,6 @@ export function analizarGrabacion(
   eventos: EventoGrabadoUI[],
   config: ConfigInicioGrabacion,
   tiempoDoble: number,
-  tiempoTriple: number,
 ): PasoMacro[] {
   const pasos: PasoMacro[] = [];
 
@@ -658,7 +656,6 @@ export function analizarGrabacion(
           grupo.ultimoUpDe.get(actual.codigo),
           evento.momentoMs,
           tiempoDoble,
-          tiempoTriple,
           grupo.tapsGatilloActual,
         );
 

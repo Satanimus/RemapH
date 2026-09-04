@@ -19,8 +19,7 @@
 # las que no matcheen ninguna fila de este archivo.
 
 clave	nombre_ui	valor_defecto	tipo
-tiempo_doble	Tiempo para detectar doble toque (ms)	250	numero
-tiempo_triple	Tiempo para detectar triple toque (ms)	380	numero
+tiempo_doble	Tiempo entre toques, doble/triple (ms)	250	numero
 tiempo_mantenido	Tiempo mínimo para Mantenido (ms)	300	numero
 sensibilidad_rueda	Sensibilidad de la rueda (pulsos)	5	numero
 tiempo_repeticion	Intervalo de repetición Turbo (ms)	30	numero

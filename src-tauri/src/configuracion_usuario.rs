@@ -666,8 +666,6 @@ pub fn aplicar_valor(clave: &str, valor: &str) -> Result<(), String> {
     match clave {
         "tiempo_doble" => config::establecer_tiempo_doble(parsear_numero(valor)?),
 
-        "tiempo_triple" => config::establecer_tiempo_triple(parsear_numero(valor)?),
-
         "tiempo_mantenido" => config::establecer_tiempo_mantenido(parsear_numero(valor)?),
 
         "sensibilidad_rueda" => config::establecer_sensibilidad_rueda(parsear_numero(valor)?),

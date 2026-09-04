@@ -185,8 +185,9 @@ enum FaseSesion {
     },
     /// Timer con tiempo_doble corriendo, desde el Up del primer toque.
     EsperandoDoble,
-    /// Timer con tiempo_triple corriendo. `toques` arranca en 1
-    /// (representa el primer toque, ya ocurrido).
+    /// Timer con tiempo_doble corriendo (se reinicia en cada toque
+    /// nuevo — ver recibir_down_rt/recibir_down_captura). `toques`
+    /// arranca en 1 (representa el primer toque, ya ocurrido).
     EsperandoTriple { toques: u8 },
     /// Exclusivo de la rueda del mouse — se completa en la Etapa 4
     /// (ahí es donde llegan los InputState::Pulse). Queda declarado
@@ -308,10 +309,24 @@ pub(crate) fn recibir_down_rt(input: InputId) {
     }) {
         match runtime.sesiones[idx].fase {
             FaseSesion::EsperandoTriple { toques: 1 } => {
-                // Segundo Down físico: solo cuenta, sigue esperando
-                // (el timer esperar_triple sigue corriendo, va a leer
-                // `toques` al despertar — NO se toca la generación).
+                // Segundo Down físico: solo cuenta, sigue esperando el
+                // tercero. tiempo_doble() es la ÚNICA ventana de
+                // repetición (ver config.rs) y se reinicia en cada
+                // toque nuevo — el tercer toque recibe su propia
+                // ventana completa en vez de heredar el resto de una
+                // ventana medida desde el primer toque (ese diseño
+                // viejo causaba el bug "mod + gatillo triple se
+                // simplifica a mod+gatillo simple": con un modificador
+                // sostenido la coordinación motriz extra agotaba el
+                // margen entre el segundo y el tercer toque).
                 runtime.sesiones[idx].fase = FaseSesion::EsperandoTriple { toques: 2 };
+                runtime.sesiones[idx].generacion += 1;
+                iniciar_timer_generico(
+                    &mut runtime,
+                    idx,
+                    config::tiempo_doble(),
+                    CondicionTrigger::Doble,
+                );
                 return;
             }
             FaseSesion::EsperandoDoble => {
@@ -832,7 +847,7 @@ pub(crate) fn recibir_up_rt(input: InputId) {
             iniciar_timer_generico(
                 &mut runtime,
                 idx,
-                config::tiempo_triple(),
+                config::tiempo_doble(),
                 CondicionTrigger::Doble, // fallback si expira con 2 toques (ver timer)
             );
         } else if necesita_doble {
@@ -1040,8 +1055,18 @@ pub(crate) fn recibir_down_captura(input: InputId) {
                 resolver_condicion_captura(&mut captura, CondicionTrigger::Doble)
             }
             FaseSesion::EsperandoTriple { toques: 1 } => {
-                if let Some(s) = captura.sesion.as_mut() {
+                // Ver comentario equivalente en recibir_down_rt: se
+                // reinicia el timer de tiempo_doble() acá para que el
+                // tercer toque tenga su propia ventana completa, en
+                // vez de heredar lo que quede de la ventana medida
+                // desde el primer Up.
+                let generacion = captura.sesion.as_mut().map(|s| {
                     s.fase = FaseSesion::EsperandoTriple { toques: 2 };
+                    s.generacion += 1;
+                    s.generacion
+                });
+                if let Some(generacion) = generacion {
+                    iniciar_timer_repeticion_captura(generacion);
                 }
                 None
             }
@@ -1094,7 +1119,7 @@ pub(crate) fn recibir_up_captura(input: InputId) {
         sesion.fase = FaseSesion::EsperandoTriple { toques: 1 };
         let generacion = sesion.generacion;
         drop(captura);
-        iniciar_timer_triple_captura(generacion);
+        iniciar_timer_repeticion_captura(generacion);
         return;
     }
 
@@ -1147,9 +1172,9 @@ fn iniciar_timer_mantenido_captura(generacion: u64) {
     });
 }
 
-fn iniciar_timer_triple_captura(generacion: u64) {
+fn iniciar_timer_repeticion_captura(generacion: u64) {
     std::thread::spawn(move || {
-        std::thread::sleep(std::time::Duration::from_millis(config::tiempo_triple()));
+        std::thread::sleep(std::time::Duration::from_millis(config::tiempo_doble()));
         let mut captura = CAPTURA.lock().unwrap();
         if !vigente_captura(&captura, generacion) {
             return;
@@ -1175,7 +1200,7 @@ fn iniciar_timer_triple_captura(generacion: u64) {
 // 🛟 VIGÍA DE INACTIVIDAD (red de seguridad)
 // ------------------------------------------------------
 // Mismo patrón que iniciar_timer_mantenido_captura/
-// iniciar_timer_triple_captura (thread + sleep + chequeo por
+// iniciar_timer_repeticion_captura (thread + sleep + chequeo por
 // generación, para descartar vigías viejos de una captura
 // anterior) pero con su propia generación (vigia_generacion),
 // independiente de la de la sesión. A propósito NO se reinicia

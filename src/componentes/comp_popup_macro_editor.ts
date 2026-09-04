@@ -947,13 +947,11 @@ function montarEditor(
       );
 
       const tiempoDoble = await invoke<number>("obtener_tiempo_doble");
-      const tiempoTriple = await invoke<number>("obtener_tiempo_triple");
 
       const nuevosPasos = analizarGrabacion(
         eventos,
         config,
         tiempoDoble,
-        tiempoTriple,
       );
 
       const errorRetencion = validarRetencionMacro(nuevosPasos);
