@@ -931,9 +931,11 @@ function montarEditor(
   // config elegida en el panel de inicio y la ventana de combo del
   // capturador normal (Regla 9 — mismo valor que usa
   // AnalizadorTrigger para decidir que una secuencia terminó, ver
-  // tiempo_doble() en config.rs), los inserta al final de
-  // macroArchivo.pasos (Regla 8: el usuario solo ve el resultado
-  // ya agregado a la tabla) y cierra la ventana overlay.
+  // tiempo_doble() en config.rs), los valida con
+  // validarRetencionMacro (Patrón Diferido, Reglas 4-6) y, si
+  // pasan, los inserta al final de macroArchivo.pasos (Regla 8: el
+  // usuario solo ve el resultado ya agregado a la tabla) y cierra
+  // la ventana overlay.
   // ----------------------------------
 
   async function finalizarGrabacion(
@@ -944,11 +946,23 @@ function montarEditor(
         "tomar_eventos_grabacion_macro",
       );
 
-      const ventanaComboMs = await invoke<number>("obtener_tiempo_doble");
+      const tiempoDoble = await invoke<number>("obtener_tiempo_doble");
+      const tiempoTriple = await invoke<number>("obtener_tiempo_triple");
 
-      const nuevosPasos = analizarGrabacion(eventos, config, ventanaComboMs);
+      const nuevosPasos = analizarGrabacion(
+        eventos,
+        config,
+        tiempoDoble,
+        tiempoTriple,
+      );
 
-      macroArchivo.pasos.push(...nuevosPasos);
+      const errorRetencion = validarRetencionMacro(nuevosPasos);
+
+      if (errorRetencion) {
+        window.alert(errorRetencion);
+      } else {
+        macroArchivo.pasos.push(...nuevosPasos);
+      }
     } catch (error) {
       console.error("❌ No se pudo analizar la grabación de macro:", error);
     } finally {

@@ -13,6 +13,7 @@
 
 import type { Entrada } from "./core_entrada";
 import { crearTrigger } from "./core_trigger";
+import type { Trigger } from "./core_trigger";
 import type { PasoMacro, PuntoReferenciaPasoMacro } from "./core_macro";
 import { crearPasoMacro } from "./core_macro";
 import type { ConfigInicioGrabacion } from "./core_grabacion_macro";
@@ -179,21 +180,41 @@ function calcularEsperaMs(
 // ======================================================
 // 🧩 GRUPO ABIERTO (combo en construcción)
 // ------------------------------------------------------
-// Regla 9: mismo análisis que el capturador de teclas normal
-// — mientras las pulsaciones caen dentro de ventanaComboMs, se
-// arman como modificadores + gatillo de un mismo Trigger.
+// Regla 1: el grupo sigue abierto mientras algo siga físicamente
+// presionado (teclasVivas no vacío), sin límite de tiempo — ya no
+// se compara contra una ventana fija entre eventos.
 // ======================================================
 
 interface GrupoAbierto {
-  modificadores: Entrada[];
+  // Orden de aparición de las entradas de este grupo. La última es
+  // el "gatillo actual" (gatilloActual()); todas las anteriores son
+  // los modificadores. Puede contener códigos repetidos cuando un
+  // multi-tap se aplanó (Regla 3: "1+2+2+2").
+  secuencia: Entrada[];
 
-  gatillo: Entrada;
+  // Condición resultante del multi-tap del gatillo actual (Regla
+  // 3): "doble"/"triple" mientras los toques quedan colapsados sin
+  // agregarse a secuencia; vuelve a "simple" en cuanto se aplana o
+  // se pasa a una tecla nueva.
+  condicion: "simple" | "doble" | "triple";
 
-  // Entradas Down que todavía no recibieron su Up — mientras
-  // no esté vacío, el grupo sigue abierto aunque se haya vuelto
-  // a superar ventanaComboMs (Regla 9 solo gobierna cuándo un
-  // Down nuevo se suma como modificador vs. abre grupo nuevo;
-  // el cierre por Up es independiente, Regla 6/Etapa E8).
+  // Toques ya contados del gatillo actual sin agregarse a secuencia
+  // (0 = todavía un solo toque, sin intento de doble/triple).
+  tapsGatilloActual: number;
+
+  // true una vez que el gatillo actual "se aplanó" (ventana de
+  // doble/triple superada, o ya se llegó a triple y sigue
+  // repitiéndose) — de ahí en más, cualquier repique de esa misma
+  // tecla se agrega directo a secuencia, sin reintentar doble/triple.
+  gatilloLiteral: boolean;
+
+  // momentoMs del último Up de cada código — insumo de
+  // condicionMultiTap() para medir la ventana desde el toque
+  // anterior (mismo criterio que cache.rs).
+  ultimoUpDe: Map<string, number>;
+
+  // Entradas Down que todavía no recibieron su Up — mientras no
+  // esté vacío, el grupo sigue abierto (Regla 1).
   teclasVivas: string[];
 
   posicion: [number, number] | null;
@@ -212,6 +233,164 @@ interface GrupoAbierto {
   momentoApertura: number;
 
   momentoUltimo: number;
+
+  // Etapa C — Patrón Diferido (Reglas 4-6). true en cuanto el grupo
+  // deja de poder representarse como una sola fila (Down de tecla
+  // nueva tras un ciclo ya completo, o Up en orden no anidado).
+  diferido: boolean;
+
+  // Registro cronológico de cada Down/Up del grupo — insumo de
+  // emitirDiferido() para reconstruir las líneas diferidas.
+  eventosCrudos: {
+    entrada: Entrada;
+    state: "Down" | "Up";
+    momentoMs: number;
+  }[];
+
+  // Snapshot de grupo.secuencia.slice(0, -1) tomado en el instante
+  // en que Regla 4 dispara diferido=true (modificador(es) sostenidos
+  // que enmarcan el grupo — uno solo, o varios si venían pegados al
+  // principio sin tecla intermedia, Regla 5). null mientras no se
+  // haya tomado el snapshot, o si Regla 6 (orden no anidado) invalida
+  // cualquier agrupación: en ese caso el grupo entero se reconstruye
+  // línea por línea desde eventosCrudos, sin envoltorio.
+  wrapperDiferido: Entrada[] | null;
+}
+
+// El "gatillo actual" siempre es la última entrada agregada a
+// secuencia — la tecla que se está disambiguando (mismo criterio
+// que Sesion.objetivo() en cache.rs).
+function gatilloActual(grupo: GrupoAbierto): Entrada {
+  return grupo.secuencia[grupo.secuencia.length - 1];
+}
+
+// ======================================================
+// 🔁 CONDICIÓN DE MULTI-TAP (Regla 3)
+// ------------------------------------------------------
+// Decide si un nuevo toque del MISMO código que el gatillo actual
+// colapsa como doble/triple (mismas ventanas que cache.rs:
+// tiempo_doble/tiempo_triple, medidas desde el Up del toque
+// anterior) o si hay que aplanar: ventana superada, o ya se
+// alcanzó triple (tapsPrevios >= 3, tope de CondicionTrigger).
+// ======================================================
+
+function condicionMultiTap(
+  ultimoUp: number | undefined,
+  momentoMs: number,
+  tiempoDoble: number,
+  tiempoTriple: number,
+  tapsPrevios: number,
+): "doble" | "triple" | "aplanar" {
+  if (tapsPrevios >= 2) {
+    return "aplanar";
+  }
+
+  const ventana = tapsPrevios === 0 ? tiempoDoble : tiempoTriple;
+  const dentroDeVentana =
+    ultimoUp !== undefined && momentoMs - ultimoUp <= ventana;
+
+  if (!dentroDeVentana) {
+    return "aplanar";
+  }
+
+  return tapsPrevios === 0 ? "doble" : "triple";
+}
+
+// ======================================================
+// 🧵 EMITIR DIFERIDO (Patrón Diferido, Reglas 4-6)
+// ------------------------------------------------------
+// Reconstruye los pasos de un grupo diferido a partir de
+// eventosCrudos (registro cronológico de cada Down/Up).
+//
+// Modo con envoltorio (grupo.wrapperDiferido no nulo — Reglas
+// 4-5): el/los modificador(es) sostenidos que enmarcan el grupo
+// salen como una línea "(down)" al principio y una línea "(up)"
+// al final; cada tecla intermedia que completa su propio ciclo
+// down/up mientras el envoltorio sigue sostenido sale como una
+// única fila simple (Regla 4), en el orden real en que ocurrieron.
+//
+// Modo sin envoltorio (grupo.wrapperDiferido null — Regla 6,
+// orden de liberación no anidado): no hay envoltorio confiable
+// que fijar — cada evento crudo del grupo entero sale como su
+// propia línea Down o Up independiente, en el orden real en que
+// ocurrió.
+// ======================================================
+
+function triggerDeTecla(
+  gatillo: Entrada,
+  modificadores: Entrada[] = [],
+): Trigger {
+  const trigger = crearTrigger();
+  trigger.modificadores = modificadores;
+  trigger.gatillo = gatillo;
+  trigger.condicion = "simple";
+  return trigger;
+}
+
+function emitirDiferido(
+  grupo: GrupoAbierto,
+  _config: ConfigInicioGrabacion,
+): PasoMacro[] {
+  const pasos: PasoMacro[] = [];
+
+  // Regla 6: sin envoltorio confiable — línea por línea, literal.
+  if (!grupo.wrapperDiferido) {
+    for (const evento of grupo.eventosCrudos) {
+      const paso = crearPasoMacro("tecla_mouse");
+      paso.teclaAccion = triggerDeTecla(evento.entrada);
+      paso.teclaRetencion = evento.state === "Down" ? "down" : "up";
+      pasos.push(paso);
+    }
+    return pasos;
+  }
+
+  // Reglas 4-5: envoltorio sostenido al principio y al final.
+  const wrapper = grupo.wrapperDiferido;
+  const codigosWrapper = new Set(wrapper.map((entrada) => entrada.codigo));
+
+  const pasoDown = crearPasoMacro("tecla_mouse");
+  pasoDown.teclaAccion = triggerDeTecla(
+    wrapper[wrapper.length - 1],
+    wrapper.slice(0, -1),
+  );
+  pasoDown.teclaRetencion = "down";
+  pasos.push(pasoDown);
+
+  // Teclas intermedias (Regla 4): cada una completa su propio ciclo
+  // down/up mientras el envoltorio sigue sostenido — una sola fila
+  // simple por ciclo completo, en el orden real en que ocurrieron.
+  const abiertas = new Map<string, Entrada>();
+
+  for (const evento of grupo.eventosCrudos) {
+    if (codigosWrapper.has(evento.entrada.codigo)) {
+      continue;
+    }
+
+    if (evento.state === "Down") {
+      abiertas.set(evento.entrada.codigo, evento.entrada);
+      continue;
+    }
+
+    if (!abiertas.has(evento.entrada.codigo)) {
+      continue;
+    }
+
+    abiertas.delete(evento.entrada.codigo);
+
+    const pasoIntermedio = crearPasoMacro("tecla_mouse");
+    pasoIntermedio.teclaAccion = triggerDeTecla(evento.entrada);
+    pasos.push(pasoIntermedio);
+  }
+
+  const pasoUp = crearPasoMacro("tecla_mouse");
+  pasoUp.teclaAccion = triggerDeTecla(
+    wrapper[wrapper.length - 1],
+    wrapper.slice(0, -1),
+  );
+  pasoUp.teclaRetencion = "up";
+  pasos.push(pasoUp);
+
+  return pasos;
 }
 
 // ======================================================
@@ -255,7 +434,7 @@ function cerrarGrupo(
   }
 
   const esArrastre =
-    grupo.gatillo.tipo === "Mouse" &&
+    gatilloActual(grupo).tipo === "Mouse" &&
     !!grupo.posicion &&
     !!grupo.posicionAlSoltar &&
     (grupo.posicion[0] !== grupo.posicionAlSoltar[0] ||
@@ -279,10 +458,19 @@ function cerrarGrupo(
     pasos.push(pasoCoordenada);
   }
 
+  // Regla 4-6 (Etapa C): grupo diferido — ya no cabe en una sola fila
+  // Tecla/Mouse ni en el par down/up de arrastre de abajo (que asume
+  // un único gatillo). Se delega la construcción de los pasos de
+  // Tecla/Mouse completa a emitirDiferido().
+  if (grupo.diferido) {
+    pasos.push(...emitirDiferido(grupo, config));
+    return pasos;
+  }
+
   const trigger = crearTrigger();
-  trigger.modificadores = grupo.modificadores;
-  trigger.gatillo = grupo.gatillo;
-  trigger.condicion = "simple";
+  trigger.modificadores = grupo.secuencia.slice(0, -1);
+  trigger.gatillo = gatilloActual(grupo);
+  trigger.condicion = grupo.condicion;
 
   if (!esArrastre) {
     const pasoTecla = crearPasoMacro("tecla_mouse");
@@ -320,9 +508,9 @@ function cerrarGrupo(
   // Mismo trigger (secuencia idéntica) — es lo que
   // validarRetencionMacro exige para emparejar down/up.
   const triggerUp = crearTrigger();
-  triggerUp.modificadores = grupo.modificadores;
-  triggerUp.gatillo = grupo.gatillo;
-  triggerUp.condicion = "simple";
+  triggerUp.modificadores = grupo.secuencia.slice(0, -1);
+  triggerUp.gatillo = gatilloActual(grupo);
+  triggerUp.condicion = grupo.condicion;
   pasoUp.teclaAccion = triggerUp;
   pasoUp.teclaRetencion = "up";
   pasos.push(pasoUp);
@@ -334,17 +522,19 @@ function cerrarGrupo(
 // 🎬 ANÁLISIS PRINCIPAL
 // ------------------------------------------------------
 // Recorre los eventos en orden manteniendo un único grupo
-// abierto a la vez (Reglas 6, 7, 9, 10, 12). Down/Up de
-// arrastre diferido "(down)"/"(up)" explícito NO se resuelve
-// acá — Etapa E solo agrupa combos y separa Coordenada/Tecla;
-// la sintaxis "(down)" es editable después por el usuario en
-// el editor (Regla 13, Etapa F para el soporte en runtime).
+// abierto a la vez (Reglas 1-7). Patrón Diferido (Reglas 4-6:
+// tecla nueva tras un ciclo ya completo, u orden de liberación
+// no anidado) ya queda resuelto en esta etapa — marca
+// grupo.diferido y, si corresponde, fija grupo.wrapperDiferido;
+// cerrarGrupo() delega la construcción final de esos pasos a
+// emitirDiferido().
 // ======================================================
 
 export function analizarGrabacion(
   eventos: EventoGrabadoUI[],
   config: ConfigInicioGrabacion,
-  ventanaComboMs: number,
+  tiempoDoble: number,
+  tiempoTriple: number,
 ): PasoMacro[] {
   const pasos: PasoMacro[] = [];
 
@@ -381,7 +571,8 @@ export function analizarGrabacion(
     );
 
     if (grupoACerrar.posicion) {
-      ultimaPosicionEmitida = grupoACerrar.posicionAlSoltar ?? grupoACerrar.posicion;
+      ultimaPosicionEmitida =
+        grupoACerrar.posicionAlSoltar ?? grupoACerrar.posicion;
     }
 
     momentoCierreAnterior = momentoCierre;
@@ -396,57 +587,131 @@ export function analizarGrabacion(
     grupo = null;
   };
 
+  const crearGrupo = (evento: EventoGrabadoUI): GrupoAbierto => ({
+    secuencia: [evento.entrada],
+    condicion: "simple",
+    tapsGatilloActual: 0,
+    gatilloLiteral: false,
+    ultimoUpDe: new Map(),
+    teclasVivas: [evento.entrada.codigo],
+    posicion: evento.posicion,
+    ventana: evento.ventana,
+    posicionAlSoltar: null,
+    ventanaAlSoltar: null,
+    momentoApertura: evento.momentoMs,
+    momentoUltimo: evento.momentoMs,
+    diferido: false,
+    eventosCrudos:
+      evento.state === "Down"
+        ? [
+            {
+              entrada: evento.entrada,
+              state: "Down",
+              momentoMs: evento.momentoMs,
+            },
+          ]
+        : [],
+    wrapperDiferido: null,
+  });
+
   for (const evento of eventos) {
     if (evento.state === "Down") {
       // Auto-repetición del SO: mientras se mantiene una tecla
       // presionada, Windows reenvía Down periódicamente sin que
       // haya habido Up de por medio. Si el código ya está vivo en
-      // el grupo actual, es esa repetición — se descarta entera
-      // (no abre grupo nuevo, no cierra el actual, no se suma
-      // como modificador) para que la tecla aparezca una sola vez
-      // sin importar el "tiempo" que se la mantuvo, y para que no
-      // corte el combo en dos si la repetición llega después de
-      // ventanaComboMs.
+      // el grupo actual, es esa repetición — se descarta entera.
       if (grupo && grupo.teclasVivas.includes(evento.entrada.codigo)) {
         grupo.momentoUltimo = evento.momentoMs;
         continue;
       }
 
       if (!grupo) {
-        grupo = {
-          modificadores: [],
-          gatillo: evento.entrada,
-          teclasVivas: [evento.entrada.codigo],
-          posicion: evento.posicion,
-          ventana: evento.ventana,
-          posicionAlSoltar: null,
-          ventanaAlSoltar: null,
-          momentoApertura: evento.momentoMs,
-          momentoUltimo: evento.momentoMs,
-        };
+        grupo = crearGrupo(evento);
         continue;
       }
 
-      if (evento.momentoMs - grupo.momentoUltimo <= ventanaComboMs) {
-        grupo.modificadores.push(grupo.gatillo);
-        grupo.gatillo = evento.entrada;
+      const actual = gatilloActual(grupo);
+
+      // Repique del MISMO gatillo ya aplanado (cola de la Regla 3):
+      // se agrega directo a secuencia, literal, sin reintentar
+      // doble/triple y SIN pasar por la comprobación de Patrón
+      // Diferido de abajo — un repique del propio gatillo nunca la
+      // dispara, sin importar cuántas veces se repita ("1+2+2+2+2",
+      // no importa cuántos "2" haya).
+      if (grupo.gatilloLiteral && evento.entrada.codigo === actual.codigo) {
+        grupo.secuencia.push(evento.entrada);
         grupo.teclasVivas.push(evento.entrada.codigo);
         grupo.momentoUltimo = evento.momentoMs;
+        grupo.eventosCrudos.push({
+          entrada: evento.entrada,
+          state: "Down",
+          momentoMs: evento.momentoMs,
+        });
         continue;
       }
 
-      cerrar();
-      grupo = {
-        modificadores: [],
-        gatillo: evento.entrada,
-        teclasVivas: [evento.entrada.codigo],
-        posicion: evento.posicion,
-        ventana: evento.ventana,
-        posicionAlSoltar: null,
-        ventanaAlSoltar: null,
-        momentoApertura: evento.momentoMs,
-        momentoUltimo: evento.momentoMs,
-      };
+      // Regla 3: repique del MISMO gatillo — intenta colapsar en
+      // doble/triple; si la ventana se superó o ya se llegó a
+      // triple, aplana (agrega literal a secuencia).
+      if (evento.entrada.codigo === actual.codigo) {
+        const resultado = condicionMultiTap(
+          grupo.ultimoUpDe.get(actual.codigo),
+          evento.momentoMs,
+          tiempoDoble,
+          tiempoTriple,
+          grupo.tapsGatilloActual,
+        );
+
+        if (resultado === "aplanar") {
+          for (let i = 0; i < grupo.tapsGatilloActual; i++) {
+            grupo.secuencia.push(actual);
+          }
+          grupo.secuencia.push(evento.entrada);
+          grupo.condicion = "simple";
+          grupo.gatilloLiteral = true;
+          grupo.tapsGatilloActual = 0;
+        } else {
+          grupo.tapsGatilloActual += 1;
+          grupo.condicion = resultado;
+        }
+
+        grupo.teclasVivas.push(evento.entrada.codigo);
+        grupo.momentoUltimo = evento.momentoMs;
+        grupo.eventosCrudos.push({
+          entrada: evento.entrada,
+          state: "Down",
+          momentoMs: evento.momentoMs,
+        });
+        continue;
+      }
+
+      // Regla 1 / Regla 4: tecla nueva. Si el grupo ya es diferido,
+      // o si alguna tecla anterior de la secuencia ya completó su
+      // ciclo down/up mientras el grupo seguía abierto (secuencia
+      // más larga que teclasVivas), esta tecla ya no se suma a
+      // secuencia — el grupo pasa a Patrón Diferido (Regla 4) y el
+      // envoltorio sostenido queda fijado en grupo.secuencia.slice(0,
+      // -1) tal como estaba justo antes de este evento (Regla 5 si
+      // ese envoltorio tiene 2+ teclas pegadas al principio).
+      if (grupo.diferido || grupo.secuencia.length > grupo.teclasVivas.length) {
+        if (!grupo.diferido) {
+          grupo.wrapperDiferido = grupo.secuencia.slice(0, -1);
+        }
+        grupo.diferido = true;
+      } else {
+        grupo.secuencia.push(evento.entrada);
+        grupo.condicion = "simple";
+        grupo.gatilloLiteral = false;
+        grupo.tapsGatilloActual = 0;
+      }
+
+      grupo.teclasVivas.push(evento.entrada.codigo);
+      grupo.momentoUltimo = evento.momentoMs;
+      grupo.eventosCrudos.push({
+        entrada: evento.entrada,
+        state: "Down",
+        momentoMs: evento.momentoMs,
+      });
       continue;
     }
 
@@ -455,20 +720,42 @@ export function analizarGrabacion(
         continue;
       }
 
+      grupo.ultimoUpDe.set(evento.entrada.codigo, evento.momentoMs);
+
       // Posición al soltar el GATILLO (el botón de mouse que
       // manda la acción, no un modificador que se suelta antes) —
       // es la que se compara contra la de apertura para detectar
       // arrastre. Se toma del propio evento Up, que trae su
       // posición/ventana actual del back-end.
-      if (evento.entrada.codigo === grupo.gatillo.codigo) {
+      if (evento.entrada.codigo === gatilloActual(grupo).codigo) {
         grupo.posicionAlSoltar = evento.posicion;
         grupo.ventanaAlSoltar = evento.ventana;
+      }
+
+      // Regla 6: orden de liberación no anidado — se suelta una
+      // tecla que no es el gatillo actual MIENTRAS el gatillo actual
+      // sigue vivo (si el gatillo ya se hubiese soltado antes, esto
+      // sería un cierre normal en orden anidado, Regla 2). Invalida
+      // cualquier envoltorio ya fijado: el grupo entero se reconstruye
+      // línea por línea desde eventosCrudos (emitirDiferido, modo sin
+      // envoltorio).
+      if (
+        evento.entrada.codigo !== gatilloActual(grupo).codigo &&
+        grupo.teclasVivas.includes(gatilloActual(grupo).codigo)
+      ) {
+        grupo.diferido = true;
+        grupo.wrapperDiferido = null;
       }
 
       grupo.teclasVivas = grupo.teclasVivas.filter(
         (codigo) => codigo !== evento.entrada.codigo,
       );
       grupo.momentoUltimo = evento.momentoMs;
+      grupo.eventosCrudos.push({
+        entrada: evento.entrada,
+        state: "Up",
+        momentoMs: evento.momentoMs,
+      });
 
       if (grupo.teclasVivas.length === 0) {
         cerrar();
@@ -476,14 +763,16 @@ export function analizarGrabacion(
       continue;
     }
 
-    // Pulse (Regla 12: incluye Rueda)
-    if (grupo && evento.momentoMs - grupo.momentoUltimo <= ventanaComboMs) {
-      const modificadores = [...grupo.modificadores, grupo.gatillo];
-
+    // Pulse (Regla 12: incluye Rueda) — Regla 1: se une al grupo
+    // abierto si algo sigue sostenido, sin comparar tiempo.
+    if (grupo && grupo.teclasVivas.length > 0) {
       emitirCierre(
         {
-          modificadores,
-          gatillo: evento.entrada,
+          secuencia: [...grupo.secuencia, evento.entrada],
+          condicion: "simple",
+          tapsGatilloActual: 0,
+          gatilloLiteral: false,
+          ultimoUpDe: grupo.ultimoUpDe,
           teclasVivas: [],
           posicion: grupo.posicion ?? evento.posicion,
           ventana: grupo.ventana ?? evento.ventana,
@@ -491,6 +780,9 @@ export function analizarGrabacion(
           ventanaAlSoltar: null,
           momentoApertura: grupo.momentoApertura,
           momentoUltimo: evento.momentoMs,
+          diferido: false,
+          eventosCrudos: [],
+          wrapperDiferido: null,
         },
         evento.momentoMs,
       );
@@ -501,20 +793,7 @@ export function analizarGrabacion(
 
     cerrar();
 
-    emitirCierre(
-      {
-        modificadores: [],
-        gatillo: evento.entrada,
-        teclasVivas: [],
-        posicion: evento.posicion,
-        ventana: evento.ventana,
-        posicionAlSoltar: null,
-        ventanaAlSoltar: null,
-        momentoApertura: evento.momentoMs,
-        momentoUltimo: evento.momentoMs,
-      },
-      evento.momentoMs,
-    );
+    emitirCierre(crearGrupo(evento), evento.momentoMs);
   }
 
   cerrar();

@@ -1064,6 +1064,7 @@ pub(crate) fn recibir_down_captura(input: InputId) {
         .get_or_insert_with(|| Sesion::nueva(0, Vec::new(), false));
     sesion.entrada.push(input.clone());
     sesion.generacion += 1;
+    sesion.pendiente = None;
     sesion.fase = FaseSesion::EsperandoMantenido {
         necesita_doble: true,
         necesita_triple: true,

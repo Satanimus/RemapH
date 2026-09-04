@@ -157,6 +157,7 @@ pub fn run() {
             comandos::seleccionar_carpeta,
             comandos::obtener_programas_abrir_con,
             comandos::obtener_tiempo_doble,
+            comandos::obtener_tiempo_triple,
             comandos::establecer_tiempo_doble,
             comandos::obtener_tiempo_mantenido,
             comandos::abrir_selector_emoji,

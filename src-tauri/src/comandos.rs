@@ -357,6 +357,11 @@ pub fn obtener_tiempo_doble() -> u64 {
 }
 
 #[tauri::command]
+pub fn obtener_tiempo_triple() -> u64 {
+    config::tiempo_triple()
+}
+
+#[tauri::command]
 pub fn establecer_tiempo_doble(valor: u64) {
     config::establecer_tiempo_doble(valor)
 }
