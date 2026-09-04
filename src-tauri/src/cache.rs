@@ -16,7 +16,7 @@ use crate::perfil_cache::{
     AccionCache, AppCache, ComportamientoMacro, CondicionTrigger, CoordenadaCache, ExtraCache,
     RemapeoCache,
 };
-use crate::{config, entrada, motor, perfil_ui, runtime};
+use crate::{config, entrada, perfil_ui, runtime};
 use std::collections::HashMap;
 use std::sync::{LazyLock, Mutex};
 
@@ -1025,17 +1025,18 @@ fn activar_captura_interna() {
     // Up real jamás va a llegar a Windows: mientras la captura esté
     // activa, entrada.rs consume TODO (ver su cabecera) y nunca reenvía
     // nada — Windows seguía creyendo esas teclas apretadas para siempre.
-    // Se emula acá mismo, una sola vez al activar, el Up hacia Windows
-    // de cada una — dejando todo limpio antes de seguir armando la
+    // entrada::soltar_forzado() emula acá mismo, una sola vez al
+    // activar, el Up hacia Windows de cada una Y la purga de cualquier
+    // grupo DEVOLVIENDO pendiente en entrada.rs (ver su doc — sin la
+    // purga queda un grupo zombie que rompe la próxima captura sí,
+    // la otra no) — dejando todo limpio antes de seguir armando la
     // captura (más abajo se agregan igual como modificador vía
     // perfil_ui::recibir_down). No hace falta guardar ningún estado de
-    // "pendiente de soltar" en ningún lado: para cuando el usuario
-    // suelte esa tecla de verdad, Windows ya la tiene como levantada,
-    // así que ese Up físico real simplemente se consume en Captura como
+    // "pendiente de soltar" en cache.rs: para cuando el usuario suelte
+    // esa tecla de verdad, Windows ya la tiene como levantada, así que
+    // ese Up físico real simplemente se consume en Captura como
     // cualquier otro (ver recibir_up_captura) sin volver a emitirse.
-    for input in &presionadas_previas {
-        motor::emitir_evento(InputEvent::up(input.clone()));
-    }
+    entrada::soltar_forzado(&presionadas_previas);
 
     let mut captura = CAPTURA.lock().unwrap();
     captura.activa = true;

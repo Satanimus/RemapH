@@ -462,6 +462,24 @@ pub fn procesar_evento(evento: InputEvent) {
     EVENTO_EN_CURSO.with(|c| *c.borrow_mut() = None);
 }
 
+/// [FIX] Llamada por Cache al activar Modo Captura, por cada tecla que
+/// ya estaba físicamente abajo en ese momento: emite su Up a Windows
+/// (deja el estado del sistema limpio) Y la purga de cualquier grupo
+/// DEVOLVIENDO que la tuviera pendiente. Lo segundo es indispensable:
+/// sin purgar, ese grupo queda zombie (nunca ve el Up real — Captura
+/// se lo come primero, ver la excepción de arriba) y termina
+/// interceptando en silencio el PRÓXIMO Down real de esa tecla (rama
+/// a: lo reemite crudo y hace `return` antes de llegar a
+/// cache::procesar_evento_runtime()) — la tecla queda invisible para
+/// RUNTIME.presionadas en la vuelta siguiente. Efecto observado: la
+/// captura funciona una vez sí, una vez no, alternando.
+pub(crate) fn soltar_forzado(inputs: &[InputId]) {
+    for input in inputs {
+        motor::emitir_evento(InputEvent::up(input.clone()));
+    }
+    purgar_de_devolviendo(inputs);
+}
+
 /// Llamada por Cache (síncrona o desde el timer): no hay match posible.
 /// Si había un RETENIDO, se reinyecta su buffer completo en orden, sin
 /// delay, y lo que quede sin soltar pasa a un grupo DEVOLVIENDO (modo
