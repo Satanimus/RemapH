@@ -783,6 +783,39 @@ fn resembrar_fantasma(restantes: Vec<InputId>) {
     }
 }
 
+/// Llamada al entrar en Modo Captura (ver activar_captura_interna):
+/// vacía Runtime por completo y devuelve todo lo que estaba
+/// físicamente presionado en ese instante. Sin esto, cualquier
+/// modificador que el usuario ya tuviera abajo al abrir el botón
+/// Capturador (ej. Ctrl sostenido con el mouse mientras hace clic en
+/// "Capturar") quedaba "vivo" en una Sesion de Runtime que Captura
+/// nunca llega a ver — su Up real, una vez en Modo Captura, no
+/// coincide con ningún objetivo() del lado de Captura y se pierde:
+/// el modificador queda lógicamente "tomado" para siempre (bug
+/// reportado: "a veces me deja el modificador tomado").
+///
+/// Detiene cualquier InstanciaActiva (Mantenido/Turbo en ejecución)
+/// por el camino correcto (OrdenRuntime::Detener, no un simple
+/// descarte del Vec) para no dejar un bucle de Turbo corriendo de
+/// fondo, y descarta toda Sesion en construcción — sus timers ya
+/// programados se auto-invalidan al despertar (chequean vigencia
+/// contra RUNTIME.sesiones, que para entonces ya no las tiene).
+fn tomar_presionadas_runtime() -> Vec<InputId> {
+    let mut runtime = RUNTIME.lock().unwrap();
+
+    let activas = std::mem::take(&mut runtime.activas);
+    runtime.sesiones.clear();
+    let presionadas = std::mem::take(&mut runtime.presionadas);
+
+    drop(runtime);
+
+    for instancia in activas {
+        runtime::ejecutar(OrdenRuntime::Detener { id: instancia.id });
+    }
+
+    presionadas
+}
+
 // ------------------------------------------------------
 // 🔼 UP
 // ------------------------------------------------------
@@ -983,13 +1016,33 @@ static CAPTURA: Mutex<EstadoCaptura> = Mutex::new(EstadoCaptura {
 });
 
 fn activar_captura_interna() {
+    // Se toma y vacía Runtime ANTES de tomar el lock de CAPTURA (regla
+    // de oro del archivo: nunca dos Mutex a la vez) — ver doc de
+    // tomar_presionadas_runtime().
+    let presionadas_previas = tomar_presionadas_runtime();
+
     let mut captura = CAPTURA.lock().unwrap();
     captura.activa = true;
-    captura.sesion = None;
-    captura.presionadas.clear();
+    captura.sesion = if presionadas_previas.is_empty() {
+        None
+    } else {
+        Some(Sesion::nueva(0, presionadas_previas.clone(), false))
+    };
+    captura.presionadas = presionadas_previas.clone();
     captura.vigia_generacion += 1;
     let generacion = captura.vigia_generacion;
     drop(captura);
+
+    // perfil_ui::secuencia (la lista que separa modificadores/gatillo
+    // al resolver, ver recibir_condicion) solo se entera de una tecla
+    // vía este mismo llamado que recibir_down_captura hace para cada
+    // Down real — sin esto, un modificador que ya estaba abajo al
+    // entrar en Captura quedaría sembrado en captura.sesion pero
+    // ausente de perfil_ui, y no aparecería en el trigger final.
+    for input in presionadas_previas {
+        perfil_ui::recibir_down(input);
+    }
+
     iniciar_vigia_inactividad_captura(generacion);
 }
 
@@ -1137,6 +1190,18 @@ fn resolver_condicion_captura(
         if let Some(sesion) = captura.sesion.as_mut() {
             sesion.pendiente = Some(condicion);
             sesion.fase = FaseSesion::Construyendo;
+            // Invalida cualquier timer todavía dormido de la fase
+            // anterior (ej. el timer_repeticion armado en el segundo
+            // toque de un Triple): sin este bump, si ese timer
+            // despierta mientras esto sigue parqueado en `pendiente`
+            // esperando el Up final de un modificador sostenido,
+            // vigente_captura() lo sigue viendo como vigente, no
+            // encuentra fase EsperandoTriple (ya es Construyendo) y
+            // reintenta resolver con toques=1 (Simple) — pisando el
+            // `pendiente` correcto. Bug reportado: "ctrl+click(x3)"
+            // se guardaba como "ctrl+click" cuando se soltaba ctrl
+            // con demora tras el tercer toque.
+            sesion.generacion += 1;
         }
         return None;
     }
