@@ -33,7 +33,7 @@ use std::fs;
 use std::path::Path;
 
 use crate::macro_cache;
-use crate::macro_json::MacroArchivoJson;
+use crate::macro_json::{self, MacroArchivoJson};
 use crate::macro_usuario;
 
 // ======================================================
@@ -218,7 +218,11 @@ pub fn eliminar_macro(nombre: String) -> Result<(), String> {
 // ======================================================
 
 fn guardar_en_disco(macro_archivo: &MacroArchivoJson, ruta: &Path) -> Result<(), String> {
-    let json = serde_json::to_string_pretty(macro_archivo).map_err(|error| error.to_string())?;
+    // [FIX] json_para_disco() recorta, por cada paso, los campos que
+    // no aplican a su `tipo` (ver doc en macro_json.rs) — antes se
+    // escribía el struct completo tal cual (todos los campos de los
+    // 7 tipos de paso, la mayoría en su valor por defecto sin usarse).
+    let json = macro_json::json_para_disco(macro_archivo)?;
 
     fs::write(ruta, json).map_err(|error| error.to_string())?;
 
