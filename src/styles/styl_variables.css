@@ -39,6 +39,9 @@
       (mezcla con blanco), así queda un solo rojo configurable. */
   --highlight-red: color-mix(in srgb, var(--red-dark) 80%, white 20%);
   --cyan-dark: #0b7285;
+  --black-dark: #000000;
+  --gray-dark-1: #202020;
+  --gray-dark-2: #141414;
 
   /* ==========================
          Estados de perfil
@@ -73,15 +76,15 @@
   /* Capa de color propia de cada ventana secundaria, pintada encima
       de --fondo-general (color-mix con su propia opacidad — mismo
       patrón que --barra-superior-color/opacidad, ver styl_layout.css). */
-  --fondo-configuracion-color: #181818;
+  --fondo-configuracion-color: var(--bg);
 
   --fondo-configuracion-opacidad: 50%;
 
-  --fondo-coordenadas-color: #181818;
+  --fondo-coordenadas-color: var(--bg);
 
   --fondo-coordenadas-opacidad: 50%;
 
-  --fila-titulos-color: #2b2b2b;
+  --fila-titulos-color: var(--panel2);
 
   --fila-titulos-opacidad: 80%;
 
@@ -89,11 +92,11 @@
        Fondo de tabla
        ========================== */
 
-  --tabla-color-impar: #202020;
+  --tabla-color-impar: var(--gray-dark-1);
 
-  --tabla-color-par: #141414;
+  --tabla-color-par: var(--gray-dark-2);
 
-  --tabla-color-hover: #03a9f4;
+  --tabla-color-hover: var(--highlight);
 
   --tabla-fondo-opacidad: 50%;
 
@@ -104,19 +107,19 @@
        (catálogo apariencia.tsv, Etapa I)
        ========================== */
 
-  --barra-superior-color: #222222;
+  --barra-superior-color: var(--panel);
 
   --barra-superior-opacidad: 60%;
 
-  --barra-lateral-color: #222222;
+  --barra-lateral-color: var(--panel);
 
   --barra-lateral-opacidad: 60%;
 
-  --barra-inferior-color: #222222;
+  --barra-inferior-color: var(--panel);
 
   --barra-inferior-opacidad: 60%;
 
-  --cabecera-tabla-color: #000000;
+  --cabecera-tabla-color: var(--black-dark);
 
   --cabecera-tabla-opacidad: 40%;
 
