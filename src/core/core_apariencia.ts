@@ -34,6 +34,22 @@ import { invoke } from "@tauri-apps/api/core";
 // overrides, restablecer, etc.) se quedaba pisando el valor viejo.
 let clavesAplicadasPrevias: string[] = [];
 
+// Convierte un color hex (#rrggbb) a rgba(...) con el alpha dado —
+// usado para los "blobs" decorativos de fondo-app (ver más abajo),
+// que antes eran rgba(0,212,255,.15)/rgba(13,110,253,.15) fijos en
+// styl_layout.css sin relación con fondo-app-color1/color2.
+function hexARgba(hex: string, alpha: number): string {
+  const limpio = hex.replace("#", "");
+
+  const bigint = Number.parseInt(limpio, 16);
+
+  const r = (bigint >> 16) & 255;
+  const g = (bigint >> 8) & 255;
+  const b = bigint & 255;
+
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
 export async function aplicarOverridesApariencia(): Promise<void> {
   try {
     const overrides = await invoke<Record<string, string>>(
@@ -67,12 +83,27 @@ export async function aplicarOverridesApariencia(): Promise<void> {
         : "var(--bg)",
     );
 
+    // [FIX] Antes .app/.layout (styl_layout.css) traían dos
+    // radial-gradient fijos (cyan/azul de marca) apilados ENCIMA de
+    // var(--fondo-app), sin relación con fondo-app-color1/color2:
+    // en modo "Plano" seguían viéndose esos dos blobs en las
+    // esquinas (con solo el centro en el color plano elegido), y en
+    // cualquier modo no reaccionaban a un cambio de Color 1/Color 2.
+    // Ahora --fondo-app se arma acá completo (blobs incluidos) según
+    // el modo, y .app/.layout solo hacen `background: var(--fondo-app)`:
+    // en "Plano" es el color 1 solo, sin blobs; en "Degradado" son
+    // los blobs (coloreados con color 1/color 2 reales, no fijos) más
+    // el degradado lineal de base.
     const modoApp = overrides["fondo-app-modo"] ?? "degradado";
+    const color1App = overrides["fondo-app-color1"] ?? "#0d1117";
+    const color2App = overrides["fondo-app-color2"] ?? "#05070a";
 
     raiz.style.setProperty(
       "--fondo-app",
       modoApp === "degradado"
-        ? "linear-gradient(180deg, var(--fondo-app-color1), var(--fondo-app-color2))"
+        ? `radial-gradient(at 0% 0%, ${hexARgba(color1App, 0.15)} 0px, transparent 50%), ` +
+            `radial-gradient(at 100% 100%, ${hexARgba(color2App, 0.15)} 0px, transparent 50%), ` +
+            "linear-gradient(180deg, var(--fondo-app-color1), var(--fondo-app-color2))"
         : "var(--fondo-app-color1)",
     );
   } catch (error) {

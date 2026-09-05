@@ -8,12 +8,12 @@
 
   height: 100vh;
 
-  background:
-    radial-gradient(at 0% 0%, rgba(0, 212, 255, 0.15) 0px, transparent 50%),
-    radial-gradient(at 100% 100%,
-      rgba(13, 110, 253, 0.15) 0px,
-      transparent 50%),
-    var(--fondo-app);
+  /* [FIX] Antes traía acá mismo dos radial-gradient fijos (cyan/azul
+     de marca) encima de var(--fondo-app), ajenos al modo Plano/
+     Degradado y a Color 1/Color 2 configurados en Apariencia — ver
+     core_apariencia.ts, que ahora arma esos blobs (con los colores
+     reales) DENTRO de --fondo-app solo cuando el modo es Degradado. */
+  background: var(--fondo-app);
 }
 
 .layout {
@@ -25,12 +25,7 @@
 
   grid-template-rows: var(--toolbar-height) 1fr var(--status-height);
 
-  background:
-    radial-gradient(at 0% 0%, rgba(0, 212, 255, 0.15) 0px, transparent 50%),
-    radial-gradient(at 100% 100%,
-      rgba(13, 110, 253, 0.15) 0px,
-      transparent 50%),
-    var(--fondo-app);
+  background: var(--fondo-app);
 }
 
 .layout-cuerpo {
@@ -54,9 +49,11 @@
 
   padding: 0 var(--gap16);
 
-  background: color-mix(in srgb,
-      var(--barra-superior-color) var(--barra-superior-opacidad),
-      transparent);
+  background: color-mix(
+    in srgb,
+    var(--barra-superior-color) var(--barra-superior-opacidad),
+    transparent
+  );
 
   backdrop-filter: blur(14px);
 
@@ -205,9 +202,11 @@
 
   padding: 0 var(--gap16);
 
-  background: color-mix(in srgb,
-      var(--barra-inferior-color) var(--barra-inferior-opacidad),
-      transparent);
+  background: color-mix(
+    in srgb,
+    var(--barra-inferior-color) var(--barra-inferior-opacidad),
+    transparent
+  );
 
   backdrop-filter: blur(14px);
 
@@ -258,7 +257,7 @@
   z-index: 9999;
 }
 
-.popup-capa>div {
+.popup-capa > div {
   width: max-content;
 
   min-width: 180px;
@@ -827,7 +826,7 @@
   gap: var(--gap4);
 }
 
-.popup-coordenada-resumen-xy+.popup-coordenada-resumen-xy {
+.popup-coordenada-resumen-xy + .popup-coordenada-resumen-xy {
   margin-left: var(--gap8);
 }
 
@@ -930,7 +929,7 @@
    (una clase) — le ganaba a la regla de arriba y el popup quedaba
    angosto, ajustado al contenido, en vez de ocupar todo el ancho.
    Se repite acá con especificidad mayor (dos clases) para pisarla. */
-.popup-capa>.popup-macro-editor {
+.popup-capa > .popup-macro-editor {
   width: auto;
 }
 
@@ -1114,7 +1113,8 @@
   --col-numero-width: 32px;
   --col-asa-width: 32px;
   --col-tipo-width: 32px;
-  --grid-columnas: var(--col-numero-width) var(--col-asa-width) var(--col-tipo-width) 1fr var(--col-nota-width);
+  --grid-columnas: var(--col-numero-width) var(--col-asa-width)
+    var(--col-tipo-width) 1fr var(--col-nota-width);
 }
 
 .popup-macro-funciones {
@@ -1404,22 +1404,28 @@
   gap: var(--gap4);
   padding: var(--gap4);
   border-radius: var(--r4);
-  background: color-mix(in srgb,
-      var(--tabla-color-impar) var(--tabla-fondo-opacidad),
-      transparent);
+  background: color-mix(
+    in srgb,
+    var(--tabla-color-impar) var(--tabla-fondo-opacidad),
+    transparent
+  );
   transition: background var(--speed);
 }
 
 .popup-macro-editor-paso:nth-child(even) {
-  background: color-mix(in srgb,
-      var(--tabla-color-par) var(--tabla-fondo-opacidad),
-      transparent);
+  background: color-mix(
+    in srgb,
+    var(--tabla-color-par) var(--tabla-fondo-opacidad),
+    transparent
+  );
 }
 
 .popup-macro-editor-paso:hover {
-  background: color-mix(in srgb,
-      var(--tabla-color-hover) var(--tabla-fondo-opacidad-hover),
-      transparent);
+  background: color-mix(
+    in srgb,
+    var(--tabla-color-hover) var(--tabla-fondo-opacidad-hover),
+    transparent
+  );
 }
 
 .popup-macro-editor-paso-fila {
@@ -1441,7 +1447,9 @@
    de esta fila — la pista quedaba en 32px y los botones nuevos se
    dibujaban por encima de Tipo/Extra en vez de correrlas. */
 .popup-macro-editor-paso-fila[data-opciones-expandido="true"] {
-  grid-template-columns: var(--col-numero-width) max-content var(--col-tipo-width) 1fr var(--col-nota-width);
+  grid-template-columns: var(--col-numero-width) max-content var(
+      --col-tipo-width
+    ) 1fr var(--col-nota-width);
 }
 
 /* Bug 2/3: líneas divisorias entre columnas, mismo mecanismo que la
@@ -1457,9 +1465,9 @@
    .popup-macro-editor-celda-tipo (ver más abajo) por no ser un hijo
    directo estirable como estos tres.
    Los botones (asa/tipo/X/⧉/⊙/acción) no entran en la lista */
-.popup-macro-editor-paso-fila>.popup-macro-editor-numero,
-.popup-macro-editor-paso-fila>.popup-macro-editor-opciones,
-.popup-macro-editor-paso-fila>.popup-macro-editor-extra {
+.popup-macro-editor-paso-fila > .popup-macro-editor-numero,
+.popup-macro-editor-paso-fila > .popup-macro-editor-opciones,
+.popup-macro-editor-paso-fila > .popup-macro-editor-extra {
   /* --border (oscuro), no --border-light: mismo criterio que la
      tabla principal (.celda:not(:last-child), styl_tabla.css) y el
      gestor de coordenadas (.coordenadas-tabla tbody td). */

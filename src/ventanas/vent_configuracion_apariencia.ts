@@ -397,6 +397,18 @@ function crearCampoValor(
 
 // ----------------------------------------------------
 // Popup Editar (Etapa G3)
+// ------------------------------------------------------
+// [FIX] Antes armaba el contenido una sola vez: al elegir una
+// opción de un grupo tipo-radio (ej. Plano/Degradado),
+// alCambiar solo llamaba actualizarColumnas() (la tabla de
+// atrás) — el popup en sí nunca se reconstruía, así que
+// crearGrupoOpciones seguía leyendo el valorActual viejo y el
+// indicador cyan no se movía hasta cerrar/reabrir. Se arma con
+// una función dibujar() reinvocable que reconstruye el
+// contenido leyendo los valores ya actualizados, mutando el
+// mismo nodo `popup` ya montado en el DOM (sin volver a
+// llamar mostrarPopup/actualizarContenidoPopup — no hace falta
+// desmontar/remontar para que un cambio en los hijos se refleje).
 // ----------------------------------------------------
 
 function crearPopupEditar(
@@ -406,16 +418,31 @@ function crearPopupEditar(
   const popup = document.createElement("div");
   popup.className = "popup-editar-apariencia";
 
-  nodo.hijos.forEach((hijo) => {
-    const campo = crearCampoValor(hijo, (valorFormateado) => {
-      hijo.valor_personalizado =
-        valorFormateado === hijo.valor_defecto ? null : valorFormateado;
+  const dibujar = (): void => {
+    popup.replaceChildren();
 
-      actualizarColumnas();
+    nodo.hijos.forEach((hijo) => {
+      const campo = crearCampoValor(hijo, (valorFormateado) => {
+        hijo.valor_personalizado =
+          valorFormateado === hijo.valor_defecto ? null : valorFormateado;
+
+        actualizarColumnas();
+
+        // Solo "modo" necesita reconstruir el popup para mover su
+        // propio indicador (crearGrupoOpciones no se auto-actualiza).
+        // Para "color", reconstruir en cada "input" destruye y
+        // recrea el <input type="color">, lo que cierra de
+        // inmediato el selector nativo del sistema operativo.
+        if (hijo.tipo === "modo") {
+          dibujar();
+        }
+      });
+
+      popup.append(crearFilaPopup(hijo.nombre_ui, campo));
     });
+  };
 
-    popup.append(crearFilaPopup(hijo.nombre_ui, campo));
-  });
+  dibujar();
 
   return popup;
 }
