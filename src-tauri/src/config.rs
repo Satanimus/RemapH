@@ -562,6 +562,29 @@ pub fn establecer_tiempo_simple_teclas(valor: u64) {
 }
 
 // ======================================================
+// ⏱️ PAUSA MÍNIMA ENTRE PASOS DE MACRO
+// ------------------------------------------------------
+// [FIX] Bug "Ctrl down / c / click izquierdo se pisan": cada paso
+// llega a Windows por la vía síncrona de siempre, pero eso solo
+// garantiza que se encoló en el sistema, no que la app destino ya lo
+// procesó — teclado y mouse suelen entrar por subsistemas distintos
+// del lado receptor, con latencias distintas. Sin esta pausa, un
+// "click izquierdo" pisaba el Ctrl+C anterior (nunca llegaba a
+// copiar). Se aplica siempre, después de cada paso, sin excepción de
+// tipo (ver runt_macro.rs::ejecutar_pasos).
+// ======================================================
+
+static PAUSA_MINIMA_ENTRE_PASOS_MACRO: AtomicU64 = AtomicU64::new(15);
+
+pub fn pausa_minima_entre_pasos_macro() -> u64 {
+    PAUSA_MINIMA_ENTRE_PASOS_MACRO.load(Ordering::Relaxed)
+}
+
+pub fn establecer_pausa_minima_entre_pasos_macro(valor: u64) {
+    PAUSA_MINIMA_ENTRE_PASOS_MACRO.store(valor, Ordering::Relaxed);
+}
+
+// ======================================================
 // 🔊 DELTA DE VOLUMEN (Acción Multimedia, alcance En App)
 // ------------------------------------------------------
 // Cuánto sube/baja el volumen de la sesión de audio de un programa

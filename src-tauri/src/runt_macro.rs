@@ -151,6 +151,7 @@
 use crate::back_coordenada;
 use crate::back_multimedia;
 use crate::back_portapapeles;
+use crate::config;
 use crate::eventos::InputId;
 use crate::macro_json::PasoMacroJson;
 use crate::macros;
@@ -556,6 +557,9 @@ fn ejecutar_pasos(
         ejecutar_paso(paso, programa, posicion_inicial, debe_detenerse, retenidos);
 
         *PASO_ACTUAL_INDICADOR.lock().unwrap() += 1;
+
+        // [FIX] Ver doc de config::pausa_minima_entre_pasos_macro().
+        esperar_interrumpible(config::pausa_minima_entre_pasos_macro(), debe_detenerse);
 
         i += 1;
     }

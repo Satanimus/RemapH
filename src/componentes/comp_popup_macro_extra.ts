@@ -27,7 +27,11 @@ import type { FilaPerfil } from "../core/core_perfil";
 
 import type { ComportamientoMacro } from "../core/core_macro";
 
-import { crearGrupoOpciones, crearFilaPopup, crearInterruptor } from "./comp_popup_grupo";
+import {
+  crearGrupoOpciones,
+  crearFilaPopup,
+  crearInterruptor,
+} from "./comp_popup_grupo";
 
 // ======================================================
 // 🧩🎛️ ABRIR POPUP EXTRA "MACRO"
@@ -95,7 +99,7 @@ export function abrirPopupExtraMacro(
     );
 
     const interruptorIndicador = crearInterruptor(
-      "Si",
+      macroExtra.indicadorEjecucion ? "Si" : "No",
       macroExtra.indicadorEjecucion,
       () => {
         macroExtra.indicadorEjecucion = !macroExtra.indicadorEjecucion;
@@ -104,7 +108,10 @@ export function abrirPopupExtraMacro(
           ubicacionActiva = false;
 
           invoke("cerrar_ventana_indicador_macro").catch((error) => {
-            console.error("❌ No se pudo cerrar la ventana de ubicación:", error);
+            console.error(
+              "❌ No se pudo cerrar la ventana de ubicación:",
+              error,
+            );
           });
         }
 

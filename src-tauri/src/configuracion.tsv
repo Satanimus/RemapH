@@ -33,6 +33,7 @@ intervalo_captura_coordenada	Intervalo de refresco, ventana de captura (ms)	100	
 delay_entre_salida_doble	Pausa entre combos, Acción Doble (ms)	30	numero
 delay_rueda_repeticion	Pausa entre repeticiones de rueda (ms)	30	numero
 tiempo_simple_teclas	Pausa entre Down y Up, tecla Simple (ms)	0	numero
+pausa_minima_entre_pasos_macro	Pausa mínima entre pasos de Macro (ms)	15	numero
 delta_volumen	Paso de volumen en App (unidades)	10	numero
 menu_boton_pequeno	MenuExpress: botón pequeño (ancho,alto)	60,30	numero_par
 menu_boton_mediano	MenuExpress: botón mediano (ancho,alto)	80,40	numero_par

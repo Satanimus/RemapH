@@ -708,6 +708,10 @@ pub fn aplicar_valor(clave: &str, valor: &str) -> Result<(), String> {
 
         "tiempo_simple_teclas" => config::establecer_tiempo_simple_teclas(parsear_numero(valor)?),
 
+        "pausa_minima_entre_pasos_macro" => {
+            config::establecer_pausa_minima_entre_pasos_macro(parsear_numero(valor)?)
+        }
+
         "delta_volumen" => config::establecer_delta_volumen(parsear_numero(valor)?),
 
         "menu_boton_pequeno" => {
