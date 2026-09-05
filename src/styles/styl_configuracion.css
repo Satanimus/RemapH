@@ -24,7 +24,11 @@
   gap: var(--gap4);
   padding: var(--gap8) var(--gap12) 0;
   border-bottom: 1px solid var(--border);
-  background: var(--panel);
+  background: color-mix(
+    in srgb,
+    var(--barra-superior-color) var(--barra-superior-opacidad),
+    transparent
+  );
 }
 
 .configuracion-tab {
@@ -185,15 +189,16 @@
 }
 
 .configuracion-tabla thead th {
-  position: sticky;
-  top: 0;
-  z-index: 1;
-
-  background: var(--panel2);
+  background: color-mix(
+    in srgb,
+    var(--cabecera-tabla-color) var(--cabecera-tabla-opacidad),
+    transparent
+  );
   color: var(--text-disabled);
   text-align: left;
   font-size: var(--fs13);
-  font-weight: 600;
+  font-weight: 500;
+  letter-spacing: 0.04em;
   padding: var(--gap8);
   border-bottom: 1px solid var(--border);
 }
@@ -313,18 +318,18 @@
   white-space: nowrap;
 }
 
-/* B: encabezado con fondo claro y letra oscura, para diferenciarse
-   de las filas de título (más abajo) y del resto de la tabla. */
+/* Mismo estilo de cabecera que el resto de las tablas (--cabecera-tabla-color/opacidad) — unificado, ya no usa fondo claro/letra oscura. */
 .configuracion-tabla-arbol thead th {
-  position: sticky;
-  top: 0;
-  z-index: 1;
-
-  background: color-mix(in srgb, var(--text) 45%, var(--panel2) 55%);
-  color: var(--bg);
+  background: color-mix(
+    in srgb,
+    var(--cabecera-tabla-color) var(--cabecera-tabla-opacidad),
+    transparent
+  );
+  color: var(--text-disabled);
   text-align: left;
   font-size: var(--fs13);
-  font-weight: 600;
+  font-weight: 500;
+  letter-spacing: 0.04em;
   padding: var(--gap8);
   border-bottom: 1px solid var(--border);
 }
@@ -364,7 +369,11 @@
    que resalte como agrupador. Va después de nth-child/hover (misma
    especificidad) a propósito, para ganarles en el orden de cascada. */
 .configuracion-tabla-arbol tbody tr.configuracion-arbol-titulo {
-  background: var(--panel2);
+  background: color-mix(
+    in srgb,
+    var(--fila-titulos-color) var(--fila-titulos-opacidad),
+    transparent
+  );
 }
 
 /* A4: separación extra antes de una fila hija (nivel 3) — refuerza
@@ -544,7 +553,11 @@
   flex: 0 0 auto;
   flex-direction: column;
   border-top: 1px solid var(--border);
-  background: var(--panel);
+  background: color-mix(
+    in srgb,
+    var(--barra-inferior-color) var(--barra-inferior-opacidad),
+    transparent
+  );
 }
 
 .configuracion-fila-slot {

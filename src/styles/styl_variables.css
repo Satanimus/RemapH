@@ -81,6 +81,10 @@
 
   --fondo-coordenadas-opacidad: 50%;
 
+  --fila-titulos-color: #2b2b2b;
+
+  --fila-titulos-opacidad: 80%;
+
   /* ==========================
        Fondo de tabla
        ========================== */
@@ -112,9 +116,9 @@
 
   --barra-inferior-opacidad: 60%;
 
-  --cabecera-tabla-color: #181818;
+  --cabecera-tabla-color: #000000;
 
-  --cabecera-tabla-opacidad: 65%;
+  --cabecera-tabla-opacidad: 40%;
 
   --botones-ghost-opacidad-hover: 8%;
 

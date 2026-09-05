@@ -223,15 +223,16 @@
 }
 
 .coordenadas-tabla thead th {
-  position: sticky;
-  top: 0;
-  z-index: 1;
-
-  background: var(--panel2);
+  background: color-mix(
+    in srgb,
+    var(--cabecera-tabla-color) var(--cabecera-tabla-opacidad),
+    transparent
+  );
   color: var(--text-disabled);
   text-align: left;
   font-size: var(--fs13);
-  font-weight: 600;
+  font-weight: 500;
+  letter-spacing: 0.04em;
   padding: var(--gap8);
   border-bottom: 1px solid var(--border);
   border-right: 1px solid var(--border);
