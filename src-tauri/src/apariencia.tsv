@@ -60,6 +60,10 @@
 
 nivel	id	nombre_ui	valor_defecto	tipo
 1	color-tema	Color de tema		
+2	fondo-general	Fondo general		
+0	fondo-general-modo	Modo	degradado	modo
+0	fondo-general-color1	Color 1	#00292e	color
+0	fondo-general-color2	Color 2	#000924	color
 2	highlight	Color de resaltado (UI)		
 0	highlight	Color	#03A9F4	color
 2	bg	Fondo base		
@@ -85,6 +89,8 @@ nivel	id	nombre_ui	valor_defecto	tipo
 0	red-dark	Color	#8F2525	color
 2	cyan-dark	Cian oscurecido (acento UI)		
 0	cyan-dark	Color	#0B7285	color
+2	black-dark	Negro (acento UI)		
+0	black-dark	Color	#000000	color
 1	color-texto	Color de Texto		
 2	text	Color de texto principal		
 0	text	Color	#F2F2F2	color
@@ -117,10 +123,6 @@ nivel	id	nombre_ui	valor_defecto	tipo
 2	gap16	Espaciado grande		
 0	gap16	Tamaño	16px	pixeles
 1	color-opacidad-elementos	Color y opacidad de elementos		
-2	fondo-general	Fondo general		
-0	fondo-general-modo	Modo	degradado	modo
-0	fondo-general-color1	Color 1	#00292e	color
-0	fondo-general-color2	Color 2	#000924	color
 2	fondo-configuracion	Fondo Configuración		
 0	fondo-configuracion-color	Color	#181818	color
 0	fondo-configuracion-opacidad	Opacidad	50%	porcentaje
@@ -153,7 +155,6 @@ nivel	id	nombre_ui	valor_defecto	tipo
 2	separador	Separador		
 0	separador-opacidad-header	Opacidad	18%	porcentaje
 0	separador-opacidad-fila	Opacidad en filas	5%	porcentaje
-0	separador-opacidad-fila-hover	Opacidad hover	10%	porcentaje
 2	boton-off	Botón Off (fila y separador)		
 0	boton-off-opacidad	Opacidad	55%	porcentaje
 2	perfil-activo	Botón Perfil Activo		

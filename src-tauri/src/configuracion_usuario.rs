@@ -1732,9 +1732,17 @@ pub fn aplicar_apariencia(cambios: &[(String, String)]) -> Result<(), Vec<(Strin
 
     mapa.retain(|clave, _| !clave.starts_with(PREFIJO_CSS));
 
+    // Solo se persiste como override si el valor efectivo difiere del
+    // valor por defecto de fábrica (diff disperso, no tabla completa —
+    // mismo criterio que ya usa la UI en esPersonalizadoReal()). Un id
+    // que coincide con su default queda sin entrada acá, así sigue
+    // resolviendo por la cascada CSS normal (ej. var(--black-dark)) y
+    // se actualiza solo si ese color de tema cambia más adelante.
     for entrada in catalogo.iter().filter(|entrada| entrada.nivel == 0) {
         if let Some(valor) = valores_finales.get(&entrada.id) {
-            mapa.insert(format!("{}{}", PREFIJO_CSS, entrada.id), valor.clone());
+            if !valor.eq_ignore_ascii_case(&entrada.valor_defecto) {
+                mapa.insert(format!("{}{}", PREFIJO_CSS, entrada.id), valor.clone());
+            }
         }
     }
 

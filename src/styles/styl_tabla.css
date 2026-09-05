@@ -349,11 +349,7 @@
 }
 
 .fila:hover .celda.en-separador {
-  background: color-mix(
-    in srgb,
-    var(--separador-color) var(--separador-opacidad-fila-hover),
-    transparent
-  );
+  background: transparent;
 }
 
 .celda.en-separador-inicio {

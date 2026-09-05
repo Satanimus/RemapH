@@ -313,12 +313,11 @@
        tapar con un color sólido nuevo). Valores para tocar a mano:
        - --separador-opacidad-header: cabecera del separador (.fila-separador)
        - --separador-opacidad-fila: filas debajo, en reposo (.celda.en-separador)
-       - --separador-opacidad-fila-hover: filas debajo, al pasar el mouse */
+       Al hover no hay tinte nuevo: la celda queda transparente y se
+       ve el hover default de la fila. */
   --separador-opacidad-header: 18%;
 
   --separador-opacidad-fila: 5%;
-
-  --separador-opacidad-fila-hover: 10%;
 
   /* ==========================
        Overlays flotantes
