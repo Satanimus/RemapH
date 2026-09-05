@@ -463,20 +463,53 @@ pub fn procesar_evento(evento: InputEvent) {
 }
 
 /// [FIX] Llamada por Cache al activar Modo Captura, por cada tecla que
-/// ya estaba físicamente abajo en ese momento: emite su Up a Windows
-/// (deja el estado del sistema limpio) Y la purga de cualquier grupo
-/// DEVOLVIENDO que la tuviera pendiente. Lo segundo es indispensable:
-/// sin purgar, ese grupo queda zombie (nunca ve el Up real — Captura
-/// se lo come primero, ver la excepción de arriba) y termina
-/// interceptando en silencio el PRÓXIMO Down real de esa tecla (rama
-/// a: lo reemite crudo y hace `return` antes de llegar a
-/// cache::procesar_evento_runtime()) — la tecla queda invisible para
-/// RUNTIME.presionadas en la vuelta siguiente. Efecto observado: la
-/// captura funciona una vez sí, una vez no, alternando.
+/// ya estaba físicamente abajo en ese momento. Tiene que cubrir los
+/// DOS lugares donde ese Down puede estar en curso:
+///
+/// 1) Todavía en RETENIDO (buffer de retener(), sin resolver aún —
+///    caso típico: el usuario mantiene la tecla y al toque hace click
+///    en "Capturar", mucho antes de que el analizador la resuelva).
+///    Ese Down JAMÁS se envió a Windows (ver doc de consumir()/pasar()
+///    — "nunca se emitió nada de esto"), así que acá no hay nada que
+///    liberar en Windows: alcanza con descartar el RETENIDO entero.
+///    Si no se descarta, la red de seguridad (vigilar_retenido) lo va
+///    a resolver sola más tarde con un pasar() que emite ese Down
+///    tarde y a destiempo — abriendo un DEVOLVIENDO que espera un Up
+///    que ya nunca va a llegar (Captura se comió el real antes),
+///    dejando la tecla tomada para siempre en Windows.
+///
+/// 2) Ya resuelto en un grupo DEVOLVIENDO. Si el grupo NO estaba
+///    bloqueado (bloquear:false, nacido de pasar()) su Down sí llegó
+///    de verdad a Windows — hay que emitirle el Up ahora. Si estaba
+///    bloqueado (bloquear:true, nacido de consumir(), Down nunca
+///    salió) no se emite nada. En ambos casos se purga el grupo (ver
+///    purgar_de_devolviendo): sin purgar, queda zombie y termina
+///    interceptando en silencio el PRÓXIMO Down real de esa tecla
+///    (rama a) sin dejarlo llegar a cache::procesar_evento_runtime().
 pub(crate) fn soltar_forzado(inputs: &[InputId]) {
-    for input in inputs {
-        motor::emitir_evento(InputEvent::up(input.clone()));
+    {
+        let mut retenido = RETENIDO.lock().unwrap();
+        if let Some(grupo) = retenido.as_ref() {
+            if grupo.buffer.iter().any(|e| inputs.contains(&e.input)) {
+                *retenido = None;
+            }
+        }
     }
+
+    let a_soltar: Vec<InputId> = {
+        let devolviendo = DEVOLVIENDO.lock().unwrap();
+        devolviendo
+            .iter()
+            .filter(|grupo| !grupo.bloquear)
+            .flat_map(|grupo| grupo.faltan_soltar.iter().cloned())
+            .filter(|input| inputs.contains(input))
+            .collect()
+    };
+
+    for input in a_soltar {
+        motor::emitir_evento(InputEvent::up(input));
+    }
+
     purgar_de_devolviendo(inputs);
 }
 
