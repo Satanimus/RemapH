@@ -10,11 +10,9 @@
 
   background:
     radial-gradient(at 0% 0%, rgba(0, 212, 255, 0.15) 0px, transparent 50%),
-    radial-gradient(
-      at 100% 100%,
+    radial-gradient(at 100% 100%,
       rgba(13, 110, 253, 0.15) 0px,
-      transparent 50%
-    ),
+      transparent 50%),
     var(--fondo-app);
 }
 
@@ -29,11 +27,9 @@
 
   background:
     radial-gradient(at 0% 0%, rgba(0, 212, 255, 0.15) 0px, transparent 50%),
-    radial-gradient(
-      at 100% 100%,
+    radial-gradient(at 100% 100%,
       rgba(13, 110, 253, 0.15) 0px,
-      transparent 50%
-    ),
+      transparent 50%),
     var(--fondo-app);
 }
 
@@ -58,11 +54,9 @@
 
   padding: 0 var(--gap16);
 
-  background: color-mix(
-    in srgb,
-    var(--barra-superior-color) var(--barra-superior-opacidad),
-    transparent
-  );
+  background: color-mix(in srgb,
+      var(--barra-superior-color) var(--barra-superior-opacidad),
+      transparent);
 
   backdrop-filter: blur(14px);
 
@@ -211,11 +205,9 @@
 
   padding: 0 var(--gap16);
 
-  background: color-mix(
-    in srgb,
-    var(--barra-inferior-color) var(--barra-inferior-opacidad),
-    transparent
-  );
+  background: color-mix(in srgb,
+      var(--barra-inferior-color) var(--barra-inferior-opacidad),
+      transparent);
 
   backdrop-filter: blur(14px);
 
@@ -266,7 +258,7 @@
   z-index: 9999;
 }
 
-.popup-capa > div {
+.popup-capa>div {
   width: max-content;
 
   min-width: 180px;
@@ -835,7 +827,7 @@
   gap: var(--gap4);
 }
 
-.popup-coordenada-resumen-xy + .popup-coordenada-resumen-xy {
+.popup-coordenada-resumen-xy+.popup-coordenada-resumen-xy {
   margin-left: var(--gap8);
 }
 
@@ -907,9 +899,24 @@
    en vez de ser una sola línea fija.
    ====================================================== */
 
+/* [FIX] Antes era un popup flotante libre (min/max width propios,
+   posicionado a mano por mostrarPopupFijo con left/top en px según
+   el punto de apertura) con 8 asas de redimensión. Al cambiar el
+   tamaño de la ventana principal quedaba fuera de sitio (tapado por
+   el borde) y había que arrastrarlo/ajustarlo a mano.
+   Ahora es una barra inferior anclada: ancho completo siempre igual
+   al de la ventana (sin lógica de reposicionamiento en JS), solo
+   redimensionable en alto desde el borde superior. Redimensionar a
+   los lados es redimensionar la ventana principal, que ya arrastra
+   este ancho consigo mismo por venir de left/right:0. */
 .popup-macro-editor {
-  min-width: 640px;
-  max-width: 1100px;
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: auto;
+  min-width: 0;
+  max-width: none;
   min-height: 420px;
   max-height: 90vh;
   overflow: hidden;
@@ -917,15 +924,23 @@
   flex-direction: column;
 }
 
+/* [FIX] .popup-capa > div (regla genérica de todos los popups, más
+   arriba en este archivo) trae `width: max-content` con selector
+   más específico (clase + elemento) que `.popup-macro-editor` sola
+   (una clase) — le ganaba a la regla de arriba y el popup quedaba
+   angosto, ajustado al contenido, en vez de ocupar todo el ancho.
+   Se repite acá con especificidad mayor (dos clases) para pisarla. */
+.popup-capa>.popup-macro-editor {
+  width: auto;
+}
+
 /* ======================================================
-   ↔️↕️ ASAS DE REDIMENSIÓN EN LOS 4 BORDES + 4 ESQUINAS
+   ↕️ ASA DE REDIMENSIÓN — SOLO BORDE SUPERIOR
    ------------------------------------------------------
-   Reemplazan el `resize: both` nativo (solo esquina inferior
-   derecha) — ver activarRedimension()/crearRedimensionadores() en
-   comp_popup_macro_editor.ts. Se apoyan hacia ADENTRO del borde
-   (top/right/bottom/left: 0, nunca offsets negativos) porque
-   .popup-macro-editor tiene overflow:hidden y recortaría cualquier
-   asa que sobresaliera del borde.
+   Única asa que queda (antes 8, ver activarRedimension()/
+   crearRedimensionadores() en comp_popup_macro_editor.ts): los
+   lados ya no se redimensionan solos, siguen el ancho de la
+   ventana principal.
    ====================================================== */
 
 .popup-macro-editor-resize {
@@ -933,70 +948,12 @@
   z-index: 5;
 }
 
-.popup-macro-editor-resize-n,
-.popup-macro-editor-resize-s {
+.popup-macro-editor-resize-n {
   left: 10px;
   right: 10px;
   height: 6px;
   cursor: ns-resize;
-}
-
-.popup-macro-editor-resize-n {
   top: 0;
-}
-
-.popup-macro-editor-resize-s {
-  bottom: 0;
-}
-
-.popup-macro-editor-resize-e,
-.popup-macro-editor-resize-w {
-  top: 10px;
-  bottom: 10px;
-  width: 6px;
-  cursor: ew-resize;
-}
-
-.popup-macro-editor-resize-e {
-  right: 0;
-}
-
-.popup-macro-editor-resize-w {
-  left: 0;
-}
-
-.popup-macro-editor-resize-ne,
-.popup-macro-editor-resize-sw {
-  width: 12px;
-  height: 12px;
-  cursor: nesw-resize;
-}
-
-.popup-macro-editor-resize-ne {
-  top: 0;
-  right: 0;
-}
-
-.popup-macro-editor-resize-sw {
-  bottom: 0;
-  left: 0;
-}
-
-.popup-macro-editor-resize-nw,
-.popup-macro-editor-resize-se {
-  width: 12px;
-  height: 12px;
-  cursor: nwse-resize;
-}
-
-.popup-macro-editor-resize-nw {
-  top: 0;
-  left: 0;
-}
-
-.popup-macro-editor-resize-se {
-  bottom: 0;
-  right: 0;
 }
 
 /* ======================================================
@@ -1032,7 +989,6 @@
   padding: var(--gap8);
   background: var(--panel2);
   border-radius: var(--r4) var(--r4) 0 0;
-  cursor: move;
 }
 
 .popup-macro-barra-nombre {
@@ -1158,8 +1114,7 @@
   --col-numero-width: 32px;
   --col-asa-width: 32px;
   --col-tipo-width: 32px;
-  --grid-columnas: var(--col-numero-width) var(--col-asa-width)
-    var(--col-tipo-width) 1fr var(--col-nota-width);
+  --grid-columnas: var(--col-numero-width) var(--col-asa-width) var(--col-tipo-width) 1fr var(--col-nota-width);
 }
 
 .popup-macro-funciones {
@@ -1449,28 +1404,22 @@
   gap: var(--gap4);
   padding: var(--gap4);
   border-radius: var(--r4);
-  background: color-mix(
-    in srgb,
-    var(--tabla-color-impar) var(--tabla-fondo-opacidad),
-    transparent
-  );
+  background: color-mix(in srgb,
+      var(--tabla-color-impar) var(--tabla-fondo-opacidad),
+      transparent);
   transition: background var(--speed);
 }
 
 .popup-macro-editor-paso:nth-child(even) {
-  background: color-mix(
-    in srgb,
-    var(--tabla-color-par) var(--tabla-fondo-opacidad),
-    transparent
-  );
+  background: color-mix(in srgb,
+      var(--tabla-color-par) var(--tabla-fondo-opacidad),
+      transparent);
 }
 
 .popup-macro-editor-paso:hover {
-  background: color-mix(
-    in srgb,
-    var(--tabla-color-hover) var(--tabla-fondo-opacidad-hover),
-    transparent
-  );
+  background: color-mix(in srgb,
+      var(--tabla-color-hover) var(--tabla-fondo-opacidad-hover),
+      transparent);
 }
 
 .popup-macro-editor-paso-fila {
@@ -1492,9 +1441,7 @@
    de esta fila — la pista quedaba en 32px y los botones nuevos se
    dibujaban por encima de Tipo/Extra en vez de correrlas. */
 .popup-macro-editor-paso-fila[data-opciones-expandido="true"] {
-  grid-template-columns: var(--col-numero-width) max-content var(
-      --col-tipo-width
-    ) 1fr var(--col-nota-width);
+  grid-template-columns: var(--col-numero-width) max-content var(--col-tipo-width) 1fr var(--col-nota-width);
 }
 
 /* Bug 2/3: líneas divisorias entre columnas, mismo mecanismo que la
@@ -1510,9 +1457,9 @@
    .popup-macro-editor-celda-tipo (ver más abajo) por no ser un hijo
    directo estirable como estos tres.
    Los botones (asa/tipo/X/⧉/⊙/acción) no entran en la lista */
-.popup-macro-editor-paso-fila > .popup-macro-editor-numero,
-.popup-macro-editor-paso-fila > .popup-macro-editor-opciones,
-.popup-macro-editor-paso-fila > .popup-macro-editor-extra {
+.popup-macro-editor-paso-fila>.popup-macro-editor-numero,
+.popup-macro-editor-paso-fila>.popup-macro-editor-opciones,
+.popup-macro-editor-paso-fila>.popup-macro-editor-extra {
   /* --border (oscuro), no --border-light: mismo criterio que la
      tabla principal (.celda:not(:last-child), styl_tabla.css) y el
      gestor de coordenadas (.coordenadas-tabla tbody td). */

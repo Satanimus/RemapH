@@ -22,8 +22,14 @@
 // El popup se monta con mostrarPopupFijo() (no mostrarPopup):
 // no se cierra con click afuera — solo con Cancelar/Guardar,
 // que son las únicas acciones que definen qué pasa con la
-// cache. Es arrastrable mediante una barra de título propia
-// (ver crearBarraTitulo).
+// cache. [FIX] Antes era una ventana flotante libre (arrastrable
+// por la barra de título, redimensionable por 8 asas) — quedaba
+// fuera de sitio al redimensionar la ventana principal y había
+// que reajustarla a mano. Ahora es una barra inferior anclada de
+// ancho completo (position:fixed; left/right/bottom:0, ver
+// .popup-macro-editor en styl_layout.css): sigue el ancho de la
+// ventana principal solo, sin arrastre, y solo se redimensiona en
+// alto desde el borde superior (ver crearRedimensionadores).
 //
 // mostrarPopupFijo() reemplaza TODA la capa global de popups,
 // así que este editor no puede abrir sub-popups anidados sin
@@ -746,7 +752,6 @@ function textoResumenCoordenadaPaso(paso: PasoMacro): string {
 // ======================================================
 
 export function abrirEditorMacro(
-  evento: MouseEvent,
   contexto: ContextoFila,
   filaPerfil: FilaPerfil,
 ): void {
@@ -765,7 +770,7 @@ export function abrirEditorMacro(
     .then((macroArchivo) => {
       idsPasosActual = new WeakMap();
 
-      montarEditor(evento, contexto, macroArchivo, filaPerfil);
+      montarEditor(contexto, macroArchivo, filaPerfil);
     })
     .catch((error) => {
       console.error("❌ No se pudo abrir la macro:", error);
@@ -777,7 +782,6 @@ export function abrirEditorMacro(
 // ======================================================
 
 function montarEditor(
-  evento: MouseEvent,
   contexto: ContextoFila,
   macroArchivoInicial: MacroArchivo,
   filaPerfil: FilaPerfil,
@@ -791,12 +795,6 @@ function montarEditor(
   let nombreCache = macroArchivoInicial.nombre;
 
   let macroArchivo = macroArchivoInicial;
-
-  // Posición del popup — se fija en la apertura y la mueve el
-  // arrastre de la barra de título (crearBarraTitulo). Un redibujado
-  // (dibujar()) NO debe volver a centrarlo en el mouse.
-  let posicionX = evento.clientX;
-  let posicionY = evento.clientY;
 
   // Índice del paso actualmente expandido (mostrando su Acción/Extra
   // en detalle) — null si ninguno. Puramente visual, no se guarda.
@@ -860,19 +858,6 @@ function montarEditor(
   let renombrando = false;
 
   let controladorArrastre: ControladorArrastre | null = null;
-
-  // true después del primer dibujar() (spec punto 1: "al hacer
-  // click en algún botón la ventana del editor se mueve" / "en modo
-  // ventana salta a la orilla izquierda"). mostrarPopupFijo corre
-  // ajustarPosicionDentroDeVentana en CADA llamada, que decide entre
-  // left/right y top/bottom según si el popup entra en la ventana
-  // con el ancho/alto que tenga en ESE momento — un redibujado
-  // disparado por cualquier botón (agrega una fila, abre un panel)
-  // cambia ese tamaño y el cálculo se repite desde cero, pudiendo
-  // saltar entre "cabe a la izquierda" y "hay que pegarlo al borde"
-  // de un click a otro. Tras el primer dibujado se fuerza left/top
-  // explícitos (más abajo) en vez de dejar que se recalcule.
-  let posicionYaAjustada = false;
 
   // Limpieza del listener "click afuera" (más abajo, en dibujar())
   // del redibujado ANTERIOR — cada dibujar() con una caja anidada
@@ -1151,72 +1136,22 @@ function montarEditor(
   }
 
   // ----------------------------------
-  // 🖱️ ARRASTRE DE LA BARRA DE TITULO
+  // ↕️ ASA DE REDIMENSIÓN — SOLO BORDE SUPERIOR
   // ------------------------------------------------------
-  // mousedown en la barra → mousemove reposiciona el popup dentro de
-  // la ventana → mouseup libera. No usa crearControladorArrastre (ese
-  // es para reordenar filas, no para mover ventanas) — patrón simple
-  // propio, análogo al de comp_popup_col_resizer más adelante.
+  // [FIX] Antes eran 8 asas (4 bordes + 4 esquinas) más el arrastre
+  // libre de la barra de título — el popup era una ventana flotante
+  // que había que reposicionar a mano tras cada resize de la
+  // ventana principal. Ahora es una barra inferior anclada
+  // (position:fixed; left/right/bottom:0 en CSS, ver
+  // .popup-macro-editor): el ancho ya no se toca nunca (sigue el de
+  // la ventana principal solo), así que la única asa que queda es
+  // la de arriba, y solo ajusta `height` corriendo `top` para que
+  // el borde inferior (bottom:0, fijo) no se mueva.
   // ----------------------------------
-
-  function iniciarArrastrePopup(
-    eventoInicial: MouseEvent,
-    contenedorPopup: HTMLElement,
-  ): void {
-    eventoInicial.preventDefault();
-
-    // La posición real en pantalla puede no coincidir con
-    // posicionX/posicionY: si el popup no entraba en la ventana al
-    // abrirse, mostrarPopupFijo (vía ajustarPosicionDentroDeVentana)
-    // lo reubicó usando right/bottom en vez de left/top, sin
-    // actualizar estas variables. Usar el valor viejo acá producía el
-    // salto en el primer arrastre — se recalcula desde la posición
-    // real de pantalla en cada inicio de arrastre.
-    const rect = contenedorPopup.getBoundingClientRect();
-
-    posicionX = rect.left;
-    posicionY = rect.top;
-
-    const offsetX = eventoInicial.clientX - posicionX;
-    const offsetY = eventoInicial.clientY - posicionY;
-
-    const alMover = (eventoMover: MouseEvent): void => {
-      posicionX = eventoMover.clientX - offsetX;
-      posicionY = eventoMover.clientY - offsetY;
-
-      contenedorPopup.style.left = `${posicionX}px`;
-      contenedorPopup.style.top = `${posicionY}px`;
-      contenedorPopup.style.right = "";
-      contenedorPopup.style.bottom = "";
-    };
-
-    const alSoltar = (): void => {
-      document.removeEventListener("mousemove", alMover);
-      document.removeEventListener("mouseup", alSoltar);
-    };
-
-    document.addEventListener("mousemove", alMover);
-    document.addEventListener("mouseup", alSoltar);
-  }
-
-  // ----------------------------------
-  // ↔️↕️ ASAS DE REDIMENSIÓN (4 bordes + 4 esquinas)
-  // ------------------------------------------------------
-  // Reemplaza el `resize: both` nativo (solo esquina inferior
-  // derecha). Cada asa mide el rect real ANTES de arrastrar y va
-  // aplicando width/height según la dirección; para los bordes
-  // norte/oeste, además hay que correr left/top para que el borde
-  // opuesto quede fijo — se recalcula con el rect DESPUÉS de
-  // aplicar el tamaño (no con el delta pedido), porque min-width/
-  // max-width/min-height/max-height del CSS pueden recortarlo.
-  // ----------------------------------
-
-  type DireccionRedimension = "n" | "s" | "e" | "w" | "ne" | "nw" | "se" | "sw";
 
   function activarRedimension(
     contenedorPopup: HTMLElement,
     asa: HTMLElement,
-    direccion: DireccionRedimension,
   ): void {
     asa.addEventListener("mousedown", (eventoInicial) => {
       if (eventoInicial.button !== 0) return;
@@ -1224,64 +1159,16 @@ function montarEditor(
       eventoInicial.preventDefault();
       eventoInicial.stopPropagation();
 
-      const rectInicial = contenedorPopup.getBoundingClientRect();
-      const xInicial = eventoInicial.clientX;
+      const alturaInicial = contenedorPopup.getBoundingClientRect().height;
       const yInicial = eventoInicial.clientY;
 
-      // El popup pudo quedar anclado por right/bottom (en vez de
-      // left/top) si mostrarPopupFijo lo pegó al borde de la
-      // ventana al abrirse (ajustarPosicionDentroDeVentana). Fijar
-      // left/top explícitos ahora, antes de tocar el tamaño, evita
-      // que un ancho/alto creciente “tire” del borde opuesto (el
-      // que sigue anclado por right/bottom) y el popup parezca
-      // crecer para el lado contrario al arrastrado. Se actualiza
-      // también posicionX/posicionY (mismo criterio que el resize
-      // por w/n más abajo) para que el próximo redibujar() no
-      // vuelva a escribir la posición de apertura original.
-      posicionX = rectInicial.left;
-      posicionY = rectInicial.top;
-
-      contenedorPopup.style.left = `${posicionX}px`;
-      contenedorPopup.style.top = `${posicionY}px`;
-      contenedorPopup.style.right = "";
-      contenedorPopup.style.bottom = "";
-
+      // bottom:0 queda fijo por CSS — solo hace falta `height`, el
+      // borde superior (`top`) se recalcula solo a partir de eso.
+      // Arrastrar el borde hacia arriba (deltaY negativo) agranda.
       const alMover = (eventoMover: MouseEvent): void => {
-        const deltaX = eventoMover.clientX - xInicial;
         const deltaY = eventoMover.clientY - yInicial;
 
-        if (direccion.includes("e")) {
-          contenedorPopup.style.width = `${rectInicial.width + deltaX}px`;
-        }
-
-        if (direccion.includes("w")) {
-          contenedorPopup.style.width = `${rectInicial.width - deltaX}px`;
-        }
-
-        if (direccion.includes("s")) {
-          contenedorPopup.style.height = `${rectInicial.height + deltaY}px`;
-        }
-
-        if (direccion.includes("n")) {
-          contenedorPopup.style.height = `${rectInicial.height - deltaY}px`;
-        }
-
-        if (direccion.includes("w") || direccion.includes("n")) {
-          const rectActual = contenedorPopup.getBoundingClientRect();
-
-          if (direccion.includes("w")) {
-            posicionX = rectInicial.right - rectActual.width;
-            contenedorPopup.style.left = `${posicionX}px`;
-          }
-
-          if (direccion.includes("n")) {
-            posicionY = rectInicial.bottom - rectActual.height;
-            contenedorPopup.style.top = `${posicionY}px`;
-          }
-
-          contenedorPopup.style.right = "";
-          contenedorPopup.style.bottom = "";
-        }
+        contenedorPopup.style.height = `${alturaInicial - deltaY}px`;
       };
 
       const alSoltar = (): void => {
@@ -1295,33 +1182,20 @@ function montarEditor(
   }
 
   function crearRedimensionadores(contenedorPopup: HTMLElement): HTMLElement[] {
-    const direcciones: DireccionRedimension[] = [
-      "n",
-      "s",
-      "e",
-      "w",
-      "ne",
-      "nw",
-      "se",
-      "sw",
-    ];
+    const asa = document.createElement("div");
 
-    return direcciones.map((direccion) => {
-      const asa = document.createElement("div");
+    asa.className = "popup-macro-editor-resize popup-macro-editor-resize-n";
 
-      asa.className = `popup-macro-editor-resize popup-macro-editor-resize-${direccion}`;
+    activarRedimension(contenedorPopup, asa);
 
-      activarRedimension(contenedorPopup, asa, direccion);
-
-      return asa;
-    });
+    return [asa];
   }
 
   // ----------------------------------
   // 🏷️ BARRA DE TÍTULO (arrastrable, con [...] Renombrar)
   // ----------------------------------
 
-  function crearBarraTitulo(contenedorPopup: HTMLElement): HTMLElement {
+  function crearBarraTitulo(): HTMLElement {
     const barra = document.createElement("div");
 
     barra.className = "popup-macro-barra";
@@ -1455,16 +1329,6 @@ function montarEditor(
     });
 
     barra.append(nombre, botonRenombrar, spacer, botonCancelar);
-
-    barra.addEventListener("mousedown", (eventoDown) => {
-      // Ignora el mousedown que empieza en el botón [...] — ese
-      // clic es para renombrar, no para arrastrar.
-      if ((eventoDown.target as HTMLElement).closest("button")) {
-        return;
-      }
-
-      iniciarArrastrePopup(eventoDown, contenedorPopup);
-    });
 
     return barra;
   }
@@ -1736,38 +1600,18 @@ function montarEditor(
       controladorArrastre = null;
     }
 
-    // Preservar tamaño y ancho de columna Extra ajustados por el
-    // usuario antes de que mostrarPopupFijo destruya el popup actual.
+    // Preservar el alto ajustado por el usuario (asa superior) y el
+    // ancho de columna Extra antes de que mostrarPopupFijo destruya
+    // el popup actual. El ancho del popup ya no se preserva — es
+    // siempre el de la ventana principal (left/right:0 en CSS).
     const popupPrevio = document.querySelector<HTMLElement>(
       ".popup-macro-editor",
     );
-    let anchoGuardado: string | null = null;
     let altoGuardado: string | null = null;
     let colNotaGuardado: string | null = null;
 
     if (popupPrevio) {
-      const rect = popupPrevio.getBoundingClientRect();
-
-      anchoGuardado = `${rect.width}px`;
-      altoGuardado = `${rect.height}px`;
-
-      // Igual criterio que iniciarArrastrePopup (ver más arriba):
-      // la posición real en pantalla puede no coincidir con
-      // posicionX/posicionY si mostrarPopupFijo reubicó el popup
-      // con right/bottom en vez de left/top (no entraba en la
-      // ventana al dibujarse la vez anterior). Sin esto, cada
-      // redibujado por click de botón volvía a llamar
-      // mostrarPopupFijo con el x/y ORIGINAL de apertura y
-      // ajustarPosicionDentroDeVentana lo recalculaba desde cero
-      // contra el tamaño de fábrica del contenido (antes de
-      // reaplicar anchoGuardado/altoGuardado más abajo) — eso
-      // producía el salto de posición reportado (spec punto 1: "al
-      // hacer click en algún botón la ventana se mueve"). Se fija
-      // acá la posición real actual como nuevo punto de partida, así
-      // el popup no se reposiciona a menos que ya no entre en la
-      // ventana con su tamaño real.
-      posicionX = rect.left;
-      posicionY = rect.top;
+      altoGuardado = `${popupPrevio.getBoundingClientRect().height}px`;
     }
 
     const colDerechaPrevio = document.querySelector<HTMLElement>(
@@ -1821,7 +1665,7 @@ function montarEditor(
     // 🏷️ BARRA DE TÍTULO ARRASTRABLE
     // ----------------------------------
 
-    popup.append(crearBarraTitulo(popup));
+    popup.append(crearBarraTitulo());
 
     // ----------------------------------
     // 🧱 CUERPO EN DOS COLUMNAS
@@ -1967,48 +1811,17 @@ function montarEditor(
 
     crearRedimensionadores(popup).forEach((asa) => popup.append(asa));
 
-    // Aplicar el tamaño ajustado por el usuario ANTES
-    // de mostrarPopupFijo — asignar style.width/height no requiere
-    // que el nodo esté en el DOM (a diferencia de leer offsetWidth).
-    // Se necesita en este orden porque mostrarPopupFijo llama
-    // internamente a ajustarPosicionDentroDeVentana, que mide
-    // offsetWidth/offsetHeight para decidir si el popup entra en la
-    // ventana: medir ANTES de aplicar el tamaño real (como se hacía
-    // antes) usaba el tamaño "de fábrica" del contenido en vez del
-    // tamaño real que va a ocupar, dando una posición incorrecta que
-    // se notaba como salto en cada redibujado (spec punto 1).
-    if (anchoGuardado) {
-      popup.style.width = anchoGuardado;
-    }
-
+    // Reaplicar el alto ajustado por el usuario (ancho y posición ya
+    // no se guardan — el popup siempre ocupa el ancho completo,
+    // anclado por CSS).
     if (altoGuardado) {
       popup.style.height = altoGuardado;
     }
 
-    mostrarPopupFijo(popup, posicionX, posicionY);
-
-    // Solo la PRIMERA vez se deja que ajustarPosicionDentroDeVentana
-    // (dentro de mostrarPopupFijo) decida entre left/right y
-    // top/bottom según si el popup entra en la ventana. En
-    // redibujados posteriores se fuerza left/top explícitos con la
-    // posición real ya capturada arriba (rect del popup previo) —
-    // así un cambio de tamaño del contenido (agregar una fila, abrir
-    // un panel) nunca puede hacer que el cálculo se repita y el
-    // popup salte de golpe a otro lado (spec punto 1). Al arrastrar
-    // la barra de título el popup ya queda con left/top fijos
-    // (iniciarArrastrePopup), así que este mismo criterio aplica
-    // igual después de moverlo a mano.
-    if (posicionYaAjustada) {
-      popup.style.left = `${posicionX}px`;
-      popup.style.top = `${posicionY}px`;
-      popup.style.right = "";
-      popup.style.bottom = "";
-    } else {
-      posicionYaAjustada = true;
-    }
+    mostrarPopupFijo(popup);
 
     // Restaurar scroll de la lista de pasos (spec punto 4) — mismo
-    // motivo que ancho/alto arriba: hay que esperar a que
+    // motivo que el alto arriba: hay que esperar a que
     // mostrarPopupFijo la conecte al DOM, si no el navegador
     // descarta la asignación.
     if (scrollTopGuardado) {

@@ -74,20 +74,26 @@ export function mostrarPopup(
 // 📌 POPUP FIJO
 // ------------------------------------------------------
 // Mismo montaje que mostrarPopup(), pero el click en el fondo
-// de la capa NO lo cierra (el popup solo se cierra mediante
-// una acción explícita del propio contenido, p. ej. un botón
-// Cancelar/Guardar). Usado por el editor de Macro
-// (comp_popup_macro_editor.ts), que además es arrastrable.
+// de la capa NO lo cierra (el popup solo se cierra mediante una
+// acción explícita del propio contenido, p. ej. un botón
+// Cancelar/Guardar). Usado únicamente por el editor de Macro
+// (comp_popup_macro_editor.ts).
+//
+// Sin x/y: a diferencia de mostrarPopup(), este popup no se
+// posiciona por click — vive anclado como barra inferior de
+// ancho completo (position:fixed; left/right/bottom:0 fijos en
+// CSS, ver .popup-macro-editor en styl_layout.css). Por eso acá
+// no se llama a ajustarPosicionDentroDeVentana ni se toca
+// left/top/right/bottom: el propio CSS de la clase ya resuelve
+// la posición.
 // ======================================================
 
 export function mostrarPopupFijo(
   contenido: HTMLElement,
-  x?: number,
-  y?: number,
   alCerrar?: () => void,
   origen?: HTMLElement,
 ): void {
-  mostrarPopupInterno(contenido, x, y, alCerrar, true, origen);
+  mostrarPopupInterno(contenido, undefined, undefined, alCerrar, true, origen);
 }
 
 function mostrarPopupInterno(
@@ -133,9 +139,13 @@ function mostrarPopupInterno(
     contenido.style.bottom = "";
 
     ajustarPosicionDentroDeVentana(contenido, x, y);
-  } else {
+  } else if (!fijo) {
     contenido.style.position = "static";
   }
+
+  // fijo && x/y undefined (editor de Macro): no se toca position —
+  // la clase .popup-macro-editor ya trae position:fixed y
+  // left/right/bottom:0 anclados por CSS.
 }
 
 function ajustarPosicionDentroDeVentana(

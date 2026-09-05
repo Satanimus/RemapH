@@ -128,10 +128,10 @@ function crearMenuPrincipal(
       texto: "Editar",
     });
 
-    botonEditar.addEventListener("click", (eventoClick) => {
+    botonEditar.addEventListener("click", () => {
       ocultarPopup();
 
-      abrirEditorMacro(eventoClick, contexto, filaPerfil);
+      abrirEditorMacro(contexto, filaPerfil);
     });
 
     menu.append(botonEditar);
@@ -142,7 +142,7 @@ function crearMenuPrincipal(
     texto: "Nueva",
   });
 
-  botonNueva.addEventListener("click", async (eventoClick) => {
+  botonNueva.addEventListener("click", async () => {
     ocultarPopup();
 
     try {
@@ -156,7 +156,7 @@ function crearMenuPrincipal(
 
       alModificar();
 
-      abrirEditorMacro(eventoClick, contexto, filaPerfil);
+      abrirEditorMacro(contexto, filaPerfil);
     } catch (error) {
       console.error("❌ No se pudo crear la macro:", error);
     }

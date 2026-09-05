@@ -21,7 +21,7 @@
 //     y luego la descarta.
 // ======================================================
 
-use crate::macro_json::MacroArchivoJson;
+use crate::macro_json::{self, MacroArchivoJson};
 use crate::macro_usuario;
 use std::collections::HashMap;
 use std::fs;
@@ -73,6 +73,16 @@ pub fn descartar_cache(nombre: &str) {
 // destino siempre se deriva de la clave del mapa — el
 // renombrado físico lo gestiona macros::renombrar_macro,
 // no esta función.
+//
+// [FIX] Usaba serde_json::to_string_pretty directo sobre
+// el struct completo (todos los campos de los 7 tipos de
+// paso) — el recorte de macro_json::json_para_disco()
+// nunca se aplicaba en este flujo (el real: botón
+// "Guardar" del editor → comandos::macro_guardar_desde_
+// cache → esta función), aunque sí estaba wireado en
+// macros::guardar_macro() (usado por comandos.rs línea
+// ~313, otro flujo). Ahora ambos pasan por
+// json_para_disco().
 // ======================================================
 
 pub fn promover_cache(nombre: &str) -> Result<(), String> {
@@ -87,7 +97,7 @@ pub fn promover_cache(nombre: &str) -> Result<(), String> {
 
     let ruta = macro_usuario::ruta_macro(nombre)?;
 
-    let json = serde_json::to_string_pretty(&macro_archivo).map_err(|error| error.to_string())?;
+    let json = macro_json::json_para_disco(&macro_archivo)?;
 
     fs::write(&ruta, json).map_err(|error| error.to_string())?;
 
