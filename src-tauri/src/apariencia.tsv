@@ -152,8 +152,7 @@ nivel	id	nombre_ui	valor_defecto	tipo
 0	botones-ghost-opacidad-hover	Opacidad hover	8%	porcentaje
 2	separador	Separador		
 0	separador-opacidad-header	Opacidad	18%	porcentaje
-3	separador-filas	Fondo de sus filas		
-0	separador-opacidad-fila	Opacidad	5%	porcentaje
+0	separador-opacidad-fila	Opacidad en filas	5%	porcentaje
 0	separador-opacidad-fila-hover	Opacidad hover	10%	porcentaje
 2	boton-off	Botón Off (fila y separador)		
 0	boton-off-opacidad	Opacidad	55%	porcentaje
