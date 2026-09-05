@@ -27,7 +27,10 @@
 
 import { invoke } from "@tauri-apps/api/core";
 
-import { crearContenedorPopup } from "../componentes/comp_popup_contenedor";
+import {
+  crearContenedorPopup,
+  mostrarPopup,
+} from "../componentes/comp_popup_contenedor";
 
 import {
   crearCapturadorAtajo,
@@ -97,15 +100,18 @@ export interface ResultadoGuardado {
 interface FilaMontada {
   fila: FilaConfiguracion;
   tr: HTMLTableRowElement;
-  inputs: HTMLInputElement[];
 
-  // Solo para fila.tipo === "trigger" (sin <input>, ver montarFila):
-  // último atajo capturado (texto "mod,mod|gatillo", mismo formato
-  // que AtajoSimple::a_texto()) y el botón capturador, para poder
-  // refrescar su texto/HTML desde aplicarValorEnInputs (doble click
-  // en "Valor por defecto").
-  valorTrigger: string | null;
-  botonTrigger: HTMLButtonElement | null;
+  // Valor personalizado actual (formateado igual que lo que viaja a
+  // guardarLote — con sufijo "px"/"%" ya puesto, par "ancho,alto",
+  // "mod,mod|gatillo" para trigger). Se actualiza desde el campo
+  // dentro del popup Editar (ver botonPersonalizado, más abajo) en
+  // vez de leerse de un <input> siempre presente en la fila.
+  valorActual: string;
+
+  // Botón fusionado Editar/Valor Personalizado (H11, mismo patrón
+  // que vent_configuracion_apariencia.ts): "✎" cuando valorActual
+  // coincide con valorDefecto, o el valor ya guardado en su lugar.
+  botonPersonalizado: HTMLButtonElement;
 }
 
 // ======================================================
@@ -283,32 +289,6 @@ function formatearValor(tipo: TipoValorConfiguracion, valor: string): string {
   return valor;
 }
 
-function construirValorDesdeInputs(
-  montada: Pick<FilaMontada, "fila" | "inputs" | "valorTrigger">,
-): string {
-  const { fila, inputs, valorTrigger } = montada;
-
-  if (fila.tipo === "trigger") {
-    // Sin <input> (ver montarFila) — el valor lo dejó el capturador
-    // en valorTrigger, ya en formato "mod,mod|gatillo".
-    return valorTrigger ?? fila.valorDefecto;
-  }
-
-  if (fila.tipo === "numero_par") {
-    return `${inputs[0].value.trim()},${inputs[1].value.trim()}`;
-  }
-
-  if (fila.tipo === "pixeles") {
-    return `${inputs[0].value.trim()}px`;
-  }
-
-  if (fila.tipo === "porcentaje") {
-    return `${inputs[0].value.trim()}%`;
-  }
-
-  return inputs[0].value.trim();
-}
-
 // Espejo simple de validar_segun_tipo() / guardar_lote_pulsadores()
 // en configuracion_usuario.rs — el backend siempre revalida por su
 // cuenta; esto es solo para dar feedback inmediato sin ida y vuelta.
@@ -377,7 +357,7 @@ function validarValor(fila: FilaConfiguracion, valor: string): string | null {
       // Espejo de AtajoSimple::desde_texto(): "mod,mod|gatillo",
       // separador '|' presente y gatillo no vacío. El capturador
       // (comp_capturador.ts) ya arma el texto en este formato, así
-      // que esto solo protege contra un valorTrigger corrupto.
+      // que esto solo protege contra un valorActual corrupto.
       const partes = valor.split("|");
 
       if (partes.length !== 2 || partes[1].trim().length === 0) {
@@ -477,55 +457,121 @@ function atajoATexto(atajo: AtajoCaptura): string {
   return `${mods}|${gatillo}`;
 }
 
-// Inversa de construirValorDesdeInputs(): escribe valorDefecto en
-// el/los inputs de la fila según su tipo, disparando "input" en
-// cada uno para reusar el flujo normal de marcarEditando/validación
-// (ver dblclick en tdDefecto, dentro de montarFila). Para
-// fila.tipo === "trigger" no hay inputs que disparen ese evento: se
-// actualiza valorTrigger, se refresca el botón capturador y se llama
-// a marcarEditando directamente (recibida por parámetro — esta
-// función vive fuera de crearPestanaEditable, marcarEditando es
-// interna a esa fábrica).
-function aplicarValorEnInputs(
-  montada: FilaMontada,
-  valor: string,
-  marcarEditando: (clave: string, tr: HTMLTableRowElement) => void,
+// Refresca el botón fusionado Editar/Valor Personalizado (H11): "✎"
+// vacío cuando valorActual coincide con valorDefecto (Regla: sin
+// diff, no hay nada que mostrar aparte del lápiz — ver
+// esPersonalizadoReal en vent_configuracion_apariencia.ts, mismo
+// criterio acá), o el valor ya guardado en su lugar (swatch+texto
+// para color, trigger-contenido para atajo, texto plano para el
+// resto).
+function actualizarBotonPersonalizado(
+  boton: HTMLButtonElement,
+  montada: Pick<FilaMontada, "fila" | "valorActual">,
 ): void {
-  const { fila, inputs } = montada;
+  const { fila, valorActual } = montada;
+
+  if (valorActual === fila.valorDefecto) {
+    boton.textContent = "✎";
+    return;
+  }
 
   if (fila.tipo === "trigger") {
-    montada.valorTrigger = valor;
+    const atajo = parsearAtajoDesdeTexto(valorActual);
 
-    if (montada.botonTrigger) {
-      const atajo = parsearAtajoDesdeTexto(valor);
-
-      montada.botonTrigger.innerHTML =
-        atajo.gatillo !== null
-          ? `<div class="trigger-contenido">${triggerAHTML({ ...atajo, condicion: "simple" })}</div>`
-          : "🚩 Capturar";
-    }
-
-    marcarEditando(fila.clave, montada.tr);
+    boton.innerHTML =
+      atajo.gatillo !== null
+        ? `<div class="trigger-contenido">${triggerAHTML({ ...atajo, condicion: "simple" })}</div>`
+        : "✎";
 
     return;
   }
 
-  if (fila.tipo === "numero_par") {
-    const [ancho, alto] = valor.split(",");
+  boton.replaceChildren();
 
-    inputs[0].value = (ancho ?? "").trim();
-    inputs[1].value = (alto ?? "").trim();
-  } else if (fila.tipo === "pixeles") {
-    inputs[0].value = valor.replace(/px$/, "");
-  } else if (fila.tipo === "porcentaje") {
-    inputs[0].value = valor.replace(/%$/, "");
+  if (fila.tipo === "color") {
+    const swatch = document.createElement("span");
+    swatch.className = "configuracion-arbol-swatch";
+    swatch.style.backgroundColor = valorActual;
+
+    boton.append(
+      swatch,
+      document.createTextNode(formatearValor(fila.tipo, valorActual)),
+    );
   } else {
-    inputs[0].value = valor;
+    boton.textContent = formatearValor(fila.tipo, valorActual);
+  }
+}
+
+// Campo de edición según tipo, montado dentro del popup que abre el
+// botón fusionado (mismo criterio que crearCampoValor en
+// vent_configuracion_apariencia.ts, pero una sola fila/valor por
+// popup en vez de un grupo de hijos). Para "trigger" reusa el mismo
+// Botón Capturador de la ventana principal (🚩 Capturar / Esperando.../
+// atajo ya capturado, ver comp_capturador.ts::crearCapturadorAtajo).
+function crearCampoValorGeneral(
+  fila: FilaConfiguracion,
+  valorActual: string,
+  onCambiar: (valor: string) => void,
+): HTMLElement {
+  if (fila.tipo === "trigger") {
+    return crearCapturadorAtajo(
+      fila.clave as
+        | "tecla_guardar_coordenada"
+        | "tecla_toggle_perfil"
+        | "tecla_grabar_macro",
+      parsearAtajoDesdeTexto(valorActual),
+      (atajo) => onCambiar(atajoATexto(atajo)),
+    );
   }
 
-  for (const input of inputs) {
-    input.dispatchEvent(new Event("input", { bubbles: false }));
+  if (fila.tipo === "numero_par") {
+    const [ancho, alto] = valorActual.split(",");
+
+    const inputAncho = crearInputNumero((ancho ?? "").trim());
+    const inputAlto = crearInputNumero((alto ?? "").trim());
+
+    const emitir = (): void =>
+      onCambiar(`${inputAncho.value.trim()},${inputAlto.value.trim()}`);
+
+    inputAncho.addEventListener("input", emitir);
+    inputAlto.addEventListener("input", emitir);
+
+    const envoltorio = document.createElement("div");
+    envoltorio.className = "configuracion-par";
+    envoltorio.append(inputAncho, document.createTextNode("×"), inputAlto);
+
+    return envoltorio;
   }
+
+  if (fila.tipo === "pixeles") {
+    const input = crearInputNumero(valorActual.replace(/px$/, ""));
+    input.addEventListener("input", () => onCambiar(`${input.value.trim()}px`));
+    return input;
+  }
+
+  if (fila.tipo === "porcentaje") {
+    const input = crearInputPorcentaje(valorActual.replace(/%$/, ""));
+    input.addEventListener("input", () => onCambiar(`${input.value.trim()}%`));
+    return input;
+  }
+
+  if (fila.tipo === "color") {
+    const input = crearInputColor(valorActual);
+    input.addEventListener("input", () => onCambiar(input.value));
+    return input;
+  }
+
+  if (fila.tipo === "numero") {
+    const input = crearInputNumero(valorActual);
+    input.addEventListener("input", () => onCambiar(input.value.trim()));
+    return input;
+  }
+
+  const input = document.createElement("input");
+  input.type = "text";
+  input.value = valorActual;
+  input.addEventListener("input", () => onCambiar(input.value.trim()));
+  return input;
 }
 
 // ======================================================
@@ -764,102 +810,50 @@ function crearPestanaEditable(opciones: OpcionesPestana): Pestana {
       tdDefecto.textContent = formatearValor(fila.tipo, fila.valorDefecto);
     }
 
+    // Columna Editar/Valor Personalizado fusionada (mismo patrón que
+    // vent_configuracion_apariencia.ts, H11): un solo botón por fila,
+    // sin padding propio en la celda (el botón ocupa todo el ancho).
     const tdPersonalizado = document.createElement("td");
-    tdPersonalizado.className = "configuracion-celda configuracion-valor-personalizado";
+    tdPersonalizado.className = "configuracion-arbol-personalizado-celda";
+
+    const botonPersonalizado = document.createElement("button");
+    botonPersonalizado.type = "button";
+    botonPersonalizado.className = "configuracion-arbol-personalizado";
+    tdPersonalizado.append(botonPersonalizado);
 
     const valorActual = fila.valorPersonalizado ?? fila.valorDefecto;
 
-    const inputs: HTMLInputElement[] = [];
-
-    // Fila montada real, referenciada por el capturador (rama
-    // "trigger") y por el dblclick de tdDefecto — se completa antes
-    // de armar el contenido de tdPersonalizado porque ambos la
-    // necesitan por referencia (no una copia).
+    // Fila montada real, referenciada por el click del botón fusionado
+    // y por el dblclick de tdDefecto — se completa antes de armar el
+    // contenido del botón porque ambos la necesitan por referencia
+    // (no una copia).
     const montada: FilaMontada = {
       fila,
       tr,
-      inputs,
-      valorTrigger: fila.tipo === "trigger" ? valorActual : null,
-      botonTrigger: null,
+      valorActual,
+      botonPersonalizado,
     };
 
-    if (fila.tipo === "trigger") {
-      // Sin <input>: reusa el Botón Capturador (Regla 7) en vez del
-      // input de texto plano — este tipo nunca cae en el `else`
-      // genérico de abajo.
-      const boton = crearCapturadorAtajo(
-        fila.clave as
-          | "tecla_guardar_coordenada"
-          | "tecla_toggle_perfil"
-          | "tecla_grabar_macro",
-        parsearAtajoDesdeTexto(valorActual),
-        (atajo) => {
-          montada.valorTrigger = atajoATexto(atajo);
-          marcarEditando(fila.clave, tr);
-        },
-      );
+    actualizarBotonPersonalizado(botonPersonalizado, montada);
 
-      montada.botonTrigger = boton;
+    // El botón fusionado (vacío=lápiz o con el Valor Personalizado ya
+    // guardado) abre el mini popup sobre la fila; cualquier cambio
+    // dentro del popup marca la fila como pendiente de guardar. Se
+    // reabre igual estando vacío o con valor.
+    botonPersonalizado.addEventListener("click", (evento) => {
+      const campo = crearCampoValorGeneral(fila, montada.valorActual, (valor) => {
+        montada.valorActual = valor;
 
-      tdPersonalizado.append(boton);
-    } else if (fila.tipo === "numero_par") {
-      const [ancho, alto] = valorActual.split(",");
+        actualizarBotonPersonalizado(botonPersonalizado, montada);
+        marcarEditando(fila.clave, tr);
+      });
 
-      const inputAncho = crearInputNumero((ancho ?? "").trim());
-      const inputAlto = crearInputNumero((alto ?? "").trim());
+      const popup = document.createElement("div");
+      popup.className = "popup-editar-apariencia";
+      popup.append(campo);
 
-      inputs.push(inputAncho, inputAlto);
-
-      const envoltorio = document.createElement("div");
-      envoltorio.className = "configuracion-par";
-      envoltorio.append(inputAncho, document.createTextNode("×"), inputAlto);
-
-      tdPersonalizado.append(envoltorio);
-    } else if (fila.tipo === "numero") {
-      const input = crearInputNumero(valorActual);
-
-      inputs.push(input);
-
-      tdPersonalizado.append(input);
-    } else if (fila.tipo === "pixeles") {
-      // valorActual siempre trae el sufijo "px" (ver
-      // configuracion_listar_apariencia) — el input numérico solo
-      // edita el número, el "px" se reapendea al construir el valor
-      // (ver construirValorDesdeInputs).
-      const input = crearInputNumero(valorActual.replace(/px$/, ""));
-
-      inputs.push(input);
-
-      tdPersonalizado.append(input);
-    } else if (fila.tipo === "color") {
-      const input = crearInputColor(valorActual);
-
-      inputs.push(input);
-
-      tdPersonalizado.append(input);
-    } else if (fila.tipo === "porcentaje") {
-      // Mismo criterio que "pixeles": valorActual siempre trae el
-      // sufijo "%" (ver configuracion_listar_apariencia) — el input
-      // numérico solo edita el número, el "%" se reapendea al
-      // construir el valor (ver construirValorDesdeInputs).
-      const input = crearInputPorcentaje(valorActual.replace(/%$/, ""));
-
-      inputs.push(input);
-
-      tdPersonalizado.append(input);
-    } else {
-      const input = document.createElement("input");
-      input.type = "text";
-      input.value = valorActual;
-
-      inputs.push(input);
-
-      tdPersonalizado.append(input);
-    }
-
-    for (const input of inputs) {
-      input.addEventListener("input", () => marcarEditando(fila.clave, tr));
-    }
+      mostrarPopup(popup, evento.clientX, evento.clientY);
+    });
 
     // Doble click en "Valor por defecto" → lo copia a "Valor
     // personalizado" (spec: acceso rápido para restablecer una
@@ -867,7 +861,10 @@ function crearPestanaEditable(opciones: OpcionesPestana): Pestana {
     // afecta a todas).
     tdDefecto.title = "Doble click para usar este valor";
     tdDefecto.addEventListener("dblclick", () => {
-      aplicarValorEnInputs(montada, fila.valorDefecto, marcarEditando);
+      montada.valorActual = fila.valorDefecto;
+
+      actualizarBotonPersonalizado(botonPersonalizado, montada);
+      marcarEditando(fila.clave, tr);
     });
 
     if (mostrarColumnaNombre) {
@@ -940,7 +937,7 @@ function crearPestanaEditable(opciones: OpcionesPestana): Pestana {
         continue;
       }
 
-      const valor = construirValorDesdeInputs(montada);
+      const valor = montada.valorActual;
       const error = validarValor(montada.fila, valor);
 
       if (error) {

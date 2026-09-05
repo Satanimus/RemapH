@@ -317,21 +317,6 @@
   display: none;
 }
 
-.configuracion-valor-personalizado {
-  color: var(--text-disabled);
-}
-
-.configuracion-valor-personalizado input {
-  width: 100%;
-  color: var(--text-disabled);
-}
-
-.configuracion-valor-personalizado input[type="color"] {
-  width: 44px;
-  height: 28px;
-  padding: 2px;
-}
-
 /* ======================================================
    TABLA EN ÁRBOL (Apariencia)
    ------------------------------------------------------
@@ -532,14 +517,17 @@
   min-width: 0;
 }
 
-/* Fila con un campo editado, todavía sin guardar. */
-.configuracion-fila-editando .configuracion-valor-personalizado input {
-  border-color: var(--green);
+/* Fila con un campo editado, todavía sin guardar (mismo criterio que
+   .configuracion-arbol-editando/-error de Apariencia: la columna
+   Valor Personalizado ya no tiene un input propio siempre visible
+   al que colgarle el borde — ver botón fusionado en montarFila). */
+.configuracion-fila-editando {
+  box-shadow: inset 3px 0 0 var(--green);
 }
 
 /* Fila con un valor inválido, marcada al intentar guardar. */
-.configuracion-fila-error .configuracion-valor-personalizado input {
-  border-color: var(--text-red);
+.configuracion-fila-error {
+  box-shadow: inset 3px 0 0 var(--text-red);
 }
 
 /* H10: mismo criterio que .configuracion-fila-editando/-error de
