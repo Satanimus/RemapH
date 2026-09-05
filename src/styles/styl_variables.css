@@ -53,28 +53,33 @@
 
   --bg: #181818;
 
-  --fondo-general-color2: #181818;
+  --fondo-general-color1: #00292e;
 
-  /* Fallback estático (modo plano): si el JS de overrides
-      (core_apariencia.ts) todavía no corrió, esta variable ya
-      resuelve a un valor válido. Cuando el modo es "degradado",
-      core_apariencia.ts la reemplaza en caliente por un
-      linear-gradient(--bg, --fondo-general-color2). */
-  --fondo-general: var(--bg);
+  --fondo-general-color2: #000924;
+
+  /* Fondo unificado de las 3 ventanas con decoración (Principal,
+      Configuración, Coordenadas — ver html,body en styl_general.css
+      y .app/.layout en styl_layout.css). Fallback estático (modo
+      plano): si el JS de overrides (core_apariencia.ts) todavía no
+      corrió, esta variable ya resuelve a un valor válido. Cuando el
+      modo es "degradado", core_apariencia.ts la reemplaza en
+      caliente por el gradient con blobs (color1/color2 reales). */
+  --fondo-general: var(--fondo-general-color1);
 
   --panel: #222222;
 
   --panel2: #2b2b2b;
 
-  /* Fondo detrás de tabla/barras (.app/.layout, ver styl_layout.css).
-      Mismo patrón que --fondo-general: --fondo-app resuelve a color
-      plano por defecto y core_apariencia.ts lo reemplaza en caliente
-      por un gradient cuando el modo es "degradado". */
-  --fondo-app-color1: #00292e;
+  /* Capa de color propia de cada ventana secundaria, pintada encima
+      de --fondo-general (color-mix con su propia opacidad — mismo
+      patrón que --barra-superior-color/opacidad, ver styl_layout.css). */
+  --fondo-configuracion-color: #181818;
 
-  --fondo-app-color2: #000924;
+  --fondo-configuracion-opacidad: 50%;
 
-  --fondo-app: var(--fondo-app-color1);
+  --fondo-coordenadas-color: #181818;
+
+  --fondo-coordenadas-opacidad: 50%;
 
   /* ==========================
        Fondo de tabla

@@ -118,12 +118,15 @@ nivel	id	nombre_ui	valor_defecto	tipo
 0	gap16	Tamaño	16px	pixeles
 1	color-opacidad-elementos	Color y opacidad de elementos		
 2	fondo-general	Fondo general		
-0	fondo-general-modo	Modo	plano	modo
-0	fondo-general-color2	Color 2	#181818	color
-2	fondo-app	Fondo Ventana Principal		
-0	fondo-app-modo	Modo	degradado	modo
-0	fondo-app-color1	Color 1	#00292e	color
-0	fondo-app-color2	Color 2	#000924	color
+0	fondo-general-modo	Modo	degradado	modo
+0	fondo-general-color1	Color 1	#00292e	color
+0	fondo-general-color2	Color 2	#000924	color
+2	fondo-configuracion	Fondo Configuración		
+0	fondo-configuracion-color	Color	#181818	color
+0	fondo-configuracion-opacidad	Opacidad	50%	porcentaje
+2	fondo-coordenadas	Fondo Coordenadas		
+0	fondo-coordenadas-color	Color	#181818	color
+0	fondo-coordenadas-opacidad	Opacidad	50%	porcentaje
 2	barra-superior	Barra superior		
 0	barra-superior-color	Color	#222222	color
 0	barra-superior-opacidad	Opacidad	60%	porcentaje

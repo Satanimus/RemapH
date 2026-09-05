@@ -115,7 +115,11 @@
 .configuracion-cuerpo {
   flex: 1;
   overflow: hidden;
-  background: var(--bg);
+  background: color-mix(
+    in srgb,
+    var(--fondo-configuracion-color) var(--fondo-configuracion-opacidad),
+    transparent
+  );
 }
 
 .configuracion-panel {

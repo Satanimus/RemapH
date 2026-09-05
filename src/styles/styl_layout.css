@@ -9,11 +9,11 @@
   height: 100vh;
 
   /* [FIX] Antes traía acá mismo dos radial-gradient fijos (cyan/azul
-     de marca) encima de var(--fondo-app), ajenos al modo Plano/
+     de marca) encima de var(--fondo-general), ajenos al modo Plano/
      Degradado y a Color 1/Color 2 configurados en Apariencia — ver
      core_apariencia.ts, que ahora arma esos blobs (con los colores
-     reales) DENTRO de --fondo-app solo cuando el modo es Degradado. */
-  background: var(--fondo-app);
+     reales) DENTRO de --fondo-general solo cuando el modo es Degradado. */
+  background: var(--fondo-general);
 }
 
 .layout {
@@ -25,7 +25,7 @@
 
   grid-template-rows: var(--toolbar-height) 1fr var(--status-height);
 
-  background: var(--fondo-app);
+  background: var(--fondo-general);
 }
 
 .layout-cuerpo {

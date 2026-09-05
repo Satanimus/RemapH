@@ -15,6 +15,11 @@
   height: 100vh;
   padding: var(--gap16);
   gap: var(--gap12);
+  background: color-mix(
+    in srgb,
+    var(--fondo-coordenadas-color) var(--fondo-coordenadas-opacidad),
+    transparent
+  );
 }
 
 .coordenadas-barra-superior {
