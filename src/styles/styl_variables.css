@@ -70,9 +70,9 @@
       Mismo patrón que --fondo-general: --fondo-app resuelve a color
       plano por defecto y core_apariencia.ts lo reemplaza en caliente
       por un gradient cuando el modo es "degradado". */
-  --fondo-app-color1: #0d1117;
+  --fondo-app-color1: #00292e;
 
-  --fondo-app-color2: #05070a;
+  --fondo-app-color2: #000924;
 
   --fondo-app: var(--fondo-app-color1);
 
@@ -119,9 +119,9 @@
 
   --perfil-inactivo-opacidad: 10%;
 
-  --panel-lateral-item-actual-opacidad: 15%;
+  --panel-lateral-item-actual-opacidad: 50%;
 
-  --panel-lateral-eliminar-opacidad: 15%;
+  --panel-lateral-eliminar-opacidad: 100%;
 
   --guardar-opacidad: 100%;
 

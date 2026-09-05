@@ -122,8 +122,8 @@ nivel	id	nombre_ui	valor_defecto	tipo
 0	fondo-general-color2	Color 2	#181818	color
 2	fondo-app	Fondo Ventana Principal		
 0	fondo-app-modo	Modo	degradado	modo
-0	fondo-app-color1	Color 1	#0d1117	color
-0	fondo-app-color2	Color 2	#05070a	color
+0	fondo-app-color1	Color 1	#00292e	color
+0	fondo-app-color2	Color 2	#000924	color
 2	barra-superior	Barra superior		
 0	barra-superior-color	Color	#222222	color
 0	barra-superior-opacidad	Opacidad	60%	porcentaje
@@ -156,9 +156,9 @@ nivel	id	nombre_ui	valor_defecto	tipo
 2	perfil-inactivo	Botón Perfil Inactivo		
 0	perfil-inactivo-opacidad	Opacidad	10%	porcentaje
 2	panel-lateral-item-actual	Panel lateral — ítem actual		
-0	panel-lateral-item-actual-opacidad	Opacidad	15%	porcentaje
+0	panel-lateral-item-actual-opacidad	Opacidad	50%	porcentaje
 2	panel-lateral-eliminar	Panel lateral — botón Eliminar		
-0	panel-lateral-eliminar-opacidad	Opacidad	15%	porcentaje
+0	panel-lateral-eliminar-opacidad	Opacidad	100%	porcentaje
 2	boton-guardar	Botón Guardar		
 0	guardar-opacidad	Opacidad	100%	porcentaje
 2	portapapeles-boton-fijar	Botón Fijar (Portapapeles)		
