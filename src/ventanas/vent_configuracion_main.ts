@@ -211,12 +211,6 @@ const paresTab: ReadonlyArray<readonly [HTMLButtonElement, HTMLDivElement]> = [
   [tabAvanzado, panelAvanzado],
 ];
 
-// Selector de temas (Pestana.elementoBarra, solo lo expone la
-// pestaña "Tema") — se asigna más abajo, junto a la barra de
-// acciones global, pero se referencia acá porque activarTab
-// controla su visibilidad.
-let elementoSelectorTema: HTMLElement | null = null;
-
 function activarTab(botonElegido: HTMLButtonElement): void {
   for (const [boton, panel] of paresTab) {
     const activa = boton === botonElegido;
@@ -225,8 +219,6 @@ function activarTab(botonElegido: HTMLButtonElement): void {
 
     panel.classList.toggle("oculto", !activa);
   }
-
-  elementoSelectorTema?.classList.toggle("oculto", botonElegido !== tabTema);
 
   // Apariencia y Tema comparten la misma sesión de apariencia en el
   // backend (ver refrescarDesdeOtraPestana en
@@ -596,12 +588,6 @@ export interface Pestana {
   limpiarEstadoTrasGuardado: () => Promise<void>;
   restablecerPestana: () => Promise<void>;
   textoConfirmacionRestablecer: string;
-
-  // Elemento propio de la pestaña que se monta en la barra de
-  // acciones global (ver "BARRA DE ACCIONES GLOBAL"), visible solo
-  // mientras esta pestaña está activa. Hoy solo lo usa Apariencia
-  // (botón selector de temas).
-  elementoBarra?: HTMLElement;
 }
 
 function crearPestanaEditable(opciones: OpcionesPestana): Pestana {
@@ -691,13 +677,51 @@ function crearPestanaEditable(opciones: OpcionesPestana): Pestana {
   // Montar filas (+ separador de subtítulo si `grupo` cambia)
   // ----------------------------------------------------
 
+  // Botón desplegable de la fila de Título/Subtítulo (General:
+  // "Varios", "Tiempo (ms)"; Teclas: Letras, Números, etc.) — mismo
+  // criterio que alternarExpandir() en vent_configuracion_apariencia.ts
+  // (pestaña Tema): oculta/muestra las filas normales que siguen,
+  // hasta la próxima fila de subtítulo o el final de la tabla. Opera
+  // directo sobre el orden real del tbody (sin un índice paralelo)
+  // porque acá, a diferencia del árbol de Tema, no hay una lista
+  // FilaMontada[] en orden de montaje.
+  function alternarExpandirSubtitulo(
+    boton: HTMLButtonElement,
+    tr: HTMLTableRowElement,
+  ): void {
+    const contraer = boton.textContent === "▾";
+
+    boton.textContent = contraer ? "▸" : "▾";
+
+    let hermano = tr.nextElementSibling;
+
+    while (hermano && !hermano.classList.contains("configuracion-subtitulo")) {
+      hermano.classList.toggle("oculta", contraer);
+      hermano = hermano.nextElementSibling;
+    }
+  }
+
   function montarFilaSubtitulo(texto: string): void {
     const tr = document.createElement("tr");
-    tr.className = "configuracion-subtitulo";
+    tr.className = "configuracion-subtitulo configuracion-fila-titulo";
 
     const td = document.createElement("td");
     td.colSpan = encabezados.length;
-    td.textContent = texto;
+
+    const botonExpandir = document.createElement("button");
+    botonExpandir.type = "button";
+    botonExpandir.className = "configuracion-arbol-expandir";
+    botonExpandir.textContent = "▾";
+
+    botonExpandir.addEventListener("click", () => {
+      alternarExpandirSubtitulo(botonExpandir, tr);
+    });
+
+    const textoSpan = document.createElement("span");
+    textoSpan.className = "configuracion-fila-titulo-texto";
+    textoSpan.textContent = texto;
+
+    td.append(botonExpandir, textoSpan);
 
     tr.append(td);
     tbody.append(tr);
@@ -712,10 +736,15 @@ function crearPestanaEditable(opciones: OpcionesPestana): Pestana {
     const tr = document.createElement("tr");
 
     const tdNombre = document.createElement("td");
+    tdNombre.className = mostrarColumnaNombre
+      ? "configuracion-celda configuracion-celda-primera configuracion-nombre"
+      : "configuracion-celda configuracion-nombre";
     tdNombre.textContent = fila.nombreMostrado;
 
     const tdDefecto = document.createElement("td");
-    tdDefecto.className = "configuracion-valor-defecto";
+    tdDefecto.className = mostrarColumnaNombre
+      ? "configuracion-celda configuracion-valor-defecto"
+      : "configuracion-celda configuracion-celda-primera configuracion-valor-defecto";
 
     if (fila.tipo === "color") {
       const envoltorioSwatch = document.createElement("span");
@@ -736,7 +765,7 @@ function crearPestanaEditable(opciones: OpcionesPestana): Pestana {
     }
 
     const tdPersonalizado = document.createElement("td");
-    tdPersonalizado.className = "configuracion-valor-personalizado";
+    tdPersonalizado.className = "configuracion-celda configuracion-valor-personalizado";
 
     const valorActual = fila.valorPersonalizado ?? fila.valorDefecto;
 
@@ -1397,11 +1426,6 @@ botonGuardarGlobal.className =
 botonGuardarGlobal.textContent = "Aplicar cambios";
 
 barraGlobal.append(botonRestablecerGlobal, botonGuardarGlobal);
-
-if (pestanaTema.elementoBarra) {
-  elementoSelectorTema = pestanaTema.elementoBarra;
-  barraGlobal.prepend(elementoSelectorTema);
-}
 
 filaAcciones.append(barraGlobal);
 

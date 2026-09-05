@@ -78,40 +78,6 @@
   color: var(--highlight);
 }
 
-/* E7/Fix: botón ghost del selector de temas, mismo criterio que
-   .configuracion-boton-carpeta — transparente en reposo, borde+color
-   de acento en hover. Vive en la misma barra de acciones global que
-   Restablecer/Aplicar cambios (justify-content: flex-end): el
-   margin-right: auto lo empuja al extremo izquierdo, separado de
-   esos dos botones. Oculto salvo con la pestaña Apariencia activa
-   (ver activarTab en vent_configuracion_main.ts). */
-.configuracion-selector-tema {
-  background: transparent;
-  border: 1px solid transparent;
-  border-radius: var(--r4);
-  color: var(--text);
-  font-size: var(--fs13);
-  padding: var(--gap4) var(--gap8);
-  margin-right: auto;
-  cursor: pointer;
-  transition:
-    border-color 0.12s ease,
-    color 0.12s ease;
-}
-
-.configuracion-selector-tema.oculto {
-  display: none;
-}
-
-.configuracion-selector-tema:hover {
-  border-color: var(--highlight);
-  color: var(--text-highlight);
-}
-
-.configuracion-selector-tema:active {
-  transform: translateY(1px);
-}
-
 /* ======================================================
    CUERPO / PANELES
    ====================================================== */
@@ -167,6 +133,22 @@
   color: var(--text);
 }
 
+/* Fila "Tema" (pestaña Tema) — mismo criterio visual que
+   .configuracion-escala-fila de arriba: etiqueta + botones tipo
+   .ui-btn.popup-opcion (Pequeño/Normal/Grande), sin el indicador
+   circular cyan (esos botones no son mutuamente excluyentes: uno
+   abre Cargar, el otro Guardar/Renombrar/Eliminar). */
+.configuracion-tema-nombre {
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.configuracion-tema-opciones {
+  min-width: 28px;
+  padding: 0 var(--gap12);
+}
+
 /* ======================================================
    TABLA
    ====================================================== */
@@ -203,11 +185,6 @@
   border-bottom: 1px solid var(--border);
 }
 
-.configuracion-tabla tbody td {
-  padding: var(--gap8);
-  vertical-align: middle;
-}
-
 .configuracion-tabla tbody tr {
   background: color-mix(
     in srgb,
@@ -233,13 +210,46 @@
   );
 }
 
-.configuracion-valor-defecto {
+/* ======================================================
+   FAMILIA DE CELDA (grupo de estilo único)
+   ------------------------------------------------------
+   Reemplaza el padding fijado antes vía ".configuracion-tabla
+   tbody td" / ".configuracion-tabla-arbol tbody td" (selector con
+   tbody, de mayor especificidad que cualquier clase de modificador
+   — por eso un padding-left en la celda no le ganaba). Toda celda
+   de dato de las 4 pestañas debe llevar esta clase base; el
+   modificador -primera es lo único que cambia entre "primera
+   columna visible de la fila" (Nombre en General/Apariencia,
+   Valor por Defecto en Teclas, Nombre en el árbol de
+   Apariencia/Tema) y el resto. Un cambio acá cambia las 4 a la vez.
+   ====================================================== */
+.configuracion-celda {
+  height: var(--row-height);
+  padding: 0 var(--gap8);
+  vertical-align: middle;
+  box-sizing: border-box;
+}
+
+.configuracion-celda-primera {
+  padding-left: 20px;
+}
+
+.configuracion-tabla tbody td,
+.configuracion-tabla-arbol tbody td {
+  vertical-align: middle;
+}
+
+.configuracion-nombre {
   color: var(--text-disabled);
+}
+
+.configuracion-valor-defecto {
+  color: var(--text);
   cursor: pointer;
 }
 
 .configuracion-valor-defecto:hover {
-  color: var(--text);
+  color: var(--text-highlight);
 }
 
 /* El swatch de color (Apariencia) necesita ir en línea junto al
@@ -264,26 +274,56 @@
   flex-shrink: 0;
 }
 
-/* Fila separadora de subtítulo (pestaña Teclas: Letras,
-   Números, Teclado numérico, Funciones, Especiales,
-   Símbolos, Mouse). */
-.configuracion-subtitulo td {
-  padding-top: var(--gap16);
+/* ======================================================
+   FILA DE TÍTULO (grupo de estilo único)
+   ------------------------------------------------------
+   Normaliza las 4 filas de Título/Subtítulo de la ventana
+   (General: "Varios", "Tiempo (ms)"; Teclas: Letras,
+   Números, etc.; Apariencia/Tema: árbol nivel 1) para que
+   todas midan lo mismo y se vean idénticas — un cambio acá
+   cambia las 4 pestañas a la vez. Se aplica junto a
+   .configuracion-subtitulo (General/Teclas) o
+   .configuracion-arbol-titulo (Apariencia/Tema), que solo
+   aportan el colSpan/estructura propios de cada tabla.
+   ====================================================== */
+.configuracion-fila-titulo td {
+  height: var(--row-height);
+  padding: 0 var(--gap8);
   color: var(--text-disabled);
   font-size: var(--fs13);
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  border-bottom: 1px solid var(--border);
-  background: var(--panel2);
+  border-top: 1px solid var(--border-light);
+  border-bottom: 1px solid var(--border-light);
+  background: color-mix(
+    in srgb,
+    var(--fila-titulos-color) var(--fila-titulos-opacidad),
+    transparent
+  );
 }
 
-.configuracion-subtitulo:first-child td {
-  padding-top: var(--gap8);
+/* Separación entre el botón desplegable y el texto (ejemplo:
+   pestaña General) — el botón en sí no trae margen propio, así
+   que esta clase es la única fuente de esa separación en las
+   4 pestañas. */
+.configuracion-fila-titulo-texto {
+  margin-left: var(--gap8);
+}
+
+/* Fila ocultada por el botón desplegable de su Subtítulo — mismo
+   criterio que .configuracion-tabla-arbol tr.oculta (pestaña Tema). */
+.configuracion-tabla tr.oculta {
+  display: none;
+}
+
+.configuracion-valor-personalizado {
+  color: var(--text-disabled);
 }
 
 .configuracion-valor-personalizado input {
   width: 100%;
+  color: var(--text-disabled);
 }
 
 .configuracion-valor-personalizado input[type="color"] {
@@ -334,11 +374,6 @@
   border-bottom: 1px solid var(--border);
 }
 
-.configuracion-tabla-arbol tbody td {
-  padding: var(--gap8);
-  vertical-align: middle;
-}
-
 .configuracion-tabla-arbol tbody tr {
   background: color-mix(
     in srgb,
@@ -364,23 +399,12 @@
   );
 }
 
-/* A1: fila de Título (nivel 1) con el mismo gris claro que usan los
-   subtítulos de la pestaña Teclas (.configuracion-subtitulo), para
-   que resalte como agrupador. Va después de nth-child/hover (misma
-   especificidad) a propósito, para ganarles en el orden de cascada. */
-.configuracion-tabla-arbol tbody tr.configuracion-arbol-titulo {
-  background: color-mix(
-    in srgb,
-    var(--fila-titulos-color) var(--fila-titulos-opacidad),
-    transparent
-  );
-}
-
 /* A4: separación extra antes de una fila hija (nivel 3) — refuerza
    la jerarquía de árbol en filas de nivel 2 que agrupan un nivel 3
    debajo (ej. "Separador" → "Fondo de sus filas"). */
 .configuracion-tabla-arbol tbody tr.configuracion-arbol-con-hijo td {
-  padding-bottom: calc(var(--gap8) * 2);
+  height: calc(var(--row-height) + var(--gap8));
+  padding-bottom: var(--gap8);
 }
 
 /* F6: cuadradito de color en la columna Valor por Defecto. */
@@ -406,12 +430,9 @@
 
 /* E7: sangría/color por nivel (Regla 28: única diferencia visual
    entre nivel 2 y 3 es la sangría, que ya pone padding-left inline
-   en vent_configuracion_apariencia.ts — acá solo el color). */
-.configuracion-arbol-nivel-1 {
-  color: var(--text);
-  font-weight: 600;
-}
-
+   en vent_configuracion_apariencia.ts — acá solo el color). Nivel 1
+   (fila de Título) usa el grupo de estilo único
+   .configuracion-fila-titulo, no esta regla. */
 .configuracion-arbol-nivel-2,
 .configuracion-arbol-nivel-3 {
   color: var(--text-disabled);
@@ -439,7 +460,6 @@
   font-size: var(--fs16);
   cursor: pointer;
   padding: 0;
-  margin-right: var(--gap8);
   vertical-align: middle;
   transition:
     border-color 0.12s ease,
@@ -452,11 +472,14 @@
 }
 
 /* H11: columna Editar/Valor Personalizado fusionada — la celda
-   pierde el padding genérico de .configuracion-tabla-arbol tbody td
-   (el botón de adentro pone el suyo, así ocupa toda la celda y es
-   clickeable de punta a punta). */
+   pierde el padding genérico de .configuracion-celda (el botón de
+   adentro pone el suyo, así ocupa toda la celda y es clickeable de
+   punta a punta), pero conserva el alto de fila estándar. */
 .configuracion-arbol-personalizado-celda {
+  height: var(--row-height);
   padding: 0;
+  vertical-align: middle;
+  box-sizing: border-box;
 }
 
 /* Botón único: "✎" cuando no hay Valor Personalizado, o el valor ya

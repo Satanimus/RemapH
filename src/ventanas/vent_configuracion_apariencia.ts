@@ -507,10 +507,9 @@ function crearFilaArbol(
   // Teclas), sin división de columnas: así el nombre tiene todo el
   // ancho de la fila disponible antes de partirse en dos líneas.
   if (nivel === 1) {
-    tr.classList.add("configuracion-arbol-titulo");
+    tr.classList.add("configuracion-arbol-titulo", "configuracion-fila-titulo");
 
     const tdTitulo = document.createElement("td");
-    tdTitulo.className = "configuracion-arbol-nivel-1";
     tdTitulo.colSpan = COLUMNAS_ARBOL.length;
 
     const botonExpandir = document.createElement("button");
@@ -522,10 +521,11 @@ function crearFilaArbol(
       alternarExpandir(botonExpandir, tr, filasMontadas);
     });
 
-    tdTitulo.append(
-      botonExpandir,
-      document.createTextNode(nodo.entrada.nombre_ui),
-    );
+    const textoSpan = document.createElement("span");
+    textoSpan.className = "configuracion-fila-titulo-texto";
+    textoSpan.textContent = nodo.entrada.nombre_ui;
+
+    tdTitulo.append(botonExpandir, textoSpan);
 
     tr.append(tdTitulo);
 
@@ -533,7 +533,7 @@ function crearFilaArbol(
   }
 
   const tdNombre = document.createElement("td");
-  tdNombre.classList.add(`configuracion-arbol-nivel-${nivel}`);
+  tdNombre.className = `configuracion-celda configuracion-arbol-nivel-${nivel}`;
   tdNombre.style.paddingLeft = SANGRIA_POR_NIVEL[nivel] ?? "0";
   tdNombre.textContent = nodo.entrada.nombre_ui;
 
@@ -541,7 +541,7 @@ function crearFilaArbol(
   // (poblado por actualizarColumnas() más abajo, junto con
   // Valor Personalizado).
   const tdDefecto = document.createElement("td");
-  tdDefecto.className = "configuracion-arbol-defecto";
+  tdDefecto.className = "configuracion-celda configuracion-arbol-defecto";
 
   // Columna Editar/Valor Personalizado fusionada (Etapa H11): un
   // solo botón por fila, sin padding propio en la celda (el botón
@@ -675,9 +675,11 @@ export interface OpcionesPestanaApariencia {
   // (ver apariencia.tsv) — el resto del catálogo no se renderiza acá.
   grupos: string[];
 
-  // Solo la pestaña "Tema" muestra el selector Cargar/Guardar/
-  // Renombrar/Eliminar tema (botonSelectorTema, montado en la barra
-  // global por vent_configuracion_main.ts vía elementoBarra).
+  // Solo la pestaña "Tema" muestra la fila "Tema" (mismo criterio
+  // visual que la fila "Escala general" de Apariencia): botón con
+  // el nombre del tema actual (despliega Cargar) + botón "..."
+  // (despliega Guardar como/Guardar valores editados/Renombrar/
+  // Eliminar).
   incluirSelectorTema: boolean;
 
   // Solo la pestaña "Apariencia" (Texto+Dimensiones) muestra el
@@ -717,11 +719,21 @@ export function crearPestanaApariencia(
 
   const botonSelectorTema = document.createElement("button");
   botonSelectorTema.type = "button";
-  botonSelectorTema.className = "configuracion-selector-tema oculto";
-  botonSelectorTema.title = "Selector de temas";
+  botonSelectorTema.className = "ui-btn popup-opcion configuracion-tema-nombre";
+  botonSelectorTema.title = "Cambiar de tema";
 
   botonSelectorTema.addEventListener("click", (evento) => {
-    abrirPopupSelectorTema(evento);
+    abrirPopupCargarTema(evento);
+  });
+
+  const botonOpcionesTema = document.createElement("button");
+  botonOpcionesTema.type = "button";
+  botonOpcionesTema.className = "ui-btn popup-opcion configuracion-tema-opciones";
+  botonOpcionesTema.title = "Guardar / Renombrar / Eliminar tema";
+  botonOpcionesTema.textContent = "…";
+
+  botonOpcionesTema.addEventListener("click", (evento) => {
+    abrirPopupOpcionesTema(evento);
   });
 
   // E4: refleja en el botón el tema de sesión + si hay overrides
@@ -738,7 +750,7 @@ export function crearPestanaApariencia(
       : nombreTemaSesion;
   }
 
-  // F4: item de la lista de "Cargar ▾" — carga el tema en la sesión
+  // F4: item de la lista de "Cargar" — carga el tema en la sesión
   // (preview) y refresca la tabla sin reiniciar la sesión.
   function crearItemTema(
     tema: TemaListadoUI,
@@ -767,66 +779,42 @@ export function crearPestanaApariencia(
     return boton;
   }
 
-  // F5: caja interna de "Cargar ▾" — predefinidos, separador, temas
-  // de usuario.
-  async function crearCajaCargar(contenedor: HTMLElement): Promise<void> {
+  // F6 (dividido): popup del botón con el nombre del tema — lista
+  // de temas directa (predefinidos, separador, temas de usuario),
+  // sin el paso intermedio "Cargar ▾" que existía cuando compartía
+  // popup con Guardar/Renombrar/Eliminar.
+  async function abrirPopupCargarTema(evento: MouseEvent): Promise<void> {
+    const lista = document.createElement("div");
+    lista.className = "popup-lista";
+
     const temas = await invoke<TemaListadoUI[]>("configuracion_tema_listar");
 
     const predefinidos = temas.filter((tema) => tema.origen === "predefinido");
     const usuario = temas.filter((tema) => tema.origen === "usuario");
 
     for (const tema of predefinidos) {
-      contenedor.append(crearItemTema(tema, () => ocultarPopup()));
+      lista.append(crearItemTema(tema, () => ocultarPopup()));
     }
 
     const separador = document.createElement("div");
     separador.className = "app-popup-separador";
-    contenedor.append(separador);
+    lista.append(separador);
 
     for (const tema of usuario) {
-      contenedor.append(crearItemTema(tema, () => ocultarPopup()));
+      lista.append(crearItemTema(tema, () => ocultarPopup()));
     }
+
+    mostrarPopup(lista, evento.clientX, evento.clientY);
   }
 
-  // F6/G2: popup principal del selector de temas — "Cargar ▾"
-  // (expandible en el mismo popup). "Guardar como" y "Renombrar"
-  // (H4/H5) abren el popup reutilizado abrirFormularioNombre en vez
-  // de expandirse en este mismo popup.
-  function abrirPopupSelectorTema(evento: MouseEvent): void {
-    let cargarExpandido = false;
+  // G2: popup del botón "…" — Guardar como / Guardar valores
+  // editados / Renombrar / Eliminar (todo lo que no es elegir tema).
+  function abrirPopupOpcionesTema(evento: MouseEvent): void {
     let confirmandoEliminar = false;
 
     const dibujar = (): void => {
       const lista = document.createElement("div");
       lista.className = "popup-lista";
-
-      // ----------------------------------
-      // Cargar ▾
-      // ----------------------------------
-
-      const botonCargar = document.createElement("button");
-      botonCargar.className = "ui-btn";
-      botonCargar.textContent = cargarExpandido ? "Cargar ▴" : "Cargar ▾";
-
-      botonCargar.addEventListener("click", () => {
-        cargarExpandido = !cargarExpandido;
-        dibujar();
-      });
-
-      lista.append(botonCargar);
-
-      if (cargarExpandido) {
-        const caja = document.createElement("div");
-        caja.className = "popup-caja-interna";
-
-        lista.append(caja);
-
-        crearCajaCargar(caja);
-      }
-
-      const separador = document.createElement("div");
-      separador.className = "app-popup-separador";
-      lista.append(separador);
 
       // ----------------------------------
       // Guardar como
@@ -928,6 +916,25 @@ export function crearPestanaApariencia(
     };
 
     dibujar();
+  }
+
+  // Fila "Tema" (mismo criterio visual que crearFilaEscala) —
+  // etiqueta + botón nombre del tema + botón "…".
+  function crearFilaTema(): HTMLElement {
+    const fila = document.createElement("div");
+    fila.className = "configuracion-escala-fila";
+
+    const etiqueta = document.createElement("span");
+    etiqueta.className = "configuracion-escala-etiqueta";
+    etiqueta.textContent = "Tema";
+
+    const grupo = document.createElement("div");
+    grupo.className = "popup-grupo";
+    grupo.append(botonSelectorTema, botonOpcionesTema);
+
+    fila.append(etiqueta, grupo);
+
+    return fila;
   }
 
   // H2/H8: estado de edición pendiente, vive fuera de cargar() para
@@ -1260,6 +1267,10 @@ export function crearPestanaApariencia(
     panel.prepend(crearFilaEscala());
   }
 
+  if (opciones.incluirSelectorTema) {
+    panel.prepend(crearFilaTema());
+  }
+
   return {
     cargar,
     hayEdicionesPendientes,
@@ -1269,11 +1280,6 @@ export function crearPestanaApariencia(
     limpiarEstadoTrasGuardado,
     restablecerPestana,
     refrescarDesdeOtraPestana,
-
-    // Selector de temas: se monta en la barra de acciones global
-    // (ver vent_configuracion_main.ts), no dentro de este panel —
-    // solo lo expone la pestaña "Tema".
-    elementoBarra: opciones.incluirSelectorTema ? botonSelectorTema : undefined,
 
     textoConfirmacionRestablecer: opciones.textoConfirmacionRestablecer,
   };
